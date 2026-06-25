@@ -6,9 +6,10 @@ White-label multi-discipline volleyball scoring SaaS. Four disciplines supported
 
 | File | Contents |
 |------|----------|
+| [spec/00-INFRASTRUCTURE.md](spec/00-INFRASTRUCTURE.md) | Hosting, DB, auth, real-time — free tier vs production vs scale |
 | [spec/01-OVERVIEW.md](spec/01-OVERVIEW.md) | Vision, disciplines at a glance, deployment model |
 | [spec/02-ARCHITECTURE.md](spec/02-ARCHITECTURE.md) | Tech stack, event-sourcing pattern, folder structure |
-| [spec/03-DATABASE.md](spec/03-DATABASE.md) | Full Drizzle + Neon PostgreSQL schema |
+| [spec/03-DATABASE.md](spec/03-DATABASE.md) | Full Drizzle + Supabase PostgreSQL schema |
 | [spec/04-ENGINE-BEACH.md](spec/04-ENGINE-BEACH.md) | Beach volleyball engine (events, state, rules) |
 | [spec/05-ENGINE-INDOOR.md](spec/05-ENGINE-INDOOR.md) | Indoor volleyball engine (libero, rotation, VCS) |
 | [spec/06-ENGINE-GRASS.md](spec/06-ENGINE-GRASS.md) | Grass volleyball engine |
@@ -47,6 +48,6 @@ White-label multi-discipline volleyball scoring SaaS. Four disciplines supported
 - **Stats**: None (beyond score, rotation, sub counts, TTO, serve clock).
 - **Tournament**: Full (pools + knockout + standings).
 - **Branding**: White-label. Each discipline has a court-art identifier (sand, grass, hardwood, indoor-light). Each competition/tenant can set logo and colors.
-- **Deployment**: Multi-tenant SaaS on Vercel + Neon PostgreSQL.
+- **Deployment**: Multi-tenant SaaS on Vercel + Supabase (PostgreSQL + Auth + Realtime + Storage). See spec/00-INFRASTRUCTURE.md.
 - **i18n**: en, fr, de, es, pt.
 - **Migration**: No migration from old app. Fresh seed data on first deploy.

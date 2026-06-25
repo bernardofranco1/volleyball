@@ -10,19 +10,18 @@ Goal: bare app running on Vercel with auth, DB connection, and a single tenant.
 
 1. **Project bootstrap**
    - `npx create-next-app@latest volleyball --ts --app --tailwind`
-   - Install Drizzle ORM + Neon driver: `@neondatabase/serverless drizzle-orm`
-   - Install Clerk: `@clerk/nextjs`
-   - Install Pusher: `pusher pusher-js`
+   - Install Drizzle ORM + postgres.js driver: `drizzle-orm postgres`
+   - Install Supabase: `@supabase/supabase-js @supabase/ssr`
    - Install Vitest: `vitest @vitest/ui`
-   - Configure `tailwind.config.ts` with design tokens (see spec/08-UI.md)
+   - Configure Tailwind v4 with design tokens (see spec/08-UI.md)
 
 2. **Database schema**
    - Implement `src/db/schema.ts` from spec/03-DATABASE.md
-   - `drizzle-kit push` to Neon dev database
+   - `drizzle-kit push` to Supabase dev database (via pooler URL)
    - Seed first tenant: `{ slug: "fivb-demo", name: "FIVB Demo" }`
 
 3. **Auth**
-   - Clerk middleware: `src/middleware.ts`
+   - Supabase Auth middleware: `src/middleware.ts` (using `@supabase/ssr`)
    - Protect all `/t/[slug]/*` routes
    - `userTenantRoles` seeded for first admin user
 
@@ -69,9 +68,10 @@ Goal: full beach volleyball scoring, start to finish.
 
 9. **Serve clock** — `src/lib/serve-clock.ts` + `ServeClockWidget.tsx`
 
-10. **Pusher integration**
-    - `src/lib/pusher.ts` (client + server config)
-    - Auth endpoint `/api/pusher/auth`
+10. **Supabase Realtime integration**
+    - `src/lib/supabase.ts` (browser + server client variants)
+    - Serve clock broadcast after RALLY_WON
+    - Scorer subscribes to `match:{id}` + `match:{id}:scorer` channels
 
 **Deliverable:** beach volleyball match fully scoreable, real-time on multiple devices.
 
@@ -96,7 +96,7 @@ Goal: create competitions, manage teams, schedule matches.
 ## Phase 4 — Scoreboard display + PDF export (week 4)
 
 1. **Scoreboard display** — `src/app/t/[slug]/scoreboard/[matchId]/page.tsx`
-   - Public Pusher subscription
+   - Public Supabase Realtime subscription (`match:{id}`)
    - Three display modes (SCORE_ONLY, SCORE_WITH_SETS, SCORE_WITH_ROTATION)
    - TV-optimized responsive layout
    - Polling fallback (`?mode=poll`)
@@ -205,7 +205,7 @@ Goal: indoor volleyball with full officiating (rotation, libero, subs, VCS).
 
 1. Implement seed script: `src/scripts/seed.ts`
 2. 4 competitions (one per discipline), 2 matches each (1 finished + 1 live)
-3. Vercel project setup (Neon integration, Pusher env vars, Clerk keys)
+3. Vercel project setup (Supabase env vars: URL, anon key, service role key, DATABASE_URL)
 4. `vercel --prod` deployment
 5. QA sweep across all 4 disciplines
 

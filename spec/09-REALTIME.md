@@ -6,75 +6,99 @@ Three device types need live sync for any given match:
 
 | Device | Role | Access |
 |--------|------|--------|
-| Scorer tablet | Read + write all events | Clerk `SCORER` auth |
+| Scorer tablet | Read + write all events | Supabase Auth `SCORER` session |
 | Team A tablet | Submit lineup/requests, read own state | `TEAM_SCORER` session token |
 | Team B tablet | Submit lineup/requests, read own state | `TEAM_SCORER` session token |
-| Scoreboard display | Read-only, full match state | Public Pusher channel |
-| Additional viewers | Read-only | Public Pusher channel |
+| Scoreboard display | Read-only, full match state | Public Realtime channel |
+| Additional viewers | Read-only | Public Realtime channel |
 
-## Pusher channel architecture
+## Supabase Realtime channel architecture
+
+Supabase Realtime uses **Broadcast** for low-latency custom events. No separate service required — it is built into Supabase.
 
 ### Channel names
+
 ```
-private-match-{matchId}-scorer      ← SCORER only
-private-match-{matchId}-team-a      ← TEAM A tablet
-private-match-{matchId}-team-b      ← TEAM B tablet
-match-{matchId}                     ← public (scoreboard + viewers)
+match:{matchId}             ← public (scoreboard + viewers) — anon key access
+match:{matchId}:scorer      ← SCORER only (Supabase Auth JWT)
+match:{matchId}:team-a      ← Team A tablet (custom session JWT)
+match:{matchId}:team-b      ← Team B tablet (custom session JWT)
 ```
 
-### Auth endpoint
-`POST /api/pusher/auth` — verifies Clerk session or session token, returns Pusher auth signature.
+### Realtime token endpoint
+
+`POST /api/realtime/token` — validates Supabase session or session token, returns short-lived JWT claim for channel access.
 
 ```ts
-// Clerk-auth roles
-"private-match-{id}-scorer"  → requires SCORER or TENANT_ADMIN
-"private-match-{id}-team-a"  → requires valid TEAM_SCORER session token with team === "A"
-"private-match-{id}-team-b"  → requires valid TEAM_SCORER session token with team === "B"
-// Public channel: no auth
+// Channel access rules
+"match:{id}:scorer"   → requires authenticated SCORER or TENANT_ADMIN session
+"match:{id}:team-a"   → requires valid TEAM_SCORER session token with team === "A"
+"match:{id}:team-b"   → requires valid TEAM_SCORER session token with team === "B"
+// Public channel: anon key, no additional auth
 ```
 
-### Events published
+### Events broadcast
 
 **Scorer and public channels (on every event):**
 ```ts
-pusher.trigger(`match-${matchId}`, "state-update", {
-  state: matchState,       // full serialized state
-  lastEvent: event,        // the event that caused this update
-  autoEmitted: event[],    // side effects (side switch, TTO, etc.)
-})
+await supabaseAdmin.channel(`match:${matchId}`)
+  .send({
+    type: "broadcast",
+    event: "state-update",
+    payload: {
+      state: matchState,      // full serialized state
+      lastEvent: event,       // the event that caused this update
+      autoEmitted: event[],   // side effects (side switch, TTO, etc.)
+    }
+  });
 ```
 
 **After RALLY_WON, to all:**
 ```ts
-pusher.trigger(`match-${matchId}`, "serve-clock-start", {
-  deadline: Date.now() + serveClockSecs * 1000,
-  serveClockSecs,
-  serverTeam: newServer,
-})
+await supabaseAdmin.channel(`match:${matchId}`)
+  .send({
+    type: "broadcast",
+    event: "serve-clock-start",
+    payload: {
+      deadline: Date.now() + serveClockSecs * 1000,
+      serveClockSecs,
+      serverTeam: newServer,
+    }
+  });
 ```
 
 **When team tablet submits interrupt request:**
 ```ts
-pusher.trigger(`private-match-${matchId}-scorer`, "interrupt-request", {
-  requestId: string,
-  team: "A" | "B",
-  requestType: "TIMEOUT" | "SUBSTITUTION" | "CHALLENGE",
-  payload: any,
-})
+await supabaseAdmin.channel(`match:${matchId}:scorer`)
+  .send({
+    type: "broadcast",
+    event: "interrupt-request",
+    payload: {
+      requestId: string,
+      team: "A" | "B",
+      requestType: "TIMEOUT" | "SUBSTITUTION" | "CHALLENGE",
+      payload: any,
+    }
+  });
 ```
 
 **When scorer approves/denies:**
 ```ts
-pusher.trigger(`private-match-${matchId}-team-a`, "request-resolved", {
-  requestId: string,
-  status: "APPROVED" | "DENIED",
-  reason?: string,
-})
+await supabaseAdmin.channel(`match:${matchId}:team-a`)
+  .send({
+    type: "broadcast",
+    event: "request-resolved",
+    payload: {
+      requestId: string,
+      status: "APPROVED" | "DENIED",
+      reason?: string,
+    }
+  });
 ```
 
 ## Serve clock
 
-The serve clock is **display-only** — not stored as events. The clock starts when the scorer's screen receives a `serve-clock-start` push.
+The serve clock is **display-only** — not stored as events. The clock starts when clients receive a `serve-clock-start` broadcast.
 
 ### Implementation
 
@@ -86,16 +110,18 @@ export function useServeClock(matchId: string, config: TournamentConfig) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
   useEffect(() => {
-    const channel = pusher.subscribe(`match-${matchId}`);
-    channel.bind("serve-clock-start", ({ deadline }: { deadline: number }) => {
-      setDeadline(deadline);
-    });
-    channel.bind("state-update", () => {
-      // Reset clock when any state update arrives (rally started / point scored)
-      setDeadline(null);
-      setSecondsLeft(null);
-    });
-    return () => pusher.unsubscribe(`match-${matchId}`);
+    const channel = supabase.channel(`match:${matchId}`)
+      .on("broadcast", { event: "serve-clock-start" }, ({ payload }) => {
+        setDeadline(payload.deadline);
+      })
+      .on("broadcast", { event: "state-update" }, () => {
+        // Reset clock when any state update arrives (rally started / point scored)
+        setDeadline(null);
+        setSecondsLeft(null);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [matchId]);
 
   useEffect(() => {
@@ -120,7 +146,7 @@ export function useServeClock(matchId: string, config: TournamentConfig) {
 
 ## Team tablet session tokens
 
-Generated by scorer when setting up the match. Tokens are short-lived JWTs:
+Generated by scorer when setting up the match. Tokens are short-lived JWTs signed with `SUPABASE_JWT_SECRET`:
 
 ```ts
 // Payload
@@ -139,13 +165,14 @@ Scorer generates tokens from the match setup page. Each token is stored in `matc
 1. Scorer generates QR code containing the token URL
 2. Team captain scans QR on their tablet's browser
 3. Tablet opens `/t/[slug]/matches/[id]/team/A?token=xxx`
-4. Server validates token, returns Pusher auth for `private-match-{id}-team-a`
-5. Token is stored in browser `localStorage` for session persistence
+4. Server validates token, returns confirmation of channel access
+5. Tablet subscribes to `match:{id}:team-a` using the validated token
+6. Token is stored in browser `localStorage` for session persistence
 
 ## Offline queue (client)
 
 ```ts
-// src/lib/match-context.tsx (same pattern as existing app)
+// src/lib/match-context.tsx
 
 const offlineQueue = useRef<QueuedEvent[]>([]);
 
@@ -182,15 +209,30 @@ useEffect(() => {
 
 ## Multi-tab / multi-window protection
 
-Only one tab should be the "active scorer" at a time. If a scorer opens two tabs:
-- Both tabs subscribe to `private-match-{id}-scorer`
-- A Pusher `member-added` event detects duplicate connections
-- A "Another scorer tab is active — this tab is read-only" banner appears on the secondary tab
+Only one tab should be the "active scorer" at a time. Supabase Presence tracks connected clients per channel:
+
+```ts
+const channel = supabase.channel(`match:${matchId}:scorer`, {
+  config: { presence: { key: userId } }
+})
+.on("presence", { event: "sync" }, () => {
+  const state = channel.presenceState();
+  const connectedScorers = Object.keys(state).length;
+  if (connectedScorers > 1) {
+    setReadOnly(true);  // "Another scorer tab is active — this tab is read-only"
+  }
+})
+.subscribe(async (status) => {
+  if (status === "SUBSCRIBED") {
+    await channel.track({ online_at: new Date().toISOString() });
+  }
+});
+```
 
 ## State resync on reconnect
 
 When the scorer reconnects after a network interruption:
-1. Pusher triggers automatic reconnect
+1. Supabase Realtime handles automatic reconnect
 2. Client calls `GET /api/matches/[id]/state` for the authoritative server state
 3. Local state is replaced with server state
 4. Any events in the offline queue are flushed
@@ -217,8 +259,9 @@ Team Tablet                    Server                       Scorer
      │   interrupt-requests       │                            │
      │ { type: TIMEOUT, team: A } │                            │
      │ ─────────────────────────► │                            │
-     │                            │ pusher.trigger(scorer,     │
-     │                            │   "interrupt-request")     │
+     │                            │ Realtime broadcast to      │
+     │                            │ match:{id}:scorer          │
+     │                            │ "interrupt-request"        │
      │                            │ ──────────────────────────►│
      │                            │                            │ Shows notification
      │                            │                            │ [Approve] [Deny]
@@ -230,8 +273,10 @@ Team Tablet                    Server                       Scorer
      │                            │ emits TIMEOUT_REQUEST      │
      │                            │ event to match             │
      │                            │                            │
-     │◄── pusher "request-        │                            │
-     │    resolved" (APPROVED)    │                            │
+     │◄── Realtime broadcast to   │                            │
+     │    match:{id}:team-a       │                            │
+     │    "request-resolved"      │                            │
+     │    (APPROVED)              │                            │
      │                            │                            │
 ```
 
@@ -239,6 +284,14 @@ If `allowTeamTabletDirectEntry = true` in config, the server auto-approves witho
 
 ## Scoreboard display: auto-refresh
 
-The scoreboard page subscribes to the public `match-{matchId}` channel. No auth required. On each `state-update` event, React re-renders with the new state.
+The scoreboard page subscribes to the public `match:{matchId}` channel using the anon key. No auth required. On each `state-update` broadcast, React re-renders with the new state.
+
+```ts
+const channel = supabase.channel(`match:${matchId}`)
+  .on("broadcast", { event: "state-update" }, ({ payload }) => {
+    setMatchState(payload.state);
+  })
+  .subscribe();
+```
 
 For TVs/projectors with unreliable WebSocket support, there's a fallback: `?mode=poll` query param switches to 5-second HTTP polling of the `/state` endpoint.

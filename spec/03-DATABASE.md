@@ -1,6 +1,6 @@
 # 03 — Database Schema
 
-## Database: Neon PostgreSQL via Drizzle ORM
+## Database: Supabase PostgreSQL via Drizzle ORM
 
 All tables include `tenantId` for row-level multi-tenant isolation.
 
@@ -32,7 +32,7 @@ export const tenantBranding = pgTable("tenant_branding", {
 
 ```ts
 export const users = pgTable("users", {
-  id:        text("id").primaryKey(),  // Clerk userId
+  id:        text("id").primaryKey(),  // Supabase Auth user id (uuid)
   email:     text("email").notNull(),
   name:      text("name"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -368,4 +368,4 @@ export const csvImports = pgTable("csv_imports", {
 - JSON columns: `jsonb` (indexed, fast)
 - Every table has `tenantId` — RLS enforced at API layer (not Postgres RLS, for simplicity)
 - Foreign keys: all declared, enforced in production
-- Migrations: Drizzle Kit (`drizzle-kit push` for development, `drizzle-kit generate` + Neon migration API for production)
+- Migrations: Drizzle Kit (`drizzle-kit push` for development, `drizzle-kit generate` + apply against Supabase PostgreSQL for production)
