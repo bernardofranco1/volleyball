@@ -1,8 +1,15 @@
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase";
 
-// Upcoming surfaces — wired up in later phases (see spec/12-BUILD-ORDER.md).
+// Surfaces. `href` (when set) links to a shipped section; the rest are upcoming
+// phases (see spec/12-BUILD-ORDER.md).
 const SECTIONS = [
-  { title: "Competitions", note: "Create & manage competitions", phase: "Phase 3" },
+  {
+    title: "Competitions",
+    note: "Create & manage competitions",
+    phase: "Phase 3",
+    href: "competitions",
+  },
   { title: "Matches", note: "Schedule and score matches", phase: "Phase 2+" },
   { title: "Scoreboard", note: "Public TV display", phase: "Phase 4" },
   { title: "Settings", note: "Branding & configuration", phase: "Phase 9" },
@@ -30,20 +37,36 @@ export default async function DashboardPage({
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {SECTIONS.map((s) => (
-          <div
-            key={s.title}
-            className="rounded-xl border border-border bg-surface-raised p-5"
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="font-medium">{s.title}</h2>
-              <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-score-dim">
-                {s.phase}
-              </span>
+        {SECTIONS.map((s) => {
+          const href = "href" in s ? s.href : undefined;
+          const className =
+            "rounded-xl border border-border bg-surface-raised p-5" +
+            (href ? " block transition-colors hover:border-primary" : "");
+          const inner = (
+            <>
+              <div className="flex items-center justify-between">
+                <h2 className="font-medium">{s.title}</h2>
+                <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-score-dim">
+                  {s.phase}
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-score-dim">{s.note}</p>
+            </>
+          );
+          return href ? (
+            <Link
+              key={s.title}
+              href={`/t/${tenantSlug}/${href}`}
+              className={className}
+            >
+              {inner}
+            </Link>
+          ) : (
+            <div key={s.title} className={className}>
+              {inner}
             </div>
-            <p className="mt-2 text-sm text-score-dim">{s.note}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </main>
   );

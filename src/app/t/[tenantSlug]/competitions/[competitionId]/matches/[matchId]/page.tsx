@@ -1,0 +1,270 @@
+import Link from "next/link";
+import { headers } from "next/headers";
+import { notFound } from "next/navigation";
+import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
+import { db } from "@/db";
+import { events, matchSessions } from "@/db/schema";
+import { ADMIN_ROLES, requireRole } from "@/lib/authz";
+import { getCompetition, getMatch } from "@/lib/competitions";
+import {
+  createMatchSession,
+  revokeMatchSession,
+} from "@/lib/match-session-actions";
+import { qrSvg } from "@/lib/qr";
+import { SubmitButton } from "@/components/admin/SubmitButton";
+import { statusBadgeClass, ui } from "@/components/admin/styles";
+
+export const dynamic = "force-dynamic";
+
+/** Best-effort absolute origin from request headers (for scannable QR URLs). */
+async function originFromHeaders(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto =
+    h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+export default async function MatchDetailPage({
+  params,
+}: {
+  params: Promise<{
+    tenantSlug: string;
+    competitionId: string;
+    matchId: string;
+  }>;
+}) {
+  const { tenantSlug, competitionId, matchId } = await params;
+  const ctx = await requireRole(
+    tenantSlug,
+    ADMIN_ROLES,
+    `/t/${tenantSlug}/competitions/${competitionId}/matches/${matchId}`,
+  );
+
+  const competition = await getCompetition(ctx.tenant.id, competitionId);
+  if (!competition) notFound();
+  const match = await getMatch(ctx.tenant.id, matchId);
+  if (!match || match.competitionId !== competitionId) notFound();
+
+  const base = `/t/${tenantSlug}/competitions/${competitionId}`;
+
+  const [log, sessions, origin] = await Promise.all([
+    db
+      .select({
+        sequence: events.sequence,
+        eventType: events.eventType,
+        setNumber: events.setNumber,
+        scoreAfterA: events.scoreAfterA,
+        scoreAfterB: events.scoreAfterB,
+        actor: events.actor,
+        timestamp: events.timestamp,
+      })
+      .from(events)
+      .where(eq(events.matchId, matchId))
+      .orderBy(asc(events.sequence)),
+    db
+      .select()
+      .from(matchSessions)
+      .where(
+        and(
+          eq(matchSessions.matchId, matchId),
+          isNull(matchSessions.revokedAt),
+          gt(matchSessions.expiresAt, sql`now()`),
+        ),
+      ),
+    originFromHeaders(),
+  ]);
+
+  // Render a QR per active, non-expired session token (expiry filtered in SQL).
+  const tokens = await Promise.all(
+    sessions.map(async (s) => {
+      const url = `${origin}/t/${tenantSlug}/matches/${matchId}/team/${s.team}?token=${s.id}`;
+      return { session: s, url, svg: await qrSvg(url) };
+    }),
+  );
+
+  return (
+    <main className="mx-auto w-full max-w-5xl px-6 py-10">
+      <Link
+        href={`${base}/schedule`}
+        className="text-sm text-score-dim hover:text-foreground"
+      >
+        ← Schedule
+      </Link>
+
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {match.teamAName} vs {match.teamBName}
+          </h1>
+          <span className={statusBadgeClass(match.status)}>{match.status}</span>
+        </div>
+        <div className="flex gap-2">
+          <Link href={`${base}/matches/${matchId}/live`} className={ui.btnPrimary}>
+            Open Scorer
+          </Link>
+        </div>
+      </div>
+
+      <p className="mt-1 text-sm text-score-dim">
+        {competition.name} · {match.discipline}
+        {match.roundName ? ` · ${match.roundName}` : ""}
+        {match.courtNumber ? ` · Court ${match.courtNumber}` : ""}
+        {match.scheduledAt
+          ? ` · ${new Date(match.scheduledAt).toUTCString()}`
+          : ""}
+      </p>
+
+      {/* Result */}
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className={ui.card}>
+          <h2 className="mb-3 font-medium">Result</h2>
+          <div className="flex items-center justify-around text-center">
+            <div>
+              <div className="text-sm text-score-dim">{match.teamAName}</div>
+              <div className="text-4xl font-bold tabular-nums">
+                {match.setsWonA}
+              </div>
+            </div>
+            <div className="text-score-dim">sets</div>
+            <div>
+              <div className="text-sm text-score-dim">{match.teamBName}</div>
+              <div className="text-4xl font-bold tabular-nums">
+                {match.setsWonB}
+              </div>
+            </div>
+          </div>
+          {match.winner && (
+            <p className="mt-3 text-center text-sm text-score-dim">
+              Winner:{" "}
+              <span className="text-foreground">
+                {match.winner === "A" ? match.teamAName : match.teamBName}
+              </span>
+            </p>
+          )}
+        </div>
+
+        {/* Team tablet QR tokens */}
+        <div className={ui.card}>
+          <h2 className="mb-1 font-medium">Team tablet access</h2>
+          <p className="mb-4 text-xs text-score-dim">
+            Generate a QR for each team’s tablet. Tokens expire in 12 hours.
+          </p>
+
+          <div className="flex gap-2">
+            {(["A", "B"] as const).map((team) => (
+              <form key={team} action={createMatchSession}>
+                <input type="hidden" name="tenantSlug" value={tenantSlug} />
+                <input
+                  type="hidden"
+                  name="competitionId"
+                  value={competitionId}
+                />
+                <input type="hidden" name="matchId" value={matchId} />
+                <input type="hidden" name="team" value={team} />
+                <SubmitButton variant="secondary" pendingLabel="…">
+                  Generate QR for {team === "A" ? match.teamAName : match.teamBName}
+                </SubmitButton>
+              </form>
+            ))}
+          </div>
+
+          {tokens.length > 0 && (
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              {tokens.map(({ session, svg, url }) => (
+                <div
+                  key={session.id}
+                  className="rounded-lg border border-border p-3"
+                >
+                  <div className="mb-2 text-xs font-medium uppercase tracking-wide text-score-dim">
+                    Team {session.team}
+                  </div>
+                  <div
+                    className="mx-auto w-32 overflow-hidden rounded bg-white p-2 [&_svg]:h-full [&_svg]:w-full"
+                    // qrcode emits a trusted, self-generated SVG string.
+                    dangerouslySetInnerHTML={{ __html: svg }}
+                  />
+                  <a
+                    href={url}
+                    className="mt-2 block break-all text-[10px] text-score-dim hover:text-foreground"
+                  >
+                    {url}
+                  </a>
+                  <form action={revokeMatchSession} className="mt-2">
+                    <input
+                      type="hidden"
+                      name="tenantSlug"
+                      value={tenantSlug}
+                    />
+                    <input
+                      type="hidden"
+                      name="competitionId"
+                      value={competitionId}
+                    />
+                    <input type="hidden" name="matchId" value={matchId} />
+                    <input
+                      type="hidden"
+                      name="sessionId"
+                      value={session.id}
+                    />
+                    <button
+                      type="submit"
+                      className="text-xs text-score-dim hover:text-red-400"
+                    >
+                      Revoke
+                    </button>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Event log */}
+      <div className="mt-6">
+        <h2 className="mb-3 font-medium">Event log</h2>
+        {log.length === 0 ? (
+          <div className={`${ui.card} text-sm text-score-dim`}>
+            No events yet — open the scorer to start the match.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full border-collapse">
+              <thead className="bg-surface-raised">
+                <tr>
+                  <th className={ui.th}>#</th>
+                  <th className={ui.th}>Event</th>
+                  <th className={ui.th}>Set</th>
+                  <th className={ui.th}>Score</th>
+                  <th className={ui.th}>Actor</th>
+                  <th className={ui.th}>Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {log.map((e) => (
+                  <tr key={e.sequence} className="border-t border-border">
+                    <td className={`${ui.td} text-score-dim`}>{e.sequence}</td>
+                    <td className={`${ui.td} font-mono text-xs`}>
+                      {e.eventType}
+                    </td>
+                    <td className={ui.td}>{e.setNumber ?? "–"}</td>
+                    <td className={`${ui.td} tabular-nums`}>
+                      {e.scoreAfterA != null && e.scoreAfterB != null
+                        ? `${e.scoreAfterA}–${e.scoreAfterB}`
+                        : "–"}
+                    </td>
+                    <td className={`${ui.td} text-score-dim`}>{e.actor}</td>
+                    <td className={`${ui.td} text-score-dim`}>
+                      {new Date(e.timestamp).toUTCString().slice(17, 25)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
