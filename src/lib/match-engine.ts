@@ -306,7 +306,7 @@ export async function appendMatchEvent(
     );
   }
 
-  await broadcastState(matchId, { state: finalState });
+  await broadcastState(matchId, finalState.lastSequence);
   if (
     meta.config.serveClockEnabled &&
     (payload.type === "RALLY_WON_A" || payload.type === "RALLY_WON_B") &&
@@ -375,7 +375,7 @@ async function undoLastEvent(
     );
   }
 
-  await broadcastState(matchId, { state: finalState });
+  await broadcastState(matchId, finalState.lastSequence);
   return { newEvents: [undoEvent], state: finalState };
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import {
   type BeachMatchState,
@@ -50,49 +50,51 @@ export function ScoreboardDisplay({
     stateRef.current = state;
   }, [state]);
 
+  // Authoritative state from /state (the realtime channel only signals changes —
+  // spec/14 §B1 — so a forged broadcast can't push fake state to a TV).
+  const fetchState = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/matches/${matchId}/state`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { state: BeachMatchState };
+      if (data.state.lastSequence >= stateRef.current.lastSequence)
+        setState(data.state);
+    } catch {
+      /* keep last good state */
+    }
+  }, [matchId]);
+
   // Live updates: HTTP polling fallback for unreliable WebSocket environments
-  // (TVs/projectors), otherwise the public Supabase Realtime broadcast channel.
+  // (TVs/projectors), otherwise the public Supabase Realtime signal channel.
   useEffect(() => {
     if (poll) {
-      let cancelled = false;
-      const fetchState = async () => {
-        try {
-          const res = await fetch(`/api/matches/${matchId}/state`, {
-            cache: "no-store",
-          });
-          if (!res.ok || cancelled) return;
-          const data = (await res.json()) as { state: BeachMatchState };
-          if (data.state.lastSequence >= stateRef.current.lastSequence)
-            setState(data.state);
-        } catch {
-          /* keep last good state */
-        }
-      };
+      // Defer the first poll (not a synchronous setState in the effect body).
+      const first = setTimeout(fetchState, 0);
       const id = setInterval(fetchState, 5000);
-      void fetchState();
       return () => {
-        cancelled = true;
+        clearTimeout(first);
         clearInterval(id);
       };
     }
-
     const supabase = createSupabaseBrowserClient();
     const channel = supabase
       .channel(`match:${matchId}`)
       .on(
         "broadcast",
         { event: "state-update" },
-        (msg: { payload?: { state?: BeachMatchState } }) => {
-          const incoming = msg.payload?.state;
-          if (incoming && incoming.lastSequence >= stateRef.current.lastSequence)
-            setState(incoming);
+        (msg: { payload?: { lastSequence?: number } }) => {
+          const seq = msg.payload?.lastSequence;
+          if (typeof seq === "number" && seq > stateRef.current.lastSequence)
+            void fetchState();
         },
       )
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [matchId, poll]);
+  }, [matchId, poll, fetchState]);
 
   const set = activeSet(state);
   const finished = state.status === "FINISHED";

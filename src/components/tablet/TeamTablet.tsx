@@ -47,7 +47,21 @@ export function TeamTablet({
     stateRef.current = state;
   }, [state]);
 
-  // Read-only live state from the public match channel.
+  // Authoritative read-only state from /state (realtime only signals — §B1).
+  const fetchState = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/matches/${matchId}/state`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { state: IndoorMatchState };
+      if (data.state.lastSequence >= stateRef.current.lastSequence)
+        setState(data.state);
+    } catch {
+      /* keep last good state */
+    }
+  }, [matchId]);
+
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
     const channel = supabase
@@ -55,17 +69,17 @@ export function TeamTablet({
       .on(
         "broadcast",
         { event: "state-update" },
-        (m: { payload?: { state?: IndoorMatchState } }) => {
-          const incoming = m.payload?.state;
-          if (incoming && incoming.lastSequence >= stateRef.current.lastSequence)
-            setState(incoming);
+        (m: { payload?: { lastSequence?: number } }) => {
+          const seq = m.payload?.lastSequence;
+          if (typeof seq === "number" && seq > stateRef.current.lastSequence)
+            void fetchState();
         },
       )
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [matchId]);
+  }, [matchId, fetchState]);
 
   // Poll our own interrupt requests for the scorer's resolution.
   const pollRequests = useCallback(async () => {

@@ -173,13 +173,12 @@ export function MatchProvider({
       .on(
         "broadcast",
         { event: "state-update" },
-        (msg: { payload?: { state?: BeachMatchState } }) => {
-          const incoming = msg.payload?.state;
-          if (!incoming) return;
-          // Only accept updates at or beyond our confirmed sequence.
-          if (incoming.lastSequence >= stateRef.current.lastSequence) {
-            setState(incoming);
-          }
+        (msg: { payload?: { lastSequence?: number } }) => {
+          // Untrusted transport (spec/14 §B1): a signal, not the state. Refetch
+          // authoritative state when it reports a newer sequence than ours.
+          const seq = msg.payload?.lastSequence;
+          if (typeof seq === "number" && seq > stateRef.current.lastSequence)
+            void resync();
         },
       )
       .on(
@@ -194,7 +193,7 @@ export function MatchProvider({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [matchId]);
+  }, [matchId, resync]);
 
   const value = useMemo<MatchContextValue>(
     () => ({

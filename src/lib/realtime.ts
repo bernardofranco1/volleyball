@@ -31,13 +31,19 @@ async function broadcast(messages: BroadcastMessage[]): Promise<void> {
   }
 }
 
-/** Push the new match state to the public match channel (scoreboard, spectators). */
+/**
+ * Signal the public match channel that state advanced (spec/14 §B1). We send only
+ * the new `lastSequence` — NOT the state — because the realtime transport is
+ * untrusted (a client could forge a payload). Subscribers refetch authoritative
+ * state from `GET /api/matches/[id]/state`, so a forged signal causes at most a
+ * harmless refetch.
+ */
 export async function broadcastState(
   matchId: string,
-  payload: unknown,
+  lastSequence: number,
 ): Promise<void> {
   await broadcast([
-    { topic: `match:${matchId}`, event: "state-update", payload },
+    { topic: `match:${matchId}`, event: "state-update", payload: { lastSequence } },
   ]);
 }
 
