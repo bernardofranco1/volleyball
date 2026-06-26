@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — white-label neutral base with a dark default surface.
+ * (See spec/08-UI.md.) Brandable tokens (--primary, --primary-fg) are
+ * overridden at runtime by the tenant layout via an inline style, which
+ * cascades into every `*-primary` utility because the @theme mappings below
+ * resolve to `var(--token)` rather than a build-time literal.
+ */
+:root {
+  /* Brand (overridden per tenant) */
+  --primary: #0066cc;
+  --primary-fg: #ffffff;
+
+  /* Shell surfaces (dark default) */
+  --surface: #0d0d0d;
+  --surface-raised: #1a1a1a;
+  --border: rgba(255, 255, 255, 0.1);
+
+  /* Score display */
+  --score-active: #ffffff;
+  --score-dim: rgba(255, 255, 255, 0.4);
+
+  /* Page background / foreground */
+  --background: var(--surface);
+  --foreground: #ededed;
+
+  /* Court art (per-discipline SVG variables, consumed in later phases) */
+  --court-sand-light: #d4b483;
+  --court-sand-dark: #b8964d;
+  --court-grass-light: #4a7a3a;
+  --court-grass-dark: #2d5a20;
+  --court-hardwood-light: #c8844a;
+  --court-hardwood-dark: #a0622a;
+  --court-light-base: #e8e0d4;
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-score-active: var(--score-active);
+  --color-score-dim: var(--score-dim);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
