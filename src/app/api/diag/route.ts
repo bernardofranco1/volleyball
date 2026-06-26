@@ -1,7 +1,7 @@
-// TEMPORARY deploy diagnostic (Phase 11 / deploy debug). Gated by ?k=. Reports
-// what the running function actually sees for the critical env vars (presence +
-// length + non-secret fingerprints) and the REAL database error. Remove after
-// the deploy is confirmed healthy.
+// TEMPORARY deploy diagnostic (deploy debug). Gated by ?k=. Reports the REAL DB
+// error cause, an explicit-SSL connection test, and an HTTPS-egress/key test to
+// Supabase. Remove after the deploy is confirmed healthy.
+import postgres from "postgres";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 
@@ -17,35 +17,73 @@ export async function GET(req: Request) {
   }
 
   const v = (name: string) => process.env[name] ?? "";
-  const info = (name: string) => {
-    const s = v(name);
-    return { set: s.length > 0, len: s.length };
-  };
 
-  let dbOk = false;
-  let dbError: string | null = null;
+  // 1) Default app DB client (postgres-js, prepare:false, no explicit ssl).
+  const dbDefault: Record<string, unknown> = { ok: false };
   try {
     await db.execute(sql`select 1`);
-    dbOk = true;
+    dbDefault.ok = true;
   } catch (e: unknown) {
-    const err = e as { code?: string; message?: string };
-    dbError = `${err?.code ?? ""} ${err?.message ?? String(e)}`.trim().slice(0, 400);
+    const err = e as {
+      message?: string;
+      code?: string;
+      cause?: { message?: string; code?: string; errno?: number };
+    };
+    dbDefault.error = String(err?.message ?? e).slice(0, 150);
+    dbDefault.cause = err?.cause
+      ? String(err.cause.message ?? err.cause).slice(0, 250)
+      : null;
+    dbDefault.code = err?.cause?.code ?? err?.code ?? null;
+    dbDefault.errno = err?.cause?.errno ?? null;
   }
 
-  const dbu = v("DATABASE_URL");
+  // 2) Fresh connection WITH explicit SSL (does ssl:'require' fix it?).
+  const dbSsl: Record<string, unknown> = { ok: false };
+  try {
+    const c = postgres(v("DATABASE_URL"), {
+      prepare: false,
+      ssl: "require",
+      max: 1,
+      connect_timeout: 8,
+      idle_timeout: 2,
+    });
+    const r = await c`select 1 as ok`;
+    dbSsl.ok = r?.[0]?.ok === 1;
+    await c.end({ timeout: 2 });
+  } catch (e: unknown) {
+    const err = e as {
+      message?: string;
+      code?: string;
+      cause?: { message?: string; code?: string };
+    };
+    dbSsl.error = String(err?.cause?.message ?? err?.message ?? e).slice(0, 250);
+    dbSsl.code = err?.cause?.code ?? err?.code ?? null;
+  }
+
+  // 3) HTTPS egress + anon-key test against Supabase Auth.
+  const rest: Record<string, unknown> = {};
+  try {
+    const r = await fetch(`${v("NEXT_PUBLIC_SUPABASE_URL")}/auth/v1/health`, {
+      headers: { apikey: v("NEXT_PUBLIC_SUPABASE_ANON_KEY") },
+    });
+    rest.status = r.status;
+    rest.body = (await r.text()).slice(0, 150);
+  } catch (e: unknown) {
+    rest.error = String((e as { message?: string })?.message ?? e).slice(0, 150);
+  }
+
   return Response.json(
     {
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? null,
-      anonKey: { ...info("NEXT_PUBLIC_SUPABASE_ANON_KEY"), tail: v("NEXT_PUBLIC_SUPABASE_ANON_KEY").slice(-6) },
-      serviceKey: { ...info("SUPABASE_SERVICE_ROLE_KEY"), prefix: v("SUPABASE_SERVICE_ROLE_KEY").slice(0, 10) },
       databaseUrl: {
-        ...info("DATABASE_URL"),
-        endpoint: dbu.replace(/^postgres[a-z]*:\/\/[^@]*@/, "").slice(0, 80),
-        hasPct25: dbu.includes("%25"),
-        port6543: dbu.includes(":6543"),
+        len: v("DATABASE_URL").length,
+        hasPct25: v("DATABASE_URL").includes("%25"),
+        endpoint: v("DATABASE_URL")
+          .replace(/^postgres[a-z]*:\/\/[^@]*@/, "")
+          .slice(0, 80),
       },
-      appUrl: process.env.NEXT_PUBLIC_APP_URL ?? null,
-      db: { ok: dbOk, error: dbError },
+      dbDefault,
+      dbSsl,
+      supabaseAuthFetch: rest,
       vercelRegion: process.env.VERCEL_REGION ?? null,
     },
     { headers: { "Cache-Control": "no-store" } },
