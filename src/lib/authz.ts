@@ -35,7 +35,7 @@ export const getCurrentUser = cache(async () => {
 });
 
 /** TENANT_ADMIN is a superuser within its tenant and satisfies any requirement. */
-function hasRole(roles: Role[], allowed: Role[]): boolean {
+export function hasRole(roles: Role[], allowed: Role[]): boolean {
   if (roles.includes("TENANT_ADMIN")) return true;
   return roles.some((r) => allowed.includes(r));
 }

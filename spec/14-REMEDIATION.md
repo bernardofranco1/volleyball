@@ -9,6 +9,46 @@ approach** (design decision), **test**, **done-when**.
 > **never `push`** (spec/12). Match the existing helper/idiom style. After every
 > workstream: `tsc` + `eslint` + `vitest` + `next build` must stay green.
 
+## Implementation status (done in this pass)
+
+**Landed & verified** (tsc/eslint/105 tests/build green; live-DB smokes for
+snapshots, authz decision, indoor/grass/light/beach scoring, demo seed):
+- **A1–A4**: `authorizeMatch`/`requireMatchRole` on events/lineup/interrupt/pdf +
+  the live page; client-event whitelist; `safeRedirect`; `sameOriginOk`.
+- **B1**: broadcasts carry only `{lastSequence}`; clients refetch `/state`.
+- **C1/C2/C3**: `state_snapshot`/`snapshot_sequence` + transactional append + tail
+  replay; in-memory `stateCache` removed; `structuredClone`; dead SSE GET deleted;
+  in-memory rate-limit stopgap.
+- **D**: `getCurrentUser`/`getTenantBySlug` memoised via React `cache()`; one
+  `getUser` per request.
+- **E1–E4**: bracket advisory lock + partial unique index; UTC schedule parsing;
+  indoor libero front-row/serve guard; pool-belongs-to-competition check.
+- **F1**: indoor/grass/light providers collapsed into `createMatchProvider`.
+- **F4/F5/F6/F7**: dropped `lineup_submissions`; CSV size cap + batch insert; QR
+  origin from `NEXT_PUBLIC_APP_URL`; scoreboard rotation-server guard.
+- **G**: vitest suites for bracket/csv/http(safeRedirect)/authz(hasRole) +
+  regression suite (mid-set TTO, snapshot==replay, libero rotation).
+
+DB changes were applied to the dev DB via idempotent DDL (`ADD COLUMN IF NOT
+EXISTS`, partial unique index, `DROP TABLE`); **for production, generate a
+migration** instead.
+
+**Deliberately deferred (with rationale):**
+- **B2** (Realtime RLS): SQL written in `spec/migrations/realtime-authorization.sql`
+  but NOT applied — it needs Supabase-side config paired with client `private:true`,
+  and B1 already neutralizes the forgery/snoop threat. Apply as defence-in-depth.
+- **Rate limit**: shipped an in-memory per-instance limiter (`src/lib/ratelimit.ts`);
+  swap to Upstash for a cross-instance guarantee (one-file change, needs Redis).
+- **F2** (remove `as unknown as` via a generic `Engine<S,P>`): deferred — Low
+  severity, fiddly generics over unions, casts isolated to the registry boundary.
+- **F1 (beach)**: beach keeps its own provider (different context shape — names via
+  props, no roster); folding it in is a follow-up.
+- **F8** (serve-clock SSR): no change — verified a non-issue (the widget renders
+  `null` until a client sets a deadline, so there is no hydration mismatch).
+- **F3** (unify LINEUP_CONFIRMED shape): deferred — changing a working, tested
+  engine event shape for consistency isn't worth the regression risk while
+  grass/light have `teamTabletEnabled=false`.
+
 ## Migrations introduced (run in this order)
 
 1. `matches`: add `state_snapshot jsonb`, `snapshot_sequence integer not null default 0` (M1).

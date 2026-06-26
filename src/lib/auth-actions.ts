@@ -4,16 +4,10 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase";
 import { getUserPrimaryTenantSlug } from "@/lib/tenant";
 
+import { safeRedirect } from "@/lib/http";
+
 export interface LoginState {
   error: string | null;
-}
-
-/**
- * Only honor same-origin relative destinations (spec/14 §A3). Blocks open
- * redirects via `?redirectTo=https://evil.com` and protocol-relative `//evil`.
- */
-function safeRedirect(dest: string): string {
-  return /^\/(?![/\\])/.test(dest) ? dest : "";
 }
 
 /** Server Action: email/password sign-in via Supabase Auth. */
