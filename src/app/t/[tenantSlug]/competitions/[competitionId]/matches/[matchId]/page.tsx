@@ -99,10 +99,26 @@ export default async function MatchDetailPage({
           </h1>
           <span className={statusBadgeClass(match.status)}>{match.status}</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href={`${base}/matches/${matchId}/live`} className={ui.btnPrimary}>
             Open Scorer
           </Link>
+          <a
+            href={`/t/${tenantSlug}/scoreboard/${matchId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={ui.btnSecondary}
+          >
+            View Scoreboard
+          </a>
+          <a
+            href={`/api/matches/${matchId}/export.pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={ui.btnSecondary}
+          >
+            Export PDF
+          </a>
         </div>
       </div>
 

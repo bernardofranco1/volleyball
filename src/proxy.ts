@@ -45,7 +45,10 @@ export async function proxy(request: NextRequest) {
   }
 
   const { pathname } = request.nextUrl;
-  const isProtected = pathname.startsWith("/t/");
+  // The scoreboard display (`/t/{slug}/scoreboard/{matchId}`) is a public,
+  // read-only surface (TVs, spectators) — exclude it from the auth redirect.
+  const isPublicScoreboard = /^\/t\/[^/]+\/scoreboard\//.test(pathname);
+  const isProtected = pathname.startsWith("/t/") && !isPublicScoreboard;
 
   if (isProtected && !user) {
     const loginUrl = request.nextUrl.clone();
