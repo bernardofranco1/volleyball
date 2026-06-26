@@ -35,10 +35,33 @@ async function gate(fd: FormData) {
   };
 }
 
-async function readFile(fd: FormData): Promise<string | null> {
+// Cap admin CSV uploads so a huge file can't OOM the request (spec/14 §F5).
+const MAX_CSV_BYTES = 512 * 1024;
+
+async function readFile(
+  fd: FormData,
+): Promise<{ text: string } | { error: string }> {
   const f = fd.get("file");
-  if (!(f instanceof File) || f.size === 0) return null;
-  return f.text();
+  if (!(f instanceof File) || f.size === 0)
+    return { error: "Choose a CSV file." };
+  if (f.size > MAX_CSV_BYTES) return { error: "File too large (max 512 KB)." };
+  return { text: await f.text() };
+}
+
+/** One batched insert (spec/14 §F5). Returns rows written, or 0 on failure. */
+async function bulkInsert(
+  insert: () => Promise<unknown>,
+  count: number,
+  errs: string[],
+): Promise<number> {
+  if (count === 0) return 0;
+  try {
+    await insert();
+    return count;
+  } catch {
+    errs.push("Bulk insert failed — check for duplicates or invalid values.");
+    return 0;
+  }
 }
 
 async function logImport(
@@ -68,12 +91,12 @@ export async function importTeams(
 ): Promise<ImportState> {
   const g = await gate(fd);
   if (!g) return { error: "Competition not found." };
-  const text = await readFile(fd);
-  if (text == null) return { error: "Choose a CSV file." };
+  const file = await readFile(fd);
+  if ("error" in file) return { error: file.error };
 
-  const { records } = parseCsvRecords(text);
+  const { records } = parseCsvRecords(file.text);
   const errs: string[] = [];
-  let ok = 0;
+  const rows: (typeof teams.$inferInsert)[] = [];
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
     const displayName = (r.displayName ?? "").trim();
@@ -81,21 +104,17 @@ export async function importTeams(
       errs.push(`Row ${i + 2}: missing displayName`);
       continue;
     }
-    try {
-      await db.insert(teams).values({
-        id: newId("team"),
-        competitionId: g.competitionId,
-        tenantId: g.tenantId,
-        displayName,
-        countryCode: (r.countryCode || "").toUpperCase() || null,
-        clubName: r.clubName || null,
-        seed: intOrNull(r.seed),
-      });
-      ok++;
-    } catch {
-      errs.push(`Row ${i + 2}: failed to insert "${displayName}"`);
-    }
+    rows.push({
+      id: newId("team"),
+      competitionId: g.competitionId,
+      tenantId: g.tenantId,
+      displayName,
+      countryCode: (r.countryCode || "").toUpperCase() || null,
+      clubName: r.clubName || null,
+      seed: intOrNull(r.seed),
+    });
   }
+  const ok = await bulkInsert(() => db.insert(teams).values(rows), rows.length, errs);
 
   await logImport(g.tenantId, "TEAMS", fileName(fd), g.userId, ok, errs);
   revalidatePath(`/t/${g.tenantSlug}/competitions/${g.competitionId}/teams`);
@@ -109,8 +128,8 @@ export async function importPlayers(
 ): Promise<ImportState> {
   const g = await gate(fd);
   if (!g) return { error: "Competition not found." };
-  const text = await readFile(fd);
-  if (text == null) return { error: "Choose a CSV file." };
+  const file = await readFile(fd);
+  if ("error" in file) return { error: file.error };
 
   const teamRows = await db
     .select({ id: teams.id, displayName: teams.displayName })
@@ -120,9 +139,9 @@ export async function importPlayers(
     teamRows.map((t) => [t.displayName.toLowerCase(), t.id]),
   );
 
-  const { records } = parseCsvRecords(text);
+  const { records } = parseCsvRecords(file.text);
   const errs: string[] = [];
-  let ok = 0;
+  const rows: (typeof players.$inferInsert)[] = [];
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
     const teamName = (r.teamDisplayName ?? "").trim();
@@ -136,23 +155,19 @@ export async function importPlayers(
       errs.push(`Row ${i + 2}: missing player name`);
       continue;
     }
-    try {
-      await db.insert(players).values({
-        id: newId("plyr"),
-        teamId,
-        tenantId: g.tenantId,
-        firstName: r.firstName || null,
-        lastName: r.lastName || null,
-        fullName,
-        jerseyNumber: intOrNull(r.jerseyNumber),
-        isCaptain: csvBool(r.isCaptain),
-        isLibero: csvBool(r.isLibero),
-      });
-      ok++;
-    } catch {
-      errs.push(`Row ${i + 2}: failed to insert "${fullName}"`);
-    }
+    rows.push({
+      id: newId("plyr"),
+      teamId,
+      tenantId: g.tenantId,
+      firstName: r.firstName || null,
+      lastName: r.lastName || null,
+      fullName,
+      jerseyNumber: intOrNull(r.jerseyNumber),
+      isCaptain: csvBool(r.isCaptain),
+      isLibero: csvBool(r.isLibero),
+    });
   }
+  const ok = await bulkInsert(() => db.insert(players).values(rows), rows.length, errs);
 
   await logImport(g.tenantId, "PLAYERS", fileName(fd), g.userId, ok, errs);
   revalidatePath(`/t/${g.tenantSlug}/competitions/${g.competitionId}/teams`);
@@ -166,8 +181,8 @@ export async function importSchedule(
 ): Promise<ImportState> {
   const g = await gate(fd);
   if (!g) return { error: "Competition not found." };
-  const text = await readFile(fd);
-  if (text == null) return { error: "Choose a CSV file." };
+  const file = await readFile(fd);
+  if ("error" in file) return { error: file.error };
 
   const teamRows = await db
     .select({ id: teams.id, displayName: teams.displayName })
@@ -177,9 +192,9 @@ export async function importSchedule(
     teamRows.map((t) => [t.displayName.toLowerCase(), t.id]),
   );
 
-  const { records } = parseCsvRecords(text);
+  const { records } = parseCsvRecords(file.text);
   const errs: string[] = [];
-  let ok = 0;
+  const rows: (typeof matches.$inferInsert)[] = [];
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
     const a = byName.get((r.teamA ?? "").trim().toLowerCase());
@@ -203,25 +218,21 @@ export async function importSchedule(
       }
       when = d;
     }
-    try {
-      await db.insert(matches).values({
-        id: newId("match"),
-        competitionId: g.competitionId,
-        tenantId: g.tenantId,
-        teamAId: a,
-        teamBId: b,
-        discipline: g.discipline,
-        status: "SCHEDULED",
-        courtNumber: intOrNull(r.courtNumber),
-        scheduledAt: when,
-        roundName: r.roundName || null,
-        matchNumber: intOrNull(r.matchNumber),
-      });
-      ok++;
-    } catch {
-      errs.push(`Row ${i + 2}: failed to insert match`);
-    }
+    rows.push({
+      id: newId("match"),
+      competitionId: g.competitionId,
+      tenantId: g.tenantId,
+      teamAId: a,
+      teamBId: b,
+      discipline: g.discipline,
+      status: "SCHEDULED",
+      courtNumber: intOrNull(r.courtNumber),
+      scheduledAt: when,
+      roundName: r.roundName || null,
+      matchNumber: intOrNull(r.matchNumber),
+    });
   }
+  const ok = await bulkInsert(() => db.insert(matches).values(rows), rows.length, errs);
 
   await logImport(g.tenantId, "SCHEDULE", fileName(fd), g.userId, ok, errs);
   revalidatePath(`/t/${g.tenantSlug}/competitions/${g.competitionId}/schedule`);

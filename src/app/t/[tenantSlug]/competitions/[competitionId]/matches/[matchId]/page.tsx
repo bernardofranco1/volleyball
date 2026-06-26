@@ -16,8 +16,14 @@ import { statusBadgeClass, ui } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
 
-/** Best-effort absolute origin from request headers (for scannable QR URLs). */
-async function originFromHeaders(): Promise<string> {
+/**
+ * Absolute origin for scannable QR URLs. Prefer the configured app URL so a
+ * spoofed Host/X-Forwarded-Host header can't make the QR point elsewhere
+ * (spec/14 §F6); fall back to request headers only in development.
+ */
+async function resolveOrigin(): Promise<string> {
+  const configured = process.env.NEXT_PUBLIC_APP_URL;
+  if (configured) return configured.replace(/\/$/, "");
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto =
@@ -72,7 +78,7 @@ export default async function MatchDetailPage({
           gt(matchSessions.expiresAt, sql`now()`),
         ),
       ),
-    originFromHeaders(),
+    resolveOrigin(),
   ]);
 
   // Render a QR per active, non-expired session token (expiry filtered in SQL).

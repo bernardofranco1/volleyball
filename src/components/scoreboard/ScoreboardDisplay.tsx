@@ -273,9 +273,11 @@ function TeamPanel({
         {score}
       </div>
 
-      {showServer && serving ? (
+      {/* Beach tracks a 1/2 server number; rotation disciplines don't, so only
+          show the player line when we actually have one (spec/14 §F7). */}
+      {showServer && serving && serverPlayer != null ? (
         <div className="text-[clamp(0.8rem,2vw,1.2rem)] text-primary">
-          Serving: Player {serverPlayer ?? 1}
+          Serving: Player {serverPlayer}
         </div>
       ) : null}
 

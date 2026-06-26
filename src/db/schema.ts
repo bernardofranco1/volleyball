@@ -294,25 +294,8 @@ export const matchSessions = pgTable("match_sessions", {
   revokedAt: timestamp("revoked_at"),
 });
 
-// ── Team tablet lineup entry ─────────────────────────────────────────────────
-
-export const lineupSubmissions = pgTable("lineup_submissions", {
-  id: text("id").primaryKey(),
-  matchId: text("match_id")
-    .notNull()
-    .references(() => matches.id),
-  tenantId: text("tenant_id")
-    .notNull()
-    .references(() => tenants.id),
-  team: text("team", { enum: ["A", "B"] }).notNull(),
-  setNumber: integer("set_number").notNull(),
-  playerIds: jsonb("player_ids").notNull(), // string[] in rotation order
-  liberoId: text("libero_id"),
-  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
-  status: text("status", { enum: ["PENDING", "CONFIRMED", "REJECTED"] })
-    .default("PENDING")
-    .notNull(),
-});
+// Team-tablet lineups are submitted directly as LINEUP_CONFIRMED events (the
+// event log is the source of truth), so there is no separate submissions table.
 
 // ── Team tablet TO/sub/challenge requests ────────────────────────────────────
 

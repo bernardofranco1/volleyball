@@ -12,7 +12,6 @@ import {
   competitions,
   events,
   interruptRequests,
-  lineupSubmissions,
   matchSessions,
   matches,
   players,
@@ -79,9 +78,6 @@ async function wipeCompetition(compId: string) {
     await db
       .delete(interruptRequests)
       .where(inArray(interruptRequests.matchId, matchIds));
-    await db
-      .delete(lineupSubmissions)
-      .where(inArray(lineupSubmissions.matchId, matchIds));
   }
   await db.delete(matches).where(eq(matches.competitionId, compId));
 
