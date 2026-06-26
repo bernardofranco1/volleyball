@@ -6,6 +6,7 @@ import { activeSet } from "@/engine/indoor/types";
 import { IndoorCourt } from "@/components/court/IndoorCourt";
 import { IndoorActionBar } from "@/components/scoring/IndoorActionBar";
 import { IndoorLineupEntry } from "@/components/scoring/IndoorLineupEntry";
+import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 
 export function IndoorScoreboard({
@@ -14,6 +15,7 @@ export function IndoorScoreboard({
   competitionName: string;
 }) {
   const {
+    matchId,
     state,
     config,
     rosterA,
@@ -98,6 +100,12 @@ export function IndoorScoreboard({
       ) : null}
 
       <IndoorActionBar />
+
+      <InterruptNotifications
+        matchId={matchId}
+        teamAName={teamAName}
+        teamBName={teamBName}
+      />
 
       {/* Set summary */}
       {state.sets.length > 0 ? (

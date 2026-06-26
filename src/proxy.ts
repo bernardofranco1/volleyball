@@ -45,10 +45,13 @@ export async function proxy(request: NextRequest) {
   }
 
   const { pathname } = request.nextUrl;
-  // The scoreboard display (`/t/{slug}/scoreboard/{matchId}`) is a public,
-  // read-only surface (TVs, spectators) — exclude it from the auth redirect.
+  // Two tenant surfaces aren't user-gated and must skip the auth redirect:
+  //   - the scoreboard display (`/t/{slug}/scoreboard/{matchId}`) — public TV view
+  //   - the team tablet (`/t/{slug}/matches/{id}/team/{A|B}`) — session-token gated
   const isPublicScoreboard = /^\/t\/[^/]+\/scoreboard\//.test(pathname);
-  const isProtected = pathname.startsWith("/t/") && !isPublicScoreboard;
+  const isTeamTablet = /^\/t\/[^/]+\/matches\/[^/]+\/team\//.test(pathname);
+  const isProtected =
+    pathname.startsWith("/t/") && !isPublicScoreboard && !isTeamTablet;
 
   if (isProtected && !user) {
     const loginUrl = request.nextUrl.clone();

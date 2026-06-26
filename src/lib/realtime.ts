@@ -41,6 +41,20 @@ export async function broadcastState(
   ]);
 }
 
+/** Notify the scorer channel that a team tablet has raised an interrupt request. */
+export async function broadcastInterruptRequest(
+  matchId: string,
+  payload: {
+    requestId: string;
+    team: "A" | "B";
+    requestType: string;
+  },
+): Promise<void> {
+  await broadcast([
+    { topic: `match:${matchId}:scorer`, event: "interrupt-request", payload },
+  ]);
+}
+
 /** Announce a serve-clock countdown with an absolute deadline (epoch ms). */
 export async function broadcastServeClock(
   matchId: string,
