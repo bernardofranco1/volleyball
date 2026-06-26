@@ -28,6 +28,15 @@ import {
   type IndoorMatchState,
   activeSet as indoorActiveSet,
 } from "./indoor/types";
+import {
+  appendGrassEvent,
+  reduce as grassReduce,
+  replayEvents as grassReplay,
+} from "./grass/reducer";
+import {
+  type GrassMatchState,
+  activeSet as grassActiveSet,
+} from "./grass/types";
 
 /** The subset of match state the persistence/broadcast layer relies on. */
 export interface CommonMatchState {
@@ -192,9 +201,49 @@ const indoorAdapter: EngineAdapter = {
   matchStatusOf: (state) => rowStatusOf(state.status),
 };
 
+// ── Grass adapter ────────────────────────────────────────────────────────────
+
+const grassAdapter: EngineAdapter = {
+  replay: (matchId, events, config) =>
+    grassReplay(matchId, events as never, config) as unknown as CommonMatchState,
+  reduce: (state, event, config) =>
+    grassReduce(
+      state as unknown as GrassMatchState,
+      event as never,
+      config,
+    ) as unknown as CommonMatchState,
+  append: (prev, payload, config, opts) =>
+    appendGrassEvent(
+      prev as unknown as GrassMatchState,
+      payload as never,
+      config,
+      opts,
+    ) as unknown as AppendResult,
+  denormalize: (state) => {
+    const set = grassActiveSet(state as unknown as GrassMatchState);
+    const serverTeam = set?.currentServer ?? null;
+    const lastRot =
+      set == null ? null : serverTeam === "A" ? set.lastRotA : set.lastRotB;
+    const sidesAfter = set
+      ? { teamA: set.teamASide, teamB: set.teamASide === "LEFT" ? "RIGHT" : "LEFT" }
+      : null;
+    return {
+      scoreAfterA: set?.scoreA ?? null,
+      scoreAfterB: set?.scoreB ?? null,
+      setNumber: (state as unknown as GrassMatchState).currentSetNumber,
+      serverTeam,
+      // 1-based rotation position of the current server (null until first serve).
+      serverPlayerNumber: lastRot == null ? null : lastRot + 1,
+      sidesAfter,
+    };
+  },
+  matchStatusOf: (state) => rowStatusOf(state.status),
+};
+
 const REGISTRY: Partial<Record<Discipline, EngineAdapter>> = {
   BEACH: beachAdapter,
   INDOOR: indoorAdapter,
+  GRASS: grassAdapter,
 };
 
 /** The engine adapter for a discipline, or null if not yet supported. */

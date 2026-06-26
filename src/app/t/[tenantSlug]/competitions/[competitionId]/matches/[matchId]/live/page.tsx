@@ -13,9 +13,12 @@ import {
   IndoorMatchProvider,
   type PlayerLite,
 } from "@/lib/indoor-match-context";
+import { GrassMatchProvider } from "@/lib/grass-match-context";
 import { LiveScoreboard } from "@/components/scoring/LiveScoreboard";
 import { IndoorScoreboard } from "@/components/scoring/IndoorScoreboard";
+import { GrassScoreboard } from "@/components/scoring/GrassScoreboard";
 import type { IndoorMatchState } from "@/engine/indoor/types";
+import type { GrassMatchState } from "@/engine/grass/types";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +105,23 @@ export default async function LiveScoringPage({
       >
         <IndoorScoreboard competitionName={view.competitionName} />
       </IndoorMatchProvider>
+    );
+  }
+
+  if (view.discipline === "GRASS") {
+    const { rosterA, rosterB } = await loadRosters(matchId);
+    return (
+      <GrassMatchProvider
+        matchId={view.matchId}
+        initialState={view.state as unknown as GrassMatchState}
+        config={view.config}
+        rosterA={rosterA}
+        rosterB={rosterB}
+        teamAName={view.teamAName}
+        teamBName={view.teamBName}
+      >
+        <GrassScoreboard competitionName={view.competitionName} />
+      </GrassMatchProvider>
     );
   }
 
