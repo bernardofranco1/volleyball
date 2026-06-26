@@ -11,6 +11,7 @@ export interface TenantBranding {
   secondaryColor: string;
   logoUrl: string | null;
   fontFamily: string | null;
+  courtColorOverrides: Record<string, string> | null;
 }
 
 export interface TenantWithBranding {
@@ -25,6 +26,7 @@ const DEFAULT_BRANDING: TenantBranding = {
   secondaryColor: "#ffffff",
   logoUrl: null,
   fontFamily: null,
+  courtColorOverrides: null,
 };
 
 /** Resolve a tenant (with branding) by its URL slug, or null if not found. */
@@ -40,6 +42,7 @@ export async function getTenantBySlug(
       secondaryColor: tenantBranding.secondaryColor,
       logoUrl: tenantBranding.logoUrl,
       fontFamily: tenantBranding.fontFamily,
+      courtColorOverrides: tenantBranding.courtColorOverrides,
     })
     .from(tenants)
     .leftJoin(tenantBranding, eq(tenantBranding.tenantId, tenants.id))
@@ -58,6 +61,8 @@ export async function getTenantBySlug(
       secondaryColor: r.secondaryColor ?? DEFAULT_BRANDING.secondaryColor,
       logoUrl: r.logoUrl,
       fontFamily: r.fontFamily,
+      courtColorOverrides:
+        (r.courtColorOverrides as Record<string, string> | null) ?? null,
     },
   };
 }

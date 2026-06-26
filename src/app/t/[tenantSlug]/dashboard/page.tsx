@@ -1,18 +1,14 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase";
+import { getT } from "@/lib/i18n/server";
 
-// Surfaces. `href` (when set) links to a shipped section; the rest are upcoming
-// phases (see spec/12-BUILD-ORDER.md).
+// Tenant surfaces. `href` links to a shipped section; `titleKey`/`noteKey` are
+// i18n message keys resolved per the tenant's chosen locale.
 const SECTIONS = [
-  {
-    title: "Competitions",
-    note: "Create & manage competitions",
-    phase: "Phase 3",
-    href: "competitions",
-  },
-  { title: "Matches", note: "Schedule and score matches", phase: "Phase 2+" },
-  { title: "Scoreboard", note: "Public TV display", phase: "Phase 4" },
-  { title: "Settings", note: "Branding & configuration", phase: "Phase 9" },
+  { titleKey: "nav.competitions", noteKey: "dashboard.competitions", href: "competitions" },
+  { titleKey: "nav.matches", noteKey: "dashboard.matches", href: "competitions" },
+  { titleKey: "nav.scoreboard", noteKey: "dashboard.scoreboard" },
+  { titleKey: "nav.settings", noteKey: "dashboard.settings", href: "settings" },
 ] as const;
 
 export default async function DashboardPage({
@@ -21,6 +17,7 @@ export default async function DashboardPage({
   params: Promise<{ tenantSlug: string }>;
 }) {
   const { tenantSlug } = await params;
+  const { t } = await getT();
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -30,9 +27,11 @@ export default async function DashboardPage({
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("dashboard.title")}</h1>
         <p className="mt-1 text-sm text-score-dim">
-          {user?.email ? `Signed in as ${user.email}` : `Tenant: ${tenantSlug}`}
+          {user?.email
+            ? `${t("dashboard.signedInAs")} ${user.email}`
+            : `Tenant: ${tenantSlug}`}
         </p>
       </div>
 
@@ -44,25 +43,20 @@ export default async function DashboardPage({
             (href ? " block transition-colors hover:border-primary" : "");
           const inner = (
             <>
-              <div className="flex items-center justify-between">
-                <h2 className="font-medium">{s.title}</h2>
-                <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-score-dim">
-                  {s.phase}
-                </span>
-              </div>
-              <p className="mt-2 text-sm text-score-dim">{s.note}</p>
+              <h2 className="font-medium">{t(s.titleKey)}</h2>
+              <p className="mt-2 text-sm text-score-dim">{t(s.noteKey)}</p>
             </>
           );
           return href ? (
             <Link
-              key={s.title}
+              key={s.titleKey}
               href={`/t/${tenantSlug}/${href}`}
               className={className}
             >
               {inner}
             </Link>
           ) : (
-            <div key={s.title} className={className}>
+            <div key={s.titleKey} className={className}>
               {inner}
             </div>
           );
