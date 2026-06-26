@@ -19,11 +19,16 @@ function intOrNull(fd: FormData, key: string): number | null {
   const n = Number.parseInt(v, 10);
   return Number.isFinite(n) ? n : null;
 }
-/** A datetime-local input value → Date (interpreted in the server's locale), or null. */
+/**
+ * A `datetime-local` value (`YYYY-MM-DDTHH:mm`, no zone) → Date, interpreted as
+ * UTC (spec/14 §E2). The schedule UI labels and prefills times in UTC, so this
+ * makes the round-trip exact regardless of the server's local timezone.
+ */
 function dateTimeOrNull(fd: FormData, key: string): Date | null {
   const v = str(fd, key);
   if (!v) return null;
-  const d = new Date(v);
+  const hasZone = /[zZ]|[+-]\d\d:?\d\d$/.test(v);
+  const d = new Date(hasZone ? v : `${v}Z`);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 

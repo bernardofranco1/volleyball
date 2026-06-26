@@ -194,7 +194,9 @@ export async function importSchedule(
     }
     let when: Date | null = null;
     if (r.scheduledAt) {
-      const d = new Date(r.scheduledAt);
+      // Zone-less times are treated as UTC (spec/14 §E2).
+      const hasZone = /[zZ]|[+-]\d\d:?\d\d$/.test(r.scheduledAt);
+      const d = new Date(hasZone ? r.scheduledAt : `${r.scheduledAt}Z`);
       if (Number.isNaN(d.getTime())) {
         errs.push(`Row ${i + 2}: invalid date "${r.scheduledAt}"`);
         continue;

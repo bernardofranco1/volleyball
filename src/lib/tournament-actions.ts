@@ -1,9 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { matches, pools, teams } from "@/db/schema";
+
+// The transaction executor type (db or a transaction handle).
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 import type { Discipline } from "@/engine/types";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { getCompetition } from "@/lib/competitions";
@@ -37,8 +40,11 @@ function standingsPath(tenantSlug: string, competitionId: string) {
   return `/t/${tenantSlug}/competitions/${competitionId}/standings`;
 }
 
-async function nextMatchNumber(competitionId: string): Promise<number> {
-  const rows = await db
+async function nextMatchNumber(
+  exec: Tx,
+  competitionId: string,
+): Promise<number> {
+  const rows = await exec
     .select({ n: matches.matchNumber })
     .from(matches)
     .where(eq(matches.competitionId, competitionId));
@@ -68,6 +74,16 @@ export async function assignTeamPool(fd: FormData): Promise<void> {
   const teamId = str(fd, "teamId");
   const poolId = str(fd, "poolId") || null;
   if (!teamId) return;
+  // A non-empty pool must belong to this competition (spec/14 §E4) — otherwise
+  // a crafted poolId could attach a team to a foreign competition's pool.
+  if (poolId) {
+    const valid = await db
+      .select({ id: pools.id })
+      .from(pools)
+      .where(and(eq(pools.id, poolId), eq(pools.competitionId, g.competitionId)))
+      .limit(1);
+    if (valid.length === 0) return;
+  }
   await db
     .update(teams)
     .set({ poolId })
@@ -77,47 +93,55 @@ export async function assignTeamPool(fd: FormData): Promise<void> {
 
 // ── Knockout bracket ───────────────────────────────────────────────────────────
 
-/** Seed the largest power-of-two field by team seed and create round 1. */
+/**
+ * Seed the largest power-of-two field by team seed and create round 1. Wrapped in
+ * a per-competition advisory lock so concurrent clicks can't double-generate
+ * (spec/14 §E1); a partial unique index on (competition, round, match#) backstops.
+ */
 export async function generateBracket(fd: FormData): Promise<void> {
   const g = await gate(fd);
   if (!g) return;
 
-  const existing = await db
-    .select({ roundName: matches.roundName })
-    .from(matches)
-    .where(eq(matches.competitionId, g.competitionId));
-  if (existing.some((m) => isKnockoutRound(m.roundName))) return; // already generated
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${g.competitionId}))`);
 
-  const teamRows = await db
-    .select({ id: teams.id, seed: teams.seed, displayName: teams.displayName })
-    .from(teams)
-    .where(eq(teams.competitionId, g.competitionId))
-    .orderBy(asc(teams.seed), asc(teams.displayName));
-  if (teamRows.length < 2) return;
+    const existing = await tx
+      .select({ roundName: matches.roundName })
+      .from(matches)
+      .where(eq(matches.competitionId, g.competitionId));
+    if (existing.some((m) => isKnockoutRound(m.roundName))) return; // already done
 
-  const size = bracketSize(teamRows.length);
-  const field = teamRows.slice(0, size); // seeds 1..size in seed order
-  const order = seedOrder(size);
-  const label = roundLabel(size);
-  let n = await nextMatchNumber(g.competitionId);
+    const teamRows = await tx
+      .select({ id: teams.id, seed: teams.seed, displayName: teams.displayName })
+      .from(teams)
+      .where(eq(teams.competitionId, g.competitionId))
+      .orderBy(asc(teams.seed), asc(teams.displayName));
+    if (teamRows.length < 2) return;
 
-  const rows: (typeof matches.$inferInsert)[] = [];
-  for (let j = 0; j < size / 2; j++) {
-    const a = field[order[2 * j] - 1];
-    const b = field[order[2 * j + 1] - 1];
-    rows.push({
-      id: newId("match"),
-      competitionId: g.competitionId,
-      tenantId: g.tenantId,
-      teamAId: a.id,
-      teamBId: b.id,
-      discipline: g.discipline,
-      status: "SCHEDULED",
-      roundName: label,
-      matchNumber: n++,
-    });
-  }
-  await db.insert(matches).values(rows);
+    const size = bracketSize(teamRows.length);
+    const field = teamRows.slice(0, size); // seeds 1..size in seed order
+    const order = seedOrder(size);
+    const label = roundLabel(size);
+    let n = await nextMatchNumber(tx, g.competitionId);
+
+    const rows: (typeof matches.$inferInsert)[] = [];
+    for (let j = 0; j < size / 2; j++) {
+      const a = field[order[2 * j] - 1];
+      const b = field[order[2 * j + 1] - 1];
+      rows.push({
+        id: newId("match"),
+        competitionId: g.competitionId,
+        tenantId: g.tenantId,
+        teamAId: a.id,
+        teamBId: b.id,
+        discipline: g.discipline,
+        status: "SCHEDULED",
+        roundName: label,
+        matchNumber: n++,
+      });
+    }
+    await tx.insert(matches).values(rows);
+  });
   revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
 }
 
@@ -143,73 +167,78 @@ export async function advanceBracket(fd: FormData): Promise<void> {
   const g = await gate(fd);
   if (!g) return;
 
-  for (let guard = 0; guard < 8; guard++) {
-    const all = (await db
-      .select({
-        id: matches.id,
-        teamAId: matches.teamAId,
-        teamBId: matches.teamBId,
-        status: matches.status,
-        winner: matches.winner,
-        roundName: matches.roundName,
-        matchNumber: matches.matchNumber,
-      })
-      .from(matches)
-      .where(eq(matches.competitionId, g.competitionId))) as KMatch[];
+  await db.transaction(async (tx) => {
+    // Serialize concurrent advances for this competition (spec/14 §E1).
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${g.competitionId}))`);
 
-    const present = new Set(
-      all.filter((m) => isKnockoutRound(m.roundName)).map((m) => m.roundName),
-    );
-    let created = false;
+    for (let guard = 0; guard < 8; guard++) {
+      const all = (await tx
+        .select({
+          id: matches.id,
+          teamAId: matches.teamAId,
+          teamBId: matches.teamBId,
+          status: matches.status,
+          winner: matches.winner,
+          roundName: matches.roundName,
+          matchNumber: matches.matchNumber,
+        })
+        .from(matches)
+        .where(eq(matches.competitionId, g.competitionId))) as KMatch[];
 
-    for (const size of [64, 32, 16, 8, 4]) {
-      const label = roundLabel(size);
-      const nextLabel = roundLabel(size / 2);
-      const round = all
-        .filter((m) => m.roundName === label)
-        .sort((x, y) => (x.matchNumber ?? 0) - (y.matchNumber ?? 0));
-      if (round.length === 0) continue;
-      if (present.has(nextLabel)) continue; // next round already exists
-      if (!round.every((m) => m.status === "FINISHED" && m.winner)) continue;
+      const present = new Set(
+        all.filter((m) => isKnockoutRound(m.roundName)).map((m) => m.roundName),
+      );
+      let created = false;
 
-      let n = await nextMatchNumber(g.competitionId);
-      const rows: (typeof matches.$inferInsert)[] = [];
-      for (let j = 0; j < round.length / 2; j++) {
-        rows.push({
-          id: newId("match"),
-          competitionId: g.competitionId,
-          tenantId: g.tenantId,
-          teamAId: winnerId(round[2 * j]),
-          teamBId: winnerId(round[2 * j + 1]),
-          discipline: g.discipline,
-          status: "SCHEDULED",
-          roundName: nextLabel,
-          matchNumber: n++,
-        });
+      for (const size of [64, 32, 16, 8, 4]) {
+        const label = roundLabel(size);
+        const nextLabel = roundLabel(size / 2);
+        const round = all
+          .filter((m) => m.roundName === label)
+          .sort((x, y) => (x.matchNumber ?? 0) - (y.matchNumber ?? 0));
+        if (round.length === 0) continue;
+        if (present.has(nextLabel)) continue; // next round already exists
+        if (!round.every((m) => m.status === "FINISHED" && m.winner)) continue;
+
+        let n = await nextMatchNumber(tx, g.competitionId);
+        const rows: (typeof matches.$inferInsert)[] = [];
+        for (let j = 0; j < round.length / 2; j++) {
+          rows.push({
+            id: newId("match"),
+            competitionId: g.competitionId,
+            tenantId: g.tenantId,
+            teamAId: winnerId(round[2 * j]),
+            teamBId: winnerId(round[2 * j + 1]),
+            discipline: g.discipline,
+            status: "SCHEDULED",
+            roundName: nextLabel,
+            matchNumber: n++,
+          });
+        }
+        // Semifinal → also stage the 3rd-place match from the losers.
+        if (size === 4 && round.length === 2 && !present.has("3rd Place")) {
+          rows.push({
+            id: newId("match"),
+            competitionId: g.competitionId,
+            tenantId: g.tenantId,
+            teamAId: loserId(round[0]),
+            teamBId: loserId(round[1]),
+            discipline: g.discipline,
+            status: "SCHEDULED",
+            roundName: "3rd Place",
+            matchNumber: n++,
+          });
+        }
+        if (rows.length > 0) {
+          await tx.insert(matches).values(rows);
+          created = true;
+        }
+        break; // re-query and continue from the loop
       }
-      // Semifinal → also stage the 3rd-place match from the losers.
-      if (size === 4 && round.length === 2 && !present.has("3rd Place")) {
-        rows.push({
-          id: newId("match"),
-          competitionId: g.competitionId,
-          tenantId: g.tenantId,
-          teamAId: loserId(round[0]),
-          teamBId: loserId(round[1]),
-          discipline: g.discipline,
-          status: "SCHEDULED",
-          roundName: "3rd Place",
-          matchNumber: n++,
-        });
-      }
-      if (rows.length > 0) {
-        await db.insert(matches).values(rows);
-        created = true;
-      }
-      break; // re-query and continue from the loop
+
+      if (!created) break;
     }
-
-    if (!created) break;
-  }
+  });
 
   revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
 }

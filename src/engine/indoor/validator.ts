@@ -10,7 +10,6 @@ import {
   type IndoorMatchState,
   type IndoorSetState,
   activeSet,
-  isBackRowIndex,
 } from "./types";
 
 export interface ValidationResult {
@@ -153,8 +152,10 @@ export function validateIndoorEvent(
         if (onCourt) return fail("Libero is already on court");
         const idx = court.indexOf(payload.outPlayerId);
         if (idx < 0) return fail("Player being replaced is not on court");
-        if (!isBackRowIndex(idx))
-          return fail("Libero may only replace a back-row player");
+        // Back-row, non-server only (indices 4,5). Index 0 is back-row but is the
+        // server — the libero can't serve (Rule 19), so it can't replace there.
+        if (idx !== 4 && idx !== 5)
+          return fail("Libero may only replace a back-row player (not the server)");
         return OK;
       }
       // OUT: the replaced back-row player returns.

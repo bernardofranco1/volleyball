@@ -148,8 +148,42 @@ function applyPoint(set: IndoorSetState, winner: TeamId): IndoorSetState {
       s.rotationIndexB = (s.rotationIndexB + 1) % 6;
       s.courtPositionsB = rotateClockwise(s.courtPositionsB);
     }
+    // The libero rotated with the team; it may not serve or play front row
+    // (Rule 19). If it landed in the server slot or front row, it leaves and the
+    // player it replaced returns. Deterministic → reproduced on replay.
+    enforceLiberoLegality(s, winner);
   }
   return s;
+}
+
+// Court positions a libero may legally occupy: back-row, non-server (5 and 6 →
+// indices 4 and 5). Index 0 is back-row but is the server (libero can't serve).
+function liberoLegalIndex(idx: number): boolean {
+  return idx === 4 || idx === 5;
+}
+
+function enforceLiberoLegality(set: IndoorSetState, team: TeamId): void {
+  const onCourt =
+    team === "A" ? set.libero.liberoOnCourtA : set.libero.liberoOnCourtB;
+  const liberoId =
+    team === "A" ? set.libero.liberoIdA : set.libero.liberoIdB;
+  if (!onCourt || !liberoId) return;
+  const court = team === "A" ? set.courtPositionsA : set.courtPositionsB;
+  const idx = court.indexOf(liberoId);
+  if (idx < 0 || liberoLegalIndex(idx)) return;
+
+  const replacing =
+    team === "A" ? set.libero.liberoReplacingA : set.libero.liberoReplacingB;
+  if (replacing) court[idx] = replacing;
+  if (team === "A") {
+    set.libero.liberoOnCourtA = false;
+    set.libero.liberoReplacingA = null;
+    set.libero.lastLiberoRallyA = set.ralliesPlayed;
+  } else {
+    set.libero.liberoOnCourtB = false;
+    set.libero.liberoReplacingB = null;
+    set.libero.lastLiberoRallyB = set.ralliesPlayed;
+  }
 }
 
 function swapOnCourt(court: string[], outId: string, inId: string): void {
