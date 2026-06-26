@@ -9,9 +9,9 @@
 // State is event-sourced: the matches table only holds *derived* convenience
 // columns (setsWon, status, winner). The events table is the source of truth.
 
-import { asc, eq } from "drizzle-orm";
+import { aliasedTable, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { events, matches, tournamentConfig } from "@/db/schema";
+import { competitions, events, matches, teams, tournamentConfig } from "@/db/schema";
 import {
   type TournamentConfig,
   resolveConfig,
@@ -133,6 +133,46 @@ export async function loadMatchStateFresh(
   return { state, config: meta.config };
 }
 
+export interface MatchView {
+  matchId: string;
+  competitionName: string;
+  teamAName: string;
+  teamBName: string;
+  state: BeachMatchState;
+  config: TournamentConfig;
+}
+
+/** Everything the live scoring page needs: names + initial replayed state. */
+export async function loadMatchView(matchId: string): Promise<MatchView> {
+  const teamA = aliasedTable(teams, "team_a");
+  const teamB = aliasedTable(teams, "team_b");
+  const rows = await db
+    .select({
+      competitionName: competitions.name,
+      teamAName: teamA.displayName,
+      teamBName: teamB.displayName,
+    })
+    .from(matches)
+    .innerJoin(competitions, eq(competitions.id, matches.competitionId))
+    .innerJoin(teamA, eq(teamA.id, matches.teamAId))
+    .innerJoin(teamB, eq(teamB.id, matches.teamBId))
+    .where(eq(matches.id, matchId))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) throw new MatchNotFoundError(`Match ${matchId} not found`);
+
+  const { state, config } = await loadMatchStateFresh(matchId);
+  return {
+    matchId,
+    competitionName: row.competitionName,
+    teamAName: row.teamAName,
+    teamBName: row.teamBName,
+    state,
+    config,
+  };
+}
+
 // Map engine status → matches.status enum.
 type MatchRowStatus =
   | "SCHEDULED"
@@ -196,6 +236,14 @@ export async function appendMatchEvent(
   opts: { actor?: Actor; deviceInfo?: string } = {},
 ): Promise<AppendOutcome> {
   const meta = await loadMatchMeta(matchId);
+
+  // UNDO is special: it removes a prior event, so the post-state requires a full
+  // re-replay rather than a forward reduce. The target is resolved server-side
+  // (the latest non-UNDO, not-yet-undone event) so clients can just say "undo".
+  if (payload.type === "UNDO") {
+    return undoLastEvent(matchId, meta, opts.actor ?? "SCORER", opts.deviceInfo);
+  }
+
   const { state: prevState } = await loadMatchState(matchId);
   const actor: Actor = opts.actor ?? "SCORER";
   const isSystem = (type: string) =>
@@ -292,4 +340,69 @@ export async function appendMatchEvent(
   }
 
   return { newEvents: result.newEvents, state: finalState };
+}
+
+/** Append an UNDO targeting the most recent undoable event, then re-replay. */
+async function undoLastEvent(
+  matchId: string,
+  meta: MatchMeta,
+  actor: Actor,
+  deviceInfo?: string,
+): Promise<AppendOutcome> {
+  const log = await loadEvents(matchId);
+  const alreadyUndone = new Set<string>();
+  for (const ev of log) {
+    if (ev.payload.type === "UNDO") alreadyUndone.add(ev.payload.targetEventId);
+  }
+  // Latest event that is not itself an UNDO and not already undone.
+  const target = [...log]
+    .reverse()
+    .find((ev) => ev.payload.type !== "UNDO" && !alreadyUndone.has(ev.id));
+  if (!target) throw new EventRejectedError("Nothing to undo");
+
+  const nextSeq = (log[log.length - 1]?.sequence ?? 0) + 1;
+  const undoEvent: BeachEvent = {
+    id: newId("evt"),
+    sequence: nextSeq,
+    timestamp: new Date().toISOString(),
+    payload: { type: "UNDO", targetEventId: target.id },
+  };
+
+  try {
+    await db.insert(events).values({
+      id: undoEvent.id,
+      matchId,
+      tenantId: meta.tenantId,
+      sequence: undoEvent.sequence,
+      timestamp: new Date(undoEvent.timestamp),
+      eventType: "UNDO",
+      payload: undoEvent.payload,
+      actor,
+      deviceInfo: deviceInfo ?? null,
+      ...denormalize(replayEvents(matchId, [...log, undoEvent], meta.config)),
+    });
+  } catch (err) {
+    stateCache.delete(matchId);
+    throw new SequenceConflictError(
+      err instanceof Error ? err.message : "sequence conflict",
+    );
+  }
+
+  const finalState = replayEvents(matchId, [...log, undoEvent], meta.config);
+  stateCache.set(matchId, {
+    state: finalState,
+    lastSequence: finalState.lastSequence,
+  });
+  await db
+    .update(matches)
+    .set({
+      setsWonA: finalState.setsWonA,
+      setsWonB: finalState.setsWonB,
+      winner: finalState.winner,
+      status: matchStatusOf(finalState),
+    })
+    .where(eq(matches.id, matchId));
+  await broadcastState(matchId, { state: finalState, lastEvent: undoEvent });
+
+  return { newEvents: [undoEvent], state: finalState };
 }
