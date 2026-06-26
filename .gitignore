@@ -13,6 +13,10 @@
 # testing
 /coverage
 
+# CI workflow held locally until the gh token has 'workflow' scope.
+# Re-enable with: gh auth refresh -h github.com -s workflow && git add -f .github/workflows/ci.yml
+/.github/workflows/
+
 # playwright
 /test-results/
 /playwright-report/
