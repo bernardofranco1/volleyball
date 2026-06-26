@@ -16,7 +16,10 @@ import {
   appendMatchEvent,
   loadMatchStateFresh,
 } from "@/lib/match-engine";
-import type { BeachEventPayload } from "@/engine/beach/types";
+
+// Discipline-agnostic event payload: the engine for the match (beach/indoor)
+// validates the concrete shape — this route only needs `type` to route it.
+type EventPayload = { type: string } & Record<string, unknown>;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +38,7 @@ export async function POST(
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  let body: { payload?: BeachEventPayload };
+  let body: { payload?: EventPayload };
   try {
     body = await req.json();
   } catch {

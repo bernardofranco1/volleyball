@@ -1,4 +1,4 @@
-// Server-side match orchestration: the bridge between the pure beach engine and
+// Server-side match orchestration: the bridge between the pure rule engines and
 // the database + realtime layer.
 //
 //   - resolveMatchConfig: discipline defaults layered with the persisted overrides
@@ -8,21 +8,22 @@
 //
 // State is event-sourced: the matches table only holds *derived* convenience
 // columns (setsWon, status, winner). The events table is the source of truth.
+//
+// Discipline-agnostic: the concrete engine is resolved per match via the engine
+// registry (src/engine/registry.ts). Beach and indoor are supported today.
+// `state` is typed as BeachMatchState for the historical beach callers, but is
+// the discipline-correct state at runtime — indoor callers narrow it themselves.
 
 import { aliasedTable, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { competitions, events, matches, teams, tournamentConfig } from "@/db/schema";
+import { type TournamentConfig, resolveConfig } from "@/engine/config";
 import {
-  type TournamentConfig,
-  resolveConfig,
-} from "@/engine/config";
-import { appendBeachEvent, reduce, replayEvents } from "@/engine/beach/reducer";
-import {
-  type BeachEvent,
-  type BeachEventPayload,
-  type BeachMatchState,
-  activeSet,
-} from "@/engine/beach/types";
+  type CommonMatchState,
+  type EngineEvent,
+  getEngine,
+} from "@/engine/registry";
+import type { BeachEvent, BeachMatchState } from "@/engine/beach/types";
 import type { Actor, Discipline } from "@/engine/types";
 import { newId } from "@/lib/id";
 import { broadcastServeClock, broadcastState } from "@/lib/realtime";
@@ -37,13 +38,14 @@ interface MatchMeta {
   tenantId: string;
   discipline: Discipline;
   config: TournamentConfig;
+  engine: NonNullable<ReturnType<typeof getEngine>>;
 }
 
 // Per-instance state cache. Serverless instances are ephemeral, so this is a
 // best-effort fast path — `loadMatchState` falls back to a full replay on miss.
 const stateCache = new Map<
   string,
-  { state: BeachMatchState; lastSequence: number }
+  { state: CommonMatchState; lastSequence: number }
 >();
 
 async function loadMatchMeta(matchId: string): Promise<MatchMeta> {
@@ -59,9 +61,12 @@ async function loadMatchMeta(matchId: string): Promise<MatchMeta> {
 
   const row = rows[0];
   if (!row) throw new MatchNotFoundError(`Match ${matchId} not found`);
-  if (row.discipline !== "BEACH") {
+
+  const discipline = row.discipline as Discipline;
+  const engine = getEngine(discipline);
+  if (!engine) {
     throw new UnsupportedDisciplineError(
-      `Discipline ${row.discipline} is not yet supported`,
+      `Discipline ${discipline} is not yet supported`,
     );
   }
 
@@ -72,17 +77,12 @@ async function loadMatchMeta(matchId: string): Promise<MatchMeta> {
     .limit(1);
 
   const overrides = (cfgRows[0] ?? {}) as unknown as Partial<TournamentConfig>;
-  const config = resolveConfig(row.discipline as Discipline, overrides);
+  const config = resolveConfig(discipline, overrides);
 
-  return {
-    matchId,
-    tenantId: row.tenantId,
-    discipline: row.discipline as Discipline,
-    config,
-  };
+  return { matchId, tenantId: row.tenantId, discipline, config, engine };
 }
 
-async function loadEvents(matchId: string): Promise<BeachEvent[]> {
+async function loadEvents(matchId: string): Promise<EngineEvent[]> {
   const rows = await db
     .select({
       id: events.id,
@@ -98,7 +98,7 @@ async function loadEvents(matchId: string): Promise<BeachEvent[]> {
     id: r.id,
     sequence: r.sequence,
     timestamp: (r.timestamp as Date).toISOString(),
-    payload: r.payload as BeachEventPayload,
+    payload: r.payload as EngineEvent["payload"],
   }));
 }
 
@@ -114,12 +114,12 @@ export async function loadMatchState(
 ): Promise<{ state: BeachMatchState; config: TournamentConfig }> {
   const meta = await loadMatchMeta(matchId);
   const cached = stateCache.get(matchId);
-  if (cached) return { state: cached.state, config: meta.config };
+  if (cached) return { state: cached.state as unknown as BeachMatchState, config: meta.config };
 
   const log = await loadEvents(matchId);
-  const state = replayEvents(matchId, log, meta.config);
+  const state = meta.engine.replay(matchId, log, meta.config);
   stateCache.set(matchId, { state, lastSequence: state.lastSequence });
-  return { state, config: meta.config };
+  return { state: state as unknown as BeachMatchState, config: meta.config };
 }
 
 /** Fresh state straight from the event log, bypassing the cache (for SSE polling). */
@@ -128,13 +128,14 @@ export async function loadMatchStateFresh(
 ): Promise<{ state: BeachMatchState; config: TournamentConfig }> {
   const meta = await loadMatchMeta(matchId);
   const log = await loadEvents(matchId);
-  const state = replayEvents(matchId, log, meta.config);
+  const state = meta.engine.replay(matchId, log, meta.config);
   stateCache.set(matchId, { state, lastSequence: state.lastSequence });
-  return { state, config: meta.config };
+  return { state: state as unknown as BeachMatchState, config: meta.config };
 }
 
 export interface MatchView {
   matchId: string;
+  discipline: Discipline;
   competitionName: string;
   teamAName: string;
   teamBName: string;
@@ -148,6 +149,7 @@ export async function loadMatchView(matchId: string): Promise<MatchView> {
   const teamB = aliasedTable(teams, "team_b");
   const rows = await db
     .select({
+      discipline: matches.discipline,
       competitionName: competitions.name,
       teamAName: teamA.displayName,
       teamBName: teamB.displayName,
@@ -165,6 +167,7 @@ export async function loadMatchView(matchId: string): Promise<MatchView> {
   const { state, config } = await loadMatchStateFresh(matchId);
   return {
     matchId,
+    discipline: row.discipline as Discipline,
     competitionName: row.competitionName,
     teamAName: row.teamAName,
     teamBName: row.teamBName,
@@ -173,57 +176,9 @@ export async function loadMatchView(matchId: string): Promise<MatchView> {
   };
 }
 
-// Map engine status → matches.status enum.
-type MatchRowStatus =
-  | "SCHEDULED"
-  | "WARMUP"
-  | "COIN_TOSS"
-  | "LIVE"
-  | "FINISHED"
-  | "ABANDONED";
-function matchStatusOf(state: BeachMatchState): MatchRowStatus {
-  switch (state.status) {
-    case "LIVE":
-      return "LIVE";
-    case "FINISHED":
-      return "FINISHED";
-    case "COIN_TOSS":
-    case "READY":
-      return "COIN_TOSS";
-    default:
-      return "SCHEDULED";
-  }
-}
-
-// Denormalised columns for an event, computed from the post-event state.
-function denormalize(state: BeachMatchState) {
-  const set = activeSet(state);
-  const serverTeam = set?.currentServer ?? null;
-  const serverPlayerNumber =
-    set == null
-      ? null
-      : serverTeam === "A"
-        ? set.serverPlayerA
-        : set.serverPlayerB;
-  const sidesAfter = set
-    ? {
-        teamA: set.teamASide,
-        teamB: set.teamASide === "LEFT" ? "RIGHT" : "LEFT",
-      }
-    : null;
-  return {
-    scoreAfterA: set?.scoreA ?? null,
-    scoreAfterB: set?.scoreB ?? null,
-    setNumber: state.currentSetNumber,
-    serverTeam,
-    serverPlayerNumber,
-    sidesAfter,
-  };
-}
-
 export interface AppendOutcome {
-  newEvents: BeachEvent[];
-  state: BeachMatchState;
+  newEvents: EngineEvent[];
+  state: CommonMatchState;
 }
 
 /**
@@ -232,7 +187,7 @@ export interface AppendOutcome {
  */
 export async function appendMatchEvent(
   matchId: string,
-  payload: BeachEventPayload,
+  payload: { type: string } & Record<string, unknown>,
   opts: { actor?: Actor; deviceInfo?: string } = {},
 ): Promise<AppendOutcome> {
   const meta = await loadMatchMeta(matchId);
@@ -244,7 +199,7 @@ export async function appendMatchEvent(
     return undoLastEvent(matchId, meta, opts.actor ?? "SCORER", opts.deviceInfo);
   }
 
-  const { state: prevState } = await loadMatchState(matchId);
+  const { state: prevState } = await loadCommonState(matchId, meta);
   const actor: Actor = opts.actor ?? "SCORER";
   const isSystem = (type: string) =>
     type === "SET_END" ||
@@ -263,7 +218,7 @@ export async function appendMatchEvent(
     return id;
   };
 
-  const result = appendBeachEvent(prevState, payload, meta.config, {
+  const result = meta.engine.append(prevState, payload, meta.config, {
     nextSequence: prevState.lastSequence + 1,
     timestamp: new Date().toISOString(),
     makeId,
@@ -274,8 +229,8 @@ export async function appendMatchEvent(
   // Build insert rows with per-event denormalised snapshots.
   let snapshot = prevState;
   const rows = result.newEvents.map((ev) => {
-    snapshot = reduce(snapshot, ev, meta.config);
-    const d = denormalize(snapshot);
+    snapshot = meta.engine.reduce(snapshot, ev, meta.config);
+    const d = meta.engine.denormalize(snapshot);
     return {
       id: ev.id,
       matchId,
@@ -293,8 +248,6 @@ export async function appendMatchEvent(
   try {
     await db.insert(events).values(rows);
   } catch (err) {
-    // Most likely a unique(matchId, sequence) violation from a concurrent
-    // writer. Drop the cache so the next load replays fresh.
     stateCache.delete(matchId);
     throw new SequenceConflictError(
       err instanceof Error ? err.message : "sequence conflict",
@@ -307,20 +260,17 @@ export async function appendMatchEvent(
     lastSequence: finalState.lastSequence,
   });
 
-  // Update the derived matches row.
   await db
     .update(matches)
     .set({
       setsWonA: finalState.setsWonA,
       setsWonB: finalState.setsWonB,
       winner: finalState.winner,
-      status: matchStatusOf(finalState),
+      status: meta.engine.matchStatusOf(finalState),
       ...(finalState.matchStartedAt
         ? { startedAt: new Date(finalState.matchStartedAt) }
         : {}),
-      ...(finalState.status === "FINISHED"
-        ? { finishedAt: new Date() }
-        : {}),
+      ...(finalState.status === "FINISHED" ? { finishedAt: new Date() } : {}),
     })
     .where(eq(matches.id, matchId));
 
@@ -342,6 +292,19 @@ export async function appendMatchEvent(
   return { newEvents: result.newEvents, state: finalState };
 }
 
+/** Common-typed state from cache or replay (internal helper). */
+async function loadCommonState(
+  matchId: string,
+  meta: MatchMeta,
+): Promise<{ state: CommonMatchState }> {
+  const cached = stateCache.get(matchId);
+  if (cached) return { state: cached.state };
+  const log = await loadEvents(matchId);
+  const state = meta.engine.replay(matchId, log, meta.config);
+  stateCache.set(matchId, { state, lastSequence: state.lastSequence });
+  return { state };
+}
+
 /** Append an UNDO targeting the most recent undoable event, then re-replay. */
 async function undoLastEvent(
   matchId: string,
@@ -352,21 +315,27 @@ async function undoLastEvent(
   const log = await loadEvents(matchId);
   const alreadyUndone = new Set<string>();
   for (const ev of log) {
-    if (ev.payload.type === "UNDO") alreadyUndone.add(ev.payload.targetEventId);
+    if (ev.payload.type === "UNDO")
+      alreadyUndone.add(ev.payload.targetEventId as string);
   }
-  // Latest event that is not itself an UNDO and not already undone.
   const target = [...log]
     .reverse()
     .find((ev) => ev.payload.type !== "UNDO" && !alreadyUndone.has(ev.id));
   if (!target) throw new EventRejectedError("Nothing to undo");
 
   const nextSeq = (log[log.length - 1]?.sequence ?? 0) + 1;
-  const undoEvent: BeachEvent = {
+  const undoEvent: EngineEvent = {
     id: newId("evt"),
     sequence: nextSeq,
     timestamp: new Date().toISOString(),
     payload: { type: "UNDO", targetEventId: target.id },
   };
+
+  const finalState = meta.engine.replay(
+    matchId,
+    [...log, undoEvent],
+    meta.config,
+  );
 
   try {
     await db.insert(events).values({
@@ -379,7 +348,7 @@ async function undoLastEvent(
       payload: undoEvent.payload,
       actor,
       deviceInfo: deviceInfo ?? null,
-      ...denormalize(replayEvents(matchId, [...log, undoEvent], meta.config)),
+      ...meta.engine.denormalize(finalState),
     });
   } catch (err) {
     stateCache.delete(matchId);
@@ -388,7 +357,6 @@ async function undoLastEvent(
     );
   }
 
-  const finalState = replayEvents(matchId, [...log, undoEvent], meta.config);
   stateCache.set(matchId, {
     state: finalState,
     lastSequence: finalState.lastSequence,
@@ -399,10 +367,13 @@ async function undoLastEvent(
       setsWonA: finalState.setsWonA,
       setsWonB: finalState.setsWonB,
       winner: finalState.winner,
-      status: matchStatusOf(finalState),
+      status: meta.engine.matchStatusOf(finalState),
     })
     .where(eq(matches.id, matchId));
   await broadcastState(matchId, { state: finalState, lastEvent: undoEvent });
 
   return { newEvents: [undoEvent], state: finalState };
 }
+
+// Re-export for callers that still import the beach event type from here.
+export type { BeachEvent };
