@@ -11,6 +11,7 @@ import {
   revokeMatchSession,
 } from "@/lib/match-session-actions";
 import { qrSvg } from "@/lib/qr";
+import { checkEventIntegrity } from "@/lib/integrity";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { statusBadgeClass, ui } from "@/components/admin/styles";
 
@@ -80,6 +81,7 @@ export default async function MatchDetailPage({
       ),
     resolveOrigin(),
   ]);
+  const integrity = await checkEventIntegrity(matchId);
 
   // Render a QR per active, non-expired session token (expiry filtered in SQL).
   const tokens = await Promise.all(
@@ -245,7 +247,25 @@ export default async function MatchDetailPage({
 
       {/* Event log */}
       <div className="mt-6">
-        <h2 className="mb-3 font-medium">Event log</h2>
+        <div className="mb-3 flex items-center gap-3">
+          <h2 className="font-medium">Event log</h2>
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+              integrity.ok
+                ? "border-green-500/40 text-green-400"
+                : "border-red-500/50 text-red-400"
+            }`}
+            title={
+              integrity.ok
+                ? "Contiguous event log"
+                : `Gaps: ${integrity.gaps.join(", ") || "—"} · Dupes: ${integrity.duplicates.join(", ") || "—"}`
+            }
+          >
+            {integrity.ok
+              ? `✓ ${integrity.count} events`
+              : `⚠ integrity (${integrity.gaps.length} gaps)`}
+          </span>
+        </div>
         {log.length === 0 ? (
           <div className={`${ui.card} text-sm text-score-dim`}>
             No events yet — open the scorer to start the match.

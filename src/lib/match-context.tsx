@@ -195,6 +195,15 @@ export function MatchProvider({
     };
   }, [matchId, resync]);
 
+  // Backstop reconcile: catches missed realtime signals so the view can't go
+  // silently stale during a broker outage (§P11.2).
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (stateRef.current.status !== "FINISHED") void resync();
+    }, 25000);
+    return () => clearInterval(id);
+  }, [resync]);
+
   const value = useMemo<MatchContextValue>(
     () => ({
       matchId,

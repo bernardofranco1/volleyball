@@ -231,6 +231,15 @@ export function createMatchProvider<
       };
     }, [matchId, resync]);
 
+    // Backstop reconcile: catches realtime signals that never arrived (broker
+    // outage / dropped messages) so a live view can't silently go stale (§P11.2).
+    useEffect(() => {
+      const id = setInterval(() => {
+        if (stateRef.current.status !== "FINISHED") void resync();
+      }, 25000);
+      return () => clearInterval(id);
+    }, [resync]);
+
     const value = useMemo<MatchContextValue<S, P>>(
       () => ({
         matchId,
