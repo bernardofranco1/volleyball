@@ -8,6 +8,7 @@ import { competitions, tournamentConfig } from "@/db/schema";
 import type { Discipline } from "@/engine/types";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { getCompetition } from "@/lib/competitions";
+import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
 import { fail, type FormState } from "@/lib/action-state";
 
@@ -68,6 +69,15 @@ export async function createCompetition(
     setScore: intOrNull(fd, "setScore"),
   });
 
+  await recordAudit({
+    tenantId: ctx.tenant.id,
+    actor: { userId: ctx.user.id, email: ctx.user.email },
+    action: "competition.create",
+    entityType: "competition",
+    entityId: id,
+    summary: `Created ${discipline} competition “${name}”`,
+  });
+
   revalidatePath(`/t/${tenantSlug}/competitions`);
   redirect(`/t/${tenantSlug}/competitions/${id}`);
 }
@@ -116,6 +126,16 @@ export async function setCompetitionStatus(fd: FormData): Promise<void> {
     .update(competitions)
     .set({ status: status as (typeof STATUSES)[number] })
     .where(eq(competitions.id, competitionId));
+
+  await recordAudit({
+    tenantId: ctx.tenant.id,
+    actor: { userId: ctx.user.id, email: ctx.user.email },
+    action: `competition.status.${status.toLowerCase()}`,
+    entityType: "competition",
+    entityId: competitionId,
+    summary: `Set “${comp.name}” to ${status}`,
+    metadata: { from: comp.status, to: status },
+  });
 
   revalidatePath(`/t/${tenantSlug}/competitions`);
   revalidatePath(`/t/${tenantSlug}/competitions/${competitionId}`);

@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { matchSessions, matches } from "@/db/schema";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { getCompetition } from "@/lib/competitions";
+import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
 
 function str(fd: FormData, key: string): string {
@@ -55,8 +56,9 @@ export async function createMatchSession(fd: FormData): Promise<void> {
   const team = str(fd, "team");
   if (team !== "A" && team !== "B") return;
 
+  const sessionId = newId("mses");
   await db.insert(matchSessions).values({
-    id: newId("mses"),
+    id: sessionId,
     matchId: g.matchId,
     tenantId: g.tenantId,
     team,
@@ -65,6 +67,15 @@ export async function createMatchSession(fd: FormData): Promise<void> {
     expiresAt: new Date(Date.now() + SESSION_TTL_MS),
   });
 
+  await recordAudit({
+    tenantId: g.tenantId,
+    actor: { userId: g.userId },
+    action: "matchSession.issue",
+    entityType: "match",
+    entityId: g.matchId,
+    summary: `Issued a team-${team} tablet token`,
+    metadata: { sessionId, team },
+  });
   revalidatePath(matchPath(g.tenantSlug, g.competitionId, g.matchId));
 }
 
@@ -86,5 +97,14 @@ export async function revokeMatchSession(fd: FormData): Promise<void> {
       ),
     );
 
+  await recordAudit({
+    tenantId: g.tenantId,
+    actor: { userId: g.userId },
+    action: "matchSession.revoke",
+    entityType: "match",
+    entityId: g.matchId,
+    summary: "Revoked a team tablet token",
+    metadata: { sessionId },
+  });
   revalidatePath(matchPath(g.tenantSlug, g.competitionId, g.matchId));
 }

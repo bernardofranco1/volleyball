@@ -46,6 +46,19 @@ export default async function SettingsPage({
           branding={ctx.tenant.branding}
         />
 
+        <Link
+          href={`/t/${tenantSlug}/audit`}
+          className={`${ui.card} flex items-center justify-between transition-colors hover:border-primary`}
+        >
+          <span>
+            <span className="font-medium">Audit log</span>
+            <span className="mt-1 block text-sm text-score-dim">
+              Recent administrative changes (lifecycle, deletes, bracket, tokens).
+            </span>
+          </span>
+          <span className="text-score-dim">→</span>
+        </Link>
+
         <div className={`${ui.card} text-xs text-score-dim`}>
           <p className="mb-1 font-medium text-foreground">Custom domain</p>
           Mapping a tenant to a custom domain (Vercel Domains API) is configured at

@@ -8,6 +8,7 @@ import type { Discipline } from "@/engine/types";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { getCompetition } from "@/lib/competitions";
 import { csvBool, parseCsvRecords } from "@/lib/csv";
+import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
 import type { ImportState } from "@/lib/action-state";
 
@@ -81,6 +82,13 @@ async function logImport(
     rowsError: errs.length,
     errors: errs.length ? errs : null,
     createdBy,
+  });
+  await recordAudit({
+    tenantId,
+    actor: { userId: createdBy },
+    action: `csv.import.${importType.toLowerCase()}`,
+    entityType: "import",
+    summary: `Imported ${ok} ${importType.toLowerCase()} (${errs.length} skipped)${filename ? ` from ${filename}` : ""}`,
   });
 }
 

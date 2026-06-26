@@ -364,3 +364,27 @@ export const csvImports = pgTable("csv_imports", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   createdBy: text("created_by"),
 });
+
+// ── Admin audit log (Phase 11) ───────────────────────────────────────────────
+// Append-only record of sensitive admin mutations (lifecycle, deletes, bracket,
+// branding, token issuance, bulk imports). Written best-effort; never blocks the
+// operation it records.
+
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    actorUserId: text("actor_user_id"),
+    actorEmail: text("actor_email"),
+    action: text("action").notNull(), // e.g. "competition.activate"
+    entityType: text("entity_type"), // "competition" | "team" | "match" | …
+    entityId: text("entity_id"),
+    summary: text("summary"), // human-readable one-liner
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("audit_log_tenant_idx").on(t.tenantId, t.createdAt)],
+);

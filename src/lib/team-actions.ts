@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { matches, players, teams } from "@/db/schema";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { getCompetition } from "@/lib/competitions";
+import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
 import { fail, OK, type FormState } from "@/lib/action-state";
 
@@ -26,7 +27,12 @@ async function gate(fd: FormData) {
   const ctx = await requireRole(tenantSlug, ADMIN_ROLES);
   const comp = await getCompetition(ctx.tenant.id, competitionId);
   if (!comp) return null;
-  return { tenantSlug, competitionId, tenantId: ctx.tenant.id };
+  return {
+    tenantSlug,
+    competitionId,
+    tenantId: ctx.tenant.id,
+    actor: { userId: ctx.user.id, email: ctx.user.email },
+  };
 }
 
 function teamsPath(tenantSlug: string, competitionId: string) {
@@ -96,6 +102,15 @@ export async function deleteTeam(fd: FormData): Promise<void> {
     .delete(teams)
     .where(and(eq(teams.id, teamId), eq(teams.competitionId, g.competitionId)));
 
+  await recordAudit({
+    tenantId: g.tenantId,
+    actor: g.actor,
+    action: "team.delete",
+    entityType: "team",
+    entityId: teamId,
+    summary: `Deleted team and its players`,
+    metadata: { competitionId: g.competitionId },
+  });
   revalidatePath(teamsPath(g.tenantSlug, g.competitionId));
 }
 

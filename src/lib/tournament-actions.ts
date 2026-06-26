@@ -10,6 +10,7 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 import type { Discipline } from "@/engine/types";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { getCompetition } from "@/lib/competitions";
+import { recordAudit } from "@/lib/audit";
 import {
   bracketSize,
   isKnockoutRound,
@@ -33,6 +34,7 @@ async function gate(fd: FormData) {
     competitionId,
     tenantId: ctx.tenant.id,
     discipline: comp.discipline as Discipline,
+    actor: { userId: ctx.user.id, email: ctx.user.email },
   };
 }
 
@@ -142,6 +144,14 @@ export async function generateBracket(fd: FormData): Promise<void> {
     }
     await tx.insert(matches).values(rows);
   });
+  await recordAudit({
+    tenantId: g.tenantId,
+    actor: g.actor,
+    action: "bracket.generate",
+    entityType: "competition",
+    entityId: g.competitionId,
+    summary: "Generated single-elimination bracket",
+  });
   revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
 }
 
@@ -240,5 +250,13 @@ export async function advanceBracket(fd: FormData): Promise<void> {
     }
   });
 
+  await recordAudit({
+    tenantId: g.tenantId,
+    actor: g.actor,
+    action: "bracket.advance",
+    entityType: "competition",
+    entityId: g.competitionId,
+    summary: "Advanced bracket winners",
+  });
   revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
 }

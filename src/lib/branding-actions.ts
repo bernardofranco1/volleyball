@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { tenantBranding } from "@/db/schema";
 import { requireRole } from "@/lib/authz";
 import { COURT_VARS } from "@/lib/branding";
+import { recordAudit } from "@/lib/audit";
 import { fail, OK, type FormState } from "@/lib/action-state";
 
 function str(fd: FormData, key: string): string {
@@ -54,6 +55,16 @@ export async function updateBranding(
         courtColorOverrides,
       },
     });
+
+  await recordAudit({
+    tenantId: ctx.tenant.id,
+    actor: { userId: ctx.user.id, email: ctx.user.email },
+    action: "branding.update",
+    entityType: "tenant",
+    entityId: ctx.tenant.id,
+    summary: "Updated tenant branding",
+    metadata: { primaryColor, hasLogo: Boolean(logoUrl) },
+  });
 
   revalidatePath(`/t/${tenantSlug}`, "layout");
   return OK;

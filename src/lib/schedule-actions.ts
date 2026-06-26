@@ -7,6 +7,7 @@ import { events, matchSessions, matches, teams } from "@/db/schema";
 import type { Discipline } from "@/engine/types";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { getCompetition } from "@/lib/competitions";
+import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
 import { fail, OK, type FormState } from "@/lib/action-state";
 
@@ -43,6 +44,7 @@ async function gate(fd: FormData) {
     competitionId,
     tenantId: ctx.tenant.id,
     discipline: comp.discipline as Discipline,
+    actor: { userId: ctx.user.id, email: ctx.user.email },
   };
 }
 
@@ -142,6 +144,15 @@ export async function deleteMatch(fd: FormData): Promise<void> {
       and(eq(matches.id, matchId), eq(matches.competitionId, g.competitionId)),
     );
 
+  await recordAudit({
+    tenantId: g.tenantId,
+    actor: g.actor,
+    action: "match.delete",
+    entityType: "match",
+    entityId: matchId,
+    summary: "Deleted a scheduled match",
+    metadata: { competitionId: g.competitionId },
+  });
   revalidatePath(schedulePath(g.tenantSlug, g.competitionId));
 }
 
