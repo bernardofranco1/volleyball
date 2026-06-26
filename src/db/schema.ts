@@ -388,3 +388,23 @@ export const auditLog = pgTable(
   },
   (t) => [index("audit_log_tenant_idx").on(t.tenantId, t.createdAt)],
 );
+
+// ── Tenant billing (Phase 11 scaffold — Stripe, "future") ────────────────────
+// One row per tenant, kept in sync by the Stripe webhook. Inert until Stripe is
+// configured; defaults leave every tenant on "free"/"none".
+
+export const tenantBilling = pgTable("tenant_billing", {
+  tenantId: text("tenant_id")
+    .primaryKey()
+    .references(() => tenants.id),
+  plan: text("plan").default("free").notNull(),
+  status: text("status", {
+    enum: ["none", "trialing", "active", "past_due", "canceled", "incomplete"],
+  })
+    .default("none")
+    .notNull(),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
