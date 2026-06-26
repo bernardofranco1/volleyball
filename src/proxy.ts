@@ -50,8 +50,12 @@ export async function proxy(request: NextRequest) {
   //   - the team tablet (`/t/{slug}/matches/{id}/team/{A|B}`) — session-token gated
   const isPublicScoreboard = /^\/t\/[^/]+\/scoreboard\//.test(pathname);
   const isTeamTablet = /^\/t\/[^/]+\/matches\/[^/]+\/team\//.test(pathname);
+  const isPublicResults = /^\/t\/[^/]+\/results\//.test(pathname);
   const isProtected =
-    pathname.startsWith("/t/") && !isPublicScoreboard && !isTeamTablet;
+    pathname.startsWith("/t/") &&
+    !isPublicScoreboard &&
+    !isTeamTablet &&
+    !isPublicResults;
 
   if (isProtected && !user) {
     const loginUrl = request.nextUrl.clone();

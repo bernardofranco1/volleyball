@@ -109,6 +109,14 @@ export async function computeStandings(
     }
   }
 
+  // Head-to-head wins: h2h[winnerTeamId][loserTeamId] = count.
+  const h2h = new Map<string, Map<string, number>>();
+  const bumpH2H = (winner: string, loser: string) => {
+    const row = h2h.get(winner) ?? new Map<string, number>();
+    row.set(loser, (row.get(loser) ?? 0) + 1);
+    h2h.set(winner, row);
+  };
+
   // Aggregate per team.
   const agg = new Map<string, StandingRow>();
   for (const t of teamRows) {
@@ -146,9 +154,11 @@ export async function computeStandings(
     if (m.winner === "A") {
       a.w++;
       b.l++;
+      bumpH2H(m.teamAId, m.teamBId);
     } else if (m.winner === "B") {
       b.w++;
       a.l++;
+      bumpH2H(m.teamBId, m.teamAId);
     }
   }
 
@@ -172,14 +182,17 @@ export async function computeStandings(
     groups.set(key, list);
   }
 
+  // Tiebreakers: W → set ratio → point ratio → head-to-head → name.
   const sortRows = (rows: StandingRow[]) =>
-    rows.sort(
-      (x, y) =>
-        y.w - x.w ||
-        y.srNum - x.srNum ||
-        y.prNum - x.prNum ||
-        x.teamName.localeCompare(y.teamName),
-    );
+    rows.sort((x, y) => {
+      if (y.w !== x.w) return y.w - x.w;
+      if (y.srNum !== x.srNum) return y.srNum - x.srNum;
+      if (y.prNum !== x.prNum) return y.prNum - x.prNum;
+      const xBeatY = h2h.get(x.teamId)?.get(y.teamId) ?? 0;
+      const yBeatX = h2h.get(y.teamId)?.get(x.teamId) ?? 0;
+      if (xBeatY !== yBeatX) return yBeatX - xBeatY;
+      return x.teamName.localeCompare(y.teamName);
+    });
 
   const result: StandingsGroup[] = [];
   for (const [key, rows] of groups) {
