@@ -14,11 +14,14 @@ import {
   type PlayerLite,
 } from "@/lib/indoor-match-context";
 import { GrassMatchProvider } from "@/lib/grass-match-context";
+import { LightMatchProvider } from "@/lib/light-match-context";
 import { LiveScoreboard } from "@/components/scoring/LiveScoreboard";
 import { IndoorScoreboard } from "@/components/scoring/IndoorScoreboard";
 import { GrassScoreboard } from "@/components/scoring/GrassScoreboard";
+import { LightScoreboard } from "@/components/scoring/LightScoreboard";
 import type { IndoorMatchState } from "@/engine/indoor/types";
 import type { GrassMatchState } from "@/engine/grass/types";
+import type { LightMatchState } from "@/engine/light/types";
 
 export const dynamic = "force-dynamic";
 
@@ -122,6 +125,23 @@ export default async function LiveScoringPage({
       >
         <GrassScoreboard competitionName={view.competitionName} />
       </GrassMatchProvider>
+    );
+  }
+
+  if (view.discipline === "LIGHT") {
+    const { rosterA, rosterB } = await loadRosters(matchId);
+    return (
+      <LightMatchProvider
+        matchId={view.matchId}
+        initialState={view.state as unknown as LightMatchState}
+        config={view.config}
+        rosterA={rosterA}
+        rosterB={rosterB}
+        teamAName={view.teamAName}
+        teamBName={view.teamBName}
+      >
+        <LightScoreboard competitionName={view.competitionName} />
+      </LightMatchProvider>
     );
   }
 

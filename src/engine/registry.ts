@@ -37,6 +37,15 @@ import {
   type GrassMatchState,
   activeSet as grassActiveSet,
 } from "./grass/types";
+import {
+  appendLightEvent,
+  reduce as lightReduce,
+  replayEvents as lightReplay,
+} from "./light/reducer";
+import {
+  type LightMatchState,
+  activeSet as lightActiveSet,
+} from "./light/types";
 
 /** The subset of match state the persistence/broadcast layer relies on. */
 export interface CommonMatchState {
@@ -240,10 +249,49 @@ const grassAdapter: EngineAdapter = {
   matchStatusOf: (state) => rowStatusOf(state.status),
 };
 
+// ── Light adapter ────────────────────────────────────────────────────────────
+
+const lightAdapter: EngineAdapter = {
+  replay: (matchId, events, config) =>
+    lightReplay(matchId, events as never, config) as unknown as CommonMatchState,
+  reduce: (state, event, config) =>
+    lightReduce(
+      state as unknown as LightMatchState,
+      event as never,
+      config,
+    ) as unknown as CommonMatchState,
+  append: (prev, payload, config, opts) =>
+    appendLightEvent(
+      prev as unknown as LightMatchState,
+      payload as never,
+      config,
+      opts,
+    ) as unknown as AppendResult,
+  denormalize: (state) => {
+    const set = lightActiveSet(state as unknown as LightMatchState);
+    const serverTeam = set?.currentServer ?? null;
+    const lastRot =
+      set == null ? null : serverTeam === "A" ? set.lastRotA : set.lastRotB;
+    const sidesAfter = set
+      ? { teamA: set.teamASide, teamB: set.teamASide === "LEFT" ? "RIGHT" : "LEFT" }
+      : null;
+    return {
+      scoreAfterA: set?.scoreA ?? null,
+      scoreAfterB: set?.scoreB ?? null,
+      setNumber: (state as unknown as LightMatchState).currentSetNumber,
+      serverTeam,
+      serverPlayerNumber: lastRot == null ? null : lastRot + 1,
+      sidesAfter,
+    };
+  },
+  matchStatusOf: (state) => rowStatusOf(state.status),
+};
+
 const REGISTRY: Partial<Record<Discipline, EngineAdapter>> = {
   BEACH: beachAdapter,
   INDOOR: indoorAdapter,
   GRASS: grassAdapter,
+  LIGHT: lightAdapter,
 };
 
 /** The engine adapter for a discipline, or null if not yet supported. */
