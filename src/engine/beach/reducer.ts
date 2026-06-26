@@ -19,8 +19,8 @@ import {
   activeSet,
   initialBeachState,
   oppositeSide,
-  oppositeTeam,
 } from "./types";
+import { validateBeachEvent } from "./validator";
 
 // ── pure rule predicates (config-driven) ─────────────────────────────────────
 
@@ -390,6 +390,67 @@ export function computeAutoEmits(
   if (ss) emits.push({ type: "SIDE_SWITCH", newTeamASide: ss.newTeamASide });
   if (computeTTODue(set, config)) emits.push({ type: "TTO_START" });
   return emits;
+}
+
+// ── append orchestration (pure) ──────────────────────────────────────────────
+
+/** Events whose application can produce auto-emitted consequences. */
+function isScoringEvent(type: BeachEventPayload["type"]): boolean {
+  return type === "RALLY_WON_A" || type === "RALLY_WON_B";
+}
+
+export type AppendResult =
+  | { ok: false; reason: string }
+  | { ok: true; newEvents: BeachEvent[]; state: BeachMatchState };
+
+/**
+ * Apply a new payload to the current state: validate, build the primary event,
+ * then append any auto-emitted consequences (only after a scoring event, so a
+ * non-scoring event at a side-switch sum cannot re-trigger one). Pure — the
+ * caller supplies sequence/timestamp/id and persists `newEvents`.
+ */
+export function appendBeachEvent(
+  prevState: BeachMatchState,
+  payload: BeachEventPayload,
+  config: TournamentConfig,
+  opts: {
+    nextSequence: number;
+    timestamp: string;
+    makeId: (sequence: number) => string;
+  },
+): AppendResult {
+  const validation = validateBeachEvent(payload, prevState, config);
+  if (!validation.ok) return { ok: false, reason: validation.reason! };
+
+  let seq = opts.nextSequence;
+  const newEvents: BeachEvent[] = [];
+  let state = prevState;
+
+  const primary: BeachEvent = {
+    id: opts.makeId(seq),
+    sequence: seq,
+    timestamp: opts.timestamp,
+    payload,
+  };
+  newEvents.push(primary);
+  state = reduce(state, primary, config);
+  seq += 1;
+
+  if (isScoringEvent(payload.type)) {
+    for (const emit of computeAutoEmits(state, config)) {
+      const ev: BeachEvent = {
+        id: opts.makeId(seq),
+        sequence: seq,
+        timestamp: opts.timestamp,
+        payload: emit,
+      };
+      newEvents.push(ev);
+      state = reduce(state, ev, config);
+      seq += 1;
+    }
+  }
+
+  return { ok: true, newEvents, state };
 }
 
 // ── replay ───────────────────────────────────────────────────────────────────

@@ -1,0 +1,295 @@
+// Server-side match orchestration: the bridge between the pure beach engine and
+// the database + realtime layer.
+//
+//   - resolveMatchConfig: discipline defaults layered with the persisted overrides
+//   - loadMatchState:     replay the event log (memoised per match instance)
+//   - appendMatchEvent:   validate → persist primary + auto-emitted events →
+//                         update the denormalised matches row → broadcast
+//
+// State is event-sourced: the matches table only holds *derived* convenience
+// columns (setsWon, status, winner). The events table is the source of truth.
+
+import { asc, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { events, matches, tournamentConfig } from "@/db/schema";
+import {
+  type TournamentConfig,
+  resolveConfig,
+} from "@/engine/config";
+import { appendBeachEvent, reduce, replayEvents } from "@/engine/beach/reducer";
+import {
+  type BeachEvent,
+  type BeachEventPayload,
+  type BeachMatchState,
+  activeSet,
+} from "@/engine/beach/types";
+import type { Actor, Discipline } from "@/engine/types";
+import { newId } from "@/lib/id";
+import { broadcastServeClock, broadcastState } from "@/lib/realtime";
+
+export class MatchNotFoundError extends Error {}
+export class UnsupportedDisciplineError extends Error {}
+export class EventRejectedError extends Error {}
+export class SequenceConflictError extends Error {}
+
+interface MatchMeta {
+  matchId: string;
+  tenantId: string;
+  discipline: Discipline;
+  config: TournamentConfig;
+}
+
+// Per-instance state cache. Serverless instances are ephemeral, so this is a
+// best-effort fast path — `loadMatchState` falls back to a full replay on miss.
+const stateCache = new Map<
+  string,
+  { state: BeachMatchState; lastSequence: number }
+>();
+
+async function loadMatchMeta(matchId: string): Promise<MatchMeta> {
+  const rows = await db
+    .select({
+      tenantId: matches.tenantId,
+      discipline: matches.discipline,
+      competitionId: matches.competitionId,
+    })
+    .from(matches)
+    .where(eq(matches.id, matchId))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) throw new MatchNotFoundError(`Match ${matchId} not found`);
+  if (row.discipline !== "BEACH") {
+    throw new UnsupportedDisciplineError(
+      `Discipline ${row.discipline} is not yet supported`,
+    );
+  }
+
+  const cfgRows = await db
+    .select()
+    .from(tournamentConfig)
+    .where(eq(tournamentConfig.competitionId, row.competitionId))
+    .limit(1);
+
+  const overrides = (cfgRows[0] ?? {}) as unknown as Partial<TournamentConfig>;
+  const config = resolveConfig(row.discipline as Discipline, overrides);
+
+  return {
+    matchId,
+    tenantId: row.tenantId,
+    discipline: row.discipline as Discipline,
+    config,
+  };
+}
+
+async function loadEvents(matchId: string): Promise<BeachEvent[]> {
+  const rows = await db
+    .select({
+      id: events.id,
+      sequence: events.sequence,
+      timestamp: events.timestamp,
+      payload: events.payload,
+    })
+    .from(events)
+    .where(eq(events.matchId, matchId))
+    .orderBy(asc(events.sequence));
+
+  return rows.map((r) => ({
+    id: r.id,
+    sequence: r.sequence,
+    timestamp: (r.timestamp as Date).toISOString(),
+    payload: r.payload as BeachEventPayload,
+  }));
+}
+
+export async function resolveMatchConfig(
+  matchId: string,
+): Promise<TournamentConfig> {
+  return (await loadMatchMeta(matchId)).config;
+}
+
+/** Current state for a match (cache fast-path, else full replay). */
+export async function loadMatchState(
+  matchId: string,
+): Promise<{ state: BeachMatchState; config: TournamentConfig }> {
+  const meta = await loadMatchMeta(matchId);
+  const cached = stateCache.get(matchId);
+  if (cached) return { state: cached.state, config: meta.config };
+
+  const log = await loadEvents(matchId);
+  const state = replayEvents(matchId, log, meta.config);
+  stateCache.set(matchId, { state, lastSequence: state.lastSequence });
+  return { state, config: meta.config };
+}
+
+/** Fresh state straight from the event log, bypassing the cache (for SSE polling). */
+export async function loadMatchStateFresh(
+  matchId: string,
+): Promise<{ state: BeachMatchState; config: TournamentConfig }> {
+  const meta = await loadMatchMeta(matchId);
+  const log = await loadEvents(matchId);
+  const state = replayEvents(matchId, log, meta.config);
+  stateCache.set(matchId, { state, lastSequence: state.lastSequence });
+  return { state, config: meta.config };
+}
+
+// Map engine status → matches.status enum.
+type MatchRowStatus =
+  | "SCHEDULED"
+  | "WARMUP"
+  | "COIN_TOSS"
+  | "LIVE"
+  | "FINISHED"
+  | "ABANDONED";
+function matchStatusOf(state: BeachMatchState): MatchRowStatus {
+  switch (state.status) {
+    case "LIVE":
+      return "LIVE";
+    case "FINISHED":
+      return "FINISHED";
+    case "COIN_TOSS":
+    case "READY":
+      return "COIN_TOSS";
+    default:
+      return "SCHEDULED";
+  }
+}
+
+// Denormalised columns for an event, computed from the post-event state.
+function denormalize(state: BeachMatchState) {
+  const set = activeSet(state);
+  const serverTeam = set?.currentServer ?? null;
+  const serverPlayerNumber =
+    set == null
+      ? null
+      : serverTeam === "A"
+        ? set.serverPlayerA
+        : set.serverPlayerB;
+  const sidesAfter = set
+    ? {
+        teamA: set.teamASide,
+        teamB: set.teamASide === "LEFT" ? "RIGHT" : "LEFT",
+      }
+    : null;
+  return {
+    scoreAfterA: set?.scoreA ?? null,
+    scoreAfterB: set?.scoreB ?? null,
+    setNumber: state.currentSetNumber,
+    serverTeam,
+    serverPlayerNumber,
+    sidesAfter,
+  };
+}
+
+export interface AppendOutcome {
+  newEvents: BeachEvent[];
+  state: BeachMatchState;
+}
+
+/**
+ * Validate and persist a new event (plus any auto-emitted consequences),
+ * update the derived matches row, broadcast the new state, and return it.
+ */
+export async function appendMatchEvent(
+  matchId: string,
+  payload: BeachEventPayload,
+  opts: { actor?: Actor; deviceInfo?: string } = {},
+): Promise<AppendOutcome> {
+  const meta = await loadMatchMeta(matchId);
+  const { state: prevState } = await loadMatchState(matchId);
+  const actor: Actor = opts.actor ?? "SCORER";
+  const isSystem = (type: string) =>
+    type === "SET_END" ||
+    type === "MATCH_END" ||
+    type === "SIDE_SWITCH" ||
+    type === "TTO_START";
+
+  // Stable ids per sequence so the result and the persisted rows agree.
+  const idForSeq = new Map<number, string>();
+  const makeId = (seq: number) => {
+    let id = idForSeq.get(seq);
+    if (!id) {
+      id = newId("evt");
+      idForSeq.set(seq, id);
+    }
+    return id;
+  };
+
+  const result = appendBeachEvent(prevState, payload, meta.config, {
+    nextSequence: prevState.lastSequence + 1,
+    timestamp: new Date().toISOString(),
+    makeId,
+  });
+
+  if (!result.ok) throw new EventRejectedError(result.reason);
+
+  // Build insert rows with per-event denormalised snapshots.
+  let snapshot = prevState;
+  const rows = result.newEvents.map((ev) => {
+    snapshot = reduce(snapshot, ev, meta.config);
+    const d = denormalize(snapshot);
+    return {
+      id: ev.id,
+      matchId,
+      tenantId: meta.tenantId,
+      sequence: ev.sequence,
+      timestamp: new Date(ev.timestamp),
+      eventType: ev.payload.type,
+      payload: ev.payload,
+      actor: isSystem(ev.payload.type) ? ("SYSTEM" as Actor) : actor,
+      deviceInfo: opts.deviceInfo ?? null,
+      ...d,
+    };
+  });
+
+  try {
+    await db.insert(events).values(rows);
+  } catch (err) {
+    // Most likely a unique(matchId, sequence) violation from a concurrent
+    // writer. Drop the cache so the next load replays fresh.
+    stateCache.delete(matchId);
+    throw new SequenceConflictError(
+      err instanceof Error ? err.message : "sequence conflict",
+    );
+  }
+
+  const finalState = result.state;
+  stateCache.set(matchId, {
+    state: finalState,
+    lastSequence: finalState.lastSequence,
+  });
+
+  // Update the derived matches row.
+  await db
+    .update(matches)
+    .set({
+      setsWonA: finalState.setsWonA,
+      setsWonB: finalState.setsWonB,
+      winner: finalState.winner,
+      status: matchStatusOf(finalState),
+      ...(finalState.matchStartedAt
+        ? { startedAt: new Date(finalState.matchStartedAt) }
+        : {}),
+      ...(finalState.status === "FINISHED"
+        ? { finishedAt: new Date() }
+        : {}),
+    })
+    .where(eq(matches.id, matchId));
+
+  // Broadcast: state to everyone, plus a serve-clock countdown after a rally.
+  const lastEvent = result.newEvents[result.newEvents.length - 1];
+  await broadcastState(matchId, { state: finalState, lastEvent });
+  if (
+    meta.config.serveClockEnabled &&
+    (payload.type === "RALLY_WON_A" || payload.type === "RALLY_WON_B") &&
+    finalState.status === "LIVE"
+  ) {
+    await broadcastServeClock(
+      matchId,
+      Date.now() + meta.config.serveClockSecs * 1000,
+      meta.config.serveClockSecs,
+    );
+  }
+
+  return { newEvents: result.newEvents, state: finalState };
+}

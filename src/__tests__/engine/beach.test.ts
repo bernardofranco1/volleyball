@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DISCIPLINE_DEFAULTS, resolveConfig } from "@/engine/config";
 import {
+  appendBeachEvent,
   computeAutoEmits,
   reduce,
   replayEvents,
@@ -328,6 +329,71 @@ describe("beach reducer — VCS challenge accounting", () => {
     m.apply({ type: "VCS_CHALLENGE", team: "A" });
     m.apply({ type: "VCS_RESULT", upheld: true, team: "A" }); // success → retain
     expect(m.set.challengesRemainingA).toBe(1);
+  });
+});
+
+describe("beach append orchestrator", () => {
+  const opts = (nextSequence: number) => ({
+    nextSequence,
+    timestamp: TS,
+    makeId: (seq: number) => `e${seq}`,
+  });
+
+  function liveMatch() {
+    const m = new TestMatch();
+    m.begin("A", "LEFT");
+    return m;
+  }
+
+  it("appends a scoring event plus its auto-emitted consequences", () => {
+    const m = liveMatch();
+    // drive to 10-10 so the next A point makes sum 21 (side switch + TTO)
+    for (let i = 0; i < 10; i++) {
+      m.dispatch({ type: "RALLY_WON_A" });
+      m.dispatch({ type: "RALLY_WON_B" });
+    }
+    const res = appendBeachEvent(
+      m.state,
+      { type: "RALLY_WON_A" },
+      BEACH,
+      opts(m.state.lastSequence + 1),
+    );
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.newEvents.map((e) => e.payload.type)).toEqual([
+      "RALLY_WON_A",
+      "SIDE_SWITCH",
+      "TTO_START",
+    ]);
+  });
+
+  it("rejects an invalid event with a reason", () => {
+    const m = liveMatch();
+    const res = appendBeachEvent(
+      m.state,
+      { type: "VCS_CHALLENGE", team: "A" }, // VCS disabled for beach defaults
+      BEACH,
+      opts(m.state.lastSequence + 1),
+    );
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.reason).toMatch(/disabled/i);
+  });
+
+  it("does not re-emit a side switch on a non-scoring event at the same sum", () => {
+    const m = liveMatch();
+    for (let i = 0; i < 7; i++) m.dispatch({ type: "RALLY_WON_A" }); // 7-0, one side switch
+    const res = appendBeachEvent(
+      m.state,
+      { type: "TIMEOUT_REQUEST", team: "A" },
+      BEACH,
+      opts(m.state.lastSequence + 1),
+    );
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.newEvents.map((e) => e.payload.type)).toEqual([
+      "TIMEOUT_REQUEST",
+    ]);
   });
 });
 
