@@ -70,3 +70,12 @@ step performed with your own Vercel account:
 5. **Custom domains** (per-tenant white-label): map domains in the Vercel
    dashboard or via the Vercel Domains API. The settings page surfaces this as a
    deploy-time step (the Domains API integration is not wired into the app).
+
+## Monitoring (optional, Phase 11)
+
+- **Errors**: set `SENTRY_DSN` (+ `NEXT_PUBLIC_SENTRY_DSN`) to enable Sentry;
+  unset = inert.
+- **Uptime**: point a monitor (UptimeRobot / BetterStack / Pingdom) at
+  `GET /api/health` — 200 when the DB is reachable, 503 otherwise.
+- **Rate limiting**: set `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`
+  for cross-instance limits; otherwise a per-instance in-memory limiter is used.
