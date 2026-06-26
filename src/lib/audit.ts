@@ -6,6 +6,7 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog } from "@/db/schema";
+import { captureError } from "@/lib/observability";
 import { newId } from "@/lib/id";
 
 export interface AuditActor {
@@ -36,8 +37,10 @@ export async function recordAudit(input: AuditInput): Promise<void> {
       summary: input.summary ?? null,
       metadata: input.metadata ?? null,
     });
-  } catch {
-    // Never let an audit write break the mutation it records.
+  } catch (err) {
+    // Never let an audit write break the mutation it records; surface to
+    // monitoring (no-op until a Sentry DSN is set).
+    captureError(err, { scope: "audit", action: input.action });
   }
 }
 

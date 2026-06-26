@@ -5,6 +5,8 @@
 // key. Broadcast failures are swallowed — the SSE stream and client resync are
 // the fallback, so a realtime hiccup must never fail a scoring request.
 
+import { captureError } from "@/lib/observability";
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
@@ -26,8 +28,10 @@ async function broadcast(messages: BroadcastMessage[]): Promise<void> {
       },
       body: JSON.stringify({ messages }),
     });
-  } catch {
-    // Best-effort: clients still receive updates via the SSE stream / resync.
+  } catch (err) {
+    // Best-effort: clients still reconcile via the /state backstop. Surface the
+    // failure to monitoring (no-op until a Sentry DSN is set).
+    captureError(err, { scope: "realtime.broadcast" });
   }
 }
 
