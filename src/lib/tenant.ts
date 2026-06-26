@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { tenants, tenantBranding, userTenantRoles } from "@/db/schema";
@@ -29,8 +30,11 @@ const DEFAULT_BRANDING: TenantBranding = {
   courtColorOverrides: null,
 };
 
-/** Resolve a tenant (with branding) by its URL slug, or null if not found. */
-export async function getTenantBySlug(
+/**
+ * Resolve a tenant (with branding) by its URL slug, or null if not found.
+ * Memoised per request (`cache`) so the layout, page, and authz share one query.
+ */
+export const getTenantBySlug = cache(async function getTenantBySlug(
   slug: string,
 ): Promise<TenantWithBranding | null> {
   const rows = await db
@@ -65,7 +69,7 @@ export async function getTenantBySlug(
         (r.courtColorOverrides as Record<string, string> | null) ?? null,
     },
   };
-}
+});
 
 /**
  * The slug of the first tenant a user belongs to. Used after login to send the

@@ -61,7 +61,7 @@ export function isDecidingSwitchDue(
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
 function newSetState(

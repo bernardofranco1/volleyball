@@ -8,6 +8,8 @@ import {
   appendMatchEvent,
 } from "@/lib/match-engine";
 import { validateTabletToken } from "@/lib/match-session";
+import { sameOriginOk } from "@/lib/http";
+import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +19,8 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id } = await ctx.params;
+  if (!sameOriginOk(req))
+    return Response.json({ error: "Bad origin" }, { status: 403 });
   const body = (await req.json().catch(() => null)) as {
     token?: string;
     team?: "A" | "B";
@@ -31,6 +35,8 @@ export async function POST(
   const session = await validateTabletToken(body.token, id, body.team);
   if (!session)
     return Response.json({ error: "Invalid or expired token" }, { status: 401 });
+  if (!(await rateLimit(`lineup:${session.id}`)))
+    return Response.json({ error: "Too many requests" }, { status: 429 });
   if (!Array.isArray(body.playerIds) || body.playerIds.length === 0)
     return Response.json({ error: "Lineup is required" }, { status: 400 });
 

@@ -6,7 +6,9 @@ import type { NextRequest } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { interruptRequests } from "@/db/schema";
-import { createSupabaseServerClient } from "@/lib/supabase";
+import { authorizeMatch, SCORING_ROLES } from "@/lib/authz";
+import { sameOriginOk } from "@/lib/http";
+import { rateLimit } from "@/lib/ratelimit";
 import { validateTabletToken } from "@/lib/match-session";
 import { appendMatchEvent } from "@/lib/match-engine";
 import { broadcastInterruptRequest } from "@/lib/realtime";
@@ -24,6 +26,8 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id } = await ctx.params;
+  if (!sameOriginOk(req))
+    return Response.json({ error: "Bad origin" }, { status: 403 });
   const body = (await req.json().catch(() => null)) as {
     token?: string;
     team?: "A" | "B";
@@ -38,6 +42,8 @@ export async function POST(
   const session = await validateTabletToken(body.token, id, body.team);
   if (!session)
     return Response.json({ error: "Invalid or expired token" }, { status: 401 });
+  if (!(await rateLimit(`interrupt:${session.id}`)))
+    return Response.json({ error: "Too many requests" }, { status: 429 });
 
   const requestId = newId("ireq");
   await db.insert(interruptRequests).values({
@@ -96,12 +102,13 @@ export async function PATCH(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id } = await ctx.params;
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
-    return Response.json({ error: "Not authenticated" }, { status: 401 });
+  if (!sameOriginOk(req))
+    return Response.json({ error: "Bad origin" }, { status: 403 });
+
+  // Only a scorer/admin of the match's tenant may resolve requests (spec/14 §A1).
+  const authed = await authorizeMatch(id, SCORING_ROLES);
+  if (!authed.ok)
+    return Response.json({ error: "Forbidden" }, { status: authed.status });
 
   const body = (await req.json().catch(() => null)) as {
     requestId?: string;
@@ -126,7 +133,7 @@ export async function PATCH(
 
   await db
     .update(interruptRequests)
-    .set({ status: body.status, resolvedAt: new Date(), resolvedBy: user.id })
+    .set({ status: body.status, resolvedAt: new Date(), resolvedBy: authed.auth.user.id })
     .where(eq(interruptRequests.id, body.requestId));
 
   // Approving a timeout applies it immediately so the clock starts. Subs and

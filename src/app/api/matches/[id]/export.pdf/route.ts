@@ -1,10 +1,10 @@
 // Match-report PDF (spec/10 §"PDF export"). PDFKit needs Node APIs + reads its
 // AFM font metrics from disk, so this route is nodejs-only and `pdfkit` is a
-// serverExternalPackage (see next.config.ts). Requires an authenticated user.
+// serverExternalPackage (see next.config.ts). Authorized to the match's tenant.
 
 import type { NextRequest } from "next/server";
 import PDFDocument from "pdfkit";
-import { createSupabaseServerClient } from "@/lib/supabase";
+import { authorizeMatch, SCORING_ROLES } from "@/lib/authz";
 import {
   type MatchReportData,
   MatchReportNotFound,
@@ -21,13 +21,11 @@ export async function GET(
 ) {
   const { id } = await ctx.params;
 
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return Response.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  // The report exposes rosters/results — restrict to the match's tenant members
+  // (spec/14 §A1), not any authenticated user.
+  const authed = await authorizeMatch(id, SCORING_ROLES);
+  if (!authed.ok)
+    return Response.json({ error: "Forbidden" }, { status: authed.status });
 
   let data: MatchReportData;
   try {

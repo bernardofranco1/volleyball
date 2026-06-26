@@ -1,25 +1,43 @@
 // Match event endpoint.
-//   POST  → append a scoring/officiating event (scorer only)
-//   GET   → Server-Sent Events stream of state updates (resync fallback;
-//           Supabase Realtime is the low-latency primary channel)
+//   POST → append a scoring/officiating event. Authorized to the match's tenant
+//          (SCORER/admin), same-origin + rate-limited, and restricted to
+//          client-submittable event types (spec/14 §A1/A2/A4/C2).
+//
+// Live state sync is via Supabase Realtime + GET /api/matches/[id]/state; the
+// former SSE GET here was unused and was removed (spec/14 §C2).
 //
 // nodejs runtime: the engine talks to Postgres via postgres.js; force-dynamic
 // because every response depends on the live event log.
 
 import type { NextRequest } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase";
+import { authorizeMatch, SCORING_ROLES } from "@/lib/authz";
+import { sameOriginOk } from "@/lib/http";
+import { rateLimit } from "@/lib/ratelimit";
 import {
   EventRejectedError,
   MatchNotFoundError,
   SequenceConflictError,
   UnsupportedDisciplineError,
   appendMatchEvent,
-  loadMatchStateFresh,
 } from "@/lib/match-engine";
 
-// Discipline-agnostic event payload: the engine for the match (beach/indoor)
-// validates the concrete shape — this route only needs `type` to route it.
+// Discipline-agnostic event payload: the engine for the match validates the
+// concrete shape — this route only needs `type` to route it.
 type EventPayload = { type: string } & Record<string, unknown>;
+
+// Events a client may submit. The auto-emitted / system events (SET_END,
+// MATCH_END, SIDE_SWITCH, TTO_START, SERVE_CLOCK_EXPIRE) are produced by the
+// engine only — accepting them from a client would let it fabricate results
+// (spec/14 §A2).
+const CLIENT_SUBMITTABLE = new Set([
+  "MATCH_CREATED", "COIN_TOSS", "MATCH_START", "SET_START", "LINEUP_CONFIRMED",
+  "RALLY_WON_A", "RALLY_WON_B", "REPLAY_POINT", "TIMEOUT_REQUEST", "TIMEOUT_END",
+  "TTO_END", "SUBSTITUTION", "LIBERO_REPLACEMENT", "LIBERO_REDESIGNATION",
+  "VCS_CHALLENGE", "VCS_RESULT", "JUMP_SERVE_FOOT_FAULT", "ATTACK_ARC_FAULT",
+  "DELAY_WARNING", "DELAY_PENALTY", "MEDICAL_TIMEOUT", "MEDICAL_TIMEOUT_END",
+  "MISCONDUCT_WARNING", "MISCONDUCT_PENALTY", "MISCONDUCT_EXPULSION",
+  "MISCONDUCT_DISQUALIFICATION", "NOTE", "UNDO",
+]);
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,13 +48,17 @@ export async function POST(
 ) {
   const { id } = await ctx.params;
 
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return Response.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  if (!sameOriginOk(req))
+    return Response.json({ error: "Bad origin" }, { status: 403 });
+
+  // Authorization is keyed to the *match's* tenant, not the URL or the caller's
+  // primary tenant (spec/14 §A1).
+  const authed = await authorizeMatch(id, SCORING_ROLES);
+  if (!authed.ok)
+    return Response.json({ error: "Forbidden" }, { status: authed.status });
+
+  if (!(await rateLimit(`events:${authed.auth.user.id}:${id}`)))
+    return Response.json({ error: "Too many requests" }, { status: 429 });
 
   let body: { payload?: EventPayload };
   try {
@@ -46,6 +68,12 @@ export async function POST(
   }
   if (!body?.payload?.type) {
     return Response.json({ error: "Missing event payload" }, { status: 400 });
+  }
+  if (!CLIENT_SUBMITTABLE.has(body.payload.type)) {
+    return Response.json(
+      { error: "Event type not accepted from client" },
+      { status: 422 },
+    );
   }
 
   try {
@@ -71,68 +99,4 @@ export async function POST(
       );
     throw err;
   }
-}
-
-// SSE: emit the current state, then poll the log and push on every change.
-// Bounded lifetime — clients (EventSource) auto-reconnect.
-const POLL_MS = 1500;
-const MAX_TICKS = 40; // ~60s, then the client reconnects
-
-export async function GET(
-  req: NextRequest,
-  ctx: { params: Promise<{ id: string }> },
-) {
-  const { id } = await ctx.params;
-  const encoder = new TextEncoder();
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      let closed = false;
-      const send = (event: string, data: unknown) => {
-        if (closed) return;
-        controller.enqueue(
-          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
-        );
-      };
-      const close = () => {
-        if (closed) return;
-        closed = true;
-        try {
-          controller.close();
-        } catch {
-          /* already closed */
-        }
-      };
-      req.signal.addEventListener("abort", close);
-
-      let lastSeq = -1;
-      try {
-        for (let tick = 0; tick < MAX_TICKS && !closed; tick++) {
-          const { state } = await loadMatchStateFresh(id);
-          if (state.lastSequence !== lastSeq) {
-            lastSeq = state.lastSequence;
-            send("match-update", { state });
-          } else {
-            send("ping", { t: tick });
-          }
-          if (state.status === "FINISHED") break;
-          await new Promise((r) => setTimeout(r, POLL_MS));
-        }
-      } catch (err) {
-        send("error", {
-          message: err instanceof Error ? err.message : "stream error",
-        });
-      } finally {
-        close();
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-    },
-  });
 }

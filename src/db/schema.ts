@@ -222,6 +222,12 @@ export const matches = pgTable("matches", {
   setsWonB: integer("sets_won_b").default(0).notNull(),
   winner: text("winner", { enum: ["A", "B"] }),
 
+  // Cached replay snapshot (spec/14 §C1): the full engine state after
+  // `snapshotSequence`. Reads load this + replay only events beyond it, bounding
+  // replay cost. Treated as a cache — if absent/behind, a tail/full replay heals.
+  stateSnapshot: jsonb("state_snapshot"),
+  snapshotSequence: integer("snapshot_sequence").default(0).notNull(),
+
   courtNumber: integer("court_number"),
   scheduledAt: timestamp("scheduled_at"),
   startedAt: timestamp("started_at"),

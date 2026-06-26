@@ -1,8 +1,8 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { matches, players } from "@/db/schema";
-import { createSupabaseServerClient } from "@/lib/supabase";
+import { requireMatchRole, SCORING_ROLES } from "@/lib/authz";
 import {
   MatchNotFoundError,
   UnsupportedDisciplineError,
@@ -70,14 +70,9 @@ export default async function LiveScoringPage({
 }) {
   const { tenantSlug, competitionId, matchId } = await params;
 
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    const dest = `/t/${tenantSlug}/competitions/${competitionId}/matches/${matchId}/live`;
-    redirect(`/login?redirectTo=${encodeURIComponent(dest)}`);
-  }
+  // Authorize against the match's tenant (SCORER/admin) — not just "logged in".
+  const dest = `/t/${tenantSlug}/competitions/${competitionId}/matches/${matchId}/live`;
+  await requireMatchRole(matchId, SCORING_ROLES, dest);
 
   let view;
   try {
