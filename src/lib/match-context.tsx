@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
 import type { TournamentConfig } from "@/engine/config";
 import { appendBeachEvent } from "@/engine/beach/reducer";
 import type {
@@ -168,8 +169,9 @@ export function MatchProvider({
   // Realtime: other devices' updates + serve-clock countdowns.
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
+    ensureRealtimeAuth(supabase);
     const channel = supabase
-      .channel(`match:${matchId}`)
+      .channel(`match:${matchId}`, channelConfig())
       .on(
         "broadcast",
         { event: "state-update" },

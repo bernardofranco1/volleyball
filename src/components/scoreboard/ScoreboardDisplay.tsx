@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
 import {
   type BeachMatchState,
   activeSet,
@@ -79,8 +80,9 @@ export function ScoreboardDisplay({
       };
     }
     const supabase = createSupabaseBrowserClient();
+    ensureRealtimeAuth(supabase);
     const channel = supabase
-      .channel(`match:${matchId}`)
+      .channel(`match:${matchId}`, channelConfig())
       .on(
         "broadcast",
         { event: "state-update" },

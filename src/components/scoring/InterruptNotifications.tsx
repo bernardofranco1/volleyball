@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
 
 interface Pending {
   requestId: string;
@@ -25,8 +26,9 @@ export function InterruptNotifications({
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
+    ensureRealtimeAuth(supabase);
     const channel = supabase
-      .channel(`match:${matchId}:scorer`)
+      .channel(`match:${matchId}:scorer`, channelConfig())
       .on(
         "broadcast",
         { event: "interrupt-request" },

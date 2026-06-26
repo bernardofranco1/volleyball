@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
 import type { PlayerLite } from "@/lib/indoor-match-context";
 import type { IndoorMatchState, TeamId } from "@/engine/indoor/types";
 
@@ -64,8 +65,9 @@ export function TeamTablet({
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
+    ensureRealtimeAuth(supabase);
     const channel = supabase
-      .channel(`match:${matchId}`)
+      .channel(`match:${matchId}`, channelConfig())
       .on(
         "broadcast",
         { event: "state-update" },

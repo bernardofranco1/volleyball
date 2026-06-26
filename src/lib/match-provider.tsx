@@ -19,6 +19,7 @@ import {
   useState,
 } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
 import type { TournamentConfig } from "@/engine/config";
 
 export interface PlayerLite {
@@ -206,8 +207,9 @@ export function createMatchProvider<
 
     useEffect(() => {
       const supabase = createSupabaseBrowserClient();
+      ensureRealtimeAuth(supabase);
       const channel = supabase
-        .channel(`match:${matchId}`)
+        .channel(`match:${matchId}`, channelConfig())
         .on(
           "broadcast",
           { event: "state-update" },
