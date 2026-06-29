@@ -74,6 +74,7 @@ export default async function ScoreboardPage({
       competitionName={view.competitionName}
       tenantName={tenant.name}
       logoUrl={tenant.branding.logoUrl}
+      accentColor={tenant.branding.primaryColor ?? null}
       timeoutsPerSet={view.config.timeoutsPerSet}
       mode={mode}
       poll={poll}
