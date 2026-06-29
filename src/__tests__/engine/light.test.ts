@@ -143,6 +143,17 @@ describe("light reducer — rotation", () => {
     expect(seen).toEqual([1, 2, 3, 4, 0]);
     expect(m.set.courtPositionsA.length).toBe(5);
   });
+
+  it("serving team rotates after a won rally (Air/Light §7 / F1)", () => {
+    const m = new TestMatch();
+    m.ready("A", "LEFT"); // A serving from rotation index 0
+    expect(m.set.lastRotA).toBe(0);
+    m.score("A", 1); // A wins WHILE serving → rotates but keeps the serve
+    expect(m.set.currentServer).toBe("A");
+    expect(m.set.lastRotA).toBe(1);
+    m.score("A", 1); // wins again → rotates again
+    expect(m.set.lastRotA).toBe(2);
+  });
 });
 
 describe("light reducer — side switches", () => {

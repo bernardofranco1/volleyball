@@ -35,19 +35,19 @@ The large majority conforms. Three items below warrant confirmation.
 
 ## Findings to confirm
 
-### F1 — Air/Light server when the *serving* team wins (needs product confirmation)
-Appendix A §1 and §6 state that in Air/Light, when the **serving** team wins a
-rally, the server changes ("player moving from position 2 to position 1 serves").
-The app keeps the **same server** when the serving team wins
-(`light/reducer.ts`: `wasServing` ⇒ no rotation), i.e. standard rally scoring —
-the same behaviour as Indoor/Beach and matching normal FIVB Light Volleyball.
+### F1 — Air/Light server when the *serving* team wins — RESOLVED (2026-06-29)
+Appendix A §1/§6 state that in Air/Light, when the **serving** team wins a rally
+the server changes ("player moving from position 2 to position 1 serves"). The
+product owner confirmed this is the real FIVB Light Volleyball rule: **the team
+that wins a rally always rotates clockwise and serves next, including when it was
+already serving** (unlike indoor/beach, where the server continues).
 
-A server that rotates on a *won* rally would be highly unusual and is most likely
-a wording slip in the brief (the pos-2→pos-1 description fits the **receiving**
-team gaining service, which the app already does). **Recommendation:** keep the
-standard behaviour unless the product owner confirms the Air/Light rulebook truly
-requires rotating the server on a won rally; if so, add a Light-only
-`serverAdvanceOnServingWin` path.
+**Implemented:** `light/reducer.ts` `applyPoint` now advances the winner's
+rotation on *every* won rally (the rotation is no longer gated behind a side-out
+`!wasServing` check). A team's first service in a set still uses index 0; every
+subsequent win advances one position. Covered by a regression test in
+`light.test.ts` ("serving team rotates after a won rally"). Grass/Beach/Indoor
+are unchanged.
 
 ### F2 — Air/Light court change entering the deciding set (minor)
 Appendix A lists Air/Light court changes as "after set 1" + the deciding set at 8.

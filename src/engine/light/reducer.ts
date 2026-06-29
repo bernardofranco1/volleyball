@@ -103,21 +103,23 @@ function newSetState(
 
 function applyPoint(set: LightSetState, winner: TeamId, n: number): LightSetState {
   const s = clone(set);
-  const wasServing = s.currentServer === winner;
   if (winner === "A") s.scoreA += 1;
   else s.scoreB += 1;
 
-  if (!wasServing) {
-    s.currentServer = winner;
-    if (winner === "A") {
-      const next = s.lastRotA === null ? 0 : (s.lastRotA + 1) % n;
-      s.lastRotA = next;
-      s.rotationIndexA = next;
-    } else {
-      const next = s.lastRotB === null ? 0 : (s.lastRotB + 1) % n;
-      s.lastRotB = next;
-      s.rotationIndexB = next;
-    }
+  // Air/Light: the team that wins the rally ALWAYS rotates clockwise and serves
+  // next — including when it was already serving (FIVB Light Volleyball rule;
+  // brief §7 / Appendix A, confirmed by the product owner). This differs from
+  // indoor/beach, where the server continues on a won rally. A team's first
+  // service in a set uses index 0; every subsequent win advances one position.
+  s.currentServer = winner;
+  if (winner === "A") {
+    const next = s.lastRotA === null ? 0 : (s.lastRotA + 1) % n;
+    s.lastRotA = next;
+    s.rotationIndexA = next;
+  } else {
+    const next = s.lastRotB === null ? 0 : (s.lastRotB + 1) % n;
+    s.lastRotB = next;
+    s.rotationIndexB = next;
   }
   return s;
 }
