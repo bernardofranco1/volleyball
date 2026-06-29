@@ -240,6 +240,10 @@ export const matches = pgTable("matches", {
 
   roundName: text("round_name"),
   matchNumber: integer("match_number"),
+  // Group / phase metadata for schedule imports (brief §3.2).
+  groupName: text("group_name"),
+  phaseNumber: integer("phase_number"),
+  phaseName: text("phase_name"),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -360,7 +364,7 @@ export const csvImports = pgTable("csv_imports", {
     .notNull()
     .references(() => tenants.id),
   importType: text("import_type", {
-    enum: ["TEAMS", "PLAYERS", "SCHEDULE", "RESULTS"],
+    enum: ["TEAMS", "PLAYERS", "SCHEDULE", "RESULTS", "ROSTER"],
   }).notNull(),
   filename: text("filename"),
   rowsOk: integer("rows_ok").default(0).notNull(),

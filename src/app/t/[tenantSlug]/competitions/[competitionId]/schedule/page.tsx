@@ -192,7 +192,7 @@ export default async function SchedulePage({
             tenantSlug={tenantSlug}
             competitionId={competitionId}
             title="Import schedule"
-            hint="matchNumber,teamA,teamB,courtNumber,scheduledAt,roundName"
+            hint="Match number,Team A,Team B,Court number,Group,Phase number,Phase name,Match day,Match time (local)"
             action={importSchedule}
           />
         </aside>

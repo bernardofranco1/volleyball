@@ -10,7 +10,7 @@ import { CompetitionTabs } from "@/components/admin/CompetitionTabs";
 import { AddTeamForm } from "@/components/admin/AddTeamForm";
 import { AddPlayerForm } from "@/components/admin/AddPlayerForm";
 import { CsvImport } from "@/components/admin/CsvImport";
-import { importPlayers, importTeams } from "@/lib/csv-actions";
+import { importRoster } from "@/lib/csv-actions";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { ui } from "@/components/admin/styles";
 
@@ -201,16 +201,9 @@ export default async function TeamsPage({
           <CsvImport
             tenantSlug={tenantSlug}
             competitionId={competitionId}
-            title="Import teams"
-            hint="displayName,countryCode,clubName,seed"
-            action={importTeams}
-          />
-          <CsvImport
-            tenantSlug={tenantSlug}
-            competitionId={competitionId}
-            title="Import players"
-            hint="teamDisplayName,firstName,lastName,jerseyNumber,isCaptain,isLibero"
-            action={importPlayers}
+            title="Import teams & players"
+            hint="Team,First name,Last name,Jersey,Captain,Libero — teams are created automatically; the first data row is an ignored example"
+            action={importRoster}
           />
         </aside>
       </div>
