@@ -76,3 +76,27 @@ export function parseCsvRecords(text: string): {
 export function csvBool(v: string | undefined): boolean {
   return ["true", "1", "yes", "y", "x"].includes((v ?? "").trim().toLowerCase());
 }
+
+/** Canonicalise a header for tolerant matching: lowercase, alphanumerics only. */
+export function normKey(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Build a getter over a parsed record that matches headers tolerantly, so
+ * "Match number", "match_number" and "matchNumber" all resolve to the same
+ * cell. Returns the first non-empty value among the given aliases, else "".
+ */
+export function recordGetter(
+  rec: Record<string, string>,
+): (...aliases: string[]) => string {
+  const norm: Record<string, string> = {};
+  for (const [k, v] of Object.entries(rec)) norm[normKey(k)] = v;
+  return (...aliases: string[]) => {
+    for (const a of aliases) {
+      const v = norm[normKey(a)];
+      if (v != null && v.trim() !== "") return v.trim();
+    }
+    return "";
+  };
+}

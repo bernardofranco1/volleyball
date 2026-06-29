@@ -71,6 +71,34 @@ export async function GET(
   const { id } = await ctx.params;
   const token = req.nextUrl.searchParams.get("token");
   const team = req.nextUrl.searchParams.get("team");
+
+  // Scorer fallback (brief §2.2): no token ⇒ an authenticated scorer/admin of the
+  // match polling for PENDING requests (both teams). Realtime broadcasts are
+  // fire-and-forget with no replay, so this poll guarantees a request still
+  // surfaces if the scorer's socket missed the broadcast.
+  if (!token) {
+    const authed = await authorizeMatch(id, SCORING_ROLES);
+    if (!authed.ok)
+      return Response.json({ error: "Forbidden" }, { status: authed.status });
+    const pendingRows = await db
+      .select({
+        id: interruptRequests.id,
+        team: interruptRequests.team,
+        requestType: interruptRequests.requestType,
+        createdAt: interruptRequests.createdAt,
+      })
+      .from(interruptRequests)
+      .where(
+        and(
+          eq(interruptRequests.matchId, id),
+          eq(interruptRequests.status, "PENDING"),
+        ),
+      )
+      .orderBy(desc(interruptRequests.createdAt))
+      .limit(20);
+    return Response.json({ requests: pendingRows });
+  }
+
   if (team !== "A" && team !== "B")
     return Response.json({ error: "Bad request" }, { status: 400 });
   const session = await validateTabletToken(token, id, team);

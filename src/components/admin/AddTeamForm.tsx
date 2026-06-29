@@ -59,11 +59,23 @@ export function AddTeamForm({
             className={ui.input}
           />
         </div>
-        <div className="col-span-2">
+        <div>
           <label className={ui.label} htmlFor="t-club">
             Club (optional)
           </label>
           <input id="t-club" name="clubName" className={ui.input} />
+        </div>
+        <div>
+          <label className={ui.label} htmlFor="t-color">
+            Team colour
+          </label>
+          <input
+            id="t-color"
+            name="color"
+            type="color"
+            defaultValue="#3366cc"
+            className="h-10 w-full rounded-lg border border-border bg-surface"
+          />
         </div>
       </div>
 

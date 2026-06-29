@@ -15,7 +15,6 @@ interface InterruptRow {
 const REQUESTS = [
   { type: "TIMEOUT", label: "Time-out" },
   { type: "SUBSTITUTION", label: "Substitution" },
-  { type: "CHALLENGE", label: "Challenge" },
   { type: "MEDICAL", label: "Medical" },
 ] as const;
 

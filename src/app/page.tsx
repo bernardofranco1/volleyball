@@ -11,18 +11,9 @@ export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-24 text-center">
       <div className="flex flex-col items-center gap-8 max-w-2xl">
-        <span className="rounded-full border border-border px-4 py-1 text-xs uppercase tracking-widest text-score-dim">
-          White-label scoring SaaS
-        </span>
-
         <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight">
           Volleyball Scoring Platform
         </h1>
-
-        <p className="text-lg text-score-dim leading-8">
-          Multi-discipline, multi-tenant, real-time officiating for every form
-          of the game.
-        </p>
 
         <ul className="flex flex-wrap items-center justify-center gap-3">
           {DISCIPLINES.map((d) => (

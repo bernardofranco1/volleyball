@@ -71,9 +71,13 @@ export default async function ScoreboardPage({
       initialState={view.state}
       teamAName={view.teamAName}
       teamBName={view.teamBName}
+      teamAColor={view.teamAColor}
+      teamBColor={view.teamBColor}
       competitionName={view.competitionName}
       tenantName={tenant.name}
       logoUrl={tenant.branding.logoUrl}
+      accentColor={tenant.branding.primaryColor ?? null}
+      scheduledAtMs={match.scheduledAt ? match.scheduledAt.getTime() : null}
       timeoutsPerSet={view.config.timeoutsPerSet}
       mode={mode}
       poll={poll}

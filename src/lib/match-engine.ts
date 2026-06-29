@@ -28,7 +28,11 @@ import {
 import type { BeachEvent, BeachMatchState } from "@/engine/beach/types";
 import type { Actor, Discipline } from "@/engine/types";
 import { newId } from "@/lib/id";
-import { broadcastServeClock, broadcastState } from "@/lib/realtime";
+import {
+  broadcastServeClock,
+  broadcastState,
+  broadcastTimeout,
+} from "@/lib/realtime";
 
 export class MatchNotFoundError extends Error {}
 export class UnsupportedDisciplineError extends Error {}
@@ -168,6 +172,9 @@ export interface MatchView {
   competitionName: string;
   teamAName: string;
   teamBName: string;
+  teamAColor: string | null;
+  teamBColor: string | null;
+  scheduledAt: Date | null;
   state: BeachMatchState;
   config: TournamentConfig;
 }
@@ -182,6 +189,9 @@ export async function loadMatchView(matchId: string): Promise<MatchView> {
       competitionName: competitions.name,
       teamAName: teamA.displayName,
       teamBName: teamB.displayName,
+      teamAColor: teamA.color,
+      teamBColor: teamB.color,
+      scheduledAt: matches.scheduledAt,
     })
     .from(matches)
     .innerJoin(competitions, eq(competitions.id, matches.competitionId))
@@ -200,6 +210,9 @@ export async function loadMatchView(matchId: string): Promise<MatchView> {
     competitionName: row.competitionName,
     teamAName: row.teamAName,
     teamBName: row.teamBName,
+    teamAColor: row.teamAColor,
+    teamBColor: row.teamBColor,
+    scheduledAt: row.scheduledAt,
     state,
     config,
   };
@@ -317,6 +330,20 @@ export async function appendMatchEvent(
       Date.now() + meta.config.serveClockSecs * 1000,
       meta.config.serveClockSecs,
     );
+  }
+  // Team time-out countdown for the public board (brief §4.3).
+  if (
+    finalState.rallyPhase === "TIMEOUT_ACTIVE" &&
+    payload.type === "TIMEOUT_REQUEST"
+  ) {
+    const team = (payload as { team?: "A" | "B" }).team;
+    if (team)
+      await broadcastTimeout(
+        matchId,
+        Date.now() + meta.config.timeoutDurationSecs * 1000,
+        team,
+        meta.config.timeoutDurationSecs,
+      );
   }
 
   return { newEvents: result.newEvents, state: finalState };

@@ -10,6 +10,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // All tables include `tenantId` for row-level multi-tenant isolation
@@ -167,6 +168,7 @@ export const teams = pgTable("teams", {
   countryCode: text("country_code"), // ISO 3166-1 alpha-3 (optional)
   clubName: text("club_name"),
   seed: integer("seed"),
+  color: text("color"), // team colour (hex) for scoreboards/UI — brief §1.4
   poolId: text("pool_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -188,7 +190,11 @@ export const players = pgTable("players", {
   role: text("role", { enum: ["PLAYER", "BENCH", "STAFF"] })
     .default("PLAYER")
     .notNull(),
-});
+}, (t) => [
+  // One jersey number per team. NULLs are distinct in Postgres, so bench/staff
+  // without a number are unaffected. Brief §2.1.
+  uniqueIndex("players_team_jersey_uq").on(t.teamId, t.jerseyNumber),
+]);
 
 // ── Matches ──────────────────────────────────────────────────────────────────
 
@@ -235,6 +241,11 @@ export const matches = pgTable("matches", {
 
   roundName: text("round_name"),
   matchNumber: integer("match_number"),
+  // Group / phase metadata for schedule imports (brief §3.2).
+  groupName: text("group_name"),
+  phaseNumber: integer("phase_number"),
+  phaseName: text("phase_name"),
+  scorerPin: text("scorer_pin"), // per-match 6-digit scorer gate (brief §5.2)
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -355,7 +366,7 @@ export const csvImports = pgTable("csv_imports", {
     .notNull()
     .references(() => tenants.id),
   importType: text("import_type", {
-    enum: ["TEAMS", "PLAYERS", "SCHEDULE", "RESULTS"],
+    enum: ["TEAMS", "PLAYERS", "SCHEDULE", "RESULTS", "ROSTER"],
   }).notNull(),
   filename: text("filename"),
   rowsOk: integer("rows_ok").default(0).notNull(),

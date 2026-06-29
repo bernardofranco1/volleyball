@@ -4,8 +4,14 @@ import { revalidatePath } from "next/cache";
 import { and, eq, or } from "drizzle-orm";
 import { db } from "@/db";
 import { matches, players, teams } from "@/db/schema";
-import { ADMIN_ROLES, requireRole } from "@/lib/authz";
+import {
+  ADMIN_ROLES,
+  SCORING_ROLES,
+  authorizeMatch,
+  requireRole,
+} from "@/lib/authz";
 import { getCompetition } from "@/lib/competitions";
+import { normalizeHex } from "@/lib/colors";
 import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
 import { fail, OK, type FormState } from "@/lib/action-state";
@@ -57,9 +63,47 @@ export async function createTeam(
     countryCode: str(fd, "countryCode").toUpperCase() || null,
     clubName: str(fd, "clubName") || null,
     seed: intOrNull(fd, "seed"),
+    color: str(fd, "color") || null,
   });
 
   revalidatePath(teamsPath(g.tenantSlug, g.competitionId));
+  return OK;
+}
+
+/**
+ * Set both teams' colours for a match (brief §1.4). Scorer-accessible (mirrors
+ * the team-tablet authorisation model) so colours can be picked before the match.
+ */
+export async function setTeamColors(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const matchId = str(fd, "matchId");
+  const authed = await authorizeMatch(matchId, SCORING_ROLES);
+  if (!authed.ok) return fail("Not allowed.");
+
+  const rows = await db
+    .select({ teamAId: matches.teamAId, teamBId: matches.teamBId })
+    .from(matches)
+    .where(eq(matches.id, matchId))
+    .limit(1);
+  const m = rows[0];
+  if (!m) return fail("Match not found.");
+
+  await db
+    .update(teams)
+    .set({ color: normalizeHex(str(fd, "colorA")) })
+    .where(eq(teams.id, m.teamAId));
+  await db
+    .update(teams)
+    .set({ color: normalizeHex(str(fd, "colorB")) })
+    .where(eq(teams.id, m.teamBId));
+
+  const tenantSlug = str(fd, "tenantSlug");
+  const competitionId = str(fd, "competitionId");
+  revalidatePath(
+    `/t/${tenantSlug}/competitions/${competitionId}/matches/${matchId}`,
+  );
   return OK;
 }
 
@@ -136,6 +180,19 @@ export async function createPlayer(
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   if (!fullName) return fail("Player name is required.");
 
+  const jerseyNumber = intOrNull(fd, "jerseyNumber");
+  if (jerseyNumber != null) {
+    const dup = await db
+      .select({ id: players.id })
+      .from(players)
+      .where(
+        and(eq(players.teamId, teamId), eq(players.jerseyNumber, jerseyNumber)),
+      )
+      .limit(1);
+    if (dup.length > 0)
+      return fail(`Jersey number ${jerseyNumber} is already used on this team.`);
+  }
+
   await db.insert(players).values({
     id: newId("plyr"),
     teamId,
@@ -143,7 +200,7 @@ export async function createPlayer(
     firstName: firstName || null,
     lastName: lastName || null,
     fullName,
-    jerseyNumber: intOrNull(fd, "jerseyNumber"),
+    jerseyNumber,
     isCaptain: fd.get("isCaptain") != null,
     isLibero: fd.get("isLibero") != null,
   });

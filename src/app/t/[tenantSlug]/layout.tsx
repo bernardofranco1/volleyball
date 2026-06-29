@@ -1,6 +1,8 @@
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { logout } from "@/lib/auth-actions";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { getTenantBySlug } from "@/lib/tenant";
 import { getT } from "@/lib/i18n/server";
 import { LocaleProvider } from "@/lib/i18n/client";
@@ -45,33 +47,59 @@ export default async function TenantLayout({
         className="flex min-h-screen flex-col"
       >
         <header className="flex items-center justify-between border-b border-border px-6 py-4">
-          <div className="flex items-center gap-3">
-            {tenant.branding.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={tenant.branding.logoUrl}
-                alt={`${tenant.name} logo`}
-                className="h-7 w-auto"
-              />
-            ) : (
-              <span
-                className="grid h-7 w-7 place-items-center rounded-md bg-primary text-xs font-bold text-primary-fg"
-                aria-hidden
-              >
-                {tenant.name.charAt(0)}
-              </span>
-            )}
-            <span className="font-semibold">{tenant.name}</span>
+          <div className="flex items-center gap-6">
+            <Link
+              href={`/t/${tenantSlug}/dashboard`}
+              className="flex items-center gap-3"
+            >
+              {tenant.branding.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={tenant.branding.logoUrl}
+                  alt={`${tenant.name} logo`}
+                  className="h-7 w-auto"
+                />
+              ) : (
+                <span
+                  className="grid h-7 w-7 place-items-center rounded-md bg-primary text-xs font-bold text-primary-fg"
+                  aria-hidden
+                >
+                  {tenant.name.charAt(0)}
+                </span>
+              )}
+              <span className="font-semibold">{tenant.name}</span>
+            </Link>
+            {/* Top navigation menu (brief §1.2). */}
+            <nav className="hidden items-center gap-1 md:flex">
+              {(
+                [
+                  ["nav.dashboard", "dashboard"],
+                  ["nav.competitions", "competitions"],
+                  ["nav.settings", "settings"],
+                ] as const
+              ).map(([key, path]) => (
+                <Link
+                  key={path}
+                  href={`/t/${tenantSlug}/${path}`}
+                  className="rounded-lg px-3 py-1.5 text-sm text-score-dim transition-colors hover:bg-surface-raised hover:text-foreground"
+                >
+                  {t(key)}
+                </Link>
+              ))}
+            </nav>
           </div>
 
-          <form action={logout}>
-            <button
-              type="submit"
-              className="rounded-lg border border-border px-3 py-1.5 text-sm text-score-dim transition-colors hover:text-foreground"
-            >
-              {t("nav.signOut")}
-            </button>
-          </form>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <form action={logout}>
+              <button
+                type="submit"
+                className="rounded-lg border border-border px-3 py-1.5 text-sm text-score-dim transition-colors hover:text-foreground"
+              >
+                {t("nav.signOut")}
+              </button>
+            </form>
+          </div>
         </header>
 
         <div className="flex-1">{children}</div>
