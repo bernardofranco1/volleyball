@@ -73,7 +73,7 @@ export function ScoreboardDisplay({
     if (poll) {
       // Defer the first poll (not a synchronous setState in the effect body).
       const first = setTimeout(fetchState, 0);
-      const id = setInterval(fetchState, 5000);
+      const id = setInterval(fetchState, 3000);
       return () => {
         clearTimeout(first);
         clearInterval(id);
@@ -93,7 +93,14 @@ export function ScoreboardDisplay({
         },
       )
       .subscribe();
+    // Realtime is the instant path, but broadcasts are fire-and-forget — fetch
+    // once on mount and run a slow backstop so a missed signal never leaves the
+    // board stale (brief §4.2).
+    const first = setTimeout(fetchState, 0);
+    const backstop = setInterval(fetchState, 10000);
     return () => {
+      clearTimeout(first);
+      clearInterval(backstop);
       void supabase.removeChannel(channel);
     };
   }, [matchId, poll, fetchState]);

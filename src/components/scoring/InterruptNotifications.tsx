@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
 
@@ -10,9 +10,13 @@ interface Pending {
   requestType: string;
 }
 
-// Subscribed to `match:{id}:scorer`, this surfaces team-tablet interrupt requests
-// to the scorer with approve/deny. Approving a TIMEOUT is applied server-side; the
-// rest clear the request for the scorer to action via the bar.
+// Surfaces team-tablet interrupt requests to the scorer with approve/deny.
+// Two delivery paths (brief §2.2):
+//  1. Realtime broadcast on `match:{id}:scorer` — instant, but fire-and-forget
+//     (a missed/dropped socket loses the message).
+//  2. A 4s poll of the scorer GET endpoint (authoritative PENDING set from the
+//     DB) — guarantees the request appears even if realtime was missed.
+// Approving a TIMEOUT is applied server-side; the rest clear for the scorer.
 export function InterruptNotifications({
   matchId,
   teamAName,
@@ -23,7 +27,12 @@ export function InterruptNotifications({
   teamBName: string;
 }) {
   const [pending, setPending] = useState<Pending[]>([]);
+  // Requests this scorer just resolved — kept briefly so the poll doesn't
+  // re-add them in the window before the PATCH commits. Cleared on a timer so a
+  // failed PATCH lets the request resurface.
+  const resolvedRef = useRef<Set<string>>(new Set());
 
+  // Fast path: realtime broadcast.
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
     ensureRealtimeAuth(supabase);
@@ -37,6 +46,7 @@ export function InterruptNotifications({
         }) => {
           const p = m.payload;
           if (!p?.requestId || !p.team || !p.requestType) return;
+          if (resolvedRef.current.has(p.requestId)) return;
           const item: Pending = {
             requestId: p.requestId,
             team: p.team,
@@ -55,7 +65,42 @@ export function InterruptNotifications({
     };
   }, [matchId]);
 
+  // Reliable path: poll the authoritative PENDING set.
+  const poll = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/matches/${matchId}/interrupt-requests`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        requests?: { id: string; team: "A" | "B"; requestType: string }[];
+      };
+      if (!Array.isArray(data.requests)) return;
+      const fresh = data.requests
+        .filter((r) => !resolvedRef.current.has(r.id))
+        .map((r) => ({
+          requestId: r.id,
+          team: r.team,
+          requestType: r.requestType,
+        }));
+      setPending(fresh);
+    } catch {
+      // Keep whatever realtime delivered; next tick retries.
+    }
+  }, [matchId]);
+
+  useEffect(() => {
+    const first = setTimeout(poll, 0);
+    const iv = setInterval(poll, 4000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(iv);
+    };
+  }, [poll]);
+
   const resolve = async (requestId: string, status: "APPROVED" | "DENIED") => {
+    resolvedRef.current.add(requestId);
+    setTimeout(() => resolvedRef.current.delete(requestId), 12000);
     setPending((prev) => prev.filter((x) => x.requestId !== requestId));
     await fetch(`/api/matches/${matchId}/interrupt-requests`, {
       method: "PATCH",
