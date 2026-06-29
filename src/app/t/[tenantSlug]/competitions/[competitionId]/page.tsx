@@ -175,6 +175,33 @@ export default async function CompetitionOverviewPage({
             </div>
           </div>
 
+          {(competition.discipline === "LIGHT" ||
+            competition.discipline === "GRASS") && (
+            <div className="mt-4">
+              <label className={ui.label} htmlFor="playersPerSide">
+                Players per team{" "}
+                <span className="font-normal text-score-dim">
+                  — mandatory; each team must field exactly this many
+                </span>
+              </label>
+              <select
+                id="playersPerSide"
+                name="playersPerSide"
+                defaultValue={configRow?.playersPerSide ?? ""}
+                className={ui.input}
+              >
+                <option value="">Default ({resolved.playersPerSide})</option>
+                {(competition.discipline === "LIGHT" ? [4, 5] : [3, 4]).map(
+                  (nP) => (
+                    <option key={nP} value={nP}>
+                      {nP} players
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+          )}
+
           <div className="mt-4 space-y-2">
             <label className="flex items-center gap-2 text-sm">
               <input
