@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { csvImports, matches, players, teams } from "@/db/schema";
 import type { Discipline } from "@/engine/types";
@@ -150,6 +150,25 @@ export async function importPlayers(
   const { records } = parseCsvRecords(file.text);
   const errs: string[] = [];
   const rows: (typeof players.$inferInsert)[] = [];
+  // Jersey-uniqueness guard (brief §2.1): pre-validate against existing players
+  // and within the batch so we report row numbers instead of a raw DB error.
+  const teamIds = teamRows.map((t) => t.id);
+  const existingJerseys = new Set(
+    teamIds.length
+      ? (
+          await db
+            .select({
+              teamId: players.teamId,
+              jerseyNumber: players.jerseyNumber,
+            })
+            .from(players)
+            .where(inArray(players.teamId, teamIds))
+        )
+          .filter((p) => p.jerseyNumber != null)
+          .map((p) => `${p.teamId}:${p.jerseyNumber}`)
+      : [],
+  );
+  const seenJerseys = new Set<string>();
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
     const teamName = (r.teamDisplayName ?? "").trim();
@@ -163,6 +182,17 @@ export async function importPlayers(
       errs.push(`Row ${i + 2}: missing player name`);
       continue;
     }
+    const jerseyNumber = intOrNull(r.jerseyNumber);
+    if (jerseyNumber != null) {
+      const key = `${teamId}:${jerseyNumber}`;
+      if (existingJerseys.has(key) || seenJerseys.has(key)) {
+        errs.push(
+          `Row ${i + 2}: duplicate jersey ${jerseyNumber} for team "${teamName}"`,
+        );
+        continue;
+      }
+      seenJerseys.add(key);
+    }
     rows.push({
       id: newId("plyr"),
       teamId,
@@ -170,7 +200,7 @@ export async function importPlayers(
       firstName: r.firstName || null,
       lastName: r.lastName || null,
       fullName,
-      jerseyNumber: intOrNull(r.jerseyNumber),
+      jerseyNumber,
       isCaptain: csvBool(r.isCaptain),
       isLibero: csvBool(r.isLibero),
     });

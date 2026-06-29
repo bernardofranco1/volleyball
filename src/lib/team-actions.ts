@@ -136,6 +136,19 @@ export async function createPlayer(
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   if (!fullName) return fail("Player name is required.");
 
+  const jerseyNumber = intOrNull(fd, "jerseyNumber");
+  if (jerseyNumber != null) {
+    const dup = await db
+      .select({ id: players.id })
+      .from(players)
+      .where(
+        and(eq(players.teamId, teamId), eq(players.jerseyNumber, jerseyNumber)),
+      )
+      .limit(1);
+    if (dup.length > 0)
+      return fail(`Jersey number ${jerseyNumber} is already used on this team.`);
+  }
+
   await db.insert(players).values({
     id: newId("plyr"),
     teamId,
@@ -143,7 +156,7 @@ export async function createPlayer(
     firstName: firstName || null,
     lastName: lastName || null,
     fullName,
-    jerseyNumber: intOrNull(fd, "jerseyNumber"),
+    jerseyNumber,
     isCaptain: fd.get("isCaptain") != null,
     isLibero: fd.get("isLibero") != null,
   });

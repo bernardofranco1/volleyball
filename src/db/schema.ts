@@ -10,6 +10,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // All tables include `tenantId` for row-level multi-tenant isolation
@@ -188,7 +189,11 @@ export const players = pgTable("players", {
   role: text("role", { enum: ["PLAYER", "BENCH", "STAFF"] })
     .default("PLAYER")
     .notNull(),
-});
+}, (t) => [
+  // One jersey number per team. NULLs are distinct in Postgres, so bench/staff
+  // without a number are unaffected. Brief §2.1.
+  uniqueIndex("players_team_jersey_uq").on(t.teamId, t.jerseyNumber),
+]);
 
 // ── Matches ──────────────────────────────────────────────────────────────────
 

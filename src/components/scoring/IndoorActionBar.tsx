@@ -181,8 +181,6 @@ export function IndoorActionBar() {
   };
   const toFull = (t: TeamId) =>
     (t === "A" ? set.timeoutsUsedA : set.timeoutsUsedB) >= config.timeoutsPerSet;
-  const challengesLeft = (t: TeamId) =>
-    t === "A" ? set.vcs.challengesRemainingA : set.vcs.challengesRemainingB;
 
   return (
     <div className="flex flex-col gap-3">
@@ -208,14 +206,7 @@ export function IndoorActionBar() {
                 Libero
               </Secondary>
             ) : null}
-            {config.vcsEnabled ? (
-              <Secondary
-                disabled={challengesLeft(t) <= 0}
-                onClick={() => dispatch({ type: "VCS_CHALLENGE", team: t })}
-              >
-                Challenge ({challengesLeft(t)})
-              </Secondary>
-            ) : null}
+            {/* Challenge (VCS) hidden — brief §6 (engine kept dormant). */}
           </div>
         ))}
       </div>
