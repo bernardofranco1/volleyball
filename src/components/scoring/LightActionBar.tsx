@@ -45,11 +45,17 @@ export function LightActionBar() {
             onClick={() => {
               const prev = activeSet(state);
               if (!prev) return;
+              const nextSetNumber = state.currentSetNumber + 1;
               dispatch({
                 type: "SET_START",
-                setNumber: state.currentSetNumber + 1,
+                setNumber: nextSetNumber,
                 firstServer: oppositeTeam(prev.firstServer),
-                teamAStartSide: oppositeSide(prev.teamAStartSide),
+                // Air/Light changes ends only after set 1 + at 8 in the decider
+                // (F2): the deciding set keeps the previous side and switches at 8.
+                teamAStartSide:
+                  nextSetNumber >= config.bestOf
+                    ? prev.teamAStartSide
+                    : oppositeSide(prev.teamAStartSide),
               });
             }}
           >

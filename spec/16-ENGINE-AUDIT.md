@@ -49,23 +49,20 @@ subsequent win advances one position. Covered by a regression test in
 `light.test.ts` ("serving team rotates after a won rally"). Grass/Beach/Indoor
 are unchanged.
 
-### F2 — Air/Light court change entering the deciding set (minor)
-Appendix A lists Air/Light court changes as "after set 1" + the deciding set at 8.
-The app uses `sideSwitchBetweenSetsOnly`, which (for best-of-3) also switches
-between set 2 and the deciding set 3. The deciding set additionally switches at 8.
-Net effect is a possible extra switch entering set 3. This only affects which
-physical side a team starts the deciding set on (cosmetic for side tracking).
-**Recommendation:** confirm desired behaviour; if it must match Appendix exactly,
-suppress the between-sets switch immediately before the deciding set for LIGHT.
+### F2 — Air/Light court change entering the deciding set — RESOLVED (2026-06-29)
+Product owner confirmed Air/Light changes ends only **after set 1** + at 8 in the
+deciding set (no flip entering the decider). **Implemented:** `LightActionBar`'s
+"Start next set" keeps the previous side when the next set is the deciding set
+(`nextSetNumber >= config.bestOf`), otherwise flips as before; the deciding-set
+switch at 8 is unchanged. Indoor/Beach/Grass unaffected.
 
-### F3 — Air/Light rotation model (modelling note, not a bug)
-Appendix A describes Air/Light with fixed positions 1–5 rotating clockwise. The
-app implements Light (like Grass/Beach) with a **rotation-order** model
-(`lastRotA/B` index; server = `courtPositions[lastRot]`; advance on service gain)
-rather than fixed positional slots. This yields the correct expected server and
-rotation order; the §5 court view renders Light in rotation order accordingly. No
-change recommended — it is an equivalent, simpler model for the data we track
-(we don't enforce positional faults for Light).
+### F3 — Air/Light court positions — RESOLVED (2026-06-29)
+The engine keeps the rotation-order model (`lastRot`; correct expected server) —
+no scoring change. For the court **display**, `LightCourt` now derives court
+positions from rotation + server: position 1 = the server, the rest follow the
+rotation order around, laid out front/back per format (4-player front 3·2 /
+back 4·1; 5-player front 4·3·2 / back 5·1). Display-only; positional faults
+remain a referee call (not app-enforced for any discipline).
 
 ## Conclusion
 Indoor and Beach conform to Appendix A. Air/Light conforms on players, timeouts,
