@@ -156,6 +156,7 @@ export async function updateCompetitionConfig(fd: FormData): Promise<void> {
       bestOf: intOrNull(fd, "bestOf"),
       setScore: intOrNull(fd, "setScore"),
       setScoreTiebreak: intOrNull(fd, "setScoreTiebreak"),
+      playersPerSide: intOrNull(fd, "playersPerSide"),
       serveClockEnabled: fd.get("serveClockEnabled") != null,
       ttoEnabled: fd.get("ttoEnabled") != null,
     })
