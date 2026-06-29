@@ -135,6 +135,74 @@ export async function listMatches(competitionId: string): Promise<MatchRow[]> {
   return rows;
 }
 
+export interface TenantMatchRow {
+  id: string;
+  competitionId: string;
+  competitionName: string;
+  discipline: typeof matches.discipline.enumValues[number];
+  status: typeof matches.status.enumValues[number];
+  teamAName: string;
+  teamBName: string;
+  setsWonA: number;
+  setsWonB: number;
+  winner: "A" | "B" | null;
+  courtNumber: number | null;
+  scheduledAt: Date | null;
+}
+
+/**
+ * All matches across a tenant's competitions, with optional discipline/status
+ * filters and date ordering — powers the tenant-wide schedule page. "scheduled"
+ * groups the pre-live statuses (SCHEDULED/WARMUP/COIN_TOSS).
+ */
+export async function listTenantMatches(
+  tenantId: string,
+  opts: {
+    discipline?: string;
+    status?: "scheduled" | "live" | "finished";
+    order?: "asc" | "desc";
+  } = {},
+): Promise<TenantMatchRow[]> {
+  const teamA = aliasedTable(teams, "team_a");
+  const teamB = aliasedTable(teams, "team_b");
+  const conds = [eq(matches.tenantId, tenantId)];
+  const disciplines = matches.discipline.enumValues as readonly string[];
+  if (opts.discipline && disciplines.includes(opts.discipline))
+    conds.push(
+      eq(
+        matches.discipline,
+        opts.discipline as (typeof matches.discipline.enumValues)[number],
+      ),
+    );
+  if (opts.status === "live") conds.push(eq(matches.status, "LIVE"));
+  else if (opts.status === "finished")
+    conds.push(eq(matches.status, "FINISHED"));
+  else if (opts.status === "scheduled")
+    conds.push(inArray(matches.status, ["SCHEDULED", "WARMUP", "COIN_TOSS"]));
+  const dir = opts.order === "desc" ? desc : asc;
+  return db
+    .select({
+      id: matches.id,
+      competitionId: matches.competitionId,
+      competitionName: competitions.name,
+      discipline: matches.discipline,
+      status: matches.status,
+      teamAName: teamA.displayName,
+      teamBName: teamB.displayName,
+      setsWonA: matches.setsWonA,
+      setsWonB: matches.setsWonB,
+      winner: matches.winner,
+      courtNumber: matches.courtNumber,
+      scheduledAt: matches.scheduledAt,
+    })
+    .from(matches)
+    .innerJoin(teamA, eq(teamA.id, matches.teamAId))
+    .innerJoin(teamB, eq(teamB.id, matches.teamBId))
+    .innerJoin(competitions, eq(competitions.id, matches.competitionId))
+    .where(and(...conds))
+    .orderBy(dir(matches.scheduledAt));
+}
+
 export async function getMatch(
   tenantId: string,
   matchId: string,

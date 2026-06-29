@@ -75,6 +75,7 @@ export default async function TenantLayout({
                 [
                   ["nav.dashboard", "dashboard"],
                   ["nav.competitions", "competitions"],
+                  ["nav.matches", "matches"],
                   ["nav.settings", "settings"],
                 ] as const
               ).map(([key, path]) => (
