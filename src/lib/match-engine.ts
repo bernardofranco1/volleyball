@@ -28,7 +28,11 @@ import {
 import type { BeachEvent, BeachMatchState } from "@/engine/beach/types";
 import type { Actor, Discipline } from "@/engine/types";
 import { newId } from "@/lib/id";
-import { broadcastServeClock, broadcastState } from "@/lib/realtime";
+import {
+  broadcastServeClock,
+  broadcastState,
+  broadcastTimeout,
+} from "@/lib/realtime";
 
 export class MatchNotFoundError extends Error {}
 export class UnsupportedDisciplineError extends Error {}
@@ -317,6 +321,20 @@ export async function appendMatchEvent(
       Date.now() + meta.config.serveClockSecs * 1000,
       meta.config.serveClockSecs,
     );
+  }
+  // Team time-out countdown for the public board (brief §4.3).
+  if (
+    finalState.rallyPhase === "TIMEOUT_ACTIVE" &&
+    payload.type === "TIMEOUT_REQUEST"
+  ) {
+    const team = (payload as { team?: "A" | "B" }).team;
+    if (team)
+      await broadcastTimeout(
+        matchId,
+        Date.now() + meta.config.timeoutDurationSecs * 1000,
+        team,
+        meta.config.timeoutDurationSecs,
+      );
   }
 
   return { newEvents: result.newEvents, state: finalState };

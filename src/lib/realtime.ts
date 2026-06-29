@@ -79,3 +79,19 @@ export async function broadcastServeClock(
     },
   ]);
 }
+
+/** Announce a team time-out countdown (requesting team + absolute deadline). */
+export async function broadcastTimeout(
+  matchId: string,
+  deadline: number,
+  team: "A" | "B",
+  durationSecs: number,
+): Promise<void> {
+  await broadcast([
+    {
+      topic: `match:${matchId}`,
+      event: "timeout-start",
+      payload: { deadline, team, durationSecs },
+    },
+  ]);
+}

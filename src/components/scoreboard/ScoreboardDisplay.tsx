@@ -10,6 +10,7 @@ import {
   type BoardTheme,
   DEFAULT_BOARD_THEME,
 } from "@/components/scoreboard/BroadcastBoard";
+import { useCountdown, formatCountdown } from "@/components/scoreboard/Countdown";
 
 // Display modes are retained for URL compatibility; the broadcast board always
 // shows score + sets + serving, so they no longer change the layout.
@@ -25,6 +26,7 @@ export function ScoreboardDisplay({
   teamBName,
   logoUrl,
   accentColor,
+  scheduledAtMs,
   mode,
   poll,
   basePath,
@@ -37,12 +39,17 @@ export function ScoreboardDisplay({
   tenantName: string;
   logoUrl: string | null;
   accentColor: string | null;
+  scheduledAtMs: number | null;
   timeoutsPerSet: number;
   mode: DisplayMode;
   poll: boolean;
   basePath: string;
 }) {
   const [state, setState] = useState<BeachMatchState>(initialState);
+  const [timeoutInfo, setTimeoutInfo] = useState<{
+    deadline: number;
+    team: "A" | "B";
+  } | null>(null);
   const stateRef = useRef(state);
   useEffect(() => {
     stateRef.current = state;
@@ -89,6 +96,18 @@ export function ScoreboardDisplay({
             void fetchState();
         },
       )
+      .on(
+        "broadcast",
+        { event: "timeout-start" },
+        (msg: { payload?: { deadline?: number; team?: "A" | "B" } }) => {
+          const p = msg.payload;
+          if (
+            typeof p?.deadline === "number" &&
+            (p.team === "A" || p.team === "B")
+          )
+            setTimeoutInfo({ deadline: p.deadline, team: p.team });
+        },
+      )
       .subscribe();
     // Realtime is the instant path, but broadcasts are fire-and-forget — fetch
     // once on mount and run a slow backstop so a missed signal never leaves the
@@ -109,6 +128,17 @@ export function ScoreboardDisplay({
     ...DEFAULT_BOARD_THEME,
     ...(accentColor ? { accent: accentColor, line: accentColor } : {}),
   };
+
+  // Pre-match countdown to scheduled start (§4.4) + team time-out countdown (§4.3).
+  const preMatchMs = useCountdown(
+    scheduledAtMs && !finished && state.status !== "LIVE" ? scheduledAtMs : null,
+  );
+  const timeoutMs = useCountdown(timeoutInfo?.deadline ?? null);
+  const timeoutTeam = timeoutInfo?.team ?? null;
+  const showTimeout =
+    timeoutMs > 0 && state.rallyPhase === "TIMEOUT_ACTIVE" && timeoutTeam != null;
+  const showPreMatch =
+    preMatchMs > 0 && !finished && state.status !== "LIVE" && scheduledAtMs != null;
 
   return (
     <>
@@ -131,6 +161,32 @@ export function ScoreboardDisplay({
         finished={finished}
         theme={theme}
       />
+
+      {showPreMatch ? (
+        <div className="fixed left-1/2 top-8 z-[55] -translate-x-1/2 rounded-2xl border border-border bg-surface-raised/90 px-8 py-3 text-center backdrop-blur">
+          <div className="text-xs uppercase tracking-[0.3em] text-score-dim">
+            Starts in
+          </div>
+          <div className="font-mono text-4xl font-bold tabular-nums">
+            {formatCountdown(preMatchMs)}
+          </div>
+        </div>
+      ) : null}
+
+      {showTimeout ? (
+        <div
+          className={`fixed bottom-24 z-[55] rounded-2xl border-2 border-primary bg-surface-raised/95 px-8 py-3 text-center backdrop-blur ${
+            timeoutTeam === "A" ? "left-12" : "right-12"
+          }`}
+        >
+          <div className="text-xs uppercase tracking-[0.3em] text-primary">
+            {timeoutTeam === "A" ? teamAName : teamBName} · Time-out
+          </div>
+          <div className="font-mono text-5xl font-bold tabular-nums">
+            {formatCountdown(timeoutMs)}
+          </div>
+        </div>
+      ) : null}
 
       {/* Low-key live/poll toggle (TVs that can't hold a WebSocket). */}
       <nav className="fixed right-3 top-3 z-[60] opacity-20 transition-opacity hover:opacity-100">
