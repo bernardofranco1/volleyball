@@ -245,6 +245,7 @@ export const matches = pgTable("matches", {
   groupName: text("group_name"),
   phaseNumber: integer("phase_number"),
   phaseName: text("phase_name"),
+  scorerPin: text("scorer_pin"), // per-match 6-digit scorer gate (brief §5.2)
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

@@ -7,6 +7,8 @@ import { events, matchSessions } from "@/db/schema";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { getCompetition, getMatch } from "@/lib/competitions";
 import { TeamColorPicker } from "@/components/admin/TeamColorPicker";
+import { ScorerPinAdmin } from "@/components/admin/ScorerPinAdmin";
+import { getScorerPin } from "@/lib/scorer-pin";
 import {
   createMatchSession,
   revokeMatchSession,
@@ -140,7 +142,7 @@ export default async function MatchDetailPage({
           : ""}
       </p>
 
-      <div className="mt-6 max-w-sm">
+      <div className="mt-6 grid max-w-2xl gap-4 sm:grid-cols-2">
         <TeamColorPicker
           tenantSlug={tenantSlug}
           competitionId={competitionId}
@@ -149,6 +151,12 @@ export default async function MatchDetailPage({
           teamBName={match.teamBName}
           teamAColor={match.teamAColor}
           teamBColor={match.teamBColor}
+        />
+        <ScorerPinAdmin
+          tenantSlug={tenantSlug}
+          competitionId={competitionId}
+          matchId={matchId}
+          pin={await getScorerPin(matchId)}
         />
       </div>
 

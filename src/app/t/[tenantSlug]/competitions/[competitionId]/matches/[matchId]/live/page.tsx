@@ -16,6 +16,8 @@ import {
 import { GrassMatchProvider } from "@/lib/grass-match-context";
 import { LightMatchProvider } from "@/lib/light-match-context";
 import { PreMatchCountdownOverlay } from "@/components/scoreboard/PreMatchCountdownOverlay";
+import { ScorerPinGate } from "@/components/scoring/ScorerPinGate";
+import { scorerPinSatisfied } from "@/lib/scorer-pin";
 import { LiveScoreboard } from "@/components/scoring/LiveScoreboard";
 import { IndoorScoreboard } from "@/components/scoring/IndoorScoreboard";
 import { GrassScoreboard } from "@/components/scoring/GrassScoreboard";
@@ -74,6 +76,18 @@ export default async function LiveScoringPage({
   // Authorize against the match's tenant (SCORER/admin) — not just "logged in".
   const dest = `/t/${tenantSlug}/competitions/${competitionId}/matches/${matchId}/live`;
   await requireMatchRole(matchId, SCORING_ROLES, dest);
+
+  // Per-match scorer PIN gate (brief §5.2) — on top of admin login. No-op for
+  // matches without a PIN set.
+  if (!(await scorerPinSatisfied(matchId))) {
+    return (
+      <ScorerPinGate
+        tenantSlug={tenantSlug}
+        competitionId={competitionId}
+        matchId={matchId}
+      />
+    );
+  }
 
   let view;
   try {
