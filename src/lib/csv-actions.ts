@@ -355,6 +355,7 @@ export async function importRoster(
         countryCode: (get("Country", "countryCode") || "").toUpperCase() || null,
         clubName: get("Club", "clubName") || null,
         seed: intOrNull(get("Seed", "seed")),
+        color: get("Color", "colour", "color") || null,
       });
     }
     const firstName = get("First name", "firstName");

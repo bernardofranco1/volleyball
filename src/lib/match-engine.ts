@@ -172,6 +172,8 @@ export interface MatchView {
   competitionName: string;
   teamAName: string;
   teamBName: string;
+  teamAColor: string | null;
+  teamBColor: string | null;
   scheduledAt: Date | null;
   state: BeachMatchState;
   config: TournamentConfig;
@@ -187,6 +189,8 @@ export async function loadMatchView(matchId: string): Promise<MatchView> {
       competitionName: competitions.name,
       teamAName: teamA.displayName,
       teamBName: teamB.displayName,
+      teamAColor: teamA.color,
+      teamBColor: teamB.color,
       scheduledAt: matches.scheduledAt,
     })
     .from(matches)
@@ -206,6 +210,8 @@ export async function loadMatchView(matchId: string): Promise<MatchView> {
     competitionName: row.competitionName,
     teamAName: row.teamAName,
     teamBName: row.teamBName,
+    teamAColor: row.teamAColor,
+    teamBColor: row.teamBColor,
     scheduledAt: row.scheduledAt,
     state,
     config,

@@ -71,6 +71,8 @@ export default async function ScoreboardPage({
       initialState={view.state}
       teamAName={view.teamAName}
       teamBName={view.teamBName}
+      teamAColor={view.teamAColor}
+      teamBColor={view.teamBColor}
       competitionName={view.competitionName}
       tenantName={tenant.name}
       logoUrl={tenant.branding.logoUrl}

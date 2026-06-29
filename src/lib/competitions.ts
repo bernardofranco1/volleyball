@@ -138,7 +138,15 @@ export async function listMatches(competitionId: string): Promise<MatchRow[]> {
 export async function getMatch(
   tenantId: string,
   matchId: string,
-): Promise<MatchRow & { competitionId: string; discipline: string } | null> {
+): Promise<
+  | (MatchRow & {
+      competitionId: string;
+      discipline: string;
+      teamAColor: string | null;
+      teamBColor: string | null;
+    })
+  | null
+> {
   const teamA = aliasedTable(teams, "team_a");
   const teamB = aliasedTable(teams, "team_b");
   const rows = await db
@@ -158,6 +166,8 @@ export async function getMatch(
       scheduledAt: matches.scheduledAt,
       roundName: matches.roundName,
       matchNumber: matches.matchNumber,
+      teamAColor: teamA.color,
+      teamBColor: teamB.color,
     })
     .from(matches)
     .innerJoin(teamA, eq(teamA.id, matches.teamAId))

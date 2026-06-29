@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { events, matchSessions } from "@/db/schema";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { getCompetition, getMatch } from "@/lib/competitions";
+import { TeamColorPicker } from "@/components/admin/TeamColorPicker";
 import {
   createMatchSession,
   revokeMatchSession,
@@ -138,6 +139,18 @@ export default async function MatchDetailPage({
           ? ` · ${new Date(match.scheduledAt).toUTCString()}`
           : ""}
       </p>
+
+      <div className="mt-6 max-w-sm">
+        <TeamColorPicker
+          tenantSlug={tenantSlug}
+          competitionId={competitionId}
+          matchId={matchId}
+          teamAName={match.teamAName}
+          teamBName={match.teamBName}
+          teamAColor={match.teamAColor}
+          teamBColor={match.teamBColor}
+        />
+      </div>
 
       {/* Result */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">

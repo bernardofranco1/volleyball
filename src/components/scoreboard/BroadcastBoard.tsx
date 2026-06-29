@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { teamSwatch } from "@/lib/colors";
 
 // Broadcast scoreboard board — a faithful React port of the beach/air/grass
 // design template (spec/change-requests/scoreboards). 1920×1080 stage scaled to
@@ -38,6 +39,8 @@ export interface BoardSet {
 export interface BoardProps {
   teamAName: string;
   teamBName: string;
+  teamAColor: string | null;
+  teamBColor: string | null;
   setsWonA: number;
   setsWonB: number;
   scoreA: number;
@@ -67,6 +70,16 @@ export function BroadcastBoard(props: BoardProps) {
   const scale = useStageScale();
   const t = props.theme;
   const rootRef = useRef<HTMLDivElement>(null);
+  const swatchA = teamSwatch(props.teamAColor, t.bg);
+  const swatchB = teamSwatch(props.teamBColor, t.bg);
+  const bar = (s: { color: string; border: string }): React.CSSProperties => ({
+    width: 12,
+    height: 64,
+    flex: "none",
+    borderRadius: 4,
+    background: s.color,
+    border: `2px solid ${s.border}`,
+  });
 
   const cssVars = {
     "--bg": t.bg,
@@ -147,6 +160,7 @@ export function BroadcastBoard(props: BoardProps) {
             }}
           >
             {serveDot("A")}
+            <div style={bar(swatchA)} />
             <div
               style={{
                 fontWeight: 700,
@@ -190,6 +204,7 @@ export function BroadcastBoard(props: BoardProps) {
             >
               {props.teamBName}
             </div>
+            <div style={bar(swatchB)} />
             {serveDot("B")}
           </div>
         </div>

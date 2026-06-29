@@ -168,6 +168,7 @@ export const teams = pgTable("teams", {
   countryCode: text("country_code"), // ISO 3166-1 alpha-3 (optional)
   clubName: text("club_name"),
   seed: integer("seed"),
+  color: text("color"), // team colour (hex) for scoreboards/UI — brief §1.4
   poolId: text("pool_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

@@ -26,6 +26,8 @@ export function ScoreboardDisplay({
   teamBName,
   logoUrl,
   accentColor,
+  teamAColor,
+  teamBColor,
   scheduledAtMs,
   mode,
   poll,
@@ -39,6 +41,8 @@ export function ScoreboardDisplay({
   tenantName: string;
   logoUrl: string | null;
   accentColor: string | null;
+  teamAColor: string | null;
+  teamBColor: string | null;
   scheduledAtMs: number | null;
   timeoutsPerSet: number;
   mode: DisplayMode;
@@ -145,6 +149,8 @@ export function ScoreboardDisplay({
       <BroadcastBoard
         teamAName={teamAName}
         teamBName={teamBName}
+        teamAColor={teamAColor}
+        teamBColor={teamBColor}
         setsWonA={state.setsWonA}
         setsWonB={state.setsWonB}
         scoreA={set?.scoreA ?? 0}
