@@ -153,13 +153,18 @@ export function LightActionBar() {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Buttons follow court side so they track switches (brief §4.1). */}
       <div className="grid grid-cols-2 gap-3">
-        <Score armed={armed === "A"} onClick={() => tap("A")}>
-          {armed === "A" ? `Confirm — ${teamAName}` : `Point ${teamAName}`}
-        </Score>
-        <Score armed={armed === "B"} onClick={() => tap("B")}>
-          {armed === "B" ? `Confirm — ${teamBName}` : `Point ${teamBName}`}
-        </Score>
+        {(set?.teamASide === "RIGHT"
+          ? (["B", "A"] as const)
+          : (["A", "B"] as const)
+        ).map((t) => (
+          <Score key={t} armed={armed === t} onClick={() => tap(t)}>
+            {armed === t
+              ? `Confirm — ${t === "A" ? teamAName : teamBName}`
+              : `Point ${t === "A" ? teamAName : teamBName}`}
+          </Score>
+        ))}
       </div>
 
       <div className="grid grid-cols-2 gap-3">

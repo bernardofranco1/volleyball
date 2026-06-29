@@ -194,13 +194,18 @@ export function BeachActionBar({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Buttons follow court side so they track switches (brief §4.1). */}
       <div className="grid grid-cols-2 gap-3">
-        <ScoreButton armed={armed === "A"} onClick={() => tap("A")}>
-          {armed === "A" ? `Confirm point — ${teamAName}` : `Point ${teamAName}`}
-        </ScoreButton>
-        <ScoreButton armed={armed === "B"} onClick={() => tap("B")}>
-          {armed === "B" ? `Confirm point — ${teamBName}` : `Point ${teamBName}`}
-        </ScoreButton>
+        {(set?.teamASide === "RIGHT"
+          ? (["B", "A"] as const)
+          : (["A", "B"] as const)
+        ).map((t) => (
+          <ScoreButton key={t} armed={armed === t} onClick={() => tap(t)}>
+            {armed === t
+              ? `Confirm point — ${t === "A" ? teamAName : teamBName}`
+              : `Point ${t === "A" ? teamAName : teamBName}`}
+          </ScoreButton>
+        ))}
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-2">
