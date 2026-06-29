@@ -172,6 +172,7 @@ export interface MatchView {
   competitionName: string;
   teamAName: string;
   teamBName: string;
+  scheduledAt: Date | null;
   state: BeachMatchState;
   config: TournamentConfig;
 }
@@ -186,6 +187,7 @@ export async function loadMatchView(matchId: string): Promise<MatchView> {
       competitionName: competitions.name,
       teamAName: teamA.displayName,
       teamBName: teamB.displayName,
+      scheduledAt: matches.scheduledAt,
     })
     .from(matches)
     .innerJoin(competitions, eq(competitions.id, matches.competitionId))
@@ -204,6 +206,7 @@ export async function loadMatchView(matchId: string): Promise<MatchView> {
     competitionName: row.competitionName,
     teamAName: row.teamAName,
     teamBName: row.teamBName,
+    scheduledAt: row.scheduledAt,
     state,
     config,
   };

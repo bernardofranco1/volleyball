@@ -15,6 +15,7 @@ import {
 } from "@/lib/indoor-match-context";
 import { GrassMatchProvider } from "@/lib/grass-match-context";
 import { LightMatchProvider } from "@/lib/light-match-context";
+import { PreMatchCountdownOverlay } from "@/components/scoreboard/PreMatchCountdownOverlay";
 import { LiveScoreboard } from "@/components/scoring/LiveScoreboard";
 import { IndoorScoreboard } from "@/components/scoring/IndoorScoreboard";
 import { GrassScoreboard } from "@/components/scoring/GrassScoreboard";
@@ -89,6 +90,8 @@ export default async function LiveScoringPage({
     throw err;
   }
 
+  const scheduledAtMs = view.scheduledAt ? view.scheduledAt.getTime() : null;
+
   if (view.discipline === "INDOOR") {
     const { rosterA, rosterB } = await loadRosters(matchId);
     return (
@@ -101,6 +104,7 @@ export default async function LiveScoringPage({
         teamAName={view.teamAName}
         teamBName={view.teamBName}
       >
+        <PreMatchCountdownOverlay scheduledAtMs={scheduledAtMs} />
         <IndoorScoreboard competitionName={view.competitionName} />
       </IndoorMatchProvider>
     );
@@ -118,6 +122,7 @@ export default async function LiveScoringPage({
         teamAName={view.teamAName}
         teamBName={view.teamBName}
       >
+        <PreMatchCountdownOverlay scheduledAtMs={scheduledAtMs} />
         <GrassScoreboard competitionName={view.competitionName} />
       </GrassMatchProvider>
     );
@@ -135,6 +140,7 @@ export default async function LiveScoringPage({
         teamAName={view.teamAName}
         teamBName={view.teamBName}
       >
+        <PreMatchCountdownOverlay scheduledAtMs={scheduledAtMs} />
         <LightScoreboard competitionName={view.competitionName} />
       </LightMatchProvider>
     );
@@ -146,6 +152,7 @@ export default async function LiveScoringPage({
       initialState={view.state}
       config={view.config}
     >
+      <PreMatchCountdownOverlay scheduledAtMs={scheduledAtMs} />
       <LiveScoreboard
         competitionName={view.competitionName}
         teamAName={view.teamAName}
