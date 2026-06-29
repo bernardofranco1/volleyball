@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { logout } from "@/lib/auth-actions";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { getTenantBySlug } from "@/lib/tenant";
 import { getT } from "@/lib/i18n/server";
 import { LocaleProvider } from "@/lib/i18n/client";
@@ -88,14 +89,17 @@ export default async function TenantLayout({
             </nav>
           </div>
 
-          <form action={logout}>
-            <button
-              type="submit"
-              className="rounded-lg border border-border px-3 py-1.5 text-sm text-score-dim transition-colors hover:text-foreground"
-            >
-              {t("nav.signOut")}
-            </button>
-          </form>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <form action={logout}>
+              <button
+                type="submit"
+                className="rounded-lg border border-border px-3 py-1.5 text-sm text-score-dim transition-colors hover:text-foreground"
+              >
+                {t("nav.signOut")}
+              </button>
+            </form>
+          </div>
         </header>
 
         <div className="flex-1">{children}</div>
