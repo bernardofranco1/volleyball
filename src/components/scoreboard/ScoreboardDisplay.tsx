@@ -5,8 +5,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
 import { type BeachMatchState, activeSet } from "@/engine/beach/types";
-import { BroadcastBoard } from "@/components/scoreboard/BroadcastBoard";
+import {
+  BroadcastBoard,
+  type BoardSet,
+} from "@/components/scoreboard/BroadcastBoard";
+import {
+  IndoorBoard,
+  type IndoorPlayer,
+} from "@/components/scoreboard/IndoorBoard";
 import type { BoardTheme } from "@/lib/board-theme";
+import type { PlayerLite } from "@/lib/indoor-match-context";
+import type { Discipline } from "@/engine/types";
 import { useCountdown, formatCountdown } from "@/components/scoreboard/Countdown";
 
 // Display modes are retained for URL compatibility; the broadcast board always
@@ -25,6 +34,11 @@ export function ScoreboardDisplay({
   theme,
   teamAColor,
   teamBColor,
+  discipline,
+  rosterA,
+  rosterB,
+  maxSubsPerSet,
+  timeoutsPerSet,
   scheduledAtMs,
   mode,
   poll,
@@ -40,6 +54,10 @@ export function ScoreboardDisplay({
   theme: BoardTheme;
   teamAColor: string | null;
   teamBColor: string | null;
+  discipline: Discipline;
+  rosterA?: PlayerLite[];
+  rosterB?: PlayerLite[];
+  maxSubsPerSet?: number;
   scheduledAtMs: number | null;
   timeoutsPerSet: number;
   mode: DisplayMode;
@@ -136,29 +154,86 @@ export function ScoreboardDisplay({
   const showPreMatch =
     preMatchMs > 0 && !finished && state.status !== "LIVE" && scheduledAtMs != null;
 
+  const setsLadder: BoardSet[] = state.sets.map((s) => ({
+    setNumber: s.setNumber,
+    scoreA: s.scoreA,
+    scoreB: s.scoreB,
+    winner: s.winner,
+  }));
+
+  // Indoor reads extra fields off the current set (cast — same runtime object).
+  const iset = set as unknown as
+    | {
+        courtPositionsA?: string[];
+        courtPositionsB?: string[];
+        currentServer?: "A" | "B";
+        timeoutsUsedA?: number;
+        timeoutsUsedB?: number;
+        subsUsedA?: number;
+        subsUsedB?: number;
+      }
+    | undefined;
+  const rosterMap = new Map<string, PlayerLite>();
+  for (const p of rosterA ?? []) rosterMap.set(p.id, p);
+  for (const p of rosterB ?? []) rosterMap.set(p.id, p);
+  const rotation = (
+    ids: string[] | undefined,
+    team: "A" | "B",
+  ): IndoorPlayer[] =>
+    (ids ?? []).map((id, i) => {
+      const p = rosterMap.get(id);
+      return {
+        pos: i + 1,
+        jersey: p?.jerseyNumber ?? null,
+        name: p?.fullName ?? "—",
+        serving: iset?.currentServer === team && i === 0,
+      };
+    });
+
   return (
     <>
-      <BroadcastBoard
-        teamAName={teamAName}
-        teamBName={teamBName}
-        teamAColor={teamAColor}
-        teamBColor={teamBColor}
-        setsWonA={state.setsWonA}
-        setsWonB={state.setsWonB}
-        scoreA={set?.scoreA ?? 0}
-        scoreB={set?.scoreB ?? 0}
-        serving={set?.currentServer ?? null}
-        setNumber={set?.setNumber ?? null}
-        sets={state.sets.map((s) => ({
-          setNumber: s.setNumber,
-          scoreA: s.scoreA,
-          scoreB: s.scoreB,
-          winner: s.winner,
-        }))}
-        logoUrl={logoUrl}
-        finished={finished}
-        theme={theme}
-      />
+      {discipline === "INDOOR" ? (
+        <IndoorBoard
+          teamAName={teamAName}
+          teamBName={teamBName}
+          teamAColor={teamAColor}
+          teamBColor={teamBColor}
+          scoreA={set?.scoreA ?? 0}
+          scoreB={set?.scoreB ?? 0}
+          setsWonA={state.setsWonA}
+          setsWonB={state.setsWonB}
+          sets={setsLadder}
+          setNumber={set?.setNumber ?? null}
+          finished={finished}
+          rotationA={rotation(iset?.courtPositionsA, "A")}
+          rotationB={rotation(iset?.courtPositionsB, "B")}
+          timeoutsUsedA={iset?.timeoutsUsedA ?? 0}
+          timeoutsUsedB={iset?.timeoutsUsedB ?? 0}
+          timeoutsPerSet={timeoutsPerSet}
+          subsUsedA={iset?.subsUsedA ?? 0}
+          subsUsedB={iset?.subsUsedB ?? 0}
+          maxSubsPerSet={maxSubsPerSet ?? 6}
+          logoUrl={logoUrl}
+          theme={theme}
+        />
+      ) : (
+        <BroadcastBoard
+          teamAName={teamAName}
+          teamBName={teamBName}
+          teamAColor={teamAColor}
+          teamBColor={teamBColor}
+          setsWonA={state.setsWonA}
+          setsWonB={state.setsWonB}
+          scoreA={set?.scoreA ?? 0}
+          scoreB={set?.scoreB ?? 0}
+          serving={set?.currentServer ?? null}
+          setNumber={set?.setNumber ?? null}
+          sets={setsLadder}
+          logoUrl={logoUrl}
+          finished={finished}
+          theme={theme}
+        />
+      )}
 
       {showPreMatch ? (
         <div className="fixed left-1/2 top-8 z-[55] -translate-x-1/2 rounded-2xl border border-border bg-surface-raised/90 px-8 py-3 text-center backdrop-blur">

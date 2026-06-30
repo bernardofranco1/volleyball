@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getTenantBySlug } from "@/lib/tenant";
-import { getMatch } from "@/lib/competitions";
+import { getMatch, loadMatchRosters } from "@/lib/competitions";
 import {
   MatchNotFoundError,
   UnsupportedDisciplineError,
@@ -69,6 +69,10 @@ export default async function ScoreboardPage({
   const branding = await getCompetitionBranding(match.competitionId);
   const theme = resolveBoardTheme(view.discipline, branding);
   const boardLogo = branding?.logoUrl ?? tenant.branding.logoUrl;
+  const rosters =
+    view.discipline === "INDOOR"
+      ? await loadMatchRosters(matchId)
+      : { rosterA: [], rosterB: [] };
 
   return (
     <>
@@ -90,6 +94,10 @@ export default async function ScoreboardPage({
       teamBName={view.teamBName}
       teamAColor={view.teamAColor}
       teamBColor={view.teamBColor}
+      discipline={view.discipline}
+      rosterA={rosters.rosterA}
+      rosterB={rosters.rosterB}
+      maxSubsPerSet={view.config.maxSubsPerSet}
       competitionName={view.competitionName}
       tenantName={tenant.name}
       logoUrl={boardLogo}
