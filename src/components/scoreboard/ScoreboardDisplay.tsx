@@ -12,6 +12,7 @@ import {
 import {
   IndoorBoard,
   type IndoorPlayer,
+  type IndoorRosterEntry,
 } from "@/components/scoreboard/IndoorBoard";
 import type { BoardTheme } from "@/lib/board-theme";
 import type { PlayerLite } from "@/lib/indoor-match-context";
@@ -24,6 +25,13 @@ export type DisplayMode =
   | "SCORE_ONLY"
   | "SCORE_WITH_SETS"
   | "SCORE_WITH_ROTATION";
+
+// Court/list jerseys show the surname only (matches the redesign mock); fall back
+// to the full string if there's no whitespace to split on.
+const surname = (full: string) => {
+  const parts = full.trim().split(/\s+/);
+  return parts.length > 1 ? parts[parts.length - 1] : full;
+};
 
 export function ScoreboardDisplay({
   matchId,
@@ -185,10 +193,19 @@ export function ScoreboardDisplay({
       return {
         pos: i + 1,
         jersey: p?.jerseyNumber ?? null,
-        name: p?.fullName ?? "—",
+        name: p ? surname(p.fullName) : "—",
         serving: iset?.currentServer === team && i === 0,
+        libero: p?.isLibero ?? false,
       };
     });
+
+  // No-rotation fallback (lineup not submitted): plain roster lists.
+  const rosterList = (players: PlayerLite[] | undefined): IndoorRosterEntry[] =>
+    (players ?? []).map((p) => ({
+      jersey: p.jerseyNumber,
+      name: surname(p.fullName),
+      libero: p.isLibero,
+    }));
 
   return (
     <>
@@ -207,13 +224,14 @@ export function ScoreboardDisplay({
           finished={finished}
           rotationA={rotation(iset?.courtPositionsA, "A")}
           rotationB={rotation(iset?.courtPositionsB, "B")}
+          rosterA={rosterList(rosterA)}
+          rosterB={rosterList(rosterB)}
           timeoutsUsedA={iset?.timeoutsUsedA ?? 0}
           timeoutsUsedB={iset?.timeoutsUsedB ?? 0}
           timeoutsPerSet={timeoutsPerSet}
           subsUsedA={iset?.subsUsedA ?? 0}
           subsUsedB={iset?.subsUsedB ?? 0}
           maxSubsPerSet={maxSubsPerSet ?? 6}
-          logoUrl={logoUrl}
           theme={theme}
         />
       ) : (
