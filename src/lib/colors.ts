@@ -2,6 +2,22 @@
 // surface team colours and to handle clashes (e.g. a near-black colour on the
 // dark UI) by always pairing the swatch with a readable, contrasting border.
 
+/**
+ * Per-side default team colours. Match the TeamColorPicker's defaults so an
+ * unset team renders the SAME colour the picker previews — A blue, B red —
+ * instead of both falling back to one colour (which made the two teams
+ * indistinguishable on the court/scoreboard/buttons).
+ */
+export const TEAM_FALLBACK = { A: "#3366cc", B: "#cc3333" } as const;
+
+/** A team's display colour: its set hex, or the per-side default if unset/invalid. */
+export function resolveTeamColor(
+  color: string | null | undefined,
+  side: "A" | "B",
+): string {
+  return normalizeHex(color) ?? TEAM_FALLBACK[side];
+}
+
 /** Normalise a user colour to "#rrggbb", or null if not a valid hex. */
 export function normalizeHex(input: string | null | undefined): string | null {
   if (!input) return null;

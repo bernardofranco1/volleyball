@@ -1,6 +1,6 @@
 "use client";
 
-import { normalizeHex } from "@/lib/colors";
+import { resolveTeamColor } from "@/lib/colors";
 import type { BoardTheme } from "@/lib/board-theme";
 
 // Broadcast board for Beach / Grass / Light (spec/change-requests/08, matches the
@@ -11,7 +11,6 @@ import type { BoardTheme } from "@/lib/board-theme";
 // board.
 
 const SCORE_BLUE = "#1B43E8";
-const tcOf = (c: string | null) => normalizeHex(c) ?? "#3366cc";
 
 export interface BoardSet {
   setNumber: number;
@@ -172,12 +171,12 @@ export function BroadcastBoard(props: BoardProps) {
       <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "3cqmin", height: "100%", gap: "2cqmin" }}>
         {/* Top bar (pinned to the top edge) */}
         <div style={{ display: "flex", alignItems: "center", gap: "1.2cqmin", width: "100%", border: `0.5cqmin solid ${accent}`, borderRadius: "0.8cqmin", padding: "1.2cqmin" }}>
-          <TeamPlate name={props.teamAName} color={tcOf(props.teamAColor)} align="left" />
+          <TeamPlate name={props.teamAName} color={resolveTeamColor(props.teamAColor, "A")} align="left" />
           <div style={{ display: "flex", gap: "1cqmin", flex: "none" }}>
             <SetsWon value={props.setsWonA} />
             <SetsWon value={props.setsWonB} />
           </div>
-          <TeamPlate name={props.teamBName} color={tcOf(props.teamBColor)} align="right" />
+          <TeamPlate name={props.teamBName} color={resolveTeamColor(props.teamBColor, "B")} align="right" />
         </div>
 
         {/* Competition logo — space reserved even when absent */}

@@ -1,5 +1,6 @@
 import type { PlayerLite } from "@/lib/indoor-match-context";
 import type { Side, TeamId } from "@/engine/light/types";
+import { resolveTeamColor } from "@/lib/colors";
 import {
   PositionalCourt,
   surnameOf,
@@ -65,7 +66,7 @@ export function LightCourt({
 
     return {
       name: team === "A" ? teamAName : teamBName,
-      color: team === "A" ? teamAColor : teamBColor,
+      color: resolveTeamColor(team === "A" ? teamAColor : teamBColor, team),
       serving,
       front: layout.front.map(slot),
       back: layout.back.map(slot),
