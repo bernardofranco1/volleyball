@@ -12,9 +12,11 @@ import {
 // (courtPositions[lastRot]) with the rest following the rotation. Front line is
 // 2·3 (4-player) or 2·3·4 (5-player); back line is 1·4 or 1·5. Dashed attack
 // line (2 m) and a faint service-restraint line near the baseline.
+// back ends with position 1 so the server renders at the back (bottom for the
+// left team → diagonal mirror across the net).
 const LAYOUT: Record<number, { front: number[]; back: number[] }> = {
-  4: { front: [2, 3], back: [1, 4] },
-  5: { front: [2, 3, 4], back: [1, 5] },
+  4: { front: [2, 3], back: [4, 1] },
+  5: { front: [2, 3, 4], back: [5, 1] },
 };
 
 export function LightCourt({

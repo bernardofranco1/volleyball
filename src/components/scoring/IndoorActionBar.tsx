@@ -185,14 +185,12 @@ export function IndoorActionBar() {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Buttons follow court side so they track switches (brief §4.1). */}
-      <div className="grid grid-cols-2 gap-3">
-        {(set?.teamASide === "RIGHT"
-          ? (["B", "A"] as const)
-          : (["A", "B"] as const)
-        ).map((t) => (
+      {/* Point buttons follow court side; Undo + Note stack between them. */}
+      {(() => {
+        const order =
+          set?.teamASide === "RIGHT" ? (["B", "A"] as const) : (["A", "B"] as const);
+        const scoreBtn = (t: TeamId) => (
           <Score
-            key={t}
             armed={armed === t}
             color={resolveTeamColor(t === "A" ? teamAColor : teamBColor, t)}
             onClick={() => tap(t)}
@@ -201,8 +199,27 @@ export function IndoorActionBar() {
               ? `Confirm — ${t === "A" ? teamAName : teamBName}`
               : `Point ${t === "A" ? teamAName : teamBName}`}
           </Score>
-        ))}
-      </div>
+        );
+        return (
+          <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
+            {scoreBtn(order[0])}
+            <div className="flex flex-col justify-center gap-1.5">
+              <Secondary armed={armed === "UNDO"} onClick={tapUndo} disabled={pending}>
+                {armed === "UNDO" ? "Confirm undo" : "Undo"}
+              </Secondary>
+              <Secondary
+                onClick={() => {
+                  const text = window.prompt("Note");
+                  if (text) dispatch({ type: "NOTE", text });
+                }}
+              >
+                Note
+              </Secondary>
+            </div>
+            {scoreBtn(order[1])}
+          </div>
+        );
+      })()}
 
       {/* Per-team officiating row */}
       <div className="grid grid-cols-2 gap-3">
@@ -228,20 +245,6 @@ export function IndoorActionBar() {
       {liberoTeam ? (
         <LiberoPanel team={liberoTeam} onClose={() => setLiberoTeam(null)} />
       ) : null}
-
-      <div className="flex items-center justify-center gap-2">
-        <Secondary armed={armed === "UNDO"} onClick={tapUndo} disabled={pending}>
-          {armed === "UNDO" ? "Confirm undo" : "Undo"}
-        </Secondary>
-        <Secondary
-          onClick={() => {
-            const text = window.prompt("Note");
-            if (text) dispatch({ type: "NOTE", text });
-          }}
-        >
-          Note
-        </Secondary>
-      </div>
     </div>
   );
 }
