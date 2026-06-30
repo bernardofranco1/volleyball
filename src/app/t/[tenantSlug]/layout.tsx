@@ -44,7 +44,7 @@ export default async function TenantLayout({
       <div
         style={style}
         data-tenant={tenant.slug}
-        className="flex min-h-screen flex-col"
+        className="flex min-h-dvh flex-col"
       >
         <header className="flex items-center justify-between border-b border-border px-6 py-4">
           <div className="flex items-center gap-6">
@@ -103,7 +103,9 @@ export default async function TenantLayout({
           </div>
         </header>
 
-        <div className="flex-1">{children}</div>
+        {/* Flex column + min-h-0 so a full-height child (the scoring shell) can
+            fill the viewport below the header; normal pages just flow/scroll. */}
+        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </div>
     </LocaleProvider>
   );
