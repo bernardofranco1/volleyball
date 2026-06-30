@@ -71,6 +71,7 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
           teamBName={teamBName}
           teamAColor={teamAColor}
           teamBColor={teamBColor}
+          teamAOnLeft={(set?.teamASide ?? "LEFT") === "LEFT"}
           setsWonA={state.setsWonA}
           setsWonB={state.setsWonB}
           scoreA={set?.scoreA ?? 0}
