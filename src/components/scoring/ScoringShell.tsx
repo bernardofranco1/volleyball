@@ -142,6 +142,7 @@ export function ScoringShell({
   online,
   pending,
   error,
+  tools,
   score,
   main,
   actions,
@@ -151,6 +152,7 @@ export function ScoringShell({
   online: boolean;
   pending: boolean;
   error: string | null;
+  tools?: ReactNode;
   score: ReactNode;
   main: ReactNode;
   actions: ReactNode;
@@ -163,6 +165,7 @@ export function ScoringShell({
         <div className="mb-1 flex items-center justify-between text-[11px] text-score-dim">
           <span className="truncate">{competitionLabel}</span>
           <span className="flex flex-none items-center gap-2">
+            {tools}
             {pending ? <span aria-hidden>⟳</span> : null}
             <span
               className={`inline-block h-2 w-2 rounded-full ${online ? "bg-green-500" : "bg-amber-500"}`}

@@ -8,9 +8,11 @@ import { LightActionBar } from "@/components/scoring/LightActionBar";
 import { LightLineupEntry } from "@/components/scoring/LightLineupEntry";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
+import { ScoringLog } from "@/components/scoring/ScoringLog";
 
 export function LightScoreboard({ competitionName }: { competitionName: string }) {
   const {
+    matchId,
     state,
     config,
     rosterA,
@@ -63,6 +65,9 @@ export function LightScoreboard({ competitionName }: { competitionName: string }
       online={online}
       pending={pending}
       error={error}
+      tools={
+        <ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} rosterById={rosterById} />
+      }
       score={
         <ScoreStrip
           teamAName={teamAName}
