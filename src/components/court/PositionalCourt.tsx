@@ -173,7 +173,7 @@ export function PositionalCourt({
   const resR = COURT_X1 - HALF_W / 6;
 
   return (
-    <svg viewBox="0 0 320 232" role="img" aria-label={ariaLabel} className="mx-auto w-full max-w-xl">
+    <svg viewBox="0 0 320 232" role="img" aria-label={ariaLabel} className="mx-auto block h-auto w-full max-w-xl max-h-[55dvh]">
       {/* Court halves */}
       <rect x={COURT_X0} y={COURT_Y0} width={HALF_W} height={COURT_Y1 - COURT_Y0} fill={leftFill} stroke="rgba(255,255,255,0.55)" strokeWidth={2} />
       <rect x={NET_X} y={COURT_Y0} width={HALF_W} height={COURT_Y1 - COURT_Y0} fill={rightFill} stroke="rgba(255,255,255,0.55)" strokeWidth={2} />

@@ -70,7 +70,7 @@ export function BeachCourt({
       viewBox="0 0 320 210"
       role="img"
       aria-label="Beach court"
-      className="mx-auto w-full max-w-xl"
+      className="mx-auto block h-auto w-full max-w-xl max-h-[55dvh]"
     >
       {/* ocean/sky hint */}
       <rect x={0} y={0} width={320} height={18} fill="#1b3a5c" opacity={0.6} />
