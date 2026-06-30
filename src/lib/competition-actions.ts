@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { competitions, tournamentConfig } from "@/db/schema";
+import { competitions, competitionBranding, tournamentConfig } from "@/db/schema";
 import type { Discipline } from "@/engine/types";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { getCompetition } from "@/lib/competitions";
@@ -161,6 +161,34 @@ export async function updateCompetitionConfig(fd: FormData): Promise<void> {
       ttoEnabled: fd.get("ttoEnabled") != null,
     })
     .where(eq(tournamentConfig.competitionId, competitionId));
+
+  revalidatePath(`/t/${tenantSlug}/competitions/${competitionId}`);
+}
+
+/** Persist scoreboard appearance overrides from the Scoreboard config tab. */
+export async function updateCompetitionBranding(fd: FormData): Promise<void> {
+  const tenantSlug = str(fd, "tenantSlug");
+  const competitionId = str(fd, "competitionId");
+  const ctx = await requireRole(tenantSlug, ADMIN_ROLES);
+  const comp = await getCompetition(ctx.tenant.id, competitionId);
+  if (!comp) return;
+
+  const v = (k: string) => str(fd, k) || null;
+  const values = {
+    bgColor: v("bgColor"),
+    lineColor: v("lineColor"),
+    accentColor: v("accentColor"),
+    fontColor: v("fontColor"),
+    fontFamily: v("fontFamily"),
+    logoUrl: v("logoUrl"),
+  };
+  await db
+    .insert(competitionBranding)
+    .values({ competitionId, ...values })
+    .onConflictDoUpdate({
+      target: competitionBranding.competitionId,
+      set: values,
+    });
 
   revalidatePath(`/t/${tenantSlug}/competitions/${competitionId}`);
 }

@@ -244,3 +244,38 @@ export async function getMatch(
     .limit(1);
   return rows[0] ?? null;
 }
+
+/** Both teams' players (for the indoor scoreboard rotation). */
+export async function loadMatchRosters(matchId: string): Promise<{
+  rosterA: { id: string; fullName: string; jerseyNumber: number | null; isLibero: boolean }[];
+  rosterB: { id: string; fullName: string; jerseyNumber: number | null; isLibero: boolean }[];
+}> {
+  const m = (
+    await db
+      .select({ teamAId: matches.teamAId, teamBId: matches.teamBId })
+      .from(matches)
+      .where(eq(matches.id, matchId))
+      .limit(1)
+  )[0];
+  if (!m) return { rosterA: [], rosterB: [] };
+  const rows = await db
+    .select({
+      id: players.id,
+      teamId: players.teamId,
+      fullName: players.fullName,
+      jerseyNumber: players.jerseyNumber,
+      isLibero: players.isLibero,
+    })
+    .from(players)
+    .where(inArray(players.teamId, [m.teamAId, m.teamBId]));
+  const lite = (teamId: string) =>
+    rows
+      .filter((r) => r.teamId === teamId)
+      .map((r) => ({
+        id: r.id,
+        fullName: r.fullName,
+        jerseyNumber: r.jerseyNumber,
+        isLibero: r.isLibero,
+      }));
+  return { rosterA: lite(m.teamAId), rosterB: lite(m.teamBId) };
+}
