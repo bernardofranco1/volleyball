@@ -117,6 +117,8 @@ export default async function LiveScoringPage({
         rosterB={rosterB}
         teamAName={view.teamAName}
         teamBName={view.teamBName}
+        teamAColor={view.teamAColor}
+        teamBColor={view.teamBColor}
       >
         <PreMatchCountdownOverlay scheduledAtMs={scheduledAtMs} />
         <IndoorScoreboard competitionName={view.competitionName} />
@@ -135,6 +137,8 @@ export default async function LiveScoringPage({
         rosterB={rosterB}
         teamAName={view.teamAName}
         teamBName={view.teamBName}
+        teamAColor={view.teamAColor}
+        teamBColor={view.teamBColor}
       >
         <PreMatchCountdownOverlay scheduledAtMs={scheduledAtMs} />
         <GrassScoreboard competitionName={view.competitionName} />
@@ -153,6 +157,8 @@ export default async function LiveScoringPage({
         rosterB={rosterB}
         teamAName={view.teamAName}
         teamBName={view.teamBName}
+        teamAColor={view.teamAColor}
+        teamBColor={view.teamBColor}
       >
         <PreMatchCountdownOverlay scheduledAtMs={scheduledAtMs} />
         <LightScoreboard competitionName={view.competitionName} />

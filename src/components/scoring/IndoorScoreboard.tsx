@@ -22,6 +22,8 @@ export function IndoorScoreboard({
     rosterB,
     teamAName,
     teamBName,
+    teamAColor,
+    teamBColor,
     online,
     pending,
     error,
@@ -89,6 +91,8 @@ export function IndoorScoreboard({
           teamASide={set.teamASide}
           teamAName={teamAName}
           teamBName={teamBName}
+          teamAColor={teamAColor}
+          teamBColor={teamBColor}
           rosterById={rosterById}
           liberoIdA={set.libero.liberoOnCourtA ? set.libero.liberoIdA : null}
           liberoIdB={set.libero.liberoOnCourtB ? set.libero.liberoIdB : null}

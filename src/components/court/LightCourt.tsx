@@ -1,11 +1,16 @@
 import type { PlayerLite } from "@/lib/indoor-match-context";
 import type { Side, TeamId } from "@/engine/light/types";
+import {
+  PositionalCourt,
+  surnameOf,
+  type CourtSlot,
+  type CourtTeam,
+} from "@/components/court/PositionalCourt";
 
-// Light court (4- or 5-player): two halves facing across the net, Team A on the
-// left and Team B on the right initially (follows teamASide). Each half shows a
-// frontline (5-player 2·3·4, 4-player 2·3) and a backline (1·5 or 1·4); position
-// 1 (server) is highlighted. Players are placed by rotation — position 1 is the
-// current server (courtPositions[lastRot]) and the rest follow rotation order.
+// Light court (4- or 5-player) — players on a real court, position 1 = server
+// (courtPositions[lastRot]) with the rest following the rotation. Front line is
+// 2·3 (4-player) or 2·3·4 (5-player); back line is 1·4 or 1·5. Dashed attack
+// line (2 m) and a faint service-restraint line near the baseline.
 const LAYOUT: Record<number, { front: number[]; back: number[] }> = {
   4: { front: [2, 3], back: [1, 4] },
   5: { front: [2, 3, 4], back: [1, 5] },
@@ -20,6 +25,8 @@ export function LightCourt({
   teamASide,
   teamAName,
   teamBName,
+  teamAColor,
+  teamBColor,
   rosterById,
 }: {
   courtPositionsA: string[];
@@ -30,75 +37,51 @@ export function LightCourt({
   teamASide: Side;
   teamAName: string;
   teamBName: string;
+  teamAColor: string | null;
+  teamBColor: string | null;
   rosterById: Map<string, PlayerLite>;
 }) {
-  const leftTeam: TeamId = teamASide === "LEFT" ? "A" : "B";
-  const half = (team: TeamId) => ({
-    name: team === "A" ? teamAName : teamBName,
-    positions: team === "A" ? courtPositionsA : courtPositionsB,
-    serving: currentServer === team,
-    pos1Index: (team === "A" ? lastRotA : lastRotB) ?? 0,
-  });
-  const left = half(leftTeam);
-  const right = half(leftTeam === "A" ? "B" : "A");
-
-  const cell = (h: ReturnType<typeof half>, posNum: number) => {
-    const n = h.positions.length;
-    const idx = n > 0 ? (((h.pos1Index + posNum - 1) % n) + n) % n : 0;
-    const pid = h.positions[idx];
-    const player = pid ? rosterById.get(pid) : undefined;
-    const isServer = posNum === 1 && h.serving;
-    const label = player ? (player.jerseyNumber ?? "–") : pid ? "•" : "·";
-    return (
-      <div
-        key={posNum}
-        className={`relative grid h-12 w-12 place-items-center rounded border text-sm ${
-          isServer
-            ? "border-primary bg-primary/20 text-foreground"
-            : "border-border bg-surface text-score-dim"
-        }`}
-        title={player?.fullName ?? pid ?? `Position ${posNum}`}
-      >
-        <span className="absolute left-1 top-0.5 text-[9px] text-score-dim">
-          {posNum}
-        </span>
-        <span className="font-mono font-semibold tabular-nums">{label}</span>
-        {isServer ? (
-          <span className="absolute bottom-0.5 text-[8px] text-primary">serve</span>
-        ) : null}
-      </div>
-    );
-  };
-
-  const halfView = (h: ReturnType<typeof half>) => {
+  const buildTeam = (team: TeamId): CourtTeam => {
+    const positions = team === "A" ? courtPositionsA : courtPositionsB;
+    const rot = (team === "A" ? lastRotA : lastRotB) ?? 0;
+    const serving = currentServer === team;
+    const n = positions.length;
     const layout =
-      LAYOUT[h.positions.length] ?? {
-        front: h.positions.map((_, i) => i + 1),
-        back: [],
+      LAYOUT[n] ?? { front: positions.map((_, i) => i + 1), back: [] };
+
+    const slot = (posNum: number): CourtSlot => {
+      const idx = n > 0 ? (((rot + posNum - 1) % n) + n) % n : 0;
+      const pid = positions[idx];
+      const player = pid ? rosterById.get(pid) : undefined;
+      return {
+        jersey: player?.jerseyNumber ?? null,
+        name: player ? surnameOf(player.fullName) : "",
+        posLabel: posNum,
+        isServer: posNum === 1 && serving,
+        isLibero: false,
+        present: pid != null,
       };
-    return (
-      <div className={`flex-1 rounded-lg p-2 ${h.serving ? "bg-surface-raised" : ""}`}>
-        <div className="mb-1 truncate text-center text-xs font-medium">
-          {h.name}
-          {h.serving ? <span className="text-primary"> ●</span> : null}
-        </div>
-        <div className="flex flex-col items-center gap-1">
-          <div className="flex justify-center gap-1">
-            {layout.front.map((p) => cell(h, p))}
-          </div>
-          <div className="flex justify-center gap-1">
-            {layout.back.map((p) => cell(h, p))}
-          </div>
-        </div>
-      </div>
-    );
+    };
+
+    return {
+      name: team === "A" ? teamAName : teamBName,
+      color: team === "A" ? teamAColor : teamBColor,
+      serving,
+      front: layout.front.map(slot),
+      back: layout.back.map(slot),
+    };
   };
 
+  const leftTeam: TeamId = teamASide === "LEFT" ? "A" : "B";
   return (
-    <div className="flex items-stretch gap-2 rounded-xl border border-border p-2">
-      {halfView(left)}
-      <div className="w-px self-stretch bg-foreground/30" aria-hidden />
-      {halfView(right)}
-    </div>
+    <PositionalCourt
+      surfaceLightVar="--court-light-light"
+      surfaceDarkVar="--court-light-dark"
+      left={buildTeam(leftTeam)}
+      right={buildTeam(leftTeam === "A" ? "B" : "A")}
+      attackLine
+      restraintLine
+      ariaLabel="Light court"
+    />
   );
 }
