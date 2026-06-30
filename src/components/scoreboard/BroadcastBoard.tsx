@@ -1,38 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { teamSwatch } from "@/lib/colors";
+import type { BoardTheme } from "@/lib/board-theme";
 
-// Broadcast scoreboard board — a faithful React port of the beach/air/grass
-// design template (spec/change-requests/scoreboards). 1920×1080 stage scaled to
-// fit any screen. Themed entirely through CSS tokens (--bg/--line/--font/
-// --accent/--ff/--radius) so white-label colors drive it. Indoor reuses this
-// board too (the template's per-player roster needs per-player stats the engine
-// doesn't track — see spec/15 §4).
-
-export interface BoardTheme {
-  bg: string;
-  line: string;
-  font: string;
-  accent: string;
-  ff: string;
-  radius: string;
-}
-
-export const DEFAULT_BOARD_THEME: BoardTheme = {
-  bg: "#0E1A2B",
-  line: "#F2A01E",
-  font: "#FFFFFF",
-  accent: "#F2A01E",
-  ff: "'Saira Condensed','Barlow Condensed',system-ui,sans-serif",
-  radius: "0px",
-};
+// Broadcast scoreboard board for Beach / Grass / Light — a React port of the
+// beach design template (spec/change-requests/scoreboards). Fully fluid: it
+// fills the viewport and sizes everything in `vmin`, so it scales and reflows
+// across aspect ratios from 3:4 (portrait) to 16:9 (landscape). Themed through
+// CSS tokens (--bg/--line/--font/--accent/--ff/--radius) from the competition's
+// Scoreboard config. Indoor uses its own board.
 
 export interface BoardSet {
   setNumber: number;
   scoreA: number;
   scoreB: number;
-  /** 'A' | 'B' | null — who won the set (for the underline), null if in progress */
+  /** 'A' | 'B' | null — who won the set (underline); null if in progress. */
   winner: "A" | "B" | null;
 }
 
@@ -53,32 +35,17 @@ export interface BoardProps {
   theme: BoardTheme;
 }
 
-/** Fit the fixed 1920×1080 stage into the viewport, preserving aspect ratio. */
-function useStageScale() {
-  const [scale, setScale] = useState(1);
-  useEffect(() => {
-    const recompute = () =>
-      setScale(Math.min(window.innerWidth / 1920, window.innerHeight / 1080));
-    recompute();
-    window.addEventListener("resize", recompute);
-    return () => window.removeEventListener("resize", recompute);
-  }, []);
-  return scale;
-}
-
 export function BroadcastBoard(props: BoardProps) {
-  const scale = useStageScale();
   const t = props.theme;
-  const rootRef = useRef<HTMLDivElement>(null);
   const swatchA = teamSwatch(props.teamAColor, t.bg);
   const swatchB = teamSwatch(props.teamBColor, t.bg);
   const bar = (s: { color: string; border: string }): React.CSSProperties => ({
-    width: 12,
-    height: 64,
+    width: "1.1vmin",
+    height: "6vmin",
     flex: "none",
-    borderRadius: 4,
+    borderRadius: "0.4vmin",
     background: s.color,
-    border: `2px solid ${s.border}`,
+    border: `0.2vmin solid ${s.border}`,
   });
 
   const cssVars = {
@@ -93,8 +60,8 @@ export function BroadcastBoard(props: BoardProps) {
   const serveDot = (team: "A" | "B") => (
     <div
       style={{
-        width: 46,
-        height: 46,
+        width: "4.2vmin",
+        height: "4.2vmin",
         borderRadius: "50%",
         background: "var(--accent)",
         flex: "none",
@@ -103,149 +70,141 @@ export function BroadcastBoard(props: BoardProps) {
     />
   );
 
+  const namePanel = (
+    name: string,
+    team: "A" | "B",
+    swatch: { color: string; border: string },
+  ) => (
+    <div
+      style={{
+        flex: 1,
+        minWidth: 0,
+        background: "var(--bg)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: team === "B" ? "flex-end" : "flex-start",
+        gap: "2.4vmin",
+        padding: "1.5vmin 2.6vmin",
+        borderRadius: "var(--radius)",
+      }}
+    >
+      {team === "A" ? (
+        <>
+          {serveDot("A")}
+          <div style={bar(swatch)} />
+        </>
+      ) : null}
+      <div
+        style={{
+          fontWeight: 700,
+          fontSize: "5vmin",
+          letterSpacing: ".5px",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          minWidth: 0,
+          textAlign: team === "B" ? "right" : "left",
+        }}
+      >
+        {name}
+      </div>
+      {team === "B" ? (
+        <>
+          <div style={bar(swatch)} />
+          {serveDot("B")}
+        </>
+      ) : null}
+    </div>
+  );
+
   return (
     <div
       style={{
         position: "fixed",
         inset: 0,
         background: "var(--bg)",
+        color: "var(--font)",
+        fontFamily: "var(--ff)",
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
+        gap: "4vmin",
+        padding: "5vmin 6vmin",
         overflow: "hidden",
+        textTransform: "uppercase",
         ...cssVars,
       }}
     >
+      {/* TOP BAR: names + serve + sets-won */}
       <div
-        ref={rootRef}
         style={{
-          width: 1920,
-          height: 1080,
-          transform: `scale(${scale})`,
-          transformOrigin: "center center",
-          flex: "none",
-          background: "var(--bg)",
-          color: "var(--font)",
-          fontFamily: "var(--ff)",
+          width: "100%",
+          background: "var(--line)",
           display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 52,
-          padding: "56px 64px",
-          textTransform: "uppercase",
+          gap: "0.6vmin",
+          padding: "0.6vmin",
+          borderRadius: "var(--radius)",
         }}
       >
-        {/* TOP BAR: names + serve + sets-won */}
-        <div
-          style={{
-            width: "100%",
-            background: "var(--line)",
-            display: "flex",
-            gap: 6,
-            padding: 6,
-            borderRadius: "var(--radius)",
-          }}
-        >
-          <div
-            style={{
-              flex: 1,
-              minWidth: 0,
-              background: "var(--bg)",
-              display: "flex",
-              alignItems: "center",
-              gap: 26,
-              padding: "16px 28px",
-              borderRadius: "var(--radius)",
-            }}
-          >
-            {serveDot("A")}
-            <div style={bar(swatchA)} />
-            <div
-              style={{
-                fontWeight: 700,
-                fontSize: 56,
-                letterSpacing: ".5px",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                minWidth: 0,
-              }}
-            >
-              {props.teamAName}
-            </div>
-          </div>
-          <SetsWon value={props.setsWonA} />
-          <SetsWon value={props.setsWonB} />
-          <div
-            style={{
-              flex: 1,
-              minWidth: 0,
-              background: "var(--bg)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-end",
-              gap: 26,
-              padding: "16px 28px",
-              borderRadius: "var(--radius)",
-            }}
-          >
-            <div
-              style={{
-                fontWeight: 700,
-                fontSize: 56,
-                letterSpacing: ".5px",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                minWidth: 0,
-                textAlign: "right",
-              }}
-            >
-              {props.teamBName}
-            </div>
-            <div style={bar(swatchB)} />
-            {serveDot("B")}
-          </div>
-        </div>
+        {namePanel(props.teamAName, "A", swatchA)}
+        <SetsWon value={props.setsWonA} />
+        <SetsWon value={props.setsWonB} />
+        {namePanel(props.teamBName, "B", swatchB)}
+      </div>
 
-        {/* COMPETITION LOGO */}
-        {props.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={props.logoUrl}
-            alt=""
-            style={{ maxWidth: 640, maxHeight: 150, objectFit: "contain" }}
-          />
-        ) : (
-          <div style={{ height: 150 }} />
-        )}
+      {/* COMPETITION LOGO */}
+      {props.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={props.logoUrl}
+          alt=""
+          style={{ maxWidth: "55vmin", maxHeight: "13vmin", objectFit: "contain" }}
+        />
+      ) : null}
 
-        {/* SET INDICATOR */}
-        <div style={{ display: "flex", alignItems: "center", gap: 34 }}>
-          <div style={{ width: 54, height: 54, background: "var(--accent)", borderRadius: "var(--radius)" }} />
-          <div style={{ fontSize: 76, fontWeight: 800, letterSpacing: 3 }}>
-            {props.finished ? "Final" : props.setNumber ? `Set ${props.setNumber}` : "—"}
-          </div>
-          <div style={{ width: 54, height: 54, background: "var(--accent)", borderRadius: "var(--radius)" }} />
+      {/* SET INDICATOR */}
+      <div style={{ display: "flex", alignItems: "center", gap: "3vmin" }}>
+        <Square />
+        <div style={{ fontSize: "7vmin", fontWeight: 800, letterSpacing: "0.3vmin" }}>
+          {props.finished
+            ? "Final"
+            : props.setNumber
+              ? `Set ${props.setNumber}`
+              : "—"}
         </div>
+        <Square />
+      </div>
 
-        {/* BIG SCORE + SET-BY-SET LADDER */}
-        <div
-          style={{
-            width: "100%",
-            display: "grid",
-            gridTemplateColumns: "1fr auto 1fr",
-            alignItems: "center",
-            columnGap: 48,
-          }}
-        >
-          <BigScore value={props.scoreA} />
-          <Ladder sets={props.sets} />
-          <BigScore value={props.scoreB} />
-        </div>
+      {/* BIG SCORE + SET-BY-SET LADDER */}
+      <div
+        style={{
+          width: "100%",
+          display: "grid",
+          gridTemplateColumns: "1fr auto 1fr",
+          alignItems: "center",
+          columnGap: "4vmin",
+        }}
+      >
+        <BigScore value={props.scoreA} />
+        <Ladder sets={props.sets} />
+        <BigScore value={props.scoreB} />
       </div>
     </div>
+  );
+}
+
+function Square() {
+  return (
+    <div
+      style={{
+        width: "5vmin",
+        height: "5vmin",
+        background: "var(--accent)",
+        borderRadius: "var(--radius)",
+        flex: "none",
+      }}
+    />
   );
 }
 
@@ -253,13 +212,14 @@ function SetsWon({ value }: { value: number }) {
   return (
     <div
       style={{
-        width: 150,
+        width: "14vmin",
+        flex: "none",
         background: "var(--font)",
         color: "var(--bg)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 116,
+        fontSize: "11vmin",
         fontWeight: 800,
         lineHeight: 1,
         borderRadius: "var(--radius)",
@@ -273,7 +233,9 @@ function SetsWon({ value }: { value: number }) {
 function BigScore({ value }: { value: number }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ fontSize: 300, fontWeight: 800, lineHeight: 0.74 }}>{value}</div>
+      <div style={{ fontSize: "28vmin", fontWeight: 800, lineHeight: 0.74 }}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -285,37 +247,48 @@ function Ladder({ sets }: { sets: BoardSet[] }) {
       ? {
           textDecoration: "underline",
           textDecorationColor: "var(--accent)",
-          textDecorationThickness: 6,
-          textUnderlineOffset: 8,
+          textDecorationThickness: "0.6vmin",
+          textUnderlineOffset: "0.8vmin",
         }
       : {};
+  const col = (pick: "A" | "B") => (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        fontSize: "6vmin",
+        fontWeight: 800,
+        lineHeight: 1,
+      }}
+    >
+      {sets.map((s) => (
+        <div
+          key={s.setNumber}
+          style={{
+            height: "8vmin",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: pick === "A" ? "flex-end" : "flex-start",
+            opacity: s.winner === null || s.winner === pick ? 1 : 0.42,
+            ...underline(s.winner === pick),
+          }}
+        >
+          {pick === "A" ? s.scoreA : s.scoreB}
+        </div>
+      ))}
+    </div>
+  );
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
-      <div style={{ display: "flex", flexDirection: "column", fontSize: 64, fontWeight: 800, lineHeight: 1 }}>
-        {sets.map((s) => (
-          <div
-            key={s.setNumber}
-            style={{
-              height: 88,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-end",
-              opacity: s.winner === null || s.winner === "A" ? 1 : 0.42,
-              ...underline(s.winner === "A"),
-            }}
-          >
-            {s.scoreA}
-          </div>
-        ))}
-      </div>
+    <div style={{ display: "flex", alignItems: "center", gap: "2.4vmin" }}>
+      {col("A")}
       <div
         style={{
-          border: "5px solid var(--accent)",
+          border: "0.5vmin solid var(--accent)",
           borderRadius: "var(--radius)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          fontSize: 58,
+          fontSize: "5.4vmin",
           fontWeight: 800,
         }}
       >
@@ -323,12 +296,13 @@ function Ladder({ sets }: { sets: BoardSet[] }) {
           <div
             key={s.setNumber}
             style={{
-              width: 88,
-              height: 88,
+              width: "8vmin",
+              height: "8vmin",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              borderBottom: i < sets.length - 1 ? "5px solid var(--accent)" : undefined,
+              borderBottom:
+                i < sets.length - 1 ? "0.5vmin solid var(--accent)" : undefined,
               background: s.winner === null ? "var(--accent)" : undefined,
               color: s.winner === null ? "var(--bg)" : undefined,
             }}
@@ -337,22 +311,7 @@ function Ladder({ sets }: { sets: BoardSet[] }) {
           </div>
         ))}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", fontSize: 64, fontWeight: 800, lineHeight: 1 }}>
-        {sets.map((s) => (
-          <div
-            key={s.setNumber}
-            style={{
-              height: 88,
-              display: "flex",
-              alignItems: "center",
-              opacity: s.winner === null || s.winner === "B" ? 1 : 0.42,
-              ...underline(s.winner === "B"),
-            }}
-          >
-            {s.scoreB}
-          </div>
-        ))}
-      </div>
+      {col("B")}
     </div>
   );
 }

@@ -5,11 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
 import { type BeachMatchState, activeSet } from "@/engine/beach/types";
-import {
-  BroadcastBoard,
-  type BoardTheme,
-  DEFAULT_BOARD_THEME,
-} from "@/components/scoreboard/BroadcastBoard";
+import { BroadcastBoard } from "@/components/scoreboard/BroadcastBoard";
+import type { BoardTheme } from "@/lib/board-theme";
 import { useCountdown, formatCountdown } from "@/components/scoreboard/Countdown";
 
 // Display modes are retained for URL compatibility; the broadcast board always
@@ -25,7 +22,7 @@ export function ScoreboardDisplay({
   teamAName,
   teamBName,
   logoUrl,
-  accentColor,
+  theme,
   teamAColor,
   teamBColor,
   scheduledAtMs,
@@ -40,7 +37,7 @@ export function ScoreboardDisplay({
   competitionName: string;
   tenantName: string;
   logoUrl: string | null;
-  accentColor: string | null;
+  theme: BoardTheme;
   teamAColor: string | null;
   teamBColor: string | null;
   scheduledAtMs: number | null;
@@ -127,11 +124,6 @@ export function ScoreboardDisplay({
 
   const set = activeSet(state);
   const finished = state.status === "FINISHED";
-
-  const theme: BoardTheme = {
-    ...DEFAULT_BOARD_THEME,
-    ...(accentColor ? { accent: accentColor, line: accentColor } : {}),
-  };
 
   // Pre-match countdown to scheduled start (§4.4) + team time-out countdown (§4.3).
   const preMatchMs = useCountdown(

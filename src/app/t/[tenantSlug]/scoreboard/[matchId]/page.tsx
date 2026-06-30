@@ -10,6 +10,7 @@ import {
   ScoreboardDisplay,
   type DisplayMode,
 } from "@/components/scoreboard/ScoreboardDisplay";
+import { getCompetitionBranding, resolveBoardTheme } from "@/lib/board-theme";
 
 // Public, read-only TV display. No auth (excluded from the proxy redirect).
 export const dynamic = "force-dynamic";
@@ -65,8 +66,24 @@ export default async function ScoreboardPage({
     throw err;
   }
 
+  const branding = await getCompetitionBranding(match.competitionId);
+  const theme = resolveBoardTheme(view.discipline, branding);
+  const boardLogo = branding?.logoUrl ?? tenant.branding.logoUrl;
+
   return (
-    <ScoreboardDisplay
+    <>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link
+        rel="preconnect"
+        href="https://fonts.gstatic.com"
+        crossOrigin="anonymous"
+      />
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link
+        href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800;900&family=Barlow+Condensed:wght@600;700;800&family=Archivo:wght@700;800;900&family=Anton&display=swap"
+        rel="stylesheet"
+      />
+      <ScoreboardDisplay
       matchId={view.matchId}
       initialState={view.state}
       teamAName={view.teamAName}
@@ -75,13 +92,14 @@ export default async function ScoreboardPage({
       teamBColor={view.teamBColor}
       competitionName={view.competitionName}
       tenantName={tenant.name}
-      logoUrl={tenant.branding.logoUrl}
-      accentColor={tenant.branding.primaryColor ?? null}
+      logoUrl={boardLogo}
+      theme={theme}
       scheduledAtMs={match.scheduledAt ? match.scheduledAt.getTime() : null}
       timeoutsPerSet={view.config.timeoutsPerSet}
       mode={mode}
       poll={poll}
       basePath={basePath}
-    />
+      />
+    </>
   );
 }
