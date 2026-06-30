@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { db } from "@/db";
 import { tenantBranding } from "@/db/schema";
 import { requireRole } from "@/lib/authz";
@@ -67,5 +67,6 @@ export async function updateBranding(
   });
 
   revalidatePath(`/t/${tenantSlug}`, "layout");
+  updateTag(`tenant:${tenantSlug}`);
   return OK;
 }

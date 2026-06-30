@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { tenants, tenantBranding, userTenantRoles } from "@/db/schema";
@@ -32,30 +33,40 @@ const DEFAULT_BRANDING: TenantBranding = {
 
 /**
  * Resolve a tenant (with branding) by its URL slug, or null if not found.
- * Memoised per request (`cache`) so the layout, page, and authz share one query.
+ * Loaded on every tenant page (in the layout), so it's cached two ways:
+ *   - React `cache` de-dupes the call within a single request.
+ *   - `unstable_cache` (data cache, tag `tenant:<slug>`) serves it across
+ *     requests so navigation doesn't re-query; `updateBranding` revalidates the
+ *     tag, with a 5-min TTL as a safety net. Returns only JSON-safe values.
  */
 export const getTenantBySlug = cache(async function getTenantBySlug(
   slug: string,
 ): Promise<TenantWithBranding | null> {
-  const rows = await db
-    .select({
-      id: tenants.id,
-      slug: tenants.slug,
-      name: tenants.name,
-      primaryColor: tenantBranding.primaryColor,
-      secondaryColor: tenantBranding.secondaryColor,
-      logoUrl: tenantBranding.logoUrl,
-      fontFamily: tenantBranding.fontFamily,
-      courtColorOverrides: tenantBranding.courtColorOverrides,
-    })
-    .from(tenants)
-    .leftJoin(tenantBranding, eq(tenantBranding.tenantId, tenants.id))
-    .where(eq(tenants.slug, slug))
-    .limit(1);
+  const r = await unstable_cache(
+    async () => {
+      const rows = await db
+        .select({
+          id: tenants.id,
+          slug: tenants.slug,
+          name: tenants.name,
+          primaryColor: tenantBranding.primaryColor,
+          secondaryColor: tenantBranding.secondaryColor,
+          logoUrl: tenantBranding.logoUrl,
+          fontFamily: tenantBranding.fontFamily,
+          courtColorOverrides: tenantBranding.courtColorOverrides,
+        })
+        .from(tenants)
+        .leftJoin(tenantBranding, eq(tenantBranding.tenantId, tenants.id))
+        .where(eq(tenants.slug, slug))
+        .limit(1);
+      return rows[0] ?? null;
+    },
+    ["tenant-by-slug", slug],
+    { tags: [`tenant:${slug}`], revalidate: 60 },
+  )();
 
-  if (rows.length === 0) return null;
+  if (!r) return null;
 
-  const r = rows[0];
   return {
     id: r.id,
     slug: r.slug,

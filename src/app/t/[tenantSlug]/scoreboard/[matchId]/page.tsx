@@ -34,8 +34,16 @@ export default async function ScoreboardPage({
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) notFound();
 
-  // Confirm the match belongs to this tenant before exposing it publicly.
-  const match = await getMatch(tenant.id, matchId);
+  // Match (tenant-ownership check) and the replayed view are independent reads,
+  // so fetch them together. loadMatchView can throw, so capture its outcome
+  // rather than letting Promise.all reject.
+  const [match, viewResult] = await Promise.all([
+    getMatch(tenant.id, matchId),
+    loadMatchView(matchId).then(
+      (v) => ({ ok: true as const, v }),
+      (err: unknown) => ({ ok: false as const, err }),
+    ),
+  ]);
   if (!match) notFound();
 
   const mode: DisplayMode = MODES.includes(display as DisplayMode)
@@ -44,10 +52,8 @@ export default async function ScoreboardPage({
   const poll = modeParam === "poll";
   const basePath = `/t/${tenantSlug}/scoreboard/${matchId}`;
 
-  let view;
-  try {
-    view = await loadMatchView(matchId);
-  } catch (err) {
+  if (!viewResult.ok) {
+    const err = viewResult.err;
     if (err instanceof MatchNotFoundError) notFound();
     if (err instanceof UnsupportedDisciplineError) {
       return (
@@ -65,14 +71,17 @@ export default async function ScoreboardPage({
     }
     throw err;
   }
+  const view = viewResult.v;
 
-  const branding = await getCompetitionBranding(match.competitionId);
+  // Branding and (indoor) rosters are independent — fetch in parallel.
+  const [branding, rosters] = await Promise.all([
+    getCompetitionBranding(match.competitionId),
+    view.discipline === "INDOOR"
+      ? loadMatchRosters(matchId)
+      : Promise.resolve({ rosterA: [], rosterB: [] }),
+  ]);
   const theme = resolveBoardTheme(view.discipline, branding);
   const boardLogo = branding?.logoUrl ?? tenant.branding.logoUrl;
-  const rosters =
-    view.discipline === "INDOOR"
-      ? await loadMatchRosters(matchId)
-      : { rosterA: [], rosterB: [] };
 
   return (
     <>
