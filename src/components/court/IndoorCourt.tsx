@@ -1,5 +1,6 @@
 import type { PlayerLite } from "@/lib/indoor-match-context";
 import type { Side, TeamId } from "@/engine/indoor/types";
+import { resolveTeamColor } from "@/lib/colors";
 import {
   PositionalCourt,
   surnameOf,
@@ -63,7 +64,7 @@ export function IndoorCourt({
     const serving = currentServer === team;
     return {
       name: team === "A" ? teamAName : teamBName,
-      color: team === "A" ? teamAColor : teamBColor,
+      color: resolveTeamColor(team === "A" ? teamAColor : teamBColor, team),
       serving,
       front: FRONT.map((z) => slot(positions, z, liberoId, serving)),
       back: BACK.map((z) => slot(positions, z, liberoId, serving)),

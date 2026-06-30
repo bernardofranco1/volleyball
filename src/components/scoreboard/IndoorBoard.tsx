@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { normalizeHex } from "@/lib/colors";
+import { resolveTeamColor } from "@/lib/colors";
 import type { BoardTheme } from "@/lib/board-theme";
 import type { BoardSet } from "@/components/scoreboard/BroadcastBoard";
 import { useFitText } from "@/components/scoreboard/useFitText";
@@ -65,7 +65,6 @@ function lum(hex: string): number {
 function ink(hex: string): string {
   return lum(hex) > 0.55 ? "#10233b" : "#ffffff";
 }
-const tcOf = (c: string | null) => normalizeHex(c) ?? "#3366cc";
 
 function Swatch({ color }: { color: string }) {
   return (
@@ -285,8 +284,8 @@ function ListRow({ p, align, accent }: { p: IndoorRosterEntry; align: "left" | "
 export function IndoorBoard(props: IndoorBoardProps) {
   const t = props.theme;
   const accent = t.accent;
-  const tcA = tcOf(props.teamAColor);
-  const tcB = tcOf(props.teamBColor);
+  const tcA = resolveTeamColor(props.teamAColor, "A");
+  const tcB = resolveTeamColor(props.teamBColor, "B");
   const rootRef = useRef<HTMLDivElement>(null);
   const hasCourt = props.rotationA.length > 0 && props.rotationB.length > 0;
   useFitText(rootRef, [

@@ -177,6 +177,8 @@ export default async function LiveScoringPage({
         competitionName={view.competitionName}
         teamAName={view.teamAName}
         teamBName={view.teamBName}
+        teamAColor={view.teamAColor}
+        teamBColor={view.teamBColor}
       />
     </MatchProvider>
   );

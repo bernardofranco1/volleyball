@@ -1,21 +1,29 @@
 import type { Side, TeamId } from "@/engine/beach/types";
+import { resolveTeamColor } from "@/lib/colors";
 
 // Clean, functional 16×8 beach court. Shows which side each team occupies and
-// the current serving team (arrow + highlighted server dot).
+// the current serving team (arrow + highlighted server dot). The two player
+// markers per side carry the team's jersey colour.
 export function BeachCourt({
   teamASide,
   currentServer,
   teamAName,
   teamBName,
+  teamAColor,
+  teamBColor,
 }: {
   teamASide: Side;
   currentServer: TeamId | null;
   teamAName: string;
   teamBName: string;
+  teamAColor: string | null;
+  teamBColor: string | null;
 }) {
   const leftTeam: TeamId = teamASide === "LEFT" ? "A" : "B";
   const rightTeam: TeamId = leftTeam === "A" ? "B" : "A";
   const nameOf = (t: TeamId) => (t === "A" ? teamAName : teamBName);
+  const colorOf = (t: TeamId) =>
+    resolveTeamColor(t === "A" ? teamAColor : teamBColor, t);
 
   const half = (x: number, team: TeamId) => {
     const serving = currentServer === team;
@@ -30,16 +38,16 @@ export function BeachCourt({
           stroke="rgba(255,255,255,0.5)"
           strokeWidth={2}
         />
-        {/* two player dots */}
+        {/* two player markers in the team's jersey colour */}
         {[60, 120].map((dy) => (
           <circle
             key={dy}
             cx={x + 70}
             cy={dy}
-            r={9}
-            fill="rgba(0,0,0,0.55)"
-            stroke="rgba(255,255,255,0.7)"
-            strokeWidth={1.5}
+            r={11}
+            fill={colorOf(team)}
+            stroke="rgba(255,255,255,0.85)"
+            strokeWidth={2}
           />
         ))}
         <text

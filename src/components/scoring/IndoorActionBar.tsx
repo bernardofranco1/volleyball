@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useIndoorMatch } from "@/lib/indoor-match-context";
+import { resolveTeamColor, readableTextOn } from "@/lib/colors";
 import {
   type IndoorSetState,
   type TeamId,
@@ -14,7 +15,7 @@ type Armed = "A" | "B" | "UNDO" | null;
 const ARM_MS = 3000;
 
 export function IndoorActionBar() {
-  const { state, config, dispatch, pending, teamAName, teamBName } =
+  const { state, config, dispatch, pending, teamAName, teamBName, teamAColor, teamBColor } =
     useIndoorMatch();
   const [armed, setArmed] = useState<Armed>(null);
   const [subTeam, setSubTeam] = useState<TeamId | null>(null);
@@ -190,7 +191,12 @@ export function IndoorActionBar() {
           ? (["B", "A"] as const)
           : (["A", "B"] as const)
         ).map((t) => (
-          <Score key={t} armed={armed === t} onClick={() => tap(t)}>
+          <Score
+            key={t}
+            armed={armed === t}
+            color={resolveTeamColor(t === "A" ? teamAColor : teamBColor, t)}
+            onClick={() => tap(t)}
+          >
             {armed === t
               ? `Confirm — ${t === "A" ? teamAName : teamBName}`
               : `Point ${t === "A" ? teamAName : teamBName}`}
@@ -374,9 +380,14 @@ function Primary({ children, onClick, disabled }: { children: React.ReactNode; o
     </button>
   );
 }
-function Score({ children, onClick, armed }: { children: React.ReactNode; onClick: () => void; armed: boolean }) {
+function Score({ children, onClick, armed, color }: { children: React.ReactNode; onClick: () => void; armed: boolean; color: string }) {
   return (
-    <button type="button" onClick={onClick} className={`rounded-xl px-4 py-6 text-lg font-semibold transition-all ${armed ? "animate-pulse bg-primary text-primary-fg ring-2 ring-primary" : "border border-border bg-surface-raised hover:border-primary"}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ backgroundColor: color, color: readableTextOn(color) }}
+      className={`rounded-xl px-4 py-6 text-lg font-semibold transition-all ${armed ? "animate-pulse ring-4 ring-white/80" : "ring-1 ring-black/10 hover:brightness-110"}`}
+    >
       {children}
     </button>
   );

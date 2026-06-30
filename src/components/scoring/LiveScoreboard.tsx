@@ -10,10 +10,14 @@ export function LiveScoreboard({
   competitionName,
   teamAName,
   teamBName,
+  teamAColor,
+  teamBColor,
 }: {
   competitionName: string;
   teamAName: string;
   teamBName: string;
+  teamAColor: string | null;
+  teamBColor: string | null;
 }) {
   const { state, config, online, error, pending, serveClockDeadline } =
     useMatch();
@@ -70,6 +74,8 @@ export function LiveScoreboard({
         currentServer={set?.currentServer ?? null}
         teamAName={teamAName}
         teamBName={teamBName}
+        teamAColor={teamAColor}
+        teamBColor={teamBColor}
       />
 
       {/* Serve clock */}
@@ -81,7 +87,12 @@ export function LiveScoreboard({
       ) : null}
 
       {/* Action bar */}
-      <BeachActionBar teamAName={teamAName} teamBName={teamBName} />
+      <BeachActionBar
+        teamAName={teamAName}
+        teamBName={teamBName}
+        teamAColor={teamAColor}
+        teamBColor={teamBColor}
+      />
 
       {/* Set summary */}
       {state.sets.length > 0 ? (

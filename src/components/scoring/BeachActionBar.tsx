@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMatch } from "@/lib/match-context";
+import { resolveTeamColor, readableTextOn } from "@/lib/colors";
 import {
   type TeamId,
   activeSet,
@@ -15,9 +16,13 @@ const ARM_MS = 3000;
 export function BeachActionBar({
   teamAName,
   teamBName,
+  teamAColor,
+  teamBColor,
 }: {
   teamAName: string;
   teamBName: string;
+  teamAColor: string | null;
+  teamBColor: string | null;
 }) {
   const { state, config, dispatch, pending } = useMatch();
   const [armed, setArmed] = useState<Armed>(null);
@@ -200,7 +205,12 @@ export function BeachActionBar({
           ? (["B", "A"] as const)
           : (["A", "B"] as const)
         ).map((t) => (
-          <ScoreButton key={t} armed={armed === t} onClick={() => tap(t)}>
+          <ScoreButton
+            key={t}
+            armed={armed === t}
+            color={resolveTeamColor(t === "A" ? teamAColor : teamBColor, t)}
+            onClick={() => tap(t)}
+          >
             {armed === t
               ? `Confirm point — ${t === "A" ? teamAName : teamBName}`
               : `Point ${t === "A" ? teamAName : teamBName}`}
@@ -276,19 +286,22 @@ function ScoreButton({
   children,
   onClick,
   armed,
+  color,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   armed: boolean;
+  color: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      style={{ backgroundColor: color, color: readableTextOn(color) }}
       className={`rounded-xl px-4 py-6 text-lg font-semibold transition-all ${
         armed
-          ? "animate-pulse bg-primary text-primary-fg ring-2 ring-primary"
-          : "border border-border bg-surface-raised hover:border-primary"
+          ? "animate-pulse ring-4 ring-white/80"
+          : "ring-1 ring-black/10 hover:brightness-110"
       }`}
     >
       {children}
