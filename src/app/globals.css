@@ -32,7 +32,10 @@
   --court-grass-dark: #2d5a20;
   --court-hardwood-light: #c8844a;
   --court-hardwood-dark: #a0622a;
-  --court-light-base: #e8e0d4;
+  /* Light volleyball — recreational sport-court blue (proposed default; the
+     tenant can override both shades from Settings → Court colours). */
+  --court-light-light: #5b93c4;
+  --court-light-dark: #3f6e98;
 }
 
 @theme inline {

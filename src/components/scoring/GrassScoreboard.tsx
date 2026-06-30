@@ -20,6 +20,8 @@ export function GrassScoreboard({
     rosterB,
     teamAName,
     teamBName,
+    teamAColor,
+    teamBColor,
     online,
     pending,
     error,
@@ -87,6 +89,8 @@ export function GrassScoreboard({
           teamASide={set.teamASide}
           teamAName={teamAName}
           teamBName={teamBName}
+          teamAColor={teamAColor}
+          teamBColor={teamBColor}
           rosterById={rosterById}
         />
       ) : null}

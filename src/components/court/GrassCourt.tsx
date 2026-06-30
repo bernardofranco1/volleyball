@@ -1,8 +1,20 @@
 import type { PlayerLite } from "@/lib/indoor-match-context";
 import type { Side, TeamId } from "@/engine/grass/types";
+import {
+  PositionalCourt,
+  surnameOf,
+  type CourtSlot,
+  type CourtTeam,
+} from "@/components/court/PositionalCourt";
 
-// Grass court: each half lists its 3 or 4 players in rotation order (position 1 =
-// server). The current server is highlighted. Schematic, not to scale.
+// Grass court (3v3 / 4v4) — players placed on a real court in rotation order:
+// position 1 is the server (courtPositions[lastRot]) and the rest follow the
+// rotation. No attack line (beach-style rules), no libero.
+const LAYOUT: Record<number, { front: number[]; back: number[] }> = {
+  3: { front: [2, 3], back: [1] },
+  4: { front: [2, 3], back: [1, 4] },
+};
+
 export function GrassCourt({
   courtPositionsA,
   courtPositionsB,
@@ -12,6 +24,8 @@ export function GrassCourt({
   teamASide,
   teamAName,
   teamBName,
+  teamAColor,
+  teamBColor,
   rosterById,
 }: {
   courtPositionsA: string[];
@@ -22,59 +36,49 @@ export function GrassCourt({
   teamASide: Side;
   teamAName: string;
   teamBName: string;
+  teamAColor: string | null;
+  teamBColor: string | null;
   rosterById: Map<string, PlayerLite>;
 }) {
+  const buildTeam = (team: TeamId): CourtTeam => {
+    const positions = team === "A" ? courtPositionsA : courtPositionsB;
+    const rot = (team === "A" ? lastRotA : lastRotB) ?? 0;
+    const serving = currentServer === team;
+    const n = positions.length;
+    const layout =
+      LAYOUT[n] ?? { front: positions.map((_, i) => i + 1), back: [] };
+
+    const slot = (posNum: number): CourtSlot => {
+      const idx = n > 0 ? (((rot + posNum - 1) % n) + n) % n : 0;
+      const pid = positions[idx];
+      const player = pid ? rosterById.get(pid) : undefined;
+      return {
+        jersey: player?.jerseyNumber ?? null,
+        name: player ? surnameOf(player.fullName) : "",
+        posLabel: posNum,
+        isServer: posNum === 1 && serving,
+        isLibero: false,
+        present: pid != null,
+      };
+    };
+
+    return {
+      name: team === "A" ? teamAName : teamBName,
+      color: team === "A" ? teamAColor : teamBColor,
+      serving,
+      front: layout.front.map(slot),
+      back: layout.back.map(slot),
+    };
+  };
+
   const leftTeam: TeamId = teamASide === "LEFT" ? "A" : "B";
-  const half = (team: TeamId) => ({
-    name: team === "A" ? teamAName : teamBName,
-    positions: team === "A" ? courtPositionsA : courtPositionsB,
-    serving: currentServer === team,
-    serverIdx: team === "A" ? lastRotA : lastRotB,
-  });
-
-  const halfView = (h: ReturnType<typeof half>) => (
-    <div className={`flex-1 rounded-lg p-2 ${h.serving ? "bg-surface-raised" : ""}`}>
-      <div className="mb-2 truncate text-center text-xs font-medium">
-        {h.name}
-        {h.serving ? <span className="text-primary"> ●</span> : null}
-      </div>
-      <div className="flex flex-wrap justify-center gap-1.5">
-        {h.positions.map((pid, idx) => {
-          const player = rosterById.get(pid);
-          const isServer = h.serving && idx === h.serverIdx;
-          return (
-            <div
-              key={idx}
-              className={`relative grid h-12 w-12 place-items-center rounded border text-sm ${
-                isServer
-                  ? "border-primary bg-primary/20 text-foreground"
-                  : "border-border bg-surface text-score-dim"
-              }`}
-              title={player?.fullName ?? pid}
-            >
-              <span className="absolute left-1 top-0.5 text-[9px] text-score-dim">
-                {idx + 1}
-              </span>
-              <span className="font-mono font-semibold tabular-nums">
-                {player ? (player.jerseyNumber ?? "–") : "·"}
-              </span>
-              {isServer ? (
-                <span className="absolute bottom-0.5 text-[8px] text-primary">
-                  serve
-                </span>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-
   return (
-    <div className="flex items-stretch gap-2 rounded-xl border border-border p-2">
-      {halfView(half(leftTeam))}
-      <div className="w-px self-stretch bg-foreground/30" aria-hidden />
-      {halfView(half(leftTeam === "A" ? "B" : "A"))}
-    </div>
+    <PositionalCourt
+      surfaceLightVar="--court-grass-light"
+      surfaceDarkVar="--court-grass-dark"
+      left={buildTeam(leftTeam)}
+      right={buildTeam(leftTeam === "A" ? "B" : "A")}
+      ariaLabel="Grass court"
+    />
   );
 }

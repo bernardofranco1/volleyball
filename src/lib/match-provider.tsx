@@ -55,6 +55,8 @@ export interface MatchContextValue<S, P> {
   rosterB: PlayerLite[];
   teamAName: string;
   teamBName: string;
+  teamAColor: string | null;
+  teamBColor: string | null;
   dispatch: (payload: P) => void;
   pending: boolean;
   online: boolean;
@@ -70,6 +72,8 @@ export interface MatchProviderProps<S> {
   rosterB?: PlayerLite[];
   teamAName?: string;
   teamBName?: string;
+  teamAColor?: string | null;
+  teamBColor?: string | null;
   children: React.ReactNode;
 }
 
@@ -93,6 +97,8 @@ export function createMatchProvider<
     rosterB = [],
     teamAName = "",
     teamBName = "",
+    teamAColor = null,
+    teamBColor = null,
     children,
   }: MatchProviderProps<S>) {
     const [state, setState] = useState<S>(initialState);
@@ -251,6 +257,8 @@ export function createMatchProvider<
         rosterB,
         teamAName,
         teamBName,
+        teamAColor,
+        teamBColor,
         dispatch,
         pending,
         online,
@@ -265,6 +273,8 @@ export function createMatchProvider<
         rosterB,
         teamAName,
         teamBName,
+        teamAColor,
+        teamBColor,
         dispatch,
         pending,
         online,
