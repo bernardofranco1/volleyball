@@ -43,18 +43,21 @@ export interface PositionalCourtProps {
   ariaLabel: string;
 }
 
-// Geometry (viewBox units).
+// Geometry (viewBox units). Each half is a true square (HALF_W × HALF_W) so the
+// whole court is a real 2:1 rectangle — shorter, which fits phones better.
 const NET_X = 160;
 const COURT_X0 = 16;
 const COURT_X1 = 304;
-const COURT_Y0 = 20;
-const COURT_Y1 = 196;
 const HALF_W = NET_X - COURT_X0; // 144
-const MK_Y0 = 40; // marker band top
-const MK_Y1 = 176; // marker band bottom
+const COURT_Y0 = 12;
+const COURT_Y1 = COURT_Y0 + HALF_W; // 156 — each half is 144×144
+const MK_Y0 = 26; // marker band top
+const MK_Y1 = 148; // marker band bottom
 const FRONT_DX = 26; // column offset from the net
 const BACK_DX = 98; // column offset toward the baseline
-const R = 13;
+const R = 12;
+const NAME_Y = 172; // team-name labels (below the court)
+const VB_H = 184; // viewBox height
 
 function rowYs(n: number): number[] {
   if (n <= 0) return [];
@@ -109,7 +112,7 @@ function Marker({
         y={cy}
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize={12.5}
+        fontSize={11.5}
         fontWeight={700}
         fill={numColor}
         style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}
@@ -117,7 +120,7 @@ function Marker({
         {label}
       </text>
       {slot.posLabel != null ? (
-        <text x={cx - R - 1} y={cy - R + 1} textAnchor="middle" fontSize={7} fill="rgba(255,255,255,0.65)">
+        <text x={cx - R - 1} y={cy - R + 1} textAnchor="middle" fontSize={6.5} fill="rgba(255,255,255,0.65)">
           {slot.posLabel}
         </text>
       ) : null}
@@ -125,12 +128,12 @@ function Marker({
         <circle cx={cx + R - 2} cy={cy - R + 2} r={4} fill="var(--primary)" stroke="#fff" strokeWidth={1} />
       ) : null}
       {slot.isLibero ? (
-        <text x={cx + R - 1} y={cy + R + 1} textAnchor="middle" fontSize={7.5} fontWeight={700} fill={color}>
+        <text x={cx + R - 1} y={cy + R + 1} textAnchor="middle" fontSize={7} fontWeight={700} fill={color}>
           L
         </text>
       ) : null}
       {slot.present && slot.name ? (
-        <text x={cx} y={cy + R + 9} textAnchor="middle" fontSize={8} fill="var(--score-active)">
+        <text x={cx} y={cy + R + 8} textAnchor="middle" fontSize={7.5} fill="var(--score-active)">
           {slot.name}
         </text>
       ) : null}
@@ -173,7 +176,7 @@ export function PositionalCourt({
   const resR = COURT_X1 - HALF_W / 6;
 
   return (
-    <svg viewBox="0 0 320 232" role="img" aria-label={ariaLabel} className="mx-auto block h-auto w-full max-w-xl max-h-[55dvh]">
+    <svg viewBox={`0 0 320 ${VB_H}`} role="img" aria-label={ariaLabel} className="mx-auto block h-auto w-full max-w-xl max-h-[48dvh]">
       {/* Court halves */}
       <rect x={COURT_X0} y={COURT_Y0} width={HALF_W} height={COURT_Y1 - COURT_Y0} fill={leftFill} stroke="rgba(255,255,255,0.55)" strokeWidth={2} />
       <rect x={NET_X} y={COURT_Y0} width={HALF_W} height={COURT_Y1 - COURT_Y0} fill={rightFill} stroke="rgba(255,255,255,0.55)" strokeWidth={2} />
@@ -203,11 +206,11 @@ export function PositionalCourt({
       <HalfMarkers team={right} side="right" />
 
       {/* Team names + serving */}
-      <text x={(COURT_X0 + NET_X) / 2} y={220} textAnchor="middle" fontSize={12} fontWeight={600} fill="var(--score-active)">
+      <text x={(COURT_X0 + NET_X) / 2} y={NAME_Y} textAnchor="middle" fontSize={12} fontWeight={600} fill="var(--score-active)">
         {left.name}
         {left.serving ? " ●" : ""}
       </text>
-      <text x={(NET_X + COURT_X1) / 2} y={220} textAnchor="middle" fontSize={12} fontWeight={600} fill="var(--score-active)">
+      <text x={(NET_X + COURT_X1) / 2} y={NAME_Y} textAnchor="middle" fontSize={12} fontWeight={600} fill="var(--score-active)">
         {right.name}
         {right.serving ? " ●" : ""}
       </text>
