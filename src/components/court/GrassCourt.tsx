@@ -11,9 +11,11 @@ import {
 // Grass court (3v3 / 4v4) — players placed on a real court in rotation order:
 // position 1 is the server (courtPositions[lastRot]) and the rest follow the
 // rotation. No attack line (beach-style rules), no libero.
+// front = nearest the net, back = baseline; back ends with position 1 so the
+// server renders at the back (bottom for the left team → diagonal mirror).
 const LAYOUT: Record<number, { front: number[]; back: number[] }> = {
-  3: { front: [2, 3], back: [1] },
-  4: { front: [2, 3], back: [1, 4] },
+  3: { front: [3], back: [2, 1] }, // 1 front, 2 back
+  4: { front: [2, 3], back: [4, 1] },
 };
 
 export function GrassCourt({

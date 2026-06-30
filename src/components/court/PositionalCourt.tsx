@@ -145,14 +145,19 @@ function HalfMarkers({ team, side }: { team: CourtTeam; side: "left" | "right" }
   const frontX = side === "left" ? NET_X - FRONT_DX : NET_X + FRONT_DX;
   const backX = side === "left" ? NET_X - BACK_DX : NET_X + BACK_DX;
   const color = normalizeHex(team.color) ?? "#3366cc";
-  const frontYs = rowYs(team.front.length);
-  const backYs = rowYs(team.back.length);
+  // Canonical (left) order places the server (position 1) at the bottom of the
+  // back column. The right half is mirrored vertically so the two servers sit
+  // diagonally opposite — real-match orientation (bottom-left vs top-right).
+  const front = side === "right" ? [...team.front].reverse() : team.front;
+  const back = side === "right" ? [...team.back].reverse() : team.back;
+  const frontYs = rowYs(front.length);
+  const backYs = rowYs(back.length);
   return (
     <g>
-      {team.back.map((s, i) => (
+      {back.map((s, i) => (
         <Marker key={`b${i}`} slot={s} cx={backX} cy={backYs[i]} color={color} />
       ))}
-      {team.front.map((s, i) => (
+      {front.map((s, i) => (
         <Marker key={`f${i}`} slot={s} cx={frontX} cy={frontYs[i]} color={color} />
       ))}
     </g>
