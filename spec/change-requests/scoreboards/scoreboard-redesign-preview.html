@@ -1,0 +1,283 @@
+<title>Volleyball venue scoreboard — layout preview</title>
+<style>
+  :root{
+    --navy:#0E1A2B; --red:#E8431F; --gold:#F2A01E; --white:#FFFFFF; --blue:#1B43E8;
+    --ink:#1b2430; --muted:#8a94a3;
+    --cond:"Saira Condensed","Barlow Condensed","Arial Narrow","Roboto Condensed",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  .wrap{font-family:var(--cond);color:var(--ink);padding:18px 0 40px}
+  .bar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:14px}
+  .grp{display:flex;gap:6px;align-items:center}
+  .grp b{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-right:4px;font-family:system-ui,sans-serif;font-weight:600}
+  .btn{font-family:system-ui,sans-serif;font-size:13px;font-weight:600;border:1px solid #cfd6df;background:#fff;color:var(--ink);
+       padding:7px 13px;border-radius:8px;cursor:pointer;transition:.15s}
+  .btn:hover{border-color:#9aa6b4}
+  .btn[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .stagewrap{width:100%;background:#0a0f17;border-radius:14px;padding:18px;display:flex;justify-content:center;align-items:center;min-height:440px}
+  .stage{position:relative;width:100%;background:var(--navy);overflow:hidden;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.45)}
+  .stage.r169{aspect-ratio:16/9}
+  .stage.r43{aspect-ratio:4/3;max-width:76%}
+  .board{position:absolute;inset:0;container-type:size;color:var(--white);text-transform:uppercase;
+         font-family:var(--cond);font-weight:800;background:var(--navy)}
+  .hidden{display:none!important}
+  .cap{font-family:system-ui,sans-serif;font-size:12px;color:var(--muted);margin-top:10px;text-align:center;line-height:1.5}
+  .sw{width:22px;height:22px;border-radius:6px;border:2px solid #fff;cursor:pointer;outline:2px solid transparent}
+  .sw[aria-pressed="true"]{outline:2px solid var(--ink);outline-offset:2px}
+</style>
+
+<div class="wrap">
+  <div class="bar">
+    <div class="grp"><b>Board</b>
+      <button class="btn" id="b-beach" aria-pressed="false" onclick="setBoard('beach')">Beach / Grass / Light</button>
+      <button class="btn" id="b-indoor" aria-pressed="true" onclick="setBoard('indoor')">Indoor</button>
+    </div>
+    <div class="grp" id="layoutgrp"><b>Indoor view</b>
+      <button class="btn" id="l-court" aria-pressed="true" onclick="setLayout('court')">Court formation</button>
+      <button class="btn" id="l-list" aria-pressed="false" onclick="setLayout('list')">Side list</button>
+    </div>
+    <div class="grp"><b>Screen</b>
+      <button class="btn" id="r-169" aria-pressed="true" onclick="setRatio('169')">16:9</button>
+      <button class="btn" id="r-43" aria-pressed="false" onclick="setRatio('43')">4:3</button>
+    </div>
+    <div class="grp"><b>Accent</b>
+      <span style="display:flex;gap:6px">
+        <span class="sw" style="background:#E8431F" aria-pressed="true" title="VNL / BPT red" onclick="setAccent('#E8431F')"></span>
+        <span class="sw" style="background:#F2A01E" aria-pressed="false" title="Finals gold" onclick="setAccent('#F2A01E')"></span>
+        <span class="sw" style="background:#19b36b" aria-pressed="false" title="white-label" onclick="setAccent('#19b36b')"></span>
+      </span>
+    </div>
+    <div class="grp"><b>Logo</b>
+      <button class="btn" id="lg-on" aria-pressed="true" onclick="setLogo(true)">Present</button>
+      <button class="btn" id="lg-off" aria-pressed="false" onclick="setLogo(false)">Absent</button>
+    </div>
+  </div>
+
+  <div class="stagewrap">
+    <div class="stage r169" id="stage">
+      <div class="board" id="board-indoor"></div>
+      <div class="board hidden" id="board-beach"></div>
+    </div>
+  </div>
+  <div class="cap" id="cap"></div>
+</div>
+
+<script>
+  const state={board:'indoor',layout:'court',ratio:'169',accent:'#E8431F',logo:true};
+
+  const teams={a:{name:'Dominican Republic',color:'#002D62'},b:{name:'Japan',color:'#1B43E8'}};
+  const match={set:4,scoreA:22,scoreB:18,setsWonA:2,setsWonB:1,
+    sets:[{n:1,a:25,b:20,w:'A'},{n:2,a:23,b:25,w:'B'},{n:3,a:25,b:22,w:'A'},{n:4,a:22,b:18,w:null}],
+    toA:1,toB:0,toMax:2,subA:3,subB:2,subMax:6};
+
+  // position number -> player on court (1..6). serving = back-right (pos 1).
+  const courtA={1:{n:'11',name:'Cachopa',serving:true},2:{n:'18',name:'Honorato'},3:{n:'7',name:'Lucão'},
+                4:{n:'19',name:'Worapeerachayakorn'},5:{n:'9',name:'Darlan'},6:{n:'5',name:'Rezende',libero:true}};
+  const courtB={1:{n:'1',name:'Sekita'},2:{n:'14',name:'Ishikawa'},3:{n:'12',name:'Ran T.'},
+                4:{n:'11',name:'Nishida',serving:false},5:{n:'20',name:'Yamamoto',libero:true},6:{n:'6',name:'Yamauchi'}};
+
+  const LOGO=`<svg viewBox="0 0 300 70" height="100%" xmlns="http://www.w3.org/2000/svg" aria-label="competition logo">
+    <g fill="#fff"><path d="M8 8 L26 8 L40 50 L54 8 L72 8 L48 62 L32 62 Z"/><path d="M70 8 L88 8 L102 50 L116 8 L134 8 L110 62 L94 62 Z"/></g>
+    <text x="150" y="30" font-family="Arial Narrow,sans-serif" font-size="26" font-weight="800" fill="#fff" letter-spacing="1">VOLLEYBALL</text>
+    <text x="150" y="56" font-family="Arial Narrow,sans-serif" font-size="26" font-weight="800" fill="${state.accent}" letter-spacing="1">WORLD</text></svg>`;
+
+  function rgbaAccent(a){const n=parseInt(state.accent.slice(1),16);return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;}
+  function lum(hex){const n=parseInt(hex.slice(1),16);const r=((n>>16)&255)/255,g=((n>>8)&255)/255,b=(n&255)/255;return .2126*r+.7152*g+.0722*b;}
+  function ink(hex){return lum(hex)>.55?'#10233b':'#ffffff';}
+  function swatch(color){return `<span style="display:inline-block;width:3.2cqmin;height:7cqmin;flex:none;border-radius:.6cqmin;background:${color};border:.35cqmin solid rgba(255,255,255,.85)"></span>`;}
+
+  // ---- jersey (number on shirt) + name; libero = transparent w/ team-colour outline ----
+  function jersey(p,teamColor){
+    const lib=!!p.libero;
+    const fill=lib?'none':teamColor;
+    const stroke=lib?teamColor:'rgba(255,255,255,.35)';
+    const numCol=lib?teamColor:ink(teamColor);
+    const ball=p.serving?`<span style="position:absolute;top:-.8cqmin;right:-.8cqmin;width:2.8cqmin;height:2.8cqmin;border-radius:50%;background:${state.accent};border:.3cqmin solid #fff"></span>`:'';
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:.5cqmin;width:15cqmin">
+      <div style="position:relative;width:7.5cqmin;height:7cqmin">
+        ${ball}
+        <svg viewBox="0 0 64 60" width="100%" height="100%" style="display:block">
+          <path d="M21 4 L26 9 Q32 12 38 9 L43 4 L60 14 L53 25 L47 21.5 L47 56 L17 56 L17 21.5 L11 25 L4 14 Z"
+                fill="${fill}" stroke="${stroke}" stroke-width="${lib?3:1.5}"/>
+          <text x="32" y="42" text-anchor="middle" font-family="${'Arial Narrow,'+'sans-serif'}" font-weight="800"
+                font-size="26" fill="${numCol}">${p.n}</text>
+        </svg>
+      </div>
+      <div style="width:100%;overflow:hidden;display:flex;justify-content:center">
+        <span class="fit" data-max="3.6" style="white-space:nowrap;font-weight:800;line-height:1;font-size:3.6cqmin">${p.name}</span></div>
+      ${lib?`<div style="font-size:1.7cqmin;letter-spacing:.1cqmin;color:${teamColor};font-family:system-ui,sans-serif">LIBERO</div>`:''}
+    </div>`;
+  }
+
+  function half(courtData,side){
+    // front column = positions 4,3,2 (nearest the net/centre); back column = 5,6,1.
+    // The 3 m line sits 1/3 of the half-court from the net -> back zone is wider (flex 2)
+    // than the front zone (flex 1), so the dashed line lands near the net, not mid-court.
+    const front=[4,3,2], back=[5,6,1];
+    const col=(arr,grow)=>`<div style="display:flex;flex-direction:column;justify-content:space-around;align-items:center;flex:${grow};padding:1cqmin 0">
+        ${arr.map(pos=>jersey(courtData[pos],side==='a'?teams.a.color:teams.b.color)).join('')}</div>`;
+    const dash=`<div style="width:0;border-left:.4cqmin dashed rgba(255,255,255,.45);align-self:stretch;margin:1cqmin 0"></div>`;
+    const cols=side==='a'?[col(back,2),dash,col(front,1)]:[col(front,1),dash,col(back,2)];
+    return `<div style="display:flex;flex:1;align-items:stretch;min-width:0">${cols.join('')}</div>`;
+  }
+  function teamStats(toUsed,subUsed,align){
+    const unit=(label,val)=>`<div style="display:flex;flex-direction:column;align-items:center;gap:.3cqmin">
+        <span style="font-size:1.5cqmin;opacity:.7;font-family:system-ui,sans-serif;text-transform:none">${label}</span>
+        <span style="min-width:6.5cqmin;height:4.8cqmin;border:.3cqmin solid ${state.accent};border-radius:.5cqmin;display:flex;align-items:center;justify-content:center;font-size:2.8cqmin">${val}</span></div>`;
+    return `<div style="display:flex;align-items:flex-end;gap:1.4cqmin;flex-direction:${align==='right'?'row-reverse':'row'}">
+        ${unit('Time-outs',toUsed+'/'+match.toMax)}${unit('Subs',subUsed+'/'+match.subMax)}</div>`;
+  }
+
+  function courtArea(){
+    // realistic 2:1 court (two 9x9 halves). Height-capped so it reads short & wide.
+    const net=`<div style="width:.6cqmin;background:#fff;align-self:stretch;margin:.5cqmin 0"></div>`;
+    return `<div style="display:flex;height:56cqmin;aspect-ratio:2/1;border:.4cqmin solid rgba(255,255,255,.55);border-radius:.6cqmin;flex:none">
+        ${half(courtA,'a')}${net}${half(courtB,'b')}</div>`;
+  }
+  function teamStatsV(toUsed,subUsed){
+    const unit=(label,val)=>`<div style="display:flex;flex-direction:column;align-items:center;gap:.4cqmin">
+        <span style="font-size:1.6cqmin;opacity:.7;font-family:system-ui,sans-serif;text-transform:none">${label}</span>
+        <span style="min-width:7cqmin;height:5.2cqmin;border:.32cqmin solid ${state.accent};border-radius:.5cqmin;display:flex;align-items:center;justify-content:center;font-size:3cqmin">${val}</span></div>`;
+    return `<div style="display:flex;flex-direction:column;gap:2.4cqmin;align-items:center;flex:none">
+        ${unit('Time-outs',toUsed+'/'+match.toMax)}${unit('Subs',subUsed+'/'+match.subMax)}</div>`;
+  }
+
+  function ladderH(){
+    return `<div style="display:flex;align-items:center;gap:1cqmin">
+      ${match.sets.map(s=>`<div style="display:flex;flex-direction:column;align-items:center;border:.3cqmin solid ${state.accent};border-radius:.5cqmin;
+          ${s.w===null?`background:${state.accent}`:''};padding:.3cqmin .8cqmin;min-width:5.5cqmin">
+          <div style="font-size:1.6cqmin;opacity:.8">${['I','II','III','IV','V'][s.n-1]}</div>
+          <div style="font-size:2.6cqmin;line-height:1.1">
+            <span style="color:${s.w==='A'?state.accent:'inherit'};${s.w===null?'color:#fff':''};opacity:${s.w==='B'?.5:1}">${s.a}</span>
+            <span style="opacity:.4">·</span>
+            <span style="color:${s.w==='B'?state.accent:'inherit'};${s.w===null?'color:#fff':''};opacity:${s.w==='A'?.5:1}">${s.b}</span>
+          </div></div>`).join('')}</div>`;
+  }
+  function statChip(l,label,r){
+    return `<div style="display:flex;align-items:center;gap:.8cqmin">
+      <span style="min-width:5cqmin;height:4.6cqmin;border:.3cqmin solid ${state.accent};border-radius:.5cqmin;display:flex;align-items:center;justify-content:center;font-size:2.6cqmin">${l}</span>
+      <span style="font-size:1.5cqmin;opacity:.7;font-family:system-ui,sans-serif;text-transform:none;min-width:7cqmin;text-align:center">${label}</span>
+      <span style="min-width:5cqmin;height:4.6cqmin;border:.3cqmin solid ${state.accent};border-radius:.5cqmin;display:flex;align-items:center;justify-content:center;font-size:2.6cqmin">${r}</span>
+    </div>`;
+  }
+
+  /* ---------------- INDOOR ---------------- */
+  function renderIndoor(){
+    const scoreBox=v=>`<div style="min-width:10cqmin;height:12cqmin;background:#fff;color:var(--blue);border:.4cqmin solid ${state.accent};border-radius:.6cqmin;display:flex;align-items:center;justify-content:center;font-size:10cqmin;line-height:1">${v}</div>`;
+    const setsWonBox=v=>`<div style="min-width:4.6cqmin;height:5.4cqmin;background:#fff;color:var(--blue);border-radius:.5cqmin;display:flex;align-items:center;justify-content:center;font-size:4.2cqmin;line-height:1">${v}</div>`;
+    const teamHdr=(t,align)=>`<div style="display:flex;flex-direction:${align==='right'?'row-reverse':'row'};align-items:center;gap:1.8cqmin;min-width:0;flex:1">
+        ${swatch(t.color)}<div style="flex:1;min-width:0;display:flex;overflow:hidden;justify-content:center">
+          <span class="fit" data-max="9" style="white-space:nowrap;line-height:.95;font-size:9cqmin;text-align:center">${t.name}</span></div></div>`;
+    const center=`<div style="display:flex;flex-direction:column;align-items:center;gap:1.2cqmin;flex:none">
+        <div style="font-size:3.2cqmin;letter-spacing:.3cqmin;color:${state.accent}">${match.set?('Set '+match.set):'—'}</div>
+        <div style="display:flex;gap:1.2cqmin">${scoreBox(match.scoreA)}${scoreBox(match.scoreB)}</div>
+        <div style="display:flex;gap:1.2cqmin">${setsWonBox(match.setsWonA)}${setsWonBox(match.setsWonB)}</div></div>`;
+
+    let body;
+    if(state.layout==='court'){
+      body=`<div style="display:flex;flex-direction:column;flex:1;min-height:0;justify-content:center;gap:2cqmin">
+          <div style="display:flex;align-items:center;justify-content:center;gap:3cqmin">
+            ${teamStatsV(match.toA,match.subA)}
+            ${courtArea()}
+            ${teamStatsV(match.toB,match.subB)}
+          </div>
+          <div style="display:flex;justify-content:center">${ladderH()}</div>
+        </div>`;
+    } else {
+      body=listBody();
+    }
+
+    document.getElementById('board-indoor').innerHTML=`
+      <div style="display:flex;flex-direction:column;padding:2.6cqmin;gap:1.6cqmin;height:100%">
+        <div style="display:flex;align-items:center;gap:2cqmin;width:100%;flex:none">${teamHdr(teams.a,'left')}${center}${teamHdr(teams.b,'right')}</div>
+        ${body}
+      </div>`;
+  }
+
+  function listBody(){
+    const rosterA=Object.entries(courtA).map(([pos,p])=>({pos,...p}));
+    const rosterB=Object.entries(courtB).map(([pos,p])=>({pos,...p}));
+    const row=(p,align)=>`<div style="display:flex;flex-direction:${align==='right'?'row-reverse':'row'};align-items:center;gap:1.1cqmin;
+        border:.28cqmin solid ${state.accent};background:${p.serving?rgbaAccent(.22):'transparent'};border-radius:.5cqmin;padding:.6cqmin 1cqmin;height:5.6cqmin">
+        <span style="font-size:3cqmin;width:5cqmin;text-align:center;flex:none;color:${p.libero?state.accent:'var(--blue)'};background:${p.libero?'transparent':'#fff'};border:.22cqmin solid ${state.accent};border-radius:.4cqmin;line-height:1.5">${p.n}</span>
+        <span style="font-size:2.9cqmin;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;text-align:${align==='right'?'right':'left'}">${p.name}</span>
+        <span style="width:2.6cqmin;height:2.6cqmin;border-radius:50%;background:${state.accent};flex:none;visibility:${p.serving?'visible':'hidden'}"></span></div>`;
+    const roster=(list,align)=>`<div style="display:flex;flex-direction:column;gap:.7cqmin">${list.map(p=>row(p,align)).join('')}</div>`;
+    const ladder=`<div style="display:flex;flex-direction:column;gap:.5cqmin">
+      ${match.sets.map(s=>`<div style="display:grid;grid-template-columns:6cqmin 5cqmin 6cqmin;align-items:center;font-size:3cqmin;${s.w===null?`background:${state.accent};color:#fff;border-radius:.5cqmin`:''}">
+        <div style="text-align:right;opacity:${s.w==='B'?.45:1};color:${s.w==='A'?state.accent:'inherit'}">${s.a}</div>
+        <div style="text-align:center;font-size:2.1cqmin;opacity:.75">${['I','II','III','IV','V'][s.n-1]}</div>
+        <div style="text-align:left;opacity:${s.w==='A'?.45:1};color:${s.w==='B'?state.accent:'inherit'}">${s.b}</div></div>`).join('')}</div>`;
+    const centerCol=`<div style="display:flex;flex-direction:column;align-items:center;gap:1.4cqmin">${ladder}
+        ${statChip(match.toA+'/'+match.toMax,'Time-outs',match.toB+'/'+match.toMax)}
+        ${statChip(match.subA+'/'+match.subMax,'Subs',match.subB+'/'+match.subMax)}</div>`;
+    return `<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:3cqmin;width:100%;flex:1;align-items:start;min-height:0">
+        ${roster(rosterA,'left')}${centerCol}${roster(rosterB,'right')}</div>`;
+  }
+
+  /* ---------------- BEACH ---------------- */
+  function renderBeach(){
+    const teamPlate=(t,align)=>`<div style="flex:1;display:flex;flex-direction:${align==='right'?'row-reverse':'row'};align-items:center;gap:2cqmin;min-width:0;padding:0 1cqmin">
+        ${swatch(t.color)}<div style="font-size:5.4cqmin;line-height:.92;min-width:0;text-align:${align==='right'?'right':'left'};
+          overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${t.name}</div></div>`;
+    const setsWon=v=>`<div style="width:9cqmin;height:9cqmin;background:#fff;color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:7cqmin;line-height:1;border-radius:.5cqmin">${v}</div>`;
+    const topbar=`<div style="display:flex;align-items:center;gap:1.2cqmin;width:100%;border:.5cqmin solid ${state.accent};border-radius:.8cqmin;padding:1.2cqmin">
+        ${teamPlate(teams.a,'left')}<div style="display:flex;gap:1cqmin;flex:none">${setsWon(match.setsWonA)}${setsWon(match.setsWonB)}</div>${teamPlate(teams.b,'right')}</div>`;
+    const logoBlock=`<div style="height:12cqmin;display:flex;align-items:center;justify-content:center">${state.logo?`<div style="height:10cqmin">${LOGO}</div>`:''}</div>`;
+    const sq=`<span style="width:3cqmin;height:3cqmin;background:${state.accent};border-radius:.4cqmin;flex:none"></span>`;
+    const setInd=`<div style="display:flex;align-items:center;justify-content:center;gap:2.5cqmin">${sq}<div style="font-size:5.5cqmin;letter-spacing:.4cqmin">${match.set?('Set '+match.set):'—'}</div>${sq}</div>`;
+    const big=v=>`<div style="font-size:26cqmin;line-height:.8;text-align:center">${v}</div>`;
+    const ladder=`<div style="display:flex;align-items:center;gap:2cqmin">
+        <div style="display:flex;flex-direction:column;gap:.6cqmin;font-size:5cqmin;text-align:right">${match.sets.map(s=>`<div style="height:7cqmin;display:flex;align-items:center;justify-content:flex-end;opacity:${s.w==='B'?.45:1}">${s.a}</div>`).join('')}</div>
+        <div style="display:flex;flex-direction:column;border:.4cqmin solid ${state.accent};border-radius:.5cqmin;overflow:hidden;font-size:4.4cqmin">
+          ${match.sets.map((s,i)=>`<div style="width:7cqmin;height:7cqmin;display:flex;align-items:center;justify-content:center;${i<match.sets.length-1?`border-bottom:.4cqmin solid ${state.accent}`:''};${s.w===null?`background:${state.accent};color:#fff`:''}">${s.n}</div>`).join('')}</div>
+        <div style="display:flex;flex-direction:column;gap:.6cqmin;font-size:5cqmin;text-align:left">${match.sets.map(s=>`<div style="height:7cqmin;display:flex;align-items:center;opacity:${s.w==='A'?.45:1}">${s.b}</div>`).join('')}</div></div>`;
+    const scoreRow=`<div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:3cqmin;width:100%">${big(match.scoreA)}${ladder}${big(match.scoreB)}</div>`;
+    document.getElementById('board-beach').innerHTML=`<div style="display:flex;flex-direction:column;justify-content:space-between;padding:3cqmin;height:100%;gap:2cqmin">${topbar}${logoBlock}${setInd}${scoreRow}</div>`;
+  }
+
+  function fitNames(){
+    document.querySelectorAll('.board:not(.hidden) .fit').forEach(el=>{
+      const slot=el.parentElement, board=el.closest('.board');
+      if(!slot.clientWidth) return;
+      const minDim=Math.min(board.clientWidth,board.clientHeight);
+      let px=parseFloat(el.dataset.max)*minDim/100;
+      el.style.fontSize=px+'px';
+      let guard=0;
+      while(el.getBoundingClientRect().width>slot.clientWidth && px>8 && guard<400){px-=1;el.style.fontSize=px+'px';guard++;}
+    });
+  }
+  function render(){renderIndoor();renderBeach();requestAnimationFrame(fitNames);}
+  function setBoard(b){state.board=b;
+    document.getElementById('b-beach').setAttribute('aria-pressed',b==='beach');
+    document.getElementById('b-indoor').setAttribute('aria-pressed',b==='indoor');
+    document.getElementById('board-beach').classList.toggle('hidden',b!=='beach');
+    document.getElementById('board-indoor').classList.toggle('hidden',b!=='indoor');
+    document.getElementById('layoutgrp').style.opacity=b==='indoor'?'1':'.35';
+    requestAnimationFrame(fitNames);cap();}
+  function setLayout(l){state.layout=l;
+    document.getElementById('l-court').setAttribute('aria-pressed',l==='court');
+    document.getElementById('l-list').setAttribute('aria-pressed',l==='list');render();cap();}
+  function setRatio(r){state.ratio=r;
+    document.getElementById('r-169').setAttribute('aria-pressed',r==='169');
+    document.getElementById('r-43').setAttribute('aria-pressed',r==='43');
+    const s=document.getElementById('stage');s.classList.toggle('r169',r==='169');s.classList.toggle('r43',r==='43');
+    requestAnimationFrame(fitNames);cap();}
+  function setAccent(c){state.accent=c;
+    document.querySelectorAll('.sw').forEach(el=>el.setAttribute('aria-pressed', el.style.background.toLowerCase()===hexToRgb(c)));render();}
+  function setLogo(v){state.logo=v;
+    document.getElementById('lg-on').setAttribute('aria-pressed',v);
+    document.getElementById('lg-off').setAttribute('aria-pressed',!v);render();}
+  function hexToRgb(h){const n=parseInt(h.slice(1),16);return `rgb(${(n>>16)&255}, ${(n>>8)&255}, ${n&255})`;}
+  function cap(){
+    const b=state.board==='beach'?'Beach / Grass / Light':'Indoor';
+    const r=state.ratio==='169'?'16:9':'4:3';
+    let note;
+    if(state.board==='beach') note='Top bar pinned to the top edge; logo space held; content fills the frame.';
+    else if(state.layout==='court') note='Players shown in court formation: positions 1–6 as jerseys + names, dashed attack line each side, net in the centre. Libero = transparent jersey outlined in team colour. Serving player carries the ball badge.';
+    else note='Side list with accent-driven outlines and past-set winner highlight.';
+    document.getElementById('cap').textContent=`${b} · ${r} — ${note}`;
+  }
+  render();cap();
+  window.addEventListener('resize',()=>requestAnimationFrame(fitNames));
+</script>
