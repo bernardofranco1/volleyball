@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useGrassMatch } from "@/lib/grass-match-context";
 import { resolveTeamColor, readableTextOn } from "@/lib/colors";
+import { ScoringModal } from "@/components/scoring/ScoringModal";
 import {
   type TeamId,
   activeSet,
@@ -226,31 +227,24 @@ function SubPanel({ team, onClose }: { team: TeamId; onClose: () => void }) {
   };
 
   return (
-    <div className="rounded-xl border border-border bg-surface-raised p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-medium">
-          Substitution — {team} (used {team === "A" ? set.subsUsedA : set.subsUsedB})
-        </span>
-        <button type="button" onClick={onClose} className="text-xs text-score-dim hover:text-foreground">
-          Close
-        </button>
-      </div>
-      <div className="space-y-2">
-        <Row label="Out" value={outId} onChange={setOutId} options={court} label2={label} />
-        <Row label="In" value={inId} onChange={setInId} options={bench.map((b) => b.id)} label2={label} />
-        <button
-          type="button"
-          disabled={!outId || !inId}
-          onClick={() => {
-            dispatch({ type: "SUBSTITUTION", team, outPlayerId: outId, inPlayerId: inId });
-            onClose();
-          }}
-          className="mt-1 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-opacity hover:opacity-90 disabled:opacity-40"
-        >
-          Confirm sub
-        </button>
-      </div>
-    </div>
+    <ScoringModal
+      title={`Substitution — ${team} (used ${team === "A" ? set.subsUsedA : set.subsUsedB})`}
+      onClose={onClose}
+    >
+      <Row label="Out" value={outId} onChange={setOutId} options={court} label2={label} />
+      <Row label="In" value={inId} onChange={setInId} options={bench.map((b) => b.id)} label2={label} />
+      <button
+        type="button"
+        disabled={!outId || !inId}
+        onClick={() => {
+          dispatch({ type: "SUBSTITUTION", team, outPlayerId: outId, inPlayerId: inId });
+          onClose();
+        }}
+        className="mt-1 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-opacity hover:opacity-90 disabled:opacity-40"
+      >
+        Confirm sub
+      </button>
+    </ScoringModal>
   );
 }
 

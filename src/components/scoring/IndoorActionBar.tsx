@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useIndoorMatch } from "@/lib/indoor-match-context";
 import { resolveTeamColor, readableTextOn } from "@/lib/colors";
+import { ScoringModal } from "@/components/scoring/ScoringModal";
 import {
   type IndoorSetState,
   type TeamId,
@@ -288,8 +289,9 @@ function SubPanel({ team, onClose }: { team: TeamId; onClose: () => void }) {
 // ── libero panel ────────────────────────────────────────────────────────────
 
 function LiberoPanel({ team, onClose }: { team: TeamId; onClose: () => void }) {
-  const { state, dispatch } = useIndoorMatch();
+  const { state, dispatch, rosterA, rosterB } = useIndoorMatch();
   const set = activeSet(state)!;
+  const roster = team === "A" ? rosterA : rosterB;
   const onCourt = team === "A" ? set.libero.liberoOnCourtA : set.libero.liberoOnCourtB;
   const liberoId = team === "A" ? set.libero.liberoIdA : set.libero.liberoIdB;
   const replacing = team === "A" ? set.libero.liberoReplacingA : set.libero.liberoReplacingB;
@@ -297,6 +299,10 @@ function LiberoPanel({ team, onClose }: { team: TeamId; onClose: () => void }) {
   // Back-row positions are 1,5,6 → indices 0,4,5 (but pos 1 serves; libero usually 5/6).
   const backRow = [5, 6].map((p) => court[p - 1]).filter(Boolean);
   const [outId, setOutId] = useState(backRow[0] ?? "");
+  const label = (id: string) => {
+    const p = roster.find((r) => r.id === id);
+    return p ? `${p.jerseyNumber ?? "–"} ${p.fullName}` : id;
+  };
 
   if (!liberoId)
     return (
@@ -306,7 +312,7 @@ function LiberoPanel({ team, onClose }: { team: TeamId; onClose: () => void }) {
     );
 
   return (
-    <Panel title={`Libero — ${team}`} onClose={onClose}>
+    <Panel title={`Libero · ${label(liberoId)}`} onClose={onClose}>
       {onCourt ? (
         <PanelConfirm
           onClick={() => {
@@ -320,24 +326,11 @@ function LiberoPanel({ team, onClose }: { team: TeamId; onClose: () => void }) {
             onClose();
           }}
         >
-          Libero out → return {replacing ?? "player"}
+          Libero out → return {replacing ? label(replacing) : "player"}
         </PanelConfirm>
       ) : (
         <>
-          <label className="flex items-center gap-2 text-sm">
-            <span className="w-16 text-score-dim">Replace</span>
-            <select
-              value={outId}
-              onChange={(e) => setOutId(e.target.value)}
-              className="flex-1 rounded-lg border border-border bg-surface px-2 py-1.5"
-            >
-              {backRow.map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectRow label="Out" value={outId} onChange={setOutId} options={backRow} label2={label} />
           <PanelConfirm
             disabled={!outId}
             onClick={() => {
@@ -351,7 +344,7 @@ function LiberoPanel({ team, onClose }: { team: TeamId; onClose: () => void }) {
               onClose();
             }}
           >
-            Libero in
+            Libero in → {label(outId)}
           </PanelConfirm>
         </>
       )}
@@ -404,15 +397,9 @@ function Secondary({ children, onClick, disabled, armed }: { children: React.Rea
 }
 function Panel({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="rounded-xl border border-border bg-surface-raised p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-medium">{title}</span>
-        <button type="button" onClick={onClose} className="text-xs text-score-dim hover:text-foreground">
-          Close
-        </button>
-      </div>
-      <div className="space-y-2">{children}</div>
-    </div>
+    <ScoringModal title={title} onClose={onClose}>
+      {children}
+    </ScoringModal>
   );
 }
 function SelectRow({ label, value, onChange, options, label2 }: { label: string; value: string; onChange: (v: string) => void; options: string[]; label2: (id: string) => string }) {
