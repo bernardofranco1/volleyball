@@ -298,7 +298,7 @@ function ScoreButton({
       type="button"
       onClick={onClick}
       style={{ backgroundColor: color, color: readableTextOn(color) }}
-      className={`rounded-xl px-4 py-6 text-lg font-semibold transition-all ${
+      className={`rounded-xl px-4 py-4 text-base font-semibold transition-all ${
         armed
           ? "animate-pulse ring-4 ring-white/80"
           : "ring-1 ring-black/10 hover:brightness-110"
