@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -191,4 +191,5 @@ export async function updateCompetitionBranding(fd: FormData): Promise<void> {
     });
 
   revalidatePath(`/t/${tenantSlug}/competitions/${competitionId}`);
+  updateTag(`competition-branding:${competitionId}`);
 }

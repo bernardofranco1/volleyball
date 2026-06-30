@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { competitionBranding } from "@/db/schema";
@@ -57,22 +58,31 @@ export interface CompetitionBranding {
   logoUrl: string | null;
 }
 
+// Cached across requests (data cache, tag `competition-branding:<id>`); the
+// scoreboard loads it on every render. `updateCompetitionBranding` revalidates
+// the tag, with a 5-min TTL fallback. All fields are JSON-safe.
 export async function getCompetitionBranding(
   competitionId: string,
 ): Promise<CompetitionBranding | null> {
-  const rows = await db
-    .select({
-      bgColor: competitionBranding.bgColor,
-      lineColor: competitionBranding.lineColor,
-      accentColor: competitionBranding.accentColor,
-      fontColor: competitionBranding.fontColor,
-      fontFamily: competitionBranding.fontFamily,
-      logoUrl: competitionBranding.logoUrl,
-    })
-    .from(competitionBranding)
-    .where(eq(competitionBranding.competitionId, competitionId))
-    .limit(1);
-  return rows[0] ?? null;
+  return unstable_cache(
+    async () => {
+      const rows = await db
+        .select({
+          bgColor: competitionBranding.bgColor,
+          lineColor: competitionBranding.lineColor,
+          accentColor: competitionBranding.accentColor,
+          fontColor: competitionBranding.fontColor,
+          fontFamily: competitionBranding.fontFamily,
+          logoUrl: competitionBranding.logoUrl,
+        })
+        .from(competitionBranding)
+        .where(eq(competitionBranding.competitionId, competitionId))
+        .limit(1);
+      return rows[0] ?? null;
+    },
+    ["competition-branding", competitionId],
+    { tags: [`competition-branding:${competitionId}`], revalidate: 60 },
+  )();
 }
 
 /** Layer a competition's overrides (ignoring blanks) over the discipline default. */
