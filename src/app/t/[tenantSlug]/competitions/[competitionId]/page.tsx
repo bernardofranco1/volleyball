@@ -10,8 +10,14 @@ import {
 import {
   setCompetitionStatus,
   updateCompetitionConfig,
+  updateCompetitionBranding,
 } from "@/lib/competition-actions";
 import { resolveConfig, type TournamentConfig } from "@/engine/config";
+import {
+  getCompetitionBranding,
+  defaultBoardTheme,
+  BOARD_FONTS,
+} from "@/lib/board-theme";
 import type { Discipline } from "@/engine/types";
 import { CompetitionTabs } from "@/components/admin/CompetitionTabs";
 import { EditCompetitionForm } from "@/components/admin/EditCompetitionForm";
@@ -46,16 +52,18 @@ export default async function CompetitionOverviewPage({
   const competition = await getCompetition(ctx.tenant.id, competitionId);
   if (!competition) notFound();
 
-  const [configRow, teams, matches] = await Promise.all([
+  const [configRow, teams, matches, boardBranding] = await Promise.all([
     getCompetitionConfig(competitionId),
     listTeams(competitionId),
     listMatches(competitionId),
+    getCompetitionBranding(competitionId),
   ]);
 
   const resolved = resolveConfig(
     competition.discipline as Discipline,
     (configRow ?? {}) as unknown as Partial<TournamentConfig>,
   );
+  const boardDefault = defaultBoardTheme(competition.discipline as Discipline);
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -223,6 +231,76 @@ export default async function CompetitionOverviewPage({
 
           <div className="mt-4">
             <SubmitButton pendingLabel="Saving…">Save rules</SubmitButton>
+          </div>
+        </form>
+
+        {/* Scoreboard appearance — per-competition broadcast-board theme. */}
+        <form action={updateCompetitionBranding} className={ui.card}>
+          <h2 className="mb-1 font-medium">Scoreboard</h2>
+          <p className="mb-3 text-[11px] text-score-dim">
+            Appearance of the public broadcast board for this competition.
+          </p>
+          <input type="hidden" name="tenantSlug" value={tenantSlug} />
+          <input type="hidden" name="competitionId" value={competitionId} />
+          <div className="grid grid-cols-2 gap-3">
+            {(
+              [
+                ["bgColor", "Background", boardDefault.bg],
+                ["lineColor", "Lines", boardDefault.line],
+                ["accentColor", "Accent", boardDefault.accent],
+                ["fontColor", "Text", boardDefault.font],
+              ] as const
+            ).map(([key, label, dflt]) => (
+              <div key={key}>
+                <label className={ui.label} htmlFor={key}>
+                  {label}
+                </label>
+                <input
+                  id={key}
+                  name={key}
+                  type="color"
+                  defaultValue={
+                    (boardBranding?.[key] as string | null) ?? dflt
+                  }
+                  className="h-9 w-full rounded-lg border border-border bg-surface"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="mt-3">
+            <label className={ui.label} htmlFor="board-font">
+              Font family
+            </label>
+            <select
+              id="board-font"
+              name="fontFamily"
+              defaultValue={boardBranding?.fontFamily ?? ""}
+              className={ui.input}
+            >
+              <option value="">Default (Saira Condensed)</option>
+              {BOARD_FONTS.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="mt-3">
+            <label className={ui.label} htmlFor="board-logo">
+              Competition logo URL
+            </label>
+            <input
+              id="board-logo"
+              name="logoUrl"
+              defaultValue={boardBranding?.logoUrl ?? ""}
+              placeholder="https://… (transparent .png)"
+              className={ui.input}
+            />
+          </div>
+          <div className="mt-4">
+            <SubmitButton variant="secondary" pendingLabel="Saving…">
+              Save scoreboard
+            </SubmitButton>
           </div>
         </form>
       </div>

@@ -37,6 +37,21 @@ export const tenantBranding = pgTable("tenant_branding", {
   courtColorOverrides: jsonb("court_color_overrides"),
 });
 
+// Per-competition scoreboard appearance (configurable from the competition's
+// Scoreboard config tab). All nullable → fall back to per-discipline board
+// defaults. Applies to every discipline's broadcast board.
+export const competitionBranding = pgTable("competition_branding", {
+  competitionId: text("competition_id")
+    .primaryKey()
+    .references(() => competitions.id),
+  bgColor: text("bg_color"),
+  lineColor: text("line_color"),
+  accentColor: text("accent_color"),
+  fontColor: text("font_color"),
+  fontFamily: text("font_family"),
+  logoUrl: text("logo_url"),
+});
+
 // ── Users & roles ──────────────────────────────────────────────────────────
 
 export const users = pgTable("users", {
