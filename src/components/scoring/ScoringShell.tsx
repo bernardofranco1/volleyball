@@ -55,6 +55,7 @@ export function ScoreStrip({
   teamBName,
   teamAColor,
   teamBColor,
+  teamAOnLeft,
   setsWonA,
   setsWonB,
   scoreA,
@@ -67,6 +68,8 @@ export function ScoreStrip({
   teamBName: string;
   teamAColor: string | null;
   teamBColor: string | null;
+  /** Court side: true when Team A is on the left (set.teamASide === "LEFT"). */
+  teamAOnLeft: boolean;
   setsWonA: number;
   setsWonB: number;
   scoreA: number;
@@ -75,34 +78,59 @@ export function ScoreStrip({
   statusLabel: string;
   sets: SetLine[];
 }) {
-  const cA = resolveTeamColor(teamAColor, "A");
-  const cB = resolveTeamColor(teamBColor, "B");
+  // Order everything by court side so the score mirrors the court and the
+  // assign-point buttons when teams switch ends.
+  const teamOf = (id: "A" | "B") =>
+    id === "A"
+      ? {
+          name: teamAName,
+          color: resolveTeamColor(teamAColor, "A"),
+          score: scoreA,
+          setsWon: setsWonA,
+          serving: serving === "A",
+        }
+      : {
+          name: teamBName,
+          color: resolveTeamColor(teamBColor, "B"),
+          score: scoreB,
+          setsWon: setsWonB,
+          serving: serving === "B",
+        };
+  const leftId: "A" | "B" = teamAOnLeft ? "A" : "B";
+  const rightId: "A" | "B" = teamAOnLeft ? "B" : "A";
+  const left = teamOf(leftId);
+  const right = teamOf(rightId);
+
   return (
     <div className="flex flex-col gap-1.5">
       <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
-        <TeamScore name={teamAName} color={cA} score={scoreA} serving={serving === "A"} />
+        <TeamScore name={left.name} color={left.color} score={left.score} serving={left.serving} />
         <div className="px-1 pb-1 text-center">
           <div className="font-mono text-lg font-semibold tabular-nums text-score-dim">
-            {setsWonA}–{setsWonB}
+            {left.setsWon}–{right.setsWon}
           </div>
           <div className="text-[10px] uppercase leading-tight tracking-wide text-score-dim">
             {statusLabel}
           </div>
         </div>
-        <TeamScore name={teamBName} color={cB} score={scoreB} serving={serving === "B"} />
+        <TeamScore name={right.name} color={right.color} score={right.score} serving={right.serving} />
       </div>
       {sets.length > 0 ? (
         <div className="flex flex-wrap justify-center gap-1">
-          {sets.map((s) => (
-            <span
-              key={s.setNumber}
-              className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-score-dim"
-            >
-              <span className={s.winner === "A" ? "text-foreground" : undefined}>{s.scoreA}</span>
-              <span className="opacity-40">-</span>
-              <span className={s.winner === "B" ? "text-foreground" : undefined}>{s.scoreB}</span>
-            </span>
-          ))}
+          {sets.map((s) => {
+            const ls = teamAOnLeft ? s.scoreA : s.scoreB;
+            const rs = teamAOnLeft ? s.scoreB : s.scoreA;
+            return (
+              <span
+                key={s.setNumber}
+                className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-score-dim"
+              >
+                <span className={s.winner === leftId ? "text-foreground" : undefined}>{ls}</span>
+                <span className="opacity-40">-</span>
+                <span className={s.winner === rightId ? "text-foreground" : undefined}>{rs}</span>
+              </span>
+            );
+          })}
         </div>
       ) : null}
     </div>
