@@ -9,6 +9,7 @@ import { IndoorLineupEntry } from "@/components/scoring/IndoorLineupEntry";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
+import { ScoringLog } from "@/components/scoring/ScoringLog";
 
 export function IndoorScoreboard({ competitionName }: { competitionName: string }) {
   const {
@@ -65,6 +66,9 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
       online={online}
       pending={pending}
       error={error}
+      tools={
+        <ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} rosterById={rosterById} />
+      }
       score={
         <ScoreStrip
           teamAName={teamAName}

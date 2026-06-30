@@ -10,6 +10,9 @@
 // because every response depends on the live event log.
 
 import type { NextRequest } from "next/server";
+import { asc, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { events as eventsTable } from "@/db/schema";
 import { authorizeMatch, SCORING_ROLES } from "@/lib/authz";
 import { sameOriginOk } from "@/lib/http";
 import { rateLimit } from "@/lib/ratelimit";
@@ -41,6 +44,38 @@ const CLIENT_SUBMITTABLE = new Set([
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// GET → the match's event log for the scorer console's read-only log view.
+// Authorized to the match's tenant (same roles as scoring); returns the
+// denormalised display fields + payload so the client can render readable lines.
+export async function GET(
+  _req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  const { id } = await ctx.params;
+  const authed = await authorizeMatch(id, SCORING_ROLES);
+  if (!authed.ok)
+    return Response.json({ error: "Forbidden" }, { status: authed.status });
+
+  const rows = await db
+    .select({
+      sequence: eventsTable.sequence,
+      eventType: eventsTable.eventType,
+      setNumber: eventsTable.setNumber,
+      scoreAfterA: eventsTable.scoreAfterA,
+      scoreAfterB: eventsTable.scoreAfterB,
+      serverTeam: eventsTable.serverTeam,
+      timestamp: eventsTable.timestamp,
+      actor: eventsTable.actor,
+      notes: eventsTable.notes,
+      payload: eventsTable.payload,
+    })
+    .from(eventsTable)
+    .where(eq(eventsTable.matchId, id))
+    .orderBy(asc(eventsTable.sequence));
+
+  return Response.json({ events: rows });
+}
 
 export async function POST(
   req: NextRequest,

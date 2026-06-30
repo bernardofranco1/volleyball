@@ -6,6 +6,7 @@ import { BeachCourt } from "@/components/court/BeachCourt";
 import { BeachActionBar } from "@/components/scoring/BeachActionBar";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
+import { ScoringLog } from "@/components/scoring/ScoringLog";
 
 export function LiveScoreboard({
   competitionName,
@@ -20,7 +21,7 @@ export function LiveScoreboard({
   teamAColor: string | null;
   teamBColor: string | null;
 }) {
-  const { state, config, online, error, pending, serveClockDeadline } = useMatch();
+  const { matchId, state, config, online, error, pending, serveClockDeadline } = useMatch();
   const set = activeSet(state);
 
   const statusLabel =
@@ -36,6 +37,7 @@ export function LiveScoreboard({
       online={online}
       pending={pending}
       error={error}
+      tools={<ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} />}
       score={
         <ScoreStrip
           teamAName={teamAName}

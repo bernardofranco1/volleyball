@@ -8,9 +8,11 @@ import { GrassActionBar } from "@/components/scoring/GrassActionBar";
 import { GrassLineupEntry } from "@/components/scoring/GrassLineupEntry";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
+import { ScoringLog } from "@/components/scoring/ScoringLog";
 
 export function GrassScoreboard({ competitionName }: { competitionName: string }) {
   const {
+    matchId,
     state,
     config,
     rosterA,
@@ -63,6 +65,9 @@ export function GrassScoreboard({ competitionName }: { competitionName: string }
       online={online}
       pending={pending}
       error={error}
+      tools={
+        <ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} rosterById={rosterById} />
+      }
       score={
         <ScoreStrip
           teamAName={teamAName}
