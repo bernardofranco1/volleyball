@@ -84,8 +84,13 @@ export default async function SchedulePage({
             <ul className="space-y-3">
               {matchList.map((m) => (
                 <li key={m.id} className={ui.card}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
+                  {/* Header is the link to the match page; the edit forms below
+                      stay interactive. */}
+                  <Link
+                    href={`${base}/matches/${m.id}`}
+                    className="-m-1 flex items-center justify-between gap-3 rounded-lg p-1 transition-colors hover:bg-surface"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs text-score-dim">
                         #{m.matchNumber ?? "–"}
                       </span>
@@ -101,13 +106,8 @@ export default async function SchedulePage({
                         </span>
                       )}
                     </div>
-                    <Link
-                      href={`${base}/matches/${m.id}`}
-                      className="text-sm text-primary hover:underline"
-                    >
-                      Details →
-                    </Link>
-                  </div>
+                    <span className="flex-none text-sm text-primary">Details →</span>
+                  </Link>
 
                   <form
                     action={updateMatchSlot}
