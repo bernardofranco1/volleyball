@@ -120,52 +120,41 @@ export default async function MatchesPage({
           No matches found.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-score-dim">
-                <th className="px-4 py-2 font-medium">Date</th>
-                <th className="px-4 py-2 font-medium">Competition</th>
-                <th className="px-4 py-2 font-medium">Discipline</th>
-                <th className="px-4 py-2 font-medium">Match</th>
-                <th className="px-4 py-2 font-medium">Status</th>
-                <th className="px-4 py-2 font-medium">Sets</th>
-                <th className="px-4 py-2 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((m) => (
-                <tr key={m.id} className="border-b border-border/60 last:border-0">
-                  <td className="whitespace-nowrap px-4 py-2 font-mono text-xs tabular-nums">
+        <ul className="space-y-2">
+          {rows.map((m) => (
+            <li key={m.id}>
+              {/* Whole card is the link to the match page (mobile + web). */}
+              <Link
+                href={`/t/${tenantSlug}/competitions/${m.competitionId}/matches/${m.id}`}
+                className="block rounded-xl border border-border bg-surface-raised px-4 py-3 transition-colors hover:border-primary"
+              >
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-score-dim">
+                  <span className="font-mono tabular-nums">
                     {fmtDate(m.scheduledAt)}
-                  </td>
-                  <td className="px-4 py-2">{m.competitionName}</td>
-                  <td className="px-4 py-2 text-score-dim">{m.discipline}</td>
-                  <td className="px-4 py-2">
+                  </span>
+                  <span aria-hidden>·</span>
+                  <span className="truncate">{m.competitionName}</span>
+                  <span aria-hidden>·</span>
+                  <span>{m.discipline}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <span className="min-w-0 truncate font-medium">
                     {m.teamAName} <span className="text-score-dim">vs</span>{" "}
                     {m.teamBName}
-                  </td>
-                  <td className="px-4 py-2">
+                  </span>
+                  <span className="flex flex-none items-center gap-2">
+                    {m.status === "LIVE" || m.status === "FINISHED" ? (
+                      <span className="font-mono text-sm tabular-nums text-score-dim">
+                        {m.setsWonA}–{m.setsWonB}
+                      </span>
+                    ) : null}
                     <span className={statusBadgeClass(m.status)}>{m.status}</span>
-                  </td>
-                  <td className="px-4 py-2 font-mono tabular-nums">
-                    {m.status === "LIVE" || m.status === "FINISHED"
-                      ? `${m.setsWonA}–${m.setsWonB}`
-                      : "—"}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <Link
-                      href={`/t/${tenantSlug}/competitions/${m.competitionId}/matches/${m.id}`}
-                      className="text-primary hover:underline"
-                    >
-                      Open
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </span>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
     </main>
   );
