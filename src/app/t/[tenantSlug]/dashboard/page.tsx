@@ -6,7 +6,7 @@ import { getT } from "@/lib/i18n/server";
 // i18n message keys resolved per the tenant's chosen locale.
 const SECTIONS = [
   { titleKey: "nav.competitions", noteKey: "dashboard.competitions", href: "competitions" },
-  { titleKey: "nav.matches", noteKey: "dashboard.matches", href: "competitions" },
+  { titleKey: "nav.matches", noteKey: "dashboard.matches", href: "matches" },
   { titleKey: "nav.scoreboard", noteKey: "dashboard.scoreboard" },
   { titleKey: "nav.settings", noteKey: "dashboard.settings", href: "settings" },
 ] as const;

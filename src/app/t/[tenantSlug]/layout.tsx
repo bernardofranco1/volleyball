@@ -10,6 +10,15 @@ import { LocaleProvider } from "@/lib/i18n/client";
 // Tenant pages are user- and DB-specific, so never prerender at build time.
 export const dynamic = "force-dynamic";
 
+// Top-nav destinations (brief §1.2). Shared by the desktop bar and the mobile
+// nav row so phones aren't stranded on the dashboard.
+const NAV_LINKS = [
+  ["nav.dashboard", "dashboard"],
+  ["nav.competitions", "competitions"],
+  ["nav.matches", "matches"],
+  ["nav.settings", "settings"],
+] as const;
+
 export default async function TenantLayout({
   children,
   params,
@@ -71,14 +80,7 @@ export default async function TenantLayout({
             </Link>
             {/* Top navigation menu (brief §1.2). */}
             <nav className="hidden items-center gap-1 md:flex">
-              {(
-                [
-                  ["nav.dashboard", "dashboard"],
-                  ["nav.competitions", "competitions"],
-                  ["nav.matches", "matches"],
-                  ["nav.settings", "settings"],
-                ] as const
-              ).map(([key, path]) => (
+              {NAV_LINKS.map(([key, path]) => (
                 <Link
                   key={path}
                   href={`/t/${tenantSlug}/${path}`}
@@ -102,6 +104,20 @@ export default async function TenantLayout({
             </form>
           </div>
         </header>
+
+        {/* Mobile nav row — the top bar's inline nav is hidden on phones, so
+            without this a phone can only navigate via the dashboard cards. */}
+        <nav className="flex gap-1 overflow-x-auto border-b border-border px-4 py-2 md:hidden">
+          {NAV_LINKS.map(([key, path]) => (
+            <Link
+              key={path}
+              href={`/t/${tenantSlug}/${path}`}
+              className="flex-none rounded-lg px-3 py-1.5 text-sm text-score-dim transition-colors hover:bg-surface-raised hover:text-foreground"
+            >
+              {t(key)}
+            </Link>
+          ))}
+        </nav>
 
         {/* Flex column + min-h-0 so a full-height child (the scoring shell) can
             fill the viewport below the header; normal pages just flow/scroll. */}
