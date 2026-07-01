@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { SCORING_ROLES, requireRole } from "@/lib/authz";
+import {
+  ADMIN_ROLES,
+  SCORING_ROLES,
+  VIEW_ROLES,
+  hasRole,
+  requireRole,
+} from "@/lib/authz";
 import { listTenantMatches } from "@/lib/competitions";
 import { statusBadgeClass, ui } from "@/components/admin/styles";
 
@@ -29,7 +35,7 @@ export default async function MatchesPage({
   const { discipline, status, order } = await searchParams;
   const ctx = await requireRole(
     tenantSlug,
-    SCORING_ROLES,
+    VIEW_ROLES,
     `/t/${tenantSlug}/matches`,
   );
 
@@ -44,6 +50,18 @@ export default async function MatchesPage({
     status: statusFilter,
     order: orderDir,
   });
+
+  // Match cards route by role: managers → match management, scorers → the
+  // scoring interface, view-only → the public scoreboard (all read/act surfaces
+  // they're actually allowed to open).
+  const canManage = hasRole(ctx.roles, ADMIN_ROLES);
+  const canScore = hasRole(ctx.roles, SCORING_ROLES);
+  const matchHref = (m: (typeof rows)[number]) => {
+    const detail = `/t/${tenantSlug}/competitions/${m.competitionId}/matches/${m.id}`;
+    if (canManage) return detail;
+    if (canScore) return `${detail}/live`;
+    return `/t/${tenantSlug}/scoreboard/${m.id}`;
+  };
 
   const selectCls =
     "rounded-lg border border-border bg-surface px-3 py-1.5 text-sm";
@@ -125,7 +143,7 @@ export default async function MatchesPage({
             <li key={m.id}>
               {/* Whole card is the link to the match page (mobile + web). */}
               <Link
-                href={`/t/${tenantSlug}/competitions/${m.competitionId}/matches/${m.id}`}
+                href={matchHref(m)}
                 className="block rounded-xl border border-border bg-surface-raised px-4 py-3 transition-colors hover:border-primary"
               >
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-score-dim">

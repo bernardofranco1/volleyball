@@ -72,7 +72,7 @@ export const userTenantRoles = pgTable(
       .notNull()
       .references(() => tenants.id),
     role: text("role", {
-      enum: ["TENANT_ADMIN", "COMPETITION_ADMIN", "SCORER"],
+      enum: ["TENANT_ADMIN", "COMPETITION_ADMIN", "SCORER", "VIEWER"],
     }).notNull(),
   },
   (t) => [unique().on(t.userId, t.tenantId, t.role)],

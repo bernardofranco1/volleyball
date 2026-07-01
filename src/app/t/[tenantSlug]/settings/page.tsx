@@ -47,6 +47,20 @@ export default async function SettingsPage({
         />
 
         <Link
+          href={`/t/${tenantSlug}/access`}
+          className={`${ui.card} flex items-center justify-between transition-colors hover:border-primary`}
+        >
+          <span>
+            <span className="font-medium">Access</span>
+            <span className="mt-1 block text-sm text-score-dim">
+              Grant people Manage, Score, or View access; scoring also needs each
+              match&apos;s PIN.
+            </span>
+          </span>
+          <span className="text-score-dim">→</span>
+        </Link>
+
+        <Link
           href={`/t/${tenantSlug}/audit`}
           className={`${ui.card} flex items-center justify-between transition-colors hover:border-primary`}
         >
