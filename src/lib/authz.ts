@@ -14,7 +14,7 @@ import { matches, userTenantRoles } from "@/db/schema";
 import { createSupabaseServerClient } from "@/lib/supabase";
 import { getTenantBySlug, type TenantWithBranding } from "@/lib/tenant";
 
-export type Role = "TENANT_ADMIN" | "COMPETITION_ADMIN" | "SCORER";
+export type Role = "TENANT_ADMIN" | "COMPETITION_ADMIN" | "SCORER" | "VIEWER";
 
 export interface AuthContext {
   user: { id: string; email: string | null };
@@ -157,6 +157,13 @@ export async function requireMatchRole(
 export const ADMIN_ROLES: Role[] = ["TENANT_ADMIN", "COMPETITION_ADMIN"];
 /** Roles permitted to operate the scoring surface for a match. */
 export const SCORING_ROLES: Role[] = [
+  "SCORER",
+  "COMPETITION_ADMIN",
+  "TENANT_ADMIN",
+];
+/** Roles permitted to view read-only surfaces (matches, standings, boards). */
+export const VIEW_ROLES: Role[] = [
+  "VIEWER",
   "SCORER",
   "COMPETITION_ADMIN",
   "TENANT_ADMIN",
