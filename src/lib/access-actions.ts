@@ -9,15 +9,13 @@ import { adminCount } from "@/lib/access";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
+import { fail, ok, type FormState } from "@/lib/action-state";
+import { str } from "@/lib/form-data";
 import type { AddMemberState } from "@/lib/roles";
 
 // Access management is TENANT_ADMIN only.
 const MANAGE_ACCESS: Role[] = ["TENANT_ADMIN"];
 const ASSIGNABLE: Role[] = ["TENANT_ADMIN", "COMPETITION_ADMIN", "SCORER", "VIEWER"];
-
-function str(fd: FormData, k: string): string {
-  return String(fd.get(k) ?? "").trim();
-}
 
 // Readable temporary password (no ambiguous characters), e.g. "kM7Qp-r9Fa2".
 function genPassword(): string {
@@ -28,16 +26,22 @@ function genPassword(): string {
   return `${s.slice(0, 5)}-${s.slice(5, 12)}`;
 }
 
-/** Grant exactly one role to a user in a tenant (replaces any existing rows). */
+/**
+ * Grant exactly one role to a user in a tenant (replaces any existing rows).
+ * Transactional — a failure between the two statements must not strip the
+ * member of all roles.
+ */
 async function setSingleRole(tenantId: string, userId: string, role: Role) {
-  await db
-    .delete(userTenantRoles)
-    .where(
-      and(eq(userTenantRoles.userId, userId), eq(userTenantRoles.tenantId, tenantId)),
-    );
-  await db
-    .insert(userTenantRoles)
-    .values({ id: newId("utr"), userId, tenantId, role });
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(userTenantRoles)
+      .where(
+        and(eq(userTenantRoles.userId, userId), eq(userTenantRoles.tenantId, tenantId)),
+      );
+    await tx
+      .insert(userTenantRoles)
+      .values({ id: newId("utr"), userId, tenantId, role });
+  });
 }
 
 async function isTenantAdmin(tenantId: string, userId: string): Promise<boolean> {
@@ -94,8 +98,18 @@ export async function addMember(
         "Account created. Share the temporary password below — they should change it after signing in.";
     } else {
       // The auth account may exist without an app link — find and reuse it.
-      const { data: list } = await admin.auth.admin.listUsers();
-      const found = list?.users.find((u) => u.email?.toLowerCase() === email);
+      // listUsers is paginated (50/page): scan pages rather than only the first,
+      // otherwise members beyond page one look like "couldn't create".
+      let found: { id: string } | undefined;
+      for (let page = 1; page <= 20 && !found; page++) {
+        const { data: list, error: listError } = await admin.auth.admin.listUsers({
+          page,
+          perPage: 200,
+        });
+        if (listError || !list || list.users.length === 0) break;
+        found = list.users.find((u) => u.email?.toLowerCase() === email);
+        if (list.users.length < 200) break; // last page
+      }
       if (!found) return { error: error?.message ?? "Couldn't create the account." };
       userId = found.id;
       note = "Existing account linked. Ask them to reset their password if they can't sign in.";
@@ -121,21 +135,25 @@ export async function addMember(
 
 /**
  * Change a member's role. Guards (last-admin) are also enforced in the UI by
- * hiding the control; this server check is defence-in-depth (silent no-op).
+ * hiding the control; this server check is defence-in-depth, and reports why
+ * nothing changed instead of silently no-opping.
  */
-export async function setMemberRole(fd: FormData): Promise<void> {
+export async function setMemberRole(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
   const tenantSlug = str(fd, "tenantSlug");
   const ctx = await requireRole(tenantSlug, MANAGE_ACCESS);
   const userId = str(fd, "userId");
   const role = str(fd, "role") as Role;
-  if (!userId || !ASSIGNABLE.includes(role)) return;
+  if (!userId || !ASSIGNABLE.includes(role)) return fail("Choose a role.");
 
   if (
     role !== "TENANT_ADMIN" &&
     (await isTenantAdmin(ctx.tenant.id, userId)) &&
     (await adminCount(ctx.tenant.id)) <= 1
   ) {
-    return; // would strip the last admin
+    return fail("This is the tenant's last admin — promote someone else first.");
   }
 
   await setSingleRole(ctx.tenant.id, userId, role);
@@ -148,19 +166,25 @@ export async function setMemberRole(fd: FormData): Promise<void> {
     summary: `Set role ${role}`,
   });
   revalidatePath(`/t/${tenantSlug}/access`);
+  return ok("Role updated.");
 }
 
 /** Revoke a member's access (never removes yourself or the last admin). */
-export async function removeMember(fd: FormData): Promise<void> {
+export async function removeMember(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
   const tenantSlug = str(fd, "tenantSlug");
   const ctx = await requireRole(tenantSlug, MANAGE_ACCESS);
   const userId = str(fd, "userId");
-  if (!userId || userId === ctx.user.id) return;
+  if (!userId) return fail("Missing user.");
+  if (userId === ctx.user.id)
+    return fail("You can't remove your own access.");
   if (
     (await isTenantAdmin(ctx.tenant.id, userId)) &&
     (await adminCount(ctx.tenant.id)) <= 1
   ) {
-    return; // would remove the last admin
+    return fail("This is the tenant's last admin — promote someone else first.");
   }
 
   await db
@@ -177,4 +201,5 @@ export async function removeMember(fd: FormData): Promise<void> {
     summary: "Revoked tenant access",
   });
   revalidatePath(`/t/${tenantSlug}/access`);
+  return ok("Access revoked.");
 }

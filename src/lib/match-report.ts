@@ -5,7 +5,7 @@
 import { aliasedTable, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { competitions, events, matches, teams, tenants } from "@/db/schema";
-import { loadMatchStateFresh } from "@/lib/match-engine";
+import { loadMatchState } from "@/lib/match-engine";
 
 export interface ReportSet {
   setNumber: number;
@@ -100,7 +100,7 @@ export async function loadMatchReport(
   // Per-set detail from an engine replay (beach only — best effort).
   let sets: ReportSet[] = [];
   try {
-    const { state } = await loadMatchStateFresh(matchId);
+    const { state } = await loadMatchState(matchId);
     sets = state.sets.map((s) => ({
       setNumber: s.setNumber,
       scoreA: s.scoreA,

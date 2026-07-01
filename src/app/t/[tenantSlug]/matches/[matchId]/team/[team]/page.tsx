@@ -102,7 +102,8 @@ export default async function TeamTabletPage({
       matchId={matchId}
       team={team}
       token={session.id}
-      initialState={view.state as unknown as IndoorMatchState}
+      // The tablet renders the shared score/lineup shape; typed over indoor.
+      initialState={view.state as IndoorMatchState}
       roster={roster}
       teamName={team === "A" ? view.teamAName : view.teamBName}
       lineupRequired={view.config.lineupRequired}

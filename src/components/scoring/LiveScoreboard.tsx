@@ -4,6 +4,7 @@ import { useMatch } from "@/lib/match-context";
 import { activeSet } from "@/engine/beach/types";
 import { BeachCourt } from "@/components/court/BeachCourt";
 import { BeachActionBar } from "@/components/scoring/BeachActionBar";
+import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
@@ -21,7 +22,8 @@ export function LiveScoreboard({
   teamAColor: string | null;
   teamBColor: string | null;
 }) {
-  const { matchId, state, config, online, error, pending, serveClockDeadline } = useMatch();
+  const { matchId, state, config, online, error, pending, queuedCount, serveClockDeadline } =
+    useMatch();
   const set = activeSet(state);
 
   const statusLabel =
@@ -37,6 +39,7 @@ export function LiveScoreboard({
       online={online}
       pending={pending}
       error={error}
+      queuedCount={queuedCount}
       tools={<ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} />}
       score={
         <ScoreStrip
@@ -81,6 +84,16 @@ export function LiveScoreboard({
             teamBColor={teamBColor}
           />
         </div>
+      }
+      overlay={
+        config.teamTabletEnabled ? (
+          <InterruptNotifications
+            matchId={matchId}
+            teamAName={teamAName}
+            teamBName={teamBName}
+            active={state.status !== "FINISHED"}
+          />
+        ) : null
       }
     />
   );

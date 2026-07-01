@@ -98,7 +98,9 @@ export default async function ScoreboardPage({
       />
       <ScoreboardDisplay
       matchId={view.matchId}
-      initialState={view.state}
+      // The read-only board renders the fields common to all four discipline
+      // states (sets/scores/serving); it is typed over the beach shape.
+      initialState={view.state as import("@/engine/beach/types").BeachMatchState}
       teamAName={view.teamAName}
       teamBName={view.teamBName}
       teamAColor={view.teamAColor}

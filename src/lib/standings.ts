@@ -1,8 +1,9 @@
 // On-the-fly standings computation (spec/10 §"Pool play"). Aggregated from the
-// denormalised matches columns (sets) plus the events log (points per set). No
-// stored standings table — recomputed on each request, which is fine at the
-// scale of a single competition.
-import { and, eq, inArray } from "drizzle-orm";
+// denormalised matches columns (sets) plus a per-set SQL aggregate over the
+// events log (points per set — computed in the database, not by shipping every
+// event row over the wire). No stored standings table — recomputed per request,
+// which is fine at the scale of a single competition.
+import { and, eq, inArray, max, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { events, matches, pools, teams } from "@/db/schema";
 
@@ -25,6 +26,21 @@ export interface StandingsGroup {
   rows: StandingRow[];
 }
 
+export interface StandingsTeam {
+  id: string;
+  displayName: string;
+  poolId: string | null;
+}
+
+export interface FinishedMatch {
+  id: string;
+  teamAId: string;
+  teamBId: string;
+  setsWonA: number;
+  setsWonB: number;
+  winner: "A" | "B" | null;
+}
+
 function ratio(won: number, lost: number): number {
   if (lost === 0) return won === 0 ? 0 : Infinity;
   return won / lost;
@@ -38,76 +54,23 @@ export function fmtRatio(n: number): string {
 }
 
 /**
- * Standings grouped by pool. Teams with no pool assignment collapse into a
- * single "Overall" group. Tiebreakers: W → set ratio → point ratio → name.
- * (Head-to-head — the final spec tiebreaker — lands with the full bracket
- * algorithm in Phase 8.)
+ * Pure standings aggregation over pre-fetched rows (exported for tests).
+ *
+ * Pool scoping: when a match's two teams belong to the same pool (or both are
+ * unpooled), it counts toward that group's table. Cross-pool matches — e.g.
+ * knockout rounds after pool play — are excluded from pool tables so a pool
+ * standing reflects only pool play. When no pools exist every match counts.
+ * Tiebreakers: W → set ratio → point ratio → head-to-head → name.
  */
-export async function computeStandings(
-  competitionId: string,
-): Promise<StandingsGroup[]> {
-  const teamRows = await db
-    .select({
-      id: teams.id,
-      displayName: teams.displayName,
-      poolId: teams.poolId,
-    })
-    .from(teams)
-    .where(eq(teams.competitionId, competitionId));
+export function buildStandings(
+  teamRows: StandingsTeam[],
+  finished: FinishedMatch[],
+  pointsByMatch: Map<string, { a: number; b: number }>,
+  poolName: Map<string, string>,
+): StandingsGroup[] {
   if (teamRows.length === 0) return [];
-
-  const finished = await db
-    .select({
-      id: matches.id,
-      teamAId: matches.teamAId,
-      teamBId: matches.teamBId,
-      setsWonA: matches.setsWonA,
-      setsWonB: matches.setsWonB,
-      winner: matches.winner,
-    })
-    .from(matches)
-    .where(
-      and(
-        eq(matches.competitionId, competitionId),
-        eq(matches.status, "FINISHED"),
-      ),
-    );
-
-  // Points per match per team, from the per-set max denormalised scores.
-  const pointsByMatch = new Map<string, { a: number; b: number }>();
-  if (finished.length > 0) {
-    const evRows = await db
-      .select({
-        matchId: events.matchId,
-        setNumber: events.setNumber,
-        scoreAfterA: events.scoreAfterA,
-        scoreAfterB: events.scoreAfterB,
-      })
-      .from(events)
-      .where(
-        inArray(
-          events.matchId,
-          finished.map((m) => m.id),
-        ),
-      );
-    // max score per (match, set)
-    const perSet = new Map<string, { a: number; b: number }>();
-    for (const e of evRows) {
-      if (e.setNumber == null) continue;
-      const key = `${e.matchId}#${e.setNumber}`;
-      const cur = perSet.get(key) ?? { a: 0, b: 0 };
-      cur.a = Math.max(cur.a, e.scoreAfterA ?? 0);
-      cur.b = Math.max(cur.b, e.scoreAfterB ?? 0);
-      perSet.set(key, cur);
-    }
-    for (const [key, v] of perSet) {
-      const matchId = key.slice(0, key.indexOf("#"));
-      const cur = pointsByMatch.get(matchId) ?? { a: 0, b: 0 };
-      cur.a += v.a;
-      cur.b += v.b;
-      pointsByMatch.set(matchId, cur);
-    }
-  }
+  const poolOf = new Map(teamRows.map((t) => [t.id, t.poolId ?? null]));
+  const hasPools = teamRows.some((t) => t.poolId != null);
 
   // Head-to-head wins: h2h[winnerTeamId][loserTeamId] = count.
   const h2h = new Map<string, Map<string, number>>();
@@ -117,7 +80,6 @@ export async function computeStandings(
     h2h.set(winner, row);
   };
 
-  // Aggregate per team.
   const agg = new Map<string, StandingRow>();
   for (const t of teamRows) {
     agg.set(t.id, {
@@ -139,6 +101,8 @@ export async function computeStandings(
     const a = agg.get(m.teamAId);
     const b = agg.get(m.teamBId);
     if (!a || !b) continue; // team outside this competition (shouldn't happen)
+    // Pool scoping (see doc comment above).
+    if (hasPools && poolOf.get(m.teamAId) !== poolOf.get(m.teamBId)) continue;
     const pts = pointsByMatch.get(m.id) ?? { a: 0, b: 0 };
 
     a.mp++;
@@ -167,13 +131,6 @@ export async function computeStandings(
     row.prNum = ratio(row.pw, row.pl);
   }
 
-  // Group by pool.
-  const poolRows = await db
-    .select({ id: pools.id, name: pools.name })
-    .from(pools)
-    .where(eq(pools.competitionId, competitionId));
-  const poolName = new Map(poolRows.map((p) => [p.id, p.name]));
-
   const groups = new Map<string, StandingRow[]>();
   for (const t of teamRows) {
     const key = t.poolId ?? "__overall__";
@@ -182,7 +139,6 @@ export async function computeStandings(
     groups.set(key, list);
   }
 
-  // Tiebreakers: W → set ratio → point ratio → head-to-head → name.
   const sortRows = (rows: StandingRow[]) =>
     rows.sort((x, y) => {
       if (y.w !== x.w) return y.w - x.w;
@@ -207,4 +163,73 @@ export async function computeStandings(
     });
   }
   return result.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function computeStandings(
+  competitionId: string,
+): Promise<StandingsGroup[]> {
+  const [teamRows, finished, poolRows] = await Promise.all([
+    db
+      .select({
+        id: teams.id,
+        displayName: teams.displayName,
+        poolId: teams.poolId,
+      })
+      .from(teams)
+      .where(eq(teams.competitionId, competitionId)),
+    db
+      .select({
+        id: matches.id,
+        teamAId: matches.teamAId,
+        teamBId: matches.teamBId,
+        setsWonA: matches.setsWonA,
+        setsWonB: matches.setsWonB,
+        winner: matches.winner,
+      })
+      .from(matches)
+      .where(
+        and(
+          eq(matches.competitionId, competitionId),
+          eq(matches.status, "FINISHED"),
+        ),
+      ),
+    db
+      .select({ id: pools.id, name: pools.name })
+      .from(pools)
+      .where(eq(pools.competitionId, competitionId)),
+  ]);
+  if (teamRows.length === 0) return [];
+
+  // Points per match per team: per-set final scores aggregated in SQL —
+  // ≤ (matches × sets) rows instead of the full event log.
+  const pointsByMatch = new Map<string, { a: number; b: number }>();
+  if (finished.length > 0) {
+    const perSet = await db
+      .select({
+        matchId: events.matchId,
+        setNumber: events.setNumber,
+        a: max(events.scoreAfterA),
+        b: max(events.scoreAfterB),
+      })
+      .from(events)
+      .where(
+        and(
+          inArray(
+            events.matchId,
+            finished.map((m) => m.id),
+          ),
+          sql`${events.setNumber} is not null`,
+        ),
+      )
+      .groupBy(events.matchId, events.setNumber);
+    for (const s of perSet) {
+      const cur = pointsByMatch.get(s.matchId) ?? { a: 0, b: 0 };
+      cur.a += s.a ?? 0;
+      cur.b += s.b ?? 0;
+      pointsByMatch.set(s.matchId, cur);
+    }
+  }
+
+  const poolName = new Map(poolRows.map((p) => [p.id, p.name]));
+  return buildStandings(teamRows, finished, pointsByMatch, poolName);
 }

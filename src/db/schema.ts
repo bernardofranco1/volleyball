@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   date,
@@ -75,31 +76,42 @@ export const userTenantRoles = pgTable(
       enum: ["TENANT_ADMIN", "COMPETITION_ADMIN", "SCORER", "VIEWER"],
     }).notNull(),
   },
-  (t) => [unique().on(t.userId, t.tenantId, t.role)],
+  (t) => [
+    unique().on(t.userId, t.tenantId, t.role),
+    // Members list / last-admin guard query by tenant first; the unique above
+    // leads with userId so it can't serve them.
+    index("user_tenant_roles_tenant_idx").on(t.tenantId),
+  ],
 );
 
 // ── Competitions ─────────────────────────────────────────────────────────────
 
-export const competitions = pgTable("competitions", {
-  id: text("id").primaryKey(),
-  tenantId: text("tenant_id")
-    .notNull()
-    .references(() => tenants.id),
-  name: text("name").notNull(),
-  discipline: text("discipline", {
-    enum: ["BEACH", "INDOOR", "GRASS", "LIGHT"],
-  }).notNull(),
-  gender: text("gender", {
-    enum: ["MEN", "WOMEN", "MIXED", "UNSPECIFIED"],
-  }).default("UNSPECIFIED"),
-  startDate: date("start_date"),
-  endDate: date("end_date"),
-  venue: text("venue"),
-  status: text("status", { enum: ["DRAFT", "ACTIVE", "FINISHED"] })
-    .default("DRAFT")
-    .notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const competitions = pgTable(
+  "competitions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    name: text("name").notNull(),
+    discipline: text("discipline", {
+      enum: ["BEACH", "INDOOR", "GRASS", "LIGHT"],
+    }).notNull(),
+    gender: text("gender", {
+      enum: ["MEN", "WOMEN", "MIXED", "UNSPECIFIED"],
+    }).default("UNSPECIFIED"),
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    venue: text("venue"),
+    status: text("status", { enum: ["DRAFT", "ACTIVE", "FINISHED"] })
+      .default("DRAFT")
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  // Postgres doesn't auto-index FKs; the competitions list is always
+  // tenant-scoped and ordered by creation date.
+  (t) => [index("competitions_tenant_idx").on(t.tenantId, t.createdAt)],
+);
 
 // One row per competition. All numeric/boolean fields nullable — null means
 // "use the discipline default" (see src/engine/config.ts).
@@ -171,22 +183,26 @@ export const tournamentConfig = pgTable("tournament_config", {
 
 // ── Teams & players ──────────────────────────────────────────────────────────
 
-export const teams = pgTable("teams", {
-  id: text("id").primaryKey(),
-  competitionId: text("competition_id")
-    .notNull()
-    .references(() => competitions.id),
-  tenantId: text("tenant_id")
-    .notNull()
-    .references(() => tenants.id),
-  displayName: text("display_name").notNull(),
-  countryCode: text("country_code"), // ISO 3166-1 alpha-3 (optional)
-  clubName: text("club_name"),
-  seed: integer("seed"),
-  color: text("color"), // team colour (hex) for scoreboards/UI — brief §1.4
-  poolId: text("pool_id"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const teams = pgTable(
+  "teams",
+  {
+    id: text("id").primaryKey(),
+    competitionId: text("competition_id")
+      .notNull()
+      .references(() => competitions.id),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    displayName: text("display_name").notNull(),
+    countryCode: text("country_code"), // ISO 3166-1 alpha-3 (optional)
+    clubName: text("club_name"),
+    seed: integer("seed"),
+    color: text("color"), // team colour (hex) for scoreboards/UI — brief §1.4
+    poolId: text("pool_id").references(() => pools.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("teams_competition_idx").on(t.competitionId)],
+);
 
 export const players = pgTable("players", {
   id: text("id").primaryKey(),
@@ -213,57 +229,76 @@ export const players = pgTable("players", {
 
 // ── Matches ──────────────────────────────────────────────────────────────────
 
-export const matches = pgTable("matches", {
-  id: text("id").primaryKey(),
-  competitionId: text("competition_id")
-    .notNull()
-    .references(() => competitions.id),
-  tenantId: text("tenant_id")
-    .notNull()
-    .references(() => tenants.id),
+export const matches = pgTable(
+  "matches",
+  {
+    id: text("id").primaryKey(),
+    competitionId: text("competition_id")
+      .notNull()
+      .references(() => competitions.id),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
 
-  teamAId: text("team_a_id")
-    .notNull()
-    .references(() => teams.id),
-  teamBId: text("team_b_id")
-    .notNull()
-    .references(() => teams.id),
-  discipline: text("discipline", {
-    enum: ["BEACH", "INDOOR", "GRASS", "LIGHT"],
-  }).notNull(),
+    teamAId: text("team_a_id")
+      .notNull()
+      .references(() => teams.id),
+    teamBId: text("team_b_id")
+      .notNull()
+      .references(() => teams.id),
+    discipline: text("discipline", {
+      enum: ["BEACH", "INDOOR", "GRASS", "LIGHT"],
+    }).notNull(),
 
-  status: text("status", {
-    enum: ["SCHEDULED", "WARMUP", "COIN_TOSS", "LIVE", "FINISHED", "ABANDONED"],
-  })
-    .default("SCHEDULED")
-    .notNull(),
+    status: text("status", {
+      enum: ["SCHEDULED", "WARMUP", "COIN_TOSS", "LIVE", "FINISHED", "ABANDONED"],
+    })
+      .default("SCHEDULED")
+      .notNull(),
 
-  // Derived from replaying events — kept here for quick queries/standings.
-  setsWonA: integer("sets_won_a").default(0).notNull(),
-  setsWonB: integer("sets_won_b").default(0).notNull(),
-  winner: text("winner", { enum: ["A", "B"] }),
+    // Derived from replaying events — kept here for quick queries/standings.
+    setsWonA: integer("sets_won_a").default(0).notNull(),
+    setsWonB: integer("sets_won_b").default(0).notNull(),
+    winner: text("winner", { enum: ["A", "B"] }),
 
-  // Cached replay snapshot (spec/14 §C1): the full engine state after
-  // `snapshotSequence`. Reads load this + replay only events beyond it, bounding
-  // replay cost. Treated as a cache — if absent/behind, a tail/full replay heals.
-  stateSnapshot: jsonb("state_snapshot"),
-  snapshotSequence: integer("snapshot_sequence").default(0).notNull(),
+    // Cached replay snapshot (spec/14 §C1): the full engine state after
+    // `snapshotSequence`. Reads load this + replay only events beyond it, bounding
+    // replay cost. Treated as a cache — if absent/behind, a tail/full replay heals.
+    stateSnapshot: jsonb("state_snapshot"),
+    snapshotSequence: integer("snapshot_sequence").default(0).notNull(),
 
-  courtNumber: integer("court_number"),
-  scheduledAt: timestamp("scheduled_at"),
-  startedAt: timestamp("started_at"),
-  finishedAt: timestamp("finished_at"),
+    courtNumber: integer("court_number"),
+    scheduledAt: timestamp("scheduled_at"),
+    startedAt: timestamp("started_at"),
+    finishedAt: timestamp("finished_at"),
 
-  roundName: text("round_name"),
-  matchNumber: integer("match_number"),
-  // Group / phase metadata for schedule imports (brief §3.2).
-  groupName: text("group_name"),
-  phaseNumber: integer("phase_number"),
-  phaseName: text("phase_name"),
-  scorerPin: text("scorer_pin"), // per-match 6-digit scorer gate (brief §5.2)
+    roundName: text("round_name"),
+    matchNumber: integer("match_number"),
+    // Group / phase metadata for schedule imports (brief §3.2).
+    groupName: text("group_name"),
+    phaseNumber: integer("phase_number"),
+    phaseName: text("phase_name"),
+    scorerPin: text("scorer_pin"), // per-match 6-digit scorer gate (brief §5.2)
 
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    // Hot query paths (Postgres doesn't auto-index FKs): per-competition
+    // listings/standings, the tenant-wide match centre (ordered by time), and
+    // the delete-team referential guard.
+    index("matches_competition_status_idx").on(t.competitionId, t.status),
+    index("matches_tenant_sched_idx").on(t.tenantId, t.scheduledAt),
+    index("matches_team_a_idx").on(t.teamAId),
+    index("matches_team_b_idx").on(t.teamBId),
+    // One knockout slot per (competition, round, match#) — backstops the
+    // advisory lock in bracket generation (spec/14 §E1/M4).
+    uniqueIndex("matches_knockout_slot")
+      .on(t.competitionId, t.roundName, t.matchNumber)
+      .where(
+        sql`${t.roundName} in ('Round of 64', 'Round of 32', 'Round of 16', 'Quarterfinal', 'Semifinal', 'Final', '3rd Place')`,
+      ),
+  ],
+);
 
 // ── Events (append-only log) ─────────────────────────────────────────────────
 
@@ -297,68 +332,81 @@ export const events = pgTable(
     deviceInfo: text("device_info"),
     notes: text("notes"),
   },
-  (t) => [
-    unique().on(t.matchId, t.sequence),
-    index("events_match_id_idx").on(t.matchId),
-  ],
+  // unique(matchId, sequence) doubles as the match_id lookup index (leading
+  // column); a separate single-column index was pure write amplification on
+  // the hottest insert path.
+  (t) => [unique().on(t.matchId, t.sequence)],
 );
 
 // ── Team tablet access tokens ────────────────────────────────────────────────
 
-export const matchSessions = pgTable("match_sessions", {
-  id: text("id").primaryKey(), // signed token sent to tablet
-  matchId: text("match_id")
-    .notNull()
-    .references(() => matches.id),
-  tenantId: text("tenant_id")
-    .notNull()
-    .references(() => tenants.id),
-  team: text("team", { enum: ["A", "B"] }).notNull(),
-  role: text("role", { enum: ["SCORER", "TEAM_SCORER", "VIEWER"] }).notNull(),
-  createdBy: text("created_by"),
-  expiresAt: timestamp("expires_at").notNull(),
-  revokedAt: timestamp("revoked_at"),
-});
+export const matchSessions = pgTable(
+  "match_sessions",
+  {
+    id: text("id").primaryKey(), // signed token sent to tablet
+    matchId: text("match_id")
+      .notNull()
+      .references(() => matches.id),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    team: text("team", { enum: ["A", "B"] }).notNull(),
+    role: text("role", { enum: ["SCORER", "TEAM_SCORER", "VIEWER"] }).notNull(),
+    createdBy: text("created_by"),
+    expiresAt: timestamp("expires_at").notNull(),
+    revokedAt: timestamp("revoked_at"),
+  },
+  (t) => [index("match_sessions_match_idx").on(t.matchId)],
+);
 
 // Team-tablet lineups are submitted directly as LINEUP_CONFIRMED events (the
 // event log is the source of truth), so there is no separate submissions table.
 
 // ── Team tablet TO/sub/challenge requests ────────────────────────────────────
 
-export const interruptRequests = pgTable("interrupt_requests", {
-  id: text("id").primaryKey(),
-  matchId: text("match_id")
-    .notNull()
-    .references(() => matches.id),
-  tenantId: text("tenant_id")
-    .notNull()
-    .references(() => tenants.id),
-  team: text("team", { enum: ["A", "B"] }).notNull(),
-  requestType: text("request_type", {
-    enum: ["TIMEOUT", "SUBSTITUTION", "CHALLENGE", "MEDICAL"],
-  }).notNull(),
-  payload: jsonb("payload"),
-  status: text("status", { enum: ["PENDING", "APPROVED", "DENIED"] })
-    .default("PENDING")
-    .notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  resolvedAt: timestamp("resolved_at"),
-  resolvedBy: text("resolved_by"),
-});
+export const interruptRequests = pgTable(
+  "interrupt_requests",
+  {
+    id: text("id").primaryKey(),
+    matchId: text("match_id")
+      .notNull()
+      .references(() => matches.id),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    team: text("team", { enum: ["A", "B"] }).notNull(),
+    requestType: text("request_type", {
+      enum: ["TIMEOUT", "SUBSTITUTION", "CHALLENGE", "MEDICAL"],
+    }).notNull(),
+    payload: jsonb("payload"),
+    status: text("status", { enum: ["PENDING", "APPROVED", "DENIED"] })
+      .default("PENDING")
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at"),
+    resolvedBy: text("resolved_by"),
+  },
+  // Polled by every scorer console — (matchId, status) matches the PENDING scan.
+  (t) => [index("interrupt_requests_match_status_idx").on(t.matchId, t.status)],
+);
 
 // ── Pools & standings ────────────────────────────────────────────────────────
 
-export const pools = pgTable("pools", {
-  id: text("id").primaryKey(),
-  competitionId: text("competition_id")
-    .notNull()
-    .references(() => competitions.id),
-  tenantId: text("tenant_id")
-    .notNull()
-    .references(() => tenants.id),
-  name: text("name").notNull(),
-  roundName: text("round_name"),
-});
+export const pools = pgTable(
+  "pools",
+  {
+    id: text("id").primaryKey(),
+    competitionId: text("competition_id")
+      .notNull()
+      .references(() => competitions.id),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    name: text("name").notNull(),
+    roundName: text("round_name"),
+  },
+  (t) => [index("pools_competition_idx").on(t.competitionId)],
+);
 
 export const poolTeams = pgTable(
   "pool_teams",
@@ -375,21 +423,25 @@ export const poolTeams = pgTable(
 
 // ── CSV import log ───────────────────────────────────────────────────────────
 
-export const csvImports = pgTable("csv_imports", {
-  id: text("id").primaryKey(),
-  tenantId: text("tenant_id")
-    .notNull()
-    .references(() => tenants.id),
-  importType: text("import_type", {
-    enum: ["TEAMS", "PLAYERS", "SCHEDULE", "RESULTS", "ROSTER"],
-  }).notNull(),
-  filename: text("filename"),
-  rowsOk: integer("rows_ok").default(0).notNull(),
-  rowsError: integer("rows_error").default(0).notNull(),
-  errors: jsonb("errors"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  createdBy: text("created_by"),
-});
+export const csvImports = pgTable(
+  "csv_imports",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    importType: text("import_type", {
+      enum: ["TEAMS", "PLAYERS", "SCHEDULE", "RESULTS", "ROSTER"],
+    }).notNull(),
+    filename: text("filename"),
+    rowsOk: integer("rows_ok").default(0).notNull(),
+    rowsError: integer("rows_error").default(0).notNull(),
+    errors: jsonb("errors"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdBy: text("created_by"),
+  },
+  (t) => [index("csv_imports_tenant_idx").on(t.tenantId, t.createdAt)],
+);
 
 // ── Admin audit log (Phase 11) ───────────────────────────────────────────────
 // Append-only record of sensitive admin mutations (lifecycle, deletes, bracket,

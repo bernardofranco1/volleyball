@@ -4,42 +4,13 @@ import { revalidatePath } from "next/cache";
 import { and, eq, or } from "drizzle-orm";
 import { db } from "@/db";
 import { matches, players, teams } from "@/db/schema";
-import {
-  ADMIN_ROLES,
-  SCORING_ROLES,
-  authorizeMatch,
-  requireRole,
-} from "@/lib/authz";
-import { getCompetition } from "@/lib/competitions";
+import { SCORING_ROLES, authorizeMatch } from "@/lib/authz";
+import { gateCompetition } from "@/lib/action-gate";
 import { normalizeHex } from "@/lib/colors";
 import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
-import { fail, OK, type FormState } from "@/lib/action-state";
-
-function str(fd: FormData, key: string): string {
-  return String(fd.get(key) ?? "").trim();
-}
-function intOrNull(fd: FormData, key: string): number | null {
-  const v = str(fd, key);
-  if (!v) return null;
-  const n = Number.parseInt(v, 10);
-  return Number.isFinite(n) ? n : null;
-}
-
-/** Verify the competition belongs to the caller's tenant; return ids or null. */
-async function gate(fd: FormData) {
-  const tenantSlug = str(fd, "tenantSlug");
-  const competitionId = str(fd, "competitionId");
-  const ctx = await requireRole(tenantSlug, ADMIN_ROLES);
-  const comp = await getCompetition(ctx.tenant.id, competitionId);
-  if (!comp) return null;
-  return {
-    tenantSlug,
-    competitionId,
-    tenantId: ctx.tenant.id,
-    actor: { userId: ctx.user.id, email: ctx.user.email },
-  };
-}
+import { fail, ok, type FormState } from "@/lib/action-state";
+import { intOrNull, str } from "@/lib/form-data";
 
 function teamsPath(tenantSlug: string, competitionId: string) {
   return `/t/${tenantSlug}/competitions/${competitionId}/teams`;
@@ -49,7 +20,7 @@ export async function createTeam(
   _prev: FormState,
   fd: FormData,
 ): Promise<FormState> {
-  const g = await gate(fd);
+  const g = await gateCompetition(fd);
   if (!g) return fail("Competition not found.");
 
   const displayName = str(fd, "displayName");
@@ -63,11 +34,66 @@ export async function createTeam(
     countryCode: str(fd, "countryCode").toUpperCase() || null,
     clubName: str(fd, "clubName") || null,
     seed: intOrNull(fd, "seed"),
-    color: str(fd, "color") || null,
+    color: normalizeHex(str(fd, "color")),
   });
 
   revalidatePath(teamsPath(g.tenantSlug, g.competitionId));
-  return OK;
+  return ok(`Added ${displayName}.`);
+}
+
+/**
+ * Add several teams at once — one display name per line, with an optional
+ * ",XXX" country suffix (e.g. "Berlin Recycling,GER"). Skips names that
+ * already exist in the competition so a re-paste is idempotent.
+ */
+export async function bulkAddTeams(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
+
+  const lines = str(fd, "names")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return fail("Enter one team name per line.");
+  if (lines.length > 128) return fail("Too many teams at once (max 128).");
+
+  const existing = await db
+    .select({ name: teams.displayName })
+    .from(teams)
+    .where(eq(teams.competitionId, g.competitionId));
+  const seen = new Set(existing.map((t) => t.name.toLowerCase()));
+
+  const rows: (typeof teams.$inferInsert)[] = [];
+  for (const line of lines) {
+    const [name, country] = line.split(",").map((p) => p.trim());
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    rows.push({
+      id: newId("team"),
+      competitionId: g.competitionId,
+      tenantId: g.tenantId,
+      displayName: name,
+      countryCode: country ? country.toUpperCase().slice(0, 3) : null,
+    });
+  }
+  if (rows.length > 0) await db.insert(teams).values(rows);
+
+  await recordAudit({
+    tenantId: g.tenantId,
+    actor: g.actor,
+    action: "team.bulk_add",
+    entityType: "competition",
+    entityId: g.competitionId,
+    summary: `Bulk-added ${rows.length} team(s)`,
+  });
+  revalidatePath(teamsPath(g.tenantSlug, g.competitionId));
+  const skipped = lines.length - rows.length;
+  return ok(
+    `Added ${rows.length} team(s)${skipped > 0 ? `, skipped ${skipped} duplicate(s)` : ""}.`,
+  );
 }
 
 /**
@@ -104,15 +130,19 @@ export async function setTeamColors(
   revalidatePath(
     `/t/${tenantSlug}/competitions/${competitionId}/matches/${matchId}`,
   );
-  return OK;
+  return ok("Colours saved.");
 }
 
-export async function updateTeam(fd: FormData): Promise<void> {
-  const g = await gate(fd);
-  if (!g) return;
+export async function updateTeam(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
   const teamId = str(fd, "teamId");
+  if (!teamId) return fail("Missing team.");
   const displayName = str(fd, "displayName");
-  if (!teamId || !displayName) return;
+  if (!displayName) return fail("Team name is required.");
 
   await db
     .update(teams)
@@ -124,13 +154,17 @@ export async function updateTeam(fd: FormData): Promise<void> {
     .where(and(eq(teams.id, teamId), eq(teams.competitionId, g.competitionId)));
 
   revalidatePath(teamsPath(g.tenantSlug, g.competitionId));
+  return ok("Saved.");
 }
 
-export async function deleteTeam(fd: FormData): Promise<void> {
-  const g = await gate(fd);
-  if (!g) return;
+export async function deleteTeam(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
   const teamId = str(fd, "teamId");
-  if (!teamId) return;
+  if (!teamId) return fail("Missing team.");
 
   // A team that already appears in a scheduled match can't be removed (FK +
   // it would orphan results). Guard rather than letting the DB throw.
@@ -139,12 +173,19 @@ export async function deleteTeam(fd: FormData): Promise<void> {
     .from(matches)
     .where(or(eq(matches.teamAId, teamId), eq(matches.teamBId, teamId)))
     .limit(1);
-  if (refs.length > 0) return;
+  if (refs.length > 0)
+    return fail(
+      "This team appears in a match. Delete its matches first, then remove the team.",
+    );
 
-  await db.delete(players).where(eq(players.teamId, teamId));
-  await db
-    .delete(teams)
-    .where(and(eq(teams.id, teamId), eq(teams.competitionId, g.competitionId)));
+  await db.transaction(async (tx) => {
+    await tx.delete(players).where(eq(players.teamId, teamId));
+    await tx
+      .delete(teams)
+      .where(
+        and(eq(teams.id, teamId), eq(teams.competitionId, g.competitionId)),
+      );
+  });
 
   await recordAudit({
     tenantId: g.tenantId,
@@ -156,13 +197,14 @@ export async function deleteTeam(fd: FormData): Promise<void> {
     metadata: { competitionId: g.competitionId },
   });
   revalidatePath(teamsPath(g.tenantSlug, g.competitionId));
+  return ok("Team deleted.");
 }
 
 export async function createPlayer(
   _prev: FormState,
   fd: FormData,
 ): Promise<FormState> {
-  const g = await gate(fd);
+  const g = await gateCompetition(fd);
   if (!g) return fail("Competition not found.");
   const teamId = str(fd, "teamId");
   if (!teamId) return fail("Missing team.");
@@ -206,14 +248,73 @@ export async function createPlayer(
   });
 
   revalidatePath(teamsPath(g.tenantSlug, g.competitionId));
-  return OK;
+  return ok(`Added ${fullName}.`);
 }
 
-export async function deletePlayer(fd: FormData): Promise<void> {
-  const g = await gate(fd);
-  if (!g) return;
+/** Edit a player in place — fixes the delete-and-re-add-only roster flow. */
+export async function updatePlayer(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
   const playerId = str(fd, "playerId");
-  if (!playerId) return;
+  if (!playerId) return fail("Missing player.");
+
+  const current = (
+    await db
+      .select({ id: players.id, teamId: players.teamId })
+      .from(players)
+      .where(and(eq(players.id, playerId), eq(players.tenantId, g.tenantId)))
+      .limit(1)
+  )[0];
+  if (!current) return fail("Player not found.");
+
+  const firstName = str(fd, "firstName");
+  const lastName = str(fd, "lastName");
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+  if (!fullName) return fail("Player name is required.");
+
+  const jerseyNumber = intOrNull(fd, "jerseyNumber");
+  if (jerseyNumber != null) {
+    const dup = await db
+      .select({ id: players.id })
+      .from(players)
+      .where(
+        and(
+          eq(players.teamId, current.teamId),
+          eq(players.jerseyNumber, jerseyNumber),
+        ),
+      )
+      .limit(1);
+    if (dup.length > 0 && dup[0].id !== playerId)
+      return fail(`Jersey number ${jerseyNumber} is already used on this team.`);
+  }
+
+  await db
+    .update(players)
+    .set({
+      firstName: firstName || null,
+      lastName: lastName || null,
+      fullName,
+      jerseyNumber,
+      isCaptain: fd.get("isCaptain") != null,
+      isLibero: fd.get("isLibero") != null,
+    })
+    .where(eq(players.id, playerId));
+
+  revalidatePath(teamsPath(g.tenantSlug, g.competitionId));
+  return ok("Saved.");
+}
+
+export async function deletePlayer(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
+  const playerId = str(fd, "playerId");
+  if (!playerId) return fail("Missing player.");
 
   // Scope the delete to the tenant to prevent cross-tenant id guessing.
   await db
@@ -221,4 +322,5 @@ export async function deletePlayer(fd: FormData): Promise<void> {
     .where(and(eq(players.id, playerId), eq(players.tenantId, g.tenantId)));
 
   revalidatePath(teamsPath(g.tenantSlug, g.competitionId));
+  return ok("Player removed.");
 }

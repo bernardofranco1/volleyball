@@ -6,6 +6,7 @@ import { activeSet } from "@/engine/light/types";
 import { LightCourt } from "@/components/court/LightCourt";
 import { LightActionBar } from "@/components/scoring/LightActionBar";
 import { LightLineupEntry } from "@/components/scoring/LightLineupEntry";
+import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
@@ -24,6 +25,7 @@ export function LightScoreboard({ competitionName }: { competitionName: string }
     online,
     pending,
     error,
+    queuedCount,
     serveClockDeadline,
   } = useLightMatch();
   const set = activeSet(state);
@@ -65,6 +67,7 @@ export function LightScoreboard({ competitionName }: { competitionName: string }
       online={online}
       pending={pending}
       error={error}
+      queuedCount={queuedCount}
       tools={
         <ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} rosterById={rosterById} />
       }
@@ -97,6 +100,16 @@ export function LightScoreboard({ competitionName }: { competitionName: string }
           ) : null}
           <LightActionBar />
         </div>
+      }
+      overlay={
+        config.teamTabletEnabled ? (
+          <InterruptNotifications
+            matchId={matchId}
+            teamAName={teamAName}
+            teamBName={teamBName}
+            active={state.status !== "FINISHED"}
+          />
+        ) : null
       }
     />
   );

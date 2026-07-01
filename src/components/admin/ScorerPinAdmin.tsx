@@ -20,7 +20,19 @@ export function ScorerPinAdmin({
 }) {
   const [state, action] = useActionState(generateScorerPin, OK);
   return (
-    <form action={action} className={ui.card}>
+    <form
+      action={action}
+      className={ui.card}
+      onSubmit={(e) => {
+        if (
+          pin &&
+          !window.confirm(
+            "Rotate the scorer PIN? Scorers using the current PIN are locked out until they enter the new one.",
+          )
+        )
+          e.preventDefault();
+      }}
+    >
       <h2 className="mb-1 font-medium">Scorer PIN</h2>
       <p className="mb-3 text-[11px] text-score-dim">
         Scorers enter this on the scoring page, in addition to signing in. Share
@@ -33,9 +45,20 @@ export function ScorerPinAdmin({
         {pin ?? "——————"}
       </div>
       {state.error && <p className="mb-2 text-sm text-red-400">{state.error}</p>}
+      {state.ok && state.message && (
+        <p role="status" className="mb-2 text-sm text-emerald-400">
+          {state.message}
+        </p>
+      )}
       <SubmitButton variant="secondary" pendingLabel="Generating…">
         {pin ? "Rotate PIN" : "Generate PIN"}
       </SubmitButton>
+      {pin && (
+        <p className="mt-2 text-[11px] text-score-dim">
+          Rotating immediately signs out scorers who unlocked with the current
+          PIN.
+        </p>
+      )}
     </form>
   );
 }

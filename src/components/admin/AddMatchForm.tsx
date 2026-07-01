@@ -18,8 +18,9 @@ export function AddMatchForm({
   const [state, action] = useActionState(createMatch, OK);
   const formRef = useRef<HTMLFormElement>(null);
 
+  // Clear the inputs only after an explicit success (state.ok), not on mount.
   useEffect(() => {
-    if (!state.error) formRef.current?.reset();
+    if (state.ok) formRef.current?.reset();
   }, [state]);
 
   if (teams.length < 2) {
@@ -88,7 +89,7 @@ export function AddMatchForm({
         </div>
         <div>
           <label className={ui.label} htmlFor="m-time">
-            Scheduled at
+            Scheduled at (UTC)
           </label>
           <input
             id="m-time"
@@ -96,6 +97,9 @@ export function AddMatchForm({
             type="datetime-local"
             className={ui.input}
           />
+          <p className="mt-1 text-[11px] text-score-dim">
+            Enter the time in UTC — lists show it in each viewer&apos;s local time.
+          </p>
         </div>
       </div>
 

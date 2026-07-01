@@ -25,6 +25,7 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
     online,
     pending,
     error,
+    queuedCount,
     serveClockDeadline,
   } = useIndoorMatch();
   const set = activeSet(state);
@@ -66,6 +67,7 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
       online={online}
       pending={pending}
       error={error}
+      queuedCount={queuedCount}
       tools={
         <ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} rosterById={rosterById} />
       }
@@ -100,7 +102,14 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
         </div>
       }
       overlay={
-        <InterruptNotifications matchId={matchId} teamAName={teamAName} teamBName={teamBName} />
+        config.teamTabletEnabled ? (
+          <InterruptNotifications
+            matchId={matchId}
+            teamAName={teamAName}
+            teamBName={teamBName}
+            active={state.status !== "FINISHED"}
+          />
+        ) : null
       }
     />
   );

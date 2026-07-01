@@ -171,7 +171,7 @@ export async function PATCH(
       await appendMatchEvent(
         id,
         { type: "TIMEOUT_REQUEST", team: reqRow.team },
-        { actor: "SCORER" },
+        { actor: "SCORER", deviceInfo: authed.auth.user.id },
       );
     } catch {
       // Invalid phase (e.g. not between rallies) — scorer handles manually.

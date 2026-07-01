@@ -1,7 +1,16 @@
 // Read-side data access for competition administration (Phase 3).
 // Mutations live in the *-actions.ts modules; these are query helpers shared by
 // the admin Server Components. Every query is scoped by tenantId for isolation.
-import { aliasedTable, and, asc, desc, eq, inArray } from "drizzle-orm";
+import {
+  aliasedTable,
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+} from "drizzle-orm";
 import { db } from "@/db";
 import {
   competitions,
@@ -11,6 +20,7 @@ import {
   teams,
   tournamentConfig,
 } from "@/db/schema";
+import { isCompetitionStatus, isDiscipline } from "@/lib/domain";
 
 export type Competition = typeof competitions.$inferSelect;
 export type TournamentConfigRow = typeof tournamentConfig.$inferSelect;
@@ -20,12 +30,37 @@ export type Pool = typeof pools.$inferSelect;
 
 export async function listCompetitions(
   tenantId: string,
+  filters: { discipline?: string; status?: string; q?: string } = {},
 ): Promise<Competition[]> {
+  const conds = [eq(competitions.tenantId, tenantId)];
+  if (filters.discipline && isDiscipline(filters.discipline))
+    conds.push(eq(competitions.discipline, filters.discipline));
+  if (filters.status && isCompetitionStatus(filters.status))
+    conds.push(eq(competitions.status, filters.status));
+  if (filters.q)
+    conds.push(ilike(competitions.name, `%${filters.q.replaceAll("%", "\\%")}%`));
   return db
     .select()
     .from(competitions)
-    .where(eq(competitions.tenantId, tenantId))
+    .where(and(...conds))
     .orderBy(desc(competitions.createdAt));
+}
+
+/** Team/match totals for the overview page — counts only, not full row sets. */
+export async function competitionCounts(
+  competitionId: string,
+): Promise<{ teams: number; matches: number }> {
+  const [t, m] = await Promise.all([
+    db
+      .select({ n: count() })
+      .from(teams)
+      .where(eq(teams.competitionId, competitionId)),
+    db
+      .select({ n: count() })
+      .from(matches)
+      .where(eq(matches.competitionId, competitionId)),
+  ]);
+  return { teams: t[0]?.n ?? 0, matches: m[0]?.n ?? 0 };
 }
 
 /** A competition scoped to its tenant (null when missing or cross-tenant). */
@@ -81,14 +116,6 @@ export async function listPlayersByTeam(
     byTeam.set(p.teamId, list);
   }
   return byTeam;
-}
-
-export async function listPools(competitionId: string): Promise<Pool[]> {
-  return db
-    .select()
-    .from(pools)
-    .where(eq(pools.competitionId, competitionId))
-    .orderBy(asc(pools.name));
 }
 
 export interface MatchRow {

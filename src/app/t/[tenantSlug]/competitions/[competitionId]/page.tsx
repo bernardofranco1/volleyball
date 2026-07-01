@@ -1,11 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import {
+  competitionCounts,
   getCompetition,
   getCompetitionConfig,
-  listMatches,
-  listTeams,
 } from "@/lib/competitions";
 import {
   setCompetitionStatus,
@@ -19,22 +17,20 @@ import {
   BOARD_FONTS,
 } from "@/lib/board-theme";
 import type { Discipline } from "@/engine/types";
-import { CompetitionTabs } from "@/components/admin/CompetitionTabs";
+import { NEXT_STATUS, PLAYERS_PER_SIDE } from "@/lib/domain";
+import { ActionForm } from "@/components/admin/ActionForm";
+import { CompetitionHeader } from "@/components/admin/CompetitionHeader";
 import { EditCompetitionForm } from "@/components/admin/EditCompetitionForm";
 import { SubmitButton } from "@/components/admin/SubmitButton";
-import { statusBadgeClass, ui } from "@/components/admin/styles";
+import { ui } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
 
-// The next lifecycle status the admin can advance to (DRAFT→ACTIVE→FINISHED),
-// plus an optional "reopen" target.
-const NEXT_STATUS: Record<string, { to: string; label: string }[]> = {
-  DRAFT: [{ to: "ACTIVE", label: "Activate" }],
-  ACTIVE: [
-    { to: "FINISHED", label: "Finish" },
-    { to: "DRAFT", label: "Back to draft" },
-  ],
-  FINISHED: [{ to: "ACTIVE", label: "Reopen" }],
+const STATUS_CONFIRM: Record<string, string | undefined> = {
+  FINISHED:
+    "Finish this competition? Public results freeze at the current standings.",
+  ACTIVE: undefined,
+  DRAFT: undefined,
 };
 
 export default async function CompetitionOverviewPage({
@@ -49,71 +45,45 @@ export default async function CompetitionOverviewPage({
     `/t/${tenantSlug}/competitions/${competitionId}`,
   );
 
-  const competition = await getCompetition(ctx.tenant.id, competitionId);
-  if (!competition) notFound();
-
-  const [configRow, teams, matches, boardBranding] = await Promise.all([
+  // Everything is independent — fetch concurrently, gate on the result.
+  const [competition, configRow, counts, boardBranding] = await Promise.all([
+    getCompetition(ctx.tenant.id, competitionId),
     getCompetitionConfig(competitionId),
-    listTeams(competitionId),
-    listMatches(competitionId),
+    competitionCounts(competitionId),
     getCompetitionBranding(competitionId),
   ]);
+  if (!competition) notFound();
 
+  const discipline = competition.discipline as Discipline;
   const resolved = resolveConfig(
-    competition.discipline as Discipline,
+    discipline,
     (configRow ?? {}) as unknown as Partial<TournamentConfig>,
   );
-  const boardDefault = defaultBoardTheme(competition.discipline as Discipline);
+  const boardDefault = defaultBoardTheme(discipline);
+  const triState = (v: boolean | null | undefined) =>
+    v == null ? "" : v ? "on" : "off";
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <Link
-            href={`/t/${tenantSlug}/competitions`}
-            className="text-sm text-score-dim hover:text-foreground"
-          >
-            ← All competitions
-          </Link>
-          <div className="mt-1 flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {competition.name}
-            </h1>
-            <span className={statusBadgeClass(competition.status)}>
-              {competition.status}
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-score-dim">
-            {competition.discipline}
-            {competition.gender && competition.gender !== "UNSPECIFIED"
-              ? ` · ${competition.gender}`
-              : ""}
-            {` · ${teams.length} teams · ${matches.length} matches`}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {(NEXT_STATUS[competition.status] ?? []).map((t) => (
-            <form key={t.to} action={setCompetitionStatus}>
-              <input type="hidden" name="tenantSlug" value={tenantSlug} />
-              <input
-                type="hidden"
-                name="competitionId"
-                value={competitionId}
-              />
-              <input type="hidden" name="status" value={t.to} />
-              <SubmitButton variant={t.to === "DRAFT" ? "secondary" : "primary"}>
-                {t.label}
-              </SubmitButton>
-            </form>
-          ))}
-        </div>
-      </div>
-
-      <CompetitionTabs
+      <CompetitionHeader
         tenantSlug={tenantSlug}
-        competitionId={competitionId}
+        competition={competition}
         active="overview"
+        subtitle={` · ${counts.teams} teams · ${counts.matches} matches`}
+        actions={(NEXT_STATUS[competition.status] ?? []).map((t) => (
+          <ActionForm
+            key={t.to}
+            action={setCompetitionStatus}
+            confirm={STATUS_CONFIRM[t.to]}
+          >
+            <input type="hidden" name="tenantSlug" value={tenantSlug} />
+            <input type="hidden" name="competitionId" value={competitionId} />
+            <input type="hidden" name="status" value={t.to} />
+            <SubmitButton variant={t.to === "DRAFT" ? "secondary" : "primary"}>
+              {t.label}
+            </SubmitButton>
+          </ActionForm>
+        ))}
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -125,15 +95,17 @@ export default async function CompetitionOverviewPage({
             venue: competition.venue,
             startDate: competition.startDate,
             endDate: competition.endDate,
+            gender: competition.gender,
+            discipline: competition.discipline,
           }}
         />
 
         {/* Config panel: overrides over discipline defaults. */}
-        <form action={updateCompetitionConfig} className={ui.card}>
+        <ActionForm action={updateCompetitionConfig} className={ui.card}>
           <h2 className="mb-1 font-medium">Scoring rules</h2>
           <p className="mb-4 text-xs text-score-dim">
-            Blank = use {competition.discipline} default. Resolved values shown as
-            placeholders.
+            Blank / “default” = use the {competition.discipline} rule. Resolved
+            values shown as placeholders.
           </p>
           <input type="hidden" name="tenantSlug" value={tenantSlug} />
           <input type="hidden" name="competitionId" value={competitionId} />
@@ -143,15 +115,19 @@ export default async function CompetitionOverviewPage({
               <label className={ui.label} htmlFor="bestOf">
                 Best of
               </label>
-              <input
+              <select
                 id="bestOf"
                 name="bestOf"
-                type="number"
-                min={1}
                 defaultValue={configRow?.bestOf ?? ""}
-                placeholder={String(resolved.bestOf)}
-                className={ui.input}
-              />
+                className={ui.select}
+              >
+                <option value="">Default ({resolved.bestOf})</option>
+                {[1, 3, 5].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className={ui.label} htmlFor="setScore">
@@ -162,6 +138,7 @@ export default async function CompetitionOverviewPage({
                 name="setScore"
                 type="number"
                 min={1}
+                max={99}
                 defaultValue={configRow?.setScore ?? ""}
                 placeholder={String(resolved.setScore)}
                 className={ui.input}
@@ -176,6 +153,7 @@ export default async function CompetitionOverviewPage({
                 name="setScoreTiebreak"
                 type="number"
                 min={1}
+                max={99}
                 defaultValue={configRow?.setScoreTiebreak ?? ""}
                 placeholder={String(resolved.setScoreTiebreak)}
                 className={ui.input}
@@ -183,8 +161,7 @@ export default async function CompetitionOverviewPage({
             </div>
           </div>
 
-          {(competition.discipline === "LIGHT" ||
-            competition.discipline === "GRASS") && (
+          {PLAYERS_PER_SIDE[discipline] && (
             <div className="mt-4">
               <label className={ui.label} htmlFor="playersPerSide">
                 Players per team{" "}
@@ -196,46 +173,64 @@ export default async function CompetitionOverviewPage({
                 id="playersPerSide"
                 name="playersPerSide"
                 defaultValue={configRow?.playersPerSide ?? ""}
-                className={ui.input}
+                className={ui.select}
               >
                 <option value="">Default ({resolved.playersPerSide})</option>
-                {(competition.discipline === "LIGHT" ? [4, 5] : [3, 4]).map(
-                  (nP) => (
-                    <option key={nP} value={nP}>
-                      {nP} players
-                    </option>
-                  ),
-                )}
+                {PLAYERS_PER_SIDE[discipline]!.map((nP) => (
+                  <option key={nP} value={nP}>
+                    {nP} players
+                  </option>
+                ))}
               </select>
             </div>
           )}
 
-          <div className="mt-4 space-y-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
+          {/* Tri-state: empty = discipline default; a saved checkbox used to
+              freeze the resolved value as a permanent override. */}
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div>
+              <label className={ui.label} htmlFor="serveClockEnabled">
+                Serve clock
+              </label>
+              <select
+                id="serveClockEnabled"
                 name="serveClockEnabled"
-                defaultChecked={resolved.serveClockEnabled}
-              />
-              Serve clock enabled
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
+                defaultValue={triState(configRow?.serveClockEnabled)}
+                className={ui.select}
+              >
+                <option value="">
+                  Default ({resolved.serveClockEnabled ? "on" : "off"})
+                </option>
+                <option value="on">On</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
+            <div>
+              <label className={ui.label} htmlFor="ttoEnabled">
+                Technical time-out
+              </label>
+              <select
+                id="ttoEnabled"
                 name="ttoEnabled"
-                defaultChecked={resolved.ttoEnabled}
-              />
-              Technical time-out (TTO) enabled
-            </label>
+                defaultValue={triState(configRow?.ttoEnabled)}
+                className={ui.select}
+              >
+                <option value="">
+                  Default ({resolved.ttoEnabled ? "on" : "off"})
+                </option>
+                <option value="on">On</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
           </div>
 
           <div className="mt-4">
             <SubmitButton pendingLabel="Saving…">Save rules</SubmitButton>
           </div>
-        </form>
+        </ActionForm>
 
         {/* Scoreboard appearance — per-competition broadcast-board theme. */}
-        <form action={updateCompetitionBranding} className={ui.card}>
+        <ActionForm action={updateCompetitionBranding} className={ui.card}>
           <h2 className="mb-1 font-medium">Scoreboard</h2>
           <p className="mb-3 text-[11px] text-score-dim">
             Appearance of the public broadcast board for this competition.
@@ -259,9 +254,7 @@ export default async function CompetitionOverviewPage({
                   id={key}
                   name={key}
                   type="color"
-                  defaultValue={
-                    (boardBranding?.[key] as string | null) ?? dflt
-                  }
+                  defaultValue={(boardBranding?.[key] as string | null) ?? dflt}
                   className="h-9 w-full rounded-lg border border-border bg-surface"
                 />
               </div>
@@ -275,7 +268,7 @@ export default async function CompetitionOverviewPage({
               id="board-font"
               name="fontFamily"
               defaultValue={boardBranding?.fontFamily ?? ""}
-              className={ui.input}
+              className={ui.select}
             >
               <option value="">Default (Saira Condensed)</option>
               {BOARD_FONTS.map((f) => (
@@ -292,6 +285,7 @@ export default async function CompetitionOverviewPage({
             <input
               id="board-logo"
               name="logoUrl"
+              type="url"
               defaultValue={boardBranding?.logoUrl ?? ""}
               placeholder="https://… (transparent .png)"
               className={ui.input}
@@ -302,7 +296,7 @@ export default async function CompetitionOverviewPage({
               Save scoreboard
             </SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </div>
     </main>
   );

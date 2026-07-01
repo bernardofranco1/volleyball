@@ -86,21 +86,21 @@ export async function POST(
   if (!sameOriginOk(req))
     return Response.json({ error: "Bad origin" }, { status: 403 });
 
-  // Authorization is keyed to the *match's* tenant, not the URL or the caller's
-  // primary tenant (spec/14 §A1).
-  const authed = await authorizeMatch(id, SCORING_ROLES);
+  // Authorization (keyed to the *match's* tenant — spec/14 §A1), rate limiting
+  // (IP-keyed so it needs no auth result), and body parsing are independent —
+  // run them concurrently instead of stacking three network round trips.
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  const [authed, allowed, body] = await Promise.all([
+    authorizeMatch(id, SCORING_ROLES),
+    rateLimit(`events:${ip}:${id}`),
+    req.json().catch(() => null) as Promise<{ payload?: EventPayload } | null>,
+  ]);
   if (!authed.ok)
     return Response.json({ error: "Forbidden" }, { status: authed.status });
-
-  if (!(await rateLimit(`events:${authed.auth.user.id}:${id}`)))
+  if (!allowed)
     return Response.json({ error: "Too many requests" }, { status: 429 });
-
-  let body: { payload?: EventPayload };
-  try {
-    body = await req.json();
-  } catch {
+  if (body === null)
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
   if (!body?.payload?.type) {
     return Response.json({ error: "Missing event payload" }, { status: 400 });
   }
@@ -114,6 +114,9 @@ export async function POST(
   try {
     const { state, newEvents } = await appendMatchEvent(id, body.payload, {
       actor: "SCORER",
+      // Attribute the entry to the signed-in user — the event log is the
+      // match's legal record and must say who scored it.
+      deviceInfo: authed.auth.user.id,
     });
     return Response.json({
       state,

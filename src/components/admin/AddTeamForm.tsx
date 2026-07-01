@@ -16,10 +16,9 @@ export function AddTeamForm({
   const [state, action] = useActionState(createTeam, OK);
   const formRef = useRef<HTMLFormElement>(null);
 
-  // Clear the inputs after a successful add (state resets to OK with no error
-  // once the action's revalidation completes).
+  // Clear the inputs only after an explicit success (state.ok), not on mount.
   useEffect(() => {
-    if (!state.error) formRef.current?.reset();
+    if (state.ok) formRef.current?.reset();
   }, [state]);
 
   return (

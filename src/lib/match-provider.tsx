@@ -60,6 +60,8 @@ export interface MatchContextValue<S, P> {
   dispatch: (payload: P) => void;
   pending: boolean;
   online: boolean;
+  /** Events applied locally but not yet accepted by the server. */
+  queuedCount: number;
   serveClockDeadline: number | null;
   error: string | null;
 }
@@ -106,6 +108,7 @@ export function createMatchProvider<
     const [online, setOnline] = useState(() =>
       typeof navigator === "undefined" ? true : navigator.onLine,
     );
+    const [queuedCount, setQueuedCount] = useState(0);
     const [serveClockDeadline, setServeClockDeadline] = useState<number | null>(
       null,
     );
@@ -117,21 +120,41 @@ export function createMatchProvider<
       stateRef.current = state;
     }, [state]);
 
-    const resync = useCallback(async () => {
+    // Queued-but-unsent events survive a reload/navigation while offline —
+    // previously they lived only in a ref and were silently lost.
+    const storageKey = `vbqueue_${matchId}`;
+    const persistQueue = useCallback(() => {
+      setQueuedCount(queue.current.length);
       try {
-        const res = await fetch(`/api/matches/${matchId}/state`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as { state: S };
-        setState(data.state);
+        if (queue.current.length === 0) localStorage.removeItem(storageKey);
+        else localStorage.setItem(storageKey, JSON.stringify(queue.current));
       } catch {
-        /* offline — keep optimistic state */
+        /* storage unavailable (private mode) — queue stays in memory */
       }
-    }, [matchId]);
+    }, [storageKey]);
 
+    const resync = useCallback(
+      async (since?: number) => {
+        try {
+          const url =
+            since != null
+              ? `/api/matches/${matchId}/state?since=${since}`
+              : `/api/matches/${matchId}/state`;
+          const res = await fetch(url, { cache: "no-store" });
+          if (res.status === 204) return; // already up to date
+          if (!res.ok) return;
+          const data = (await res.json()) as { state: S };
+          setState(data.state);
+        } catch {
+          /* offline — keep optimistic state */
+        }
+      },
+      [matchId],
+    );
+
+    /** Returns true when the event reached the server (even if rejected). */
     const post = useCallback(
-      async (payload: P) => {
+      async (payload: P): Promise<boolean> => {
         setPending(true);
         try {
           const res = await fetch(`/api/matches/${matchId}/events`, {
@@ -145,25 +168,39 @@ export function createMatchProvider<
             };
             setError(body.error ?? `Request failed (${res.status})`);
             await resync();
-            return;
+            return true; // delivered — the server rejected it, don't retry
           }
           const data = (await res.json()) as { state: S };
           setState(data.state);
           setError(null);
+          return true;
         } catch {
           queue.current.push(payload);
+          persistQueue();
+          return false;
         } finally {
           setPending(false);
         }
       },
-      [matchId, resync],
+      [matchId, resync, persistQueue],
+    );
+
+    // Posts are serialized through a promise chain: two quick taps otherwise
+    // race server-side for the same sequence number and one 409s ("concurrent
+    // write") even though both came from this device in order.
+    const postChain = useRef<Promise<unknown>>(Promise.resolve());
+    const enqueuePost = useCallback(
+      (payload: P) => {
+        postChain.current = postChain.current.then(() => post(payload));
+      },
+      [post],
     );
 
     const dispatch = useCallback(
       (payload: P) => {
         // UNDO re-replays server-side; skip optimism and take the authoritative response.
         if (payload.type === "UNDO") {
-          void post(payload);
+          enqueuePost(payload);
           return;
         }
         const result = opts.append(stateRef.current, payload, config, {
@@ -184,17 +221,39 @@ export function createMatchProvider<
         ) {
           setServeClockDeadline(Date.now() + config.serveClockSecs * 1000);
         }
-        void post(payload);
+        enqueuePost(payload);
       },
-      [config, post],
+      [config, enqueuePost],
     );
 
     const flush = useCallback(async () => {
       while (queue.current.length > 0) {
         const next = queue.current.shift()!;
-        await post(next);
+        persistQueue();
+        const delivered = await post(next);
+        // Still unreachable: post() re-queued the payload — stop, or this loop
+        // would spin forever on a captive portal / flaky venue Wi-Fi.
+        if (!delivered) break;
       }
-    }, [post]);
+    }, [post, persistQueue]);
+
+    // Restore any queue persisted before a reload and try to drain it.
+    useEffect(() => {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) {
+          const items = JSON.parse(raw) as P[];
+          if (Array.isArray(items) && items.length > 0) {
+            queue.current.push(...items);
+            setQueuedCount(queue.current.length);
+            void flush();
+          }
+        }
+      } catch {
+        /* corrupt/unavailable storage — ignore */
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [storageKey]);
 
     useEffect(() => {
       const goOnline = () => {
@@ -241,9 +300,13 @@ export function createMatchProvider<
 
     // Backstop reconcile: catches realtime signals that never arrived (broker
     // outage / dropped messages) so a live view can't silently go stale (§P11.2).
+    // When nothing is in flight, pass `since` — the server answers 204 from one
+    // indexed MAX() instead of a snapshot load + tail replay.
     useEffect(() => {
       const id = setInterval(() => {
-        if (stateRef.current.status !== "FINISHED") void resync();
+        if (stateRef.current.status === "FINISHED") return;
+        const idle = queue.current.length === 0;
+        void resync(idle ? stateRef.current.lastSequence : undefined);
       }, 25000);
       return () => clearInterval(id);
     }, [resync]);
@@ -262,6 +325,7 @@ export function createMatchProvider<
         dispatch,
         pending,
         online,
+        queuedCount,
         serveClockDeadline,
         error,
       }),
@@ -278,6 +342,7 @@ export function createMatchProvider<
         dispatch,
         pending,
         online,
+        queuedCount,
         serveClockDeadline,
         error,
       ],

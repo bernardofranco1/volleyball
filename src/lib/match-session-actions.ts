@@ -8,10 +8,8 @@ import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { getCompetition } from "@/lib/competitions";
 import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
-
-function str(fd: FormData, key: string): string {
-  return String(fd.get(key) ?? "").trim();
-}
+import { fail, ok, type FormState } from "@/lib/action-state";
+import { str } from "@/lib/form-data";
 
 // Team-tablet tokens default to a single competition day.
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
@@ -50,11 +48,14 @@ function matchPath(tenantSlug: string, competitionId: string, matchId: string) {
 }
 
 /** Mint a team-tablet access token (TEAM_SCORER) for team A or B of a match. */
-export async function createMatchSession(fd: FormData): Promise<void> {
+export async function createMatchSession(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
   const g = await gate(fd);
-  if (!g) return;
+  if (!g) return fail("Match not found.");
   const team = str(fd, "team");
-  if (team !== "A" && team !== "B") return;
+  if (team !== "A" && team !== "B") return fail("Pick a team.");
 
   const sessionId = newId("mses");
   await db.insert(matchSessions).values({
@@ -77,14 +78,18 @@ export async function createMatchSession(fd: FormData): Promise<void> {
     metadata: { sessionId, team },
   });
   revalidatePath(matchPath(g.tenantSlug, g.competitionId, g.matchId));
+  return ok(`Team ${team} tablet link created.`);
 }
 
 /** Revoke a previously-issued token. */
-export async function revokeMatchSession(fd: FormData): Promise<void> {
+export async function revokeMatchSession(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
   const g = await gate(fd);
-  if (!g) return;
+  if (!g) return fail("Match not found.");
   const sessionId = str(fd, "sessionId");
-  if (!sessionId) return;
+  if (!sessionId) return fail("Missing session.");
 
   await db
     .update(matchSessions)
@@ -107,4 +112,5 @@ export async function revokeMatchSession(fd: FormData): Promise<void> {
     metadata: { sessionId },
   });
   revalidatePath(matchPath(g.tenantSlug, g.competitionId, g.matchId));
+  return ok("Token revoked.");
 }

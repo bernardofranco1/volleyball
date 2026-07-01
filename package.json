@@ -15,7 +15,8 @@
     "db:push": "drizzle-kit push",
     "db:migrate": "tsx --env-file=.env.local src/db/migrate.ts",
     "db:seed": "tsx --env-file=.env.local src/db/seed.ts",
-    "db:seed:demo": "tsx --env-file=.env.local src/scripts/seed.ts"
+    "db:seed:demo": "tsx --env-file=.env.local src/scripts/seed.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@paralleldrive/cuid2": "^3.3.0",
@@ -30,8 +31,7 @@
     "postgres": "^3.4.9",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "uuid": "^14.0.1"
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
@@ -41,7 +41,6 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^6.0.3",
     "@vitest/ui": "^4.1.9",
     "dotenv": "^17.4.2",

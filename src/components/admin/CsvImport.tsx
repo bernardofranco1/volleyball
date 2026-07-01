@@ -11,19 +11,35 @@ export function CsvImport({
   title,
   hint,
   action,
+  templateHref,
+  templateName,
 }: {
   tenantSlug: string;
   competitionId: string;
   title: string;
   hint: string;
   action: (prev: ImportState, fd: FormData) => Promise<ImportState>;
+  /** Optional data: URI (or path) for a downloadable CSV template. */
+  templateHref?: string;
+  templateName?: string;
 }) {
   const [state, formAction] = useActionState(action, IMPORT_INIT);
 
   return (
     <form action={formAction} className={ui.card}>
       <h2 className="mb-1 font-medium">{title}</h2>
-      <p className="mb-3 font-mono text-[11px] text-score-dim">{hint}</p>
+      <p className="mb-2 font-mono text-[11px] text-score-dim">{hint}</p>
+      {templateHref && (
+        <p className="mb-3 text-xs">
+          <a
+            href={templateHref}
+            download={templateName ?? "template.csv"}
+            className="text-score-dim underline hover:text-foreground"
+          >
+            Download template
+          </a>
+        </p>
+      )}
       <input type="hidden" name="tenantSlug" value={tenantSlug} />
       <input type="hidden" name="competitionId" value={competitionId} />
 

@@ -1,14 +1,32 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { addMember } from "@/lib/access-actions";
 import { ADD_MEMBER_INIT, ASSIGNABLE_ROLES, ROLE_HINT, ROLE_LABEL } from "@/lib/roles";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { ui } from "@/components/admin/styles";
 
+// The one-time temp password disappears after this long (shoulder-surfing at a
+// venue desk); the admin should copy it right away.
+const PASSWORD_VISIBLE_MS = 60_000;
+
 export function AddMemberForm({ tenantSlug }: { tenantSlug: string }) {
   const [state, action] = useActionState(addMember, ADD_MEMBER_INIT);
-  const [copied, setCopied] = useState(false);
+  // Both flags are derived per-result (keyed by the password value) so a new
+  // submission naturally resets "Copied" and restarts the dismiss timer.
+  const [copiedFor, setCopiedFor] = useState<string | null>(null);
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+
+  useEffect(() => {
+    const pw = state.created?.tempPassword;
+    if (!pw) return;
+    const t = setTimeout(() => setDismissedFor(pw), PASSWORD_VISIBLE_MS);
+    return () => clearTimeout(t);
+  }, [state]);
+
+  const tempPassword = state.created?.tempPassword ?? null;
+  const passwordVisible = tempPassword != null && dismissedFor !== tempPassword;
+  const copied = tempPassword != null && copiedFor === tempPassword;
 
   return (
     <form action={action} className={ui.card}>
@@ -57,22 +75,30 @@ export function AddMemberForm({ tenantSlug }: { tenantSlug: string }) {
           <p className="font-medium">{state.created.email}</p>
           <p className="mt-1 text-score-dim">{state.created.note}</p>
           {state.created.tempPassword ? (
-            <div className="mt-2 flex items-center gap-2">
-              <code className="flex-1 rounded bg-surface px-2 py-1 font-mono text-sm">
-                {state.created.tempPassword}
-              </code>
-              <button
-                type="button"
-                onClick={() => {
-                  void navigator.clipboard
-                    ?.writeText(state.created!.tempPassword!)
-                    .then(() => setCopied(true));
-                }}
-                className="rounded border border-border px-2 py-1 text-xs text-score-dim hover:text-foreground"
-              >
-                {copied ? "Copied" : "Copy"}
-              </button>
-            </div>
+            passwordVisible ? (
+              <div className="mt-2 flex items-center gap-2">
+                <code className="flex-1 rounded bg-surface px-2 py-1 font-mono text-sm">
+                  {state.created.tempPassword}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pw = state.created!.tempPassword!;
+                    void navigator.clipboard
+                      ?.writeText(pw)
+                      .then(() => setCopiedFor(pw));
+                  }}
+                  className="rounded border border-border px-2 py-1 text-xs text-score-dim hover:text-foreground"
+                >
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-score-dim">
+                The temporary password was hidden after a minute. If it wasn&apos;t
+                saved, ask them to use “reset password” on the login page.
+              </p>
+            )
           ) : null}
         </div>
       ) : null}

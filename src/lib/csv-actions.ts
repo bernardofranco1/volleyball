@@ -4,36 +4,16 @@ import { revalidatePath } from "next/cache";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { csvImports, matches, players, teams } from "@/db/schema";
-import type { Discipline } from "@/engine/types";
-import { ADMIN_ROLES, requireRole } from "@/lib/authz";
-import { getCompetition } from "@/lib/competitions";
+import { gateCompetition } from "@/lib/action-gate";
 import { csvBool, parseCsvRecords, recordGetter } from "@/lib/csv";
 import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
 import type { ImportState } from "@/lib/action-state";
 
-function str(fd: FormData, key: string): string {
-  return String(fd.get(key) ?? "").trim();
-}
-function intOrNull(v: string): number | null {
+function intFrom(v: string): number | null {
   if (!v) return null;
   const n = Number.parseInt(v, 10);
   return Number.isFinite(n) ? n : null;
-}
-
-async function gate(fd: FormData) {
-  const tenantSlug = str(fd, "tenantSlug");
-  const competitionId = str(fd, "competitionId");
-  const ctx = await requireRole(tenantSlug, ADMIN_ROLES);
-  const comp = await getCompetition(ctx.tenant.id, competitionId);
-  if (!comp) return null;
-  return {
-    tenantSlug,
-    competitionId,
-    tenantId: ctx.tenant.id,
-    userId: ctx.user.id,
-    discipline: comp.discipline as Discipline,
-  };
 }
 
 // Cap admin CSV uploads so a huge file can't OOM the request (spec/14 §F5).
@@ -49,6 +29,16 @@ async function readFile(
   return { text: await f.text() };
 }
 
+/** Human-readable reason from a failed bulk insert (constraint name + detail). */
+function dbErrorDetail(e: unknown): string {
+  if (e && typeof e === "object") {
+    const pg = e as { constraint_name?: string; detail?: string; message?: string };
+    const parts = [pg.constraint_name, pg.detail ?? pg.message].filter(Boolean);
+    if (parts.length) return parts.join(": ");
+  }
+  return "check for duplicates or invalid values";
+}
+
 /** One batched insert (spec/14 §F5). Returns rows written, or 0 on failure. */
 async function bulkInsert(
   insert: () => Promise<unknown>,
@@ -59,8 +49,8 @@ async function bulkInsert(
   try {
     await insert();
     return count;
-  } catch {
-    errs.push("Bulk insert failed — check for duplicates or invalid values.");
+  } catch (e) {
+    errs.push(`Bulk insert failed — ${dbErrorDetail(e)}.`);
     return 0;
   }
 }
@@ -92,132 +82,12 @@ async function logImport(
   });
 }
 
-/** teams.csv → displayName,countryCode,clubName,seed */
-export async function importTeams(
-  _prev: ImportState,
-  fd: FormData,
-): Promise<ImportState> {
-  const g = await gate(fd);
-  if (!g) return { error: "Competition not found." };
-  const file = await readFile(fd);
-  if ("error" in file) return { error: file.error };
-
-  const { records } = parseCsvRecords(file.text);
-  const errs: string[] = [];
-  const rows: (typeof teams.$inferInsert)[] = [];
-  for (let i = 0; i < records.length; i++) {
-    const r = records[i];
-    const displayName = (r.displayName ?? "").trim();
-    if (!displayName) {
-      errs.push(`Row ${i + 2}: missing displayName`);
-      continue;
-    }
-    rows.push({
-      id: newId("team"),
-      competitionId: g.competitionId,
-      tenantId: g.tenantId,
-      displayName,
-      countryCode: (r.countryCode || "").toUpperCase() || null,
-      clubName: r.clubName || null,
-      seed: intOrNull(r.seed),
-    });
-  }
-  const ok = await bulkInsert(() => db.insert(teams).values(rows), rows.length, errs);
-
-  await logImport(g.tenantId, "TEAMS", fileName(fd), g.userId, ok, errs);
-  revalidatePath(`/t/${g.tenantSlug}/competitions/${g.competitionId}/teams`);
-  return { error: null, summary: { ok, errors: errs.length, messages: errs } };
-}
-
-/** players.csv → teamDisplayName,firstName,lastName,jerseyNumber,isCaptain,isLibero */
-export async function importPlayers(
-  _prev: ImportState,
-  fd: FormData,
-): Promise<ImportState> {
-  const g = await gate(fd);
-  if (!g) return { error: "Competition not found." };
-  const file = await readFile(fd);
-  if ("error" in file) return { error: file.error };
-
-  const teamRows = await db
-    .select({ id: teams.id, displayName: teams.displayName })
-    .from(teams)
-    .where(eq(teams.competitionId, g.competitionId));
-  const byName = new Map(
-    teamRows.map((t) => [t.displayName.toLowerCase(), t.id]),
-  );
-
-  const { records } = parseCsvRecords(file.text);
-  const errs: string[] = [];
-  const rows: (typeof players.$inferInsert)[] = [];
-  // Jersey-uniqueness guard (brief §2.1): pre-validate against existing players
-  // and within the batch so we report row numbers instead of a raw DB error.
-  const teamIds = teamRows.map((t) => t.id);
-  const existingJerseys = new Set(
-    teamIds.length
-      ? (
-          await db
-            .select({
-              teamId: players.teamId,
-              jerseyNumber: players.jerseyNumber,
-            })
-            .from(players)
-            .where(inArray(players.teamId, teamIds))
-        )
-          .filter((p) => p.jerseyNumber != null)
-          .map((p) => `${p.teamId}:${p.jerseyNumber}`)
-      : [],
-  );
-  const seenJerseys = new Set<string>();
-  for (let i = 0; i < records.length; i++) {
-    const r = records[i];
-    const teamName = (r.teamDisplayName ?? "").trim();
-    const teamId = byName.get(teamName.toLowerCase());
-    if (!teamId) {
-      errs.push(`Row ${i + 2}: unknown team "${teamName}"`);
-      continue;
-    }
-    const fullName = [r.firstName, r.lastName].filter(Boolean).join(" ").trim();
-    if (!fullName) {
-      errs.push(`Row ${i + 2}: missing player name`);
-      continue;
-    }
-    const jerseyNumber = intOrNull(r.jerseyNumber);
-    if (jerseyNumber != null) {
-      const key = `${teamId}:${jerseyNumber}`;
-      if (existingJerseys.has(key) || seenJerseys.has(key)) {
-        errs.push(
-          `Row ${i + 2}: duplicate jersey ${jerseyNumber} for team "${teamName}"`,
-        );
-        continue;
-      }
-      seenJerseys.add(key);
-    }
-    rows.push({
-      id: newId("plyr"),
-      teamId,
-      tenantId: g.tenantId,
-      firstName: r.firstName || null,
-      lastName: r.lastName || null,
-      fullName,
-      jerseyNumber,
-      isCaptain: csvBool(r.isCaptain),
-      isLibero: csvBool(r.isLibero),
-    });
-  }
-  const ok = await bulkInsert(() => db.insert(players).values(rows), rows.length, errs);
-
-  await logImport(g.tenantId, "PLAYERS", fileName(fd), g.userId, ok, errs);
-  revalidatePath(`/t/${g.tenantSlug}/competitions/${g.competitionId}/teams`);
-  return { error: null, summary: { ok, errors: errs.length, messages: errs } };
-}
-
 /** schedule.csv → matchNumber,teamA,teamB,courtNumber,scheduledAt,roundName */
 export async function importSchedule(
   _prev: ImportState,
   fd: FormData,
 ): Promise<ImportState> {
-  const g = await gate(fd);
+  const g = await gateCompetition(fd);
   if (!g) return { error: "Competition not found." };
   const file = await readFile(fd);
   if ("error" in file) return { error: file.error };
@@ -271,41 +141,56 @@ export async function importSchedule(
       teamBId: b,
       discipline: g.discipline,
       status: "SCHEDULED",
-      courtNumber: intOrNull(get("Court number", "courtNumber")),
+      courtNumber: intFrom(get("Court number", "courtNumber")),
       scheduledAt: when,
       roundName: get("roundName", "round") || null,
-      matchNumber: intOrNull(get("Match number", "matchNumber")),
+      matchNumber: intFrom(get("Match number", "matchNumber")),
       groupName: get("Group", "group", "groupName") || null,
-      phaseNumber: intOrNull(get("Phase number", "phaseNumber")),
+      phaseNumber: intFrom(get("Phase number", "phaseNumber")),
       phaseName: get("Phase name", "phaseName") || null,
     });
   }
   const ok = await bulkInsert(() => db.insert(matches).values(rows), rows.length, errs);
 
-  await logImport(g.tenantId, "SCHEDULE", fileName(fd), g.userId, ok, errs);
+  await logImport(g.tenantId, "SCHEDULE", fileName(fd), g.actor.userId, ok, errs);
   revalidatePath(`/t/${g.tenantSlug}/competitions/${g.competitionId}/schedule`);
   return { error: null, summary: { ok, errors: errs.length, messages: errs } };
 }
 
 /**
+ * True when a roster row matches the template's worked example ("John Doe" on
+ * "Example Team") — those are skipped by content, not by position, so a clean
+ * file no longer silently loses its first player.
+ */
+function isExampleRow(get: (...names: string[]) => string): boolean {
+  const first = get("First name", "firstName").toLowerCase();
+  const last = get("Last name", "lastName").toLowerCase();
+  const team = get("Team", "Team name", "teamDisplayName", "displayName").toLowerCase();
+  return (
+    (first === "john" && last === "doe") ||
+    team === "example team" ||
+    team === "example"
+  );
+}
+
+/**
  * Merged teams + players import (brief §3.1): one CSV where each row is a player
- * with their team name; teams are created on first sight. The FIRST data row is
- * a worked example ("John Doe") and is ignored. Columns (tolerant headers):
- * Team, First name, Last name, Jersey, Captain, Libero (+ optional Country,
- * Club, Seed). Jersey numbers stay unique per team (brief §2.1).
+ * with their team name; teams are created on first sight. Rows matching the
+ * template's worked example ("John Doe") are ignored. Columns (tolerant
+ * headers): Team, First name, Last name, Jersey, Captain, Libero (+ optional
+ * Country, Club, Seed). Jersey numbers stay unique per team (brief §2.1).
+ * Teams and players are written in ONE transaction — a failure rolls back both.
  */
 export async function importRoster(
   _prev: ImportState,
   fd: FormData,
 ): Promise<ImportState> {
-  const g = await gate(fd);
+  const g = await gateCompetition(fd);
   if (!g) return { error: "Competition not found." };
   const file = await readFile(fd);
   if ("error" in file) return { error: file.error };
 
   const { records } = parseCsvRecords(file.text);
-  // Drop the first data row — it's the ignored example.
-  const dataRows = records.slice(1);
 
   const existingTeams = await db
     .select({ id: teams.id, displayName: teams.displayName })
@@ -334,10 +219,15 @@ export async function importRoster(
   const newTeams: (typeof teams.$inferInsert)[] = [];
   const newPlayers: (typeof players.$inferInsert)[] = [];
   const errs: string[] = [];
+  let exampleRows = 0;
 
-  for (let i = 0; i < dataRows.length; i++) {
-    const get = recordGetter(dataRows[i]);
-    const rowNo = i + 3; // header + ignored example + 1-based
+  for (let i = 0; i < records.length; i++) {
+    const get = recordGetter(records[i]);
+    const rowNo = i + 2; // 1-based + header row
+    if (isExampleRow(get)) {
+      exampleRows++;
+      continue;
+    }
     const teamName = get("Team", "Team name", "teamDisplayName", "displayName");
     if (!teamName) {
       errs.push(`Row ${rowNo}: missing team`);
@@ -354,7 +244,7 @@ export async function importRoster(
         displayName: teamName,
         countryCode: (get("Country", "countryCode") || "").toUpperCase() || null,
         clubName: get("Club", "clubName") || null,
-        seed: intOrNull(get("Seed", "seed")),
+        seed: intFrom(get("Seed", "seed")),
         color: get("Color", "colour", "color") || null,
       });
     }
@@ -365,7 +255,7 @@ export async function importRoster(
       errs.push(`Row ${rowNo}: missing player name`);
       continue;
     }
-    const jerseyNumber = intOrNull(
+    const jerseyNumber = intFrom(
       get("Jersey", "Jersey number", "jerseyNumber", "number"),
     );
     if (jerseyNumber != null) {
@@ -391,18 +281,22 @@ export async function importRoster(
     });
   }
 
-  // Teams first (players FK them), then players.
-  if (newTeams.length)
-    await bulkInsert(() => db.insert(teams).values(newTeams), newTeams.length, errs);
-  const ok = newPlayers.length
-    ? await bulkInsert(
-        () => db.insert(players).values(newPlayers),
-        newPlayers.length,
-        errs,
-      )
-    : 0;
+  // Teams first (players FK them), then players — one transaction, so a
+  // player-insert failure doesn't leave half-created teams behind.
+  let ok = 0;
+  if (newTeams.length || newPlayers.length) {
+    try {
+      await db.transaction(async (tx) => {
+        if (newTeams.length) await tx.insert(teams).values(newTeams);
+        if (newPlayers.length) await tx.insert(players).values(newPlayers);
+      });
+      ok = newPlayers.length;
+    } catch (e) {
+      errs.push(`Import failed — ${dbErrorDetail(e)}.`);
+    }
+  }
 
-  await logImport(g.tenantId, "ROSTER", fileName(fd), g.userId, ok, errs);
+  await logImport(g.tenantId, "ROSTER", fileName(fd), g.actor.userId, ok, errs);
   revalidatePath(`/t/${g.tenantSlug}/competitions/${g.competitionId}/teams`);
   return {
     error: null,
@@ -410,7 +304,10 @@ export async function importRoster(
       ok,
       errors: errs.length,
       messages: [
-        ...(newTeams.length ? [`${newTeams.length} new team(s) created`] : []),
+        ...(ok > 0 && newTeams.length
+          ? [`${newTeams.length} new team(s) created`]
+          : []),
+        ...(exampleRows > 0 ? [`${exampleRows} example row(s) ignored`] : []),
         ...errs,
       ],
     },

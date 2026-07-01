@@ -1,66 +1,16 @@
 import { notFound } from "next/navigation";
-import { eq, inArray } from "drizzle-orm";
-import { db } from "@/db";
-import { matches, players } from "@/db/schema";
 import { requireMatchRole, SCORING_ROLES } from "@/lib/authz";
 import {
   MatchNotFoundError,
   UnsupportedDisciplineError,
   loadMatchView,
 } from "@/lib/match-engine";
-import { MatchProvider } from "@/lib/match-context";
-import {
-  IndoorMatchProvider,
-  type PlayerLite,
-} from "@/lib/indoor-match-context";
-import { GrassMatchProvider } from "@/lib/grass-match-context";
-import { LightMatchProvider } from "@/lib/light-match-context";
+import { loadMatchRosters } from "@/lib/competitions";
 import { PreMatchCountdownOverlay } from "@/components/scoreboard/PreMatchCountdownOverlay";
 import { ScorerPinGate } from "@/components/scoring/ScorerPinGate";
 import { scorerPinSatisfied } from "@/lib/scorer-pin";
-import { LiveScoreboard } from "@/components/scoring/LiveScoreboard";
-import { IndoorScoreboard } from "@/components/scoring/IndoorScoreboard";
-import { GrassScoreboard } from "@/components/scoring/GrassScoreboard";
-import { LightScoreboard } from "@/components/scoring/LightScoreboard";
-import type { IndoorMatchState } from "@/engine/indoor/types";
-import type { GrassMatchState } from "@/engine/grass/types";
-import type { LightMatchState } from "@/engine/light/types";
 
 export const dynamic = "force-dynamic";
-
-/** Both teams' rosters as PlayerLite, for indoor lineup/sub entry. */
-async function loadRosters(
-  matchId: string,
-): Promise<{ rosterA: PlayerLite[]; rosterB: PlayerLite[] }> {
-  const m = (
-    await db
-      .select({ teamAId: matches.teamAId, teamBId: matches.teamBId })
-      .from(matches)
-      .where(eq(matches.id, matchId))
-      .limit(1)
-  )[0];
-  if (!m) return { rosterA: [], rosterB: [] };
-  const rows = await db
-    .select({
-      id: players.id,
-      teamId: players.teamId,
-      fullName: players.fullName,
-      jerseyNumber: players.jerseyNumber,
-      isLibero: players.isLibero,
-    })
-    .from(players)
-    .where(inArray(players.teamId, [m.teamAId, m.teamBId]));
-  const lite = (teamId: string): PlayerLite[] =>
-    rows
-      .filter((r) => r.teamId === teamId)
-      .map((r) => ({
-        id: r.id,
-        fullName: r.fullName,
-        jerseyNumber: r.jerseyNumber,
-        isLibero: r.isLibero,
-      }));
-  return { rosterA: lite(m.teamAId), rosterB: lite(m.teamBId) };
-}
 
 export default async function LiveScoringPage({
   params,
@@ -97,7 +47,7 @@ export default async function LiveScoringPage({
     if (err instanceof UnsupportedDisciplineError) {
       return (
         <p className="p-6 text-score-dim">
-          This discipline isn’t scoreable yet (beach & indoor for now).
+          This discipline isn’t scoreable yet.
         </p>
       );
     }
@@ -105,81 +55,109 @@ export default async function LiveScoringPage({
   }
 
   const scheduledAtMs = view.scheduledAt ? view.scheduledAt.getTime() : null;
+  const overlay = <PreMatchCountdownOverlay scheduledAtMs={scheduledAtMs} />;
 
-  if (view.discipline === "INDOOR") {
-    const { rosterA, rosterB } = await loadRosters(matchId);
-    return (
-      <IndoorMatchProvider
-        matchId={view.matchId}
-        initialState={view.state as unknown as IndoorMatchState}
-        config={view.config}
-        rosterA={rosterA}
-        rosterB={rosterB}
-        teamAName={view.teamAName}
-        teamBName={view.teamBName}
-        teamAColor={view.teamAColor}
-        teamBColor={view.teamBColor}
-      >
-        <PreMatchCountdownOverlay scheduledAtMs={scheduledAtMs} />
-        <IndoorScoreboard competitionName={view.competitionName} />
-      </IndoorMatchProvider>
-    );
+  // Each branch dynamically imports ONLY its discipline's provider + console —
+  // static imports shipped all four engines/action bars (~2k lines of client
+  // JS) to every scorer. `view.state` narrows per branch (discriminated union).
+  switch (view.discipline) {
+    case "INDOOR": {
+      const [{ IndoorMatchProvider }, { IndoorScoreboard }, rosters] =
+        await Promise.all([
+          import("@/lib/indoor-match-context"),
+          import("@/components/scoring/IndoorScoreboard"),
+          loadMatchRosters(matchId),
+        ]);
+      return (
+        <IndoorMatchProvider
+          matchId={view.matchId}
+          initialState={view.state}
+          config={view.config}
+          rosterA={rosters.rosterA}
+          rosterB={rosters.rosterB}
+          teamAName={view.teamAName}
+          teamBName={view.teamBName}
+          teamAColor={view.teamAColor}
+          teamBColor={view.teamBColor}
+        >
+          {overlay}
+          <IndoorScoreboard competitionName={view.competitionName} />
+        </IndoorMatchProvider>
+      );
+    }
+    case "GRASS": {
+      const [{ GrassMatchProvider }, { GrassScoreboard }, rosters] =
+        await Promise.all([
+          import("@/lib/grass-match-context"),
+          import("@/components/scoring/GrassScoreboard"),
+          loadMatchRosters(matchId),
+        ]);
+      return (
+        <GrassMatchProvider
+          matchId={view.matchId}
+          initialState={view.state}
+          config={view.config}
+          rosterA={rosters.rosterA}
+          rosterB={rosters.rosterB}
+          teamAName={view.teamAName}
+          teamBName={view.teamBName}
+          teamAColor={view.teamAColor}
+          teamBColor={view.teamBColor}
+        >
+          {overlay}
+          <GrassScoreboard competitionName={view.competitionName} />
+        </GrassMatchProvider>
+      );
+    }
+    case "LIGHT": {
+      const [{ LightMatchProvider }, { LightScoreboard }, rosters] =
+        await Promise.all([
+          import("@/lib/light-match-context"),
+          import("@/components/scoring/LightScoreboard"),
+          loadMatchRosters(matchId),
+        ]);
+      return (
+        <LightMatchProvider
+          matchId={view.matchId}
+          initialState={view.state}
+          config={view.config}
+          rosterA={rosters.rosterA}
+          rosterB={rosters.rosterB}
+          teamAName={view.teamAName}
+          teamBName={view.teamBName}
+          teamAColor={view.teamAColor}
+          teamBColor={view.teamBColor}
+        >
+          {overlay}
+          <LightScoreboard competitionName={view.competitionName} />
+        </LightMatchProvider>
+      );
+    }
+    case "BEACH": {
+      const [{ MatchProvider }, { LiveScoreboard }] = await Promise.all([
+        import("@/lib/match-context"),
+        import("@/components/scoring/LiveScoreboard"),
+      ]);
+      return (
+        <MatchProvider
+          matchId={view.matchId}
+          initialState={view.state}
+          config={view.config}
+          teamAName={view.teamAName}
+          teamBName={view.teamBName}
+          teamAColor={view.teamAColor}
+          teamBColor={view.teamBColor}
+        >
+          {overlay}
+          <LiveScoreboard
+            competitionName={view.competitionName}
+            teamAName={view.teamAName}
+            teamBName={view.teamBName}
+            teamAColor={view.teamAColor}
+            teamBColor={view.teamBColor}
+          />
+        </MatchProvider>
+      );
+    }
   }
-
-  if (view.discipline === "GRASS") {
-    const { rosterA, rosterB } = await loadRosters(matchId);
-    return (
-      <GrassMatchProvider
-        matchId={view.matchId}
-        initialState={view.state as unknown as GrassMatchState}
-        config={view.config}
-        rosterA={rosterA}
-        rosterB={rosterB}
-        teamAName={view.teamAName}
-        teamBName={view.teamBName}
-        teamAColor={view.teamAColor}
-        teamBColor={view.teamBColor}
-      >
-        <PreMatchCountdownOverlay scheduledAtMs={scheduledAtMs} />
-        <GrassScoreboard competitionName={view.competitionName} />
-      </GrassMatchProvider>
-    );
-  }
-
-  if (view.discipline === "LIGHT") {
-    const { rosterA, rosterB } = await loadRosters(matchId);
-    return (
-      <LightMatchProvider
-        matchId={view.matchId}
-        initialState={view.state as unknown as LightMatchState}
-        config={view.config}
-        rosterA={rosterA}
-        rosterB={rosterB}
-        teamAName={view.teamAName}
-        teamBName={view.teamBName}
-        teamAColor={view.teamAColor}
-        teamBColor={view.teamBColor}
-      >
-        <PreMatchCountdownOverlay scheduledAtMs={scheduledAtMs} />
-        <LightScoreboard competitionName={view.competitionName} />
-      </LightMatchProvider>
-    );
-  }
-
-  return (
-    <MatchProvider
-      matchId={view.matchId}
-      initialState={view.state}
-      config={view.config}
-    >
-      <PreMatchCountdownOverlay scheduledAtMs={scheduledAtMs} />
-      <LiveScoreboard
-        competitionName={view.competitionName}
-        teamAName={view.teamAName}
-        teamBName={view.teamBName}
-        teamAColor={view.teamAColor}
-        teamBColor={view.teamBColor}
-      />
-    </MatchProvider>
-  );
 }

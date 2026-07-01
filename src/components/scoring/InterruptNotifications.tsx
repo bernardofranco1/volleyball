@@ -14,17 +14,21 @@ interface Pending {
 // Two delivery paths (brief §2.2):
 //  1. Realtime broadcast on `match:{id}:scorer` — instant, but fire-and-forget
 //     (a missed/dropped socket loses the message).
-//  2. A 4s poll of the scorer GET endpoint (authoritative PENDING set from the
-//     DB) — guarantees the request appears even if realtime was missed.
+//  2. A 15s poll of the scorer GET endpoint (authoritative PENDING set from
+//     the DB) — a safety net for missed broadcasts, so it doesn't need to be
+//     fast. Pass `active={false}` (match finished / tablets disabled) to stop
+//     polling entirely.
 // Approving a TIMEOUT is applied server-side; the rest clear for the scorer.
 export function InterruptNotifications({
   matchId,
   teamAName,
   teamBName,
+  active = true,
 }: {
   matchId: string;
   teamAName: string;
   teamBName: string;
+  active?: boolean;
 }) {
   const [pending, setPending] = useState<Pending[]>([]);
   // Requests this scorer just resolved — kept briefly so the poll doesn't
@@ -90,13 +94,14 @@ export function InterruptNotifications({
   }, [matchId]);
 
   useEffect(() => {
+    if (!active) return;
     const first = setTimeout(poll, 0);
-    const iv = setInterval(poll, 4000);
+    const iv = setInterval(poll, 15000);
     return () => {
       clearTimeout(first);
       clearInterval(iv);
     };
-  }, [poll]);
+  }, [poll, active]);
 
   const resolve = async (requestId: string, status: "APPROVED" | "DENIED") => {
     resolvedRef.current.add(requestId);

@@ -3,11 +3,9 @@
 import { useActionState } from "react";
 import { createCompetition } from "@/lib/competition-actions";
 import { OK } from "@/lib/action-state";
+import { DISCIPLINES, GENDERS } from "@/lib/domain";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { ui } from "@/components/admin/styles";
-
-const DISCIPLINES = ["BEACH", "INDOOR", "GRASS", "LIGHT"] as const;
-const GENDERS = ["UNSPECIFIED", "MEN", "WOMEN", "MIXED"] as const;
 
 export function NewCompetitionForm({ tenantSlug }: { tenantSlug: string }) {
   const [state, action] = useActionState(createCompetition, OK);

@@ -13,7 +13,15 @@ import * as schema from "./schema";
 const connectionString =
   process.env.DATABASE_URL ?? "postgresql://localhost:5432/placeholder";
 
-const client = postgres(connectionString, { prepare: false });
+// max/idle_timeout keep N warm serverless instances from pinning the pooler's
+// client-connection budget: 5 sockets per instance is plenty (queries are
+// short), and idle sockets are released after 20s instead of held forever.
+const client = postgres(connectionString, {
+  prepare: false,
+  max: 5,
+  idle_timeout: 20,
+  connect_timeout: 10,
+});
 
 export const db = drizzle(client, { schema });
 export { schema };

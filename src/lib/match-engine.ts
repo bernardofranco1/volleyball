@@ -10,13 +10,12 @@
 // row holds derived columns (setsWon, status, winner) PLUS a `state_snapshot`
 // cache so reads replay only events beyond `snapshot_sequence` rather than the
 // whole log. The snapshot is just a cache — if absent/behind, a tail (or full)
-// replay heals it, so correctness never depends on it.
-//
-// Discipline-agnostic via the engine registry (src/engine/registry.ts). `state`
-// is typed as BeachMatchState for historical beach callers but is the
-// discipline-correct state at runtime — indoor/grass/light callers narrow it.
+// replay heals it, so correctness never depends on it. To keep write volume
+// down it's refreshed every few events (and on every set/match boundary), not
+// per rally.
 
-import { aliasedTable, and, asc, eq, gt } from "drizzle-orm";
+import { after } from "next/server";
+import { aliasedTable, and, asc, eq, gt, max } from "drizzle-orm";
 import { db } from "@/db";
 import { competitions, events, matches, teams, tournamentConfig } from "@/db/schema";
 import { type TournamentConfig, resolveConfig } from "@/engine/config";
@@ -25,13 +24,18 @@ import {
   type EngineEvent,
   getEngine,
 } from "@/engine/registry";
-import type { BeachEvent, BeachMatchState } from "@/engine/beach/types";
+import type { BeachMatchState } from "@/engine/beach/types";
+import type { IndoorMatchState } from "@/engine/indoor/types";
+import type { GrassMatchState } from "@/engine/grass/types";
+import type { LightMatchState } from "@/engine/light/types";
 import type { Actor, Discipline } from "@/engine/types";
 import { newId } from "@/lib/id";
 import {
-  broadcastServeClock,
-  broadcastState,
-  broadcastTimeout,
+  type BroadcastMessage,
+  broadcastMessages,
+  serveClockMessage,
+  stateUpdateMessage,
+  timeoutMessage,
 } from "@/lib/realtime";
 
 export class MatchNotFoundError extends Error {}
@@ -39,22 +43,37 @@ export class UnsupportedDisciplineError extends Error {}
 export class EventRejectedError extends Error {}
 export class SequenceConflictError extends Error {}
 
+// Refresh the snapshot cache every N events (plus every set/match boundary).
+// Tail replays stay ≤ N events while the matches-row write shrinks from a
+// 10-50KB jsonb rewrite per rally to one every N rallies.
+const SNAPSHOT_EVERY = 5;
+
 interface MatchMeta {
   matchId: string;
   tenantId: string;
   discipline: Discipline;
   config: TournamentConfig;
   engine: NonNullable<ReturnType<typeof getEngine>>;
+  /** Snapshot columns, fetched with the meta so loads are one round trip. */
+  snap: unknown | null;
+  snapshotSeq: number;
 }
 
+/** One query: match row + config overrides + snapshot columns. */
 async function loadMatchMeta(matchId: string): Promise<MatchMeta> {
   const rows = await db
     .select({
       tenantId: matches.tenantId,
       discipline: matches.discipline,
-      competitionId: matches.competitionId,
+      snap: matches.stateSnapshot,
+      snapshotSeq: matches.snapshotSequence,
+      cfg: tournamentConfig,
     })
     .from(matches)
+    .leftJoin(
+      tournamentConfig,
+      eq(tournamentConfig.competitionId, matches.competitionId),
+    )
     .where(eq(matches.id, matchId))
     .limit(1);
 
@@ -69,16 +88,18 @@ async function loadMatchMeta(matchId: string): Promise<MatchMeta> {
     );
   }
 
-  const cfgRows = await db
-    .select()
-    .from(tournamentConfig)
-    .where(eq(tournamentConfig.competitionId, row.competitionId))
-    .limit(1);
-
-  const overrides = (cfgRows[0] ?? {}) as unknown as Partial<TournamentConfig>;
+  const overrides = (row.cfg ?? {}) as unknown as Partial<TournamentConfig>;
   const config = resolveConfig(discipline, overrides);
 
-  return { matchId, tenantId: row.tenantId, discipline, config, engine };
+  return {
+    matchId,
+    tenantId: row.tenantId,
+    discipline,
+    config,
+    engine,
+    snap: row.snap,
+    snapshotSeq: row.snapshotSeq ?? 0,
+  };
 }
 
 function toEngineEvent(r: {
@@ -109,29 +130,28 @@ async function loadEvents(matchId: string): Promise<EngineEvent[]> {
   return rows.map(toEngineEvent);
 }
 
+/** Latest event sequence for a match (cheap indexed max; 0 when no events). */
+export async function latestSequence(matchId: string): Promise<number> {
+  const rows = await db
+    .select({ n: max(events.sequence) })
+    .from(events)
+    .where(eq(events.matchId, matchId));
+  return rows[0]?.n ?? 0;
+}
+
 /**
- * Authoritative current state: load the cached snapshot, then replay only events
- * after `snapshot_sequence`. Falls back to a full replay when no snapshot exists.
+ * Authoritative current state: start from the snapshot fetched with the meta,
+ * then replay only events after `snapshot_sequence`. Falls back to a full
+ * replay when no snapshot exists.
  */
 async function loadState(
   matchId: string,
   meta: MatchMeta,
 ): Promise<CommonMatchState> {
-  const row = (
-    await db
-      .select({
-        snap: matches.stateSnapshot,
-        seq: matches.snapshotSequence,
-      })
-      .from(matches)
-      .where(eq(matches.id, matchId))
-      .limit(1)
-  )[0];
-
-  const hasSnap = row?.snap != null;
-  const baseSeq = hasSnap ? (row.seq ?? 0) : 0;
+  const hasSnap = meta.snap != null;
+  const baseSeq = hasSnap ? meta.snapshotSeq : 0;
   let state = hasSnap
-    ? (row.snap as CommonMatchState)
+    ? (meta.snap as CommonMatchState)
     : meta.engine.replay(matchId, [], meta.config);
 
   const tail = await db
@@ -163,21 +183,26 @@ export async function loadMatchState(
   return { state: state as unknown as BeachMatchState, config: meta.config };
 }
 
-/** Alias kept for callers expecting authoritative state (e.g. /state route). */
-export const loadMatchStateFresh = loadMatchState;
-
-export interface MatchView {
+interface MatchViewBase {
   matchId: string;
-  discipline: Discipline;
   competitionName: string;
   teamAName: string;
   teamBName: string;
   teamAColor: string | null;
   teamBColor: string | null;
   scheduledAt: Date | null;
-  state: BeachMatchState;
   config: TournamentConfig;
 }
+
+/**
+ * Discriminated on `discipline` so `switch (view.discipline)` narrows `state`
+ * to the right engine's type — no `as unknown as` casts in page code.
+ */
+export type MatchView =
+  | (MatchViewBase & { discipline: "BEACH"; state: BeachMatchState })
+  | (MatchViewBase & { discipline: "INDOOR"; state: IndoorMatchState })
+  | (MatchViewBase & { discipline: "GRASS"; state: GrassMatchState })
+  | (MatchViewBase & { discipline: "LIGHT"; state: LightMatchState });
 
 /** Everything the live scoring page needs: names + initial replayed state. */
 export async function loadMatchView(matchId: string): Promise<MatchView> {
@@ -206,6 +231,8 @@ export async function loadMatchView(matchId: string): Promise<MatchView> {
   const { state, config } = await loadMatchState(matchId);
   return {
     matchId,
+    // The runtime state IS discipline-correct (built by that discipline's
+    // engine); this single boundary cast replaces the per-page ones.
     discipline: row.discipline as Discipline,
     competitionName: row.competitionName,
     teamAName: row.teamAName,
@@ -215,7 +242,7 @@ export async function loadMatchView(matchId: string): Promise<MatchView> {
     scheduledAt: row.scheduledAt,
     state,
     config,
-  };
+  } as MatchView;
 }
 
 export interface AppendOutcome {
@@ -230,20 +257,62 @@ const SYSTEM_EVENTS = new Set([
   "TTO_START",
 ]);
 
-/** Derived matches-row columns written alongside the snapshot on every change. */
-function derivedMatchColumns(meta: MatchMeta, finalState: CommonMatchState) {
+/**
+ * Derived matches-row columns written on every change. The heavyweight
+ * `state_snapshot` jsonb is included only at snapshot points (every
+ * SNAPSHOT_EVERY events, set/match boundaries, and always after UNDO — an
+ * undo invalidates the previous snapshot, which would otherwise resurrect the
+ * undone event on the next load).
+ */
+function derivedMatchColumns(
+  meta: MatchMeta,
+  finalState: CommonMatchState,
+  opts: { includeSnapshot: boolean },
+) {
   return {
     setsWonA: finalState.setsWonA,
     setsWonB: finalState.setsWonB,
     winner: finalState.winner,
     status: meta.engine.matchStatusOf(finalState),
-    stateSnapshot: finalState,
-    snapshotSequence: finalState.lastSequence,
+    ...(opts.includeSnapshot
+      ? {
+          stateSnapshot: finalState,
+          snapshotSequence: finalState.lastSequence,
+        }
+      : {}),
     ...(finalState.matchStartedAt
       ? { startedAt: new Date(finalState.matchStartedAt) }
       : {}),
     ...(finalState.status === "FINISHED" ? { finishedAt: new Date() } : {}),
   };
+}
+
+/** Sequence-conflict detection: only a unique violation on (match, sequence). */
+function toWriteError(err: unknown): Error {
+  const code = (err as { code?: string })?.code;
+  if (code === "23505")
+    return new SequenceConflictError(
+      err instanceof Error ? err.message : "sequence conflict",
+    );
+  // Anything else (connection drop, FK violation, …) is a real fault — don't
+  // dress it up as "concurrent write, please retry".
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+/**
+ * Send realtime signals in ONE batched request, after the response has been
+ * flushed (`after()`); falls back to fire-and-forget outside a request scope
+ * (scripts/tests). Broadcast failures are already swallowed inside
+ * `broadcastMessages` — clients reconcile via the /state backstop.
+ */
+function scheduleBroadcast(msgs: BroadcastMessage[]): void {
+  if (msgs.length === 0) return;
+  const send = () => broadcastMessages(msgs);
+  try {
+    after(send);
+  } catch {
+    void send();
+  }
 }
 
 /**
@@ -304,31 +373,38 @@ export async function appendMatchEvent(
   });
 
   const finalState = result.state;
+  const includeSnapshot =
+    meta.snap == null ||
+    finalState.lastSequence - meta.snapshotSeq >= SNAPSHOT_EVERY ||
+    finalState.status !== "LIVE" ||
+    result.newEvents.some((ev) => SYSTEM_EVENTS.has(ev.payload.type));
   try {
     await db.transaction(async (tx) => {
       await tx.insert(events).values(rows);
       await tx
         .update(matches)
-        .set(derivedMatchColumns(meta, finalState))
+        .set(derivedMatchColumns(meta, finalState, { includeSnapshot }))
         .where(eq(matches.id, matchId));
     });
   } catch (err) {
-    // Most likely a unique(matchId, sequence) violation from a concurrent writer.
-    throw new SequenceConflictError(
-      err instanceof Error ? err.message : "sequence conflict",
-    );
+    throw toWriteError(err);
   }
 
-  await broadcastState(matchId, finalState.lastSequence);
+  // Collect all realtime signals for this append into one batched request.
+  const msgs: BroadcastMessage[] = [
+    stateUpdateMessage(matchId, finalState.lastSequence),
+  ];
   if (
     meta.config.serveClockEnabled &&
     (payload.type === "RALLY_WON_A" || payload.type === "RALLY_WON_B") &&
     finalState.status === "LIVE"
   ) {
-    await broadcastServeClock(
-      matchId,
-      Date.now() + meta.config.serveClockSecs * 1000,
-      meta.config.serveClockSecs,
+    msgs.push(
+      serveClockMessage(
+        matchId,
+        Date.now() + meta.config.serveClockSecs * 1000,
+        meta.config.serveClockSecs,
+      ),
     );
   }
   // Team time-out countdown for the public board (brief §4.3).
@@ -338,13 +414,16 @@ export async function appendMatchEvent(
   ) {
     const team = (payload as { team?: "A" | "B" }).team;
     if (team)
-      await broadcastTimeout(
-        matchId,
-        Date.now() + meta.config.timeoutDurationSecs * 1000,
-        team,
-        meta.config.timeoutDurationSecs,
+      msgs.push(
+        timeoutMessage(
+          matchId,
+          Date.now() + meta.config.timeoutDurationSecs * 1000,
+          team,
+          meta.config.timeoutDurationSecs,
+        ),
       );
   }
+  scheduleBroadcast(msgs);
 
   return { newEvents: result.newEvents, state: finalState };
 }
@@ -393,18 +472,15 @@ async function undoLastEvent(
       });
       await tx
         .update(matches)
-        .set(derivedMatchColumns(meta, finalState))
+        // Always refresh the snapshot after an undo — the old one contains the
+        // undone event's effect and must not be replayed from.
+        .set(derivedMatchColumns(meta, finalState, { includeSnapshot: true }))
         .where(eq(matches.id, matchId));
     });
   } catch (err) {
-    throw new SequenceConflictError(
-      err instanceof Error ? err.message : "sequence conflict",
-    );
+    throw toWriteError(err);
   }
 
-  await broadcastState(matchId, finalState.lastSequence);
+  scheduleBroadcast([stateUpdateMessage(matchId, finalState.lastSequence)]);
   return { newEvents: [undoEvent], state: finalState };
 }
-
-// Re-export for callers that still import the beach event type from here.
-export type { BeachEvent };

@@ -60,9 +60,13 @@ async function rolesFor(userId: string, tenantId: string): Promise<Role[]> {
 export async function getAuthContext(
   tenantSlug: string,
 ): Promise<AuthContext | null> {
-  const user = await getCurrentUser();
+  // The user check (Supabase Auth HTTP call) and the tenant lookup are
+  // independent — run them concurrently.
+  const [user, tenant] = await Promise.all([
+    getCurrentUser(),
+    getTenantBySlug(tenantSlug),
+  ]);
   if (!user) return null;
-  const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) return null;
   return {
     user: { id: user.id, email: user.email ?? null },

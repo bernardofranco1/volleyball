@@ -31,53 +31,74 @@ export default async function SettingsPage({
         </Link>
       </div>
 
-      <div className="space-y-6">
-        <div className={ui.card}>
-          <h2 className="mb-3 font-medium">{t("settings.language")}</h2>
-          <LanguageSwitcher current={locale} />
-          <p className="mt-2 text-xs text-score-dim">
-            Applies to the shell, dashboard, and settings. A full string sweep
-            across every screen is incremental.
-          </p>
-        </div>
+      <div className="space-y-10">
+        {/* ── General ── */}
+        <section aria-labelledby="settings-general">
+          <h2
+            id="settings-general"
+            className="mb-3 text-xs font-medium uppercase tracking-wide text-score-dim"
+          >
+            General
+          </h2>
+          <div className={ui.card}>
+            <h3 className="mb-3 font-medium">{t("settings.language")}</h3>
+            <LanguageSwitcher current={locale} />
+            <p className="mt-2 text-xs text-score-dim">
+              Your language for the admin interface in this browser — it doesn&apos;t
+              change what other members or the public see.
+            </p>
+          </div>
+        </section>
 
-        <BrandingForm
-          tenantSlug={tenantSlug}
-          branding={ctx.tenant.branding}
-        />
+        {/* ── Branding ── */}
+        <section aria-labelledby="settings-branding">
+          <h2
+            id="settings-branding"
+            className="mb-3 text-xs font-medium uppercase tracking-wide text-score-dim"
+          >
+            Branding
+          </h2>
+          <BrandingForm tenantSlug={tenantSlug} branding={ctx.tenant.branding} />
+        </section>
 
-        <Link
-          href={`/t/${tenantSlug}/access`}
-          className={`${ui.card} flex items-center justify-between transition-colors hover:border-primary`}
-        >
-          <span>
-            <span className="font-medium">Access</span>
-            <span className="mt-1 block text-sm text-score-dim">
-              Grant people Manage, Score, or View access; scoring also needs each
-              match&apos;s PIN.
-            </span>
-          </span>
-          <span className="text-score-dim">→</span>
-        </Link>
+        {/* ── People & security ── */}
+        <section aria-labelledby="settings-people">
+          <h2
+            id="settings-people"
+            className="mb-3 text-xs font-medium uppercase tracking-wide text-score-dim"
+          >
+            People &amp; security
+          </h2>
+          <div className="space-y-4">
+            <Link
+              href={`/t/${tenantSlug}/access`}
+              className={`${ui.card} flex items-center justify-between transition-colors hover:border-primary`}
+            >
+              <span>
+                <span className="font-medium">Access</span>
+                <span className="mt-1 block text-sm text-score-dim">
+                  Grant people Manage, Score, or View access. Scoring also asks
+                  for a match&apos;s PIN when one is set.
+                </span>
+              </span>
+              <span className="text-score-dim">→</span>
+            </Link>
 
-        <Link
-          href={`/t/${tenantSlug}/audit`}
-          className={`${ui.card} flex items-center justify-between transition-colors hover:border-primary`}
-        >
-          <span>
-            <span className="font-medium">Audit log</span>
-            <span className="mt-1 block text-sm text-score-dim">
-              Recent administrative changes (lifecycle, deletes, bracket, tokens).
-            </span>
-          </span>
-          <span className="text-score-dim">→</span>
-        </Link>
-
-        <div className={`${ui.card} text-xs text-score-dim`}>
-          <p className="mb-1 font-medium text-foreground">Custom domain</p>
-          Mapping a tenant to a custom domain (Vercel Domains API) is configured at
-          deployment — see Phase 10/11.
-        </div>
+            <Link
+              href={`/t/${tenantSlug}/audit`}
+              className={`${ui.card} flex items-center justify-between transition-colors hover:border-primary`}
+            >
+              <span>
+                <span className="font-medium">Audit log</span>
+                <span className="mt-1 block text-sm text-score-dim">
+                  Recent administrative changes (lifecycle, deletes, bracket,
+                  tokens).
+                </span>
+              </span>
+              <span className="text-score-dim">→</span>
+            </Link>
+          </div>
+        </section>
       </div>
     </main>
   );

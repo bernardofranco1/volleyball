@@ -6,6 +6,7 @@
 // for a live-scoring app.
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import { captureError } from "@/lib/observability";
 
 const WINDOW_MS = 10_000;
 const MAX_HITS = 30; // per key per window
@@ -51,8 +52,11 @@ export async function rateLimit(
     try {
       const { success } = await upstash.limit(key);
       return success;
-    } catch {
-      return true; // fail open — never block scoring on a limiter outage
+    } catch (err) {
+      // Fail open — never block scoring on a limiter outage — but make the
+      // outage visible instead of silently running unlimited.
+      captureError(err, { scope: "ratelimit", key });
+      return true;
     }
   }
   return memoryLimit(key, max, windowMs);

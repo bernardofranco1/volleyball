@@ -85,6 +85,11 @@ export function BrandingForm({
       </div>
 
       {state.error && <p className="mt-3 text-sm text-red-400">{state.error}</p>}
+      {state.ok && state.message && (
+        <p role="status" className="mt-3 text-sm text-emerald-400">
+          {state.message} ✓
+        </p>
+      )}
 
       <div className="mt-4">
         <SubmitButton pendingLabel="…">{t("settings.save")}</SubmitButton>

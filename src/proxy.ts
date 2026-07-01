@@ -14,6 +14,25 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Decide whether the path is user-gated BEFORE paying the Supabase Auth
+  // round trip — public scoreboards/tablets/results were previously spending
+  // 30-80ms on an auth check whose result was discarded.
+  //   - the scoreboard display (`/t/{slug}/scoreboard/{matchId}`) — public TV view
+  //   - the team tablet (`/t/{slug}/matches/{id}/team/{A|B}`) — session-token gated
+  //   - public results (`/t/{slug}/results/…`)
+  const isPublicScoreboard = /^\/t\/[^/]+\/scoreboard\//.test(pathname);
+  const isTeamTablet = /^\/t\/[^/]+\/matches\/[^/]+\/team\//.test(pathname);
+  const isPublicResults = /^\/t\/[^/]+\/results\//.test(pathname);
+  const isProtected =
+    pathname.startsWith("/t/") &&
+    !isPublicScoreboard &&
+    !isTeamTablet &&
+    !isPublicResults;
+
+  if (!isProtected) return NextResponse.next({ request });
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -44,20 +63,7 @@ export async function proxy(request: NextRequest) {
     // unauthenticated so protected routes still redirect to login.
   }
 
-  const { pathname } = request.nextUrl;
-  // Two tenant surfaces aren't user-gated and must skip the auth redirect:
-  //   - the scoreboard display (`/t/{slug}/scoreboard/{matchId}`) — public TV view
-  //   - the team tablet (`/t/{slug}/matches/{id}/team/{A|B}`) — session-token gated
-  const isPublicScoreboard = /^\/t\/[^/]+\/scoreboard\//.test(pathname);
-  const isTeamTablet = /^\/t\/[^/]+\/matches\/[^/]+\/team\//.test(pathname);
-  const isPublicResults = /^\/t\/[^/]+\/results\//.test(pathname);
-  const isProtected =
-    pathname.startsWith("/t/") &&
-    !isPublicScoreboard &&
-    !isTeamTablet &&
-    !isPublicResults;
-
-  if (isProtected && !user) {
+  if (!user) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("redirectTo", pathname);
@@ -68,9 +74,12 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except static assets, image files, and the health check
-  // (uptime monitors hit /api/health frequently — no auth round-trip needed).
+  // Run on everything except static assets, image files, and /api/* — every
+  // API route does its own authorization (authorizeMatch / tablet tokens), and
+  // Route Handlers can refresh + persist the session cookie themselves, so the
+  // proxy's getUser() there was a pure extra auth round trip on the hottest
+  // paths (scoring POSTs, state/interrupt polling).
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

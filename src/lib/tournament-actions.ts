@@ -4,12 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { matches, pools, teams } from "@/db/schema";
-
-// The transaction executor type (db or a transaction handle).
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-import type { Discipline } from "@/engine/types";
-import { ADMIN_ROLES, requireRole } from "@/lib/authz";
-import { getCompetition } from "@/lib/competitions";
+import { gateCompetition } from "@/lib/action-gate";
 import { recordAudit } from "@/lib/audit";
 import {
   bracketSize,
@@ -18,48 +13,32 @@ import {
   seedOrder,
 } from "@/lib/bracket";
 import { newId } from "@/lib/id";
-
-function str(fd: FormData, key: string): string {
-  return String(fd.get(key) ?? "").trim();
-}
-
-async function gate(fd: FormData) {
-  const tenantSlug = str(fd, "tenantSlug");
-  const competitionId = str(fd, "competitionId");
-  const ctx = await requireRole(tenantSlug, ADMIN_ROLES);
-  const comp = await getCompetition(ctx.tenant.id, competitionId);
-  if (!comp) return null;
-  return {
-    tenantSlug,
-    competitionId,
-    tenantId: ctx.tenant.id,
-    discipline: comp.discipline as Discipline,
-    actor: { userId: ctx.user.id, email: ctx.user.email },
-  };
-}
+import { nextMatchNumber } from "@/lib/match-number";
+import { fail, ok, type FormState } from "@/lib/action-state";
+import { str } from "@/lib/form-data";
 
 function standingsPath(tenantSlug: string, competitionId: string) {
   return `/t/${tenantSlug}/competitions/${competitionId}/standings`;
 }
 
-async function nextMatchNumber(
-  exec: Tx,
-  competitionId: string,
-): Promise<number> {
-  const rows = await exec
-    .select({ n: matches.matchNumber })
-    .from(matches)
-    .where(eq(matches.competitionId, competitionId));
-  return rows.reduce((m, r) => Math.max(m, r.n ?? 0), 0) + 1;
-}
-
 // ── Pools ─────────────────────────────────────────────────────────────────────
 
-export async function createPool(fd: FormData): Promise<void> {
-  const g = await gate(fd);
-  if (!g) return;
+export async function createPool(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
   const name = str(fd, "name");
-  if (!name) return;
+  if (!name) return fail("Pool name is required.");
+
+  const dup = await db
+    .select({ id: pools.id })
+    .from(pools)
+    .where(and(eq(pools.competitionId, g.competitionId), eq(pools.name, name)))
+    .limit(1);
+  if (dup.length > 0) return fail(`Pool “${name}” already exists.`);
+
   await db.insert(pools).values({
     id: newId("pool"),
     competitionId: g.competitionId,
@@ -67,15 +46,62 @@ export async function createPool(fd: FormData): Promise<void> {
     name,
   });
   revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
+  return ok(`Created pool ${name}.`);
+}
+
+export async function renamePool(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
+  const poolId = str(fd, "poolId");
+  const name = str(fd, "name");
+  if (!poolId || !name) return fail("Pool name is required.");
+
+  await db
+    .update(pools)
+    .set({ name })
+    .where(and(eq(pools.id, poolId), eq(pools.competitionId, g.competitionId)));
+  revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
+  return ok("Pool renamed.");
+}
+
+/** Delete a pool; its teams become unpooled (assignments are cleared first). */
+export async function deletePool(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
+  const poolId = str(fd, "poolId");
+  if (!poolId) return fail("Missing pool.");
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(teams)
+      .set({ poolId: null })
+      .where(
+        and(eq(teams.poolId, poolId), eq(teams.competitionId, g.competitionId)),
+      );
+    await tx
+      .delete(pools)
+      .where(and(eq(pools.id, poolId), eq(pools.competitionId, g.competitionId)));
+  });
+  revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
+  return ok("Pool deleted — its teams are now unpooled.");
 }
 
 /** Assign (or clear, when poolId is empty) a team's pool. */
-export async function assignTeamPool(fd: FormData): Promise<void> {
-  const g = await gate(fd);
-  if (!g) return;
+export async function assignTeamPool(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
   const teamId = str(fd, "teamId");
   const poolId = str(fd, "poolId") || null;
-  if (!teamId) return;
+  if (!teamId) return fail("Missing team.");
   // A non-empty pool must belong to this competition (spec/14 §E4) — otherwise
   // a crafted poolId could attach a team to a foreign competition's pool.
   if (poolId) {
@@ -84,13 +110,122 @@ export async function assignTeamPool(fd: FormData): Promise<void> {
       .from(pools)
       .where(and(eq(pools.id, poolId), eq(pools.competitionId, g.competitionId)))
       .limit(1);
-    if (valid.length === 0) return;
+    if (valid.length === 0) return fail("Pool not found.");
   }
   await db
     .update(teams)
     .set({ poolId })
     .where(and(eq(teams.id, teamId), eq(teams.competitionId, g.competitionId)));
   revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
+  return ok("Saved.");
+}
+
+/**
+ * Save every team's pool assignment in one submit. Reads one `pool-<teamId>`
+ * select per team — replaces the per-team "Set" round trips.
+ */
+export async function savePoolAssignments(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
+
+  const [teamRows, poolRows] = await Promise.all([
+    db
+      .select({ id: teams.id, poolId: teams.poolId })
+      .from(teams)
+      .where(eq(teams.competitionId, g.competitionId)),
+    db
+      .select({ id: pools.id })
+      .from(pools)
+      .where(eq(pools.competitionId, g.competitionId)),
+  ]);
+  const validPools = new Set(poolRows.map((p) => p.id));
+
+  const changes: { teamId: string; poolId: string | null }[] = [];
+  for (const t of teamRows) {
+    const raw = fd.get(`pool-${t.id}`);
+    if (raw == null) continue; // not on the form
+    const poolId = String(raw) || null;
+    if (poolId && !validPools.has(poolId)) continue;
+    if (poolId !== t.poolId) changes.push({ teamId: t.id, poolId });
+  }
+
+  if (changes.length > 0) {
+    await db.transaction(async (tx) => {
+      for (const c of changes) {
+        await tx
+          .update(teams)
+          .set({ poolId: c.poolId })
+          .where(
+            and(
+              eq(teams.id, c.teamId),
+              eq(teams.competitionId, g.competitionId),
+            ),
+          );
+      }
+    });
+  }
+  revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
+  return ok(
+    changes.length > 0
+      ? `Updated ${changes.length} assignment(s).`
+      : "No changes.",
+  );
+}
+
+/**
+ * Distribute all teams into the competition's pools by seed, serpentine
+ * (1→A, 2→B, 3→B, 4→A for two pools) so pool strength stays balanced.
+ * Overwrites existing assignments.
+ */
+export async function distributePoolsBySeed(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
+
+  const [teamRows, poolRows] = await Promise.all([
+    db
+      .select({ id: teams.id })
+      .from(teams)
+      .where(eq(teams.competitionId, g.competitionId))
+      .orderBy(asc(teams.seed), asc(teams.displayName)),
+    db
+      .select({ id: pools.id, name: pools.name })
+      .from(pools)
+      .where(eq(pools.competitionId, g.competitionId))
+      .orderBy(asc(pools.name)),
+  ]);
+  if (poolRows.length < 2) return fail("Create at least two pools first.");
+  if (teamRows.length === 0) return fail("No teams to distribute.");
+
+  const k = poolRows.length;
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < teamRows.length; i++) {
+      // Serpentine: rows of k seeds alternate direction.
+      const row = Math.floor(i / k);
+      const posInRow = i % k;
+      const poolIdx = row % 2 === 0 ? posInRow : k - 1 - posInRow;
+      await tx
+        .update(teams)
+        .set({ poolId: poolRows[poolIdx].id })
+        .where(eq(teams.id, teamRows[i].id));
+    }
+  });
+
+  await recordAudit({
+    tenantId: g.tenantId,
+    actor: g.actor,
+    action: "pool.distribute",
+    entityType: "competition",
+    entityId: g.competitionId,
+    summary: `Distributed ${teamRows.length} teams into ${k} pools by seed (serpentine)`,
+  });
+  revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
+  return ok(`Distributed ${teamRows.length} teams into ${k} pools.`);
 }
 
 // ── Knockout bracket ───────────────────────────────────────────────────────────
@@ -100,25 +235,36 @@ export async function assignTeamPool(fd: FormData): Promise<void> {
  * a per-competition advisory lock so concurrent clicks can't double-generate
  * (spec/14 §E1); a partial unique index on (competition, round, match#) backstops.
  */
-export async function generateBracket(fd: FormData): Promise<void> {
-  const g = await gate(fd);
-  if (!g) return;
+export async function generateBracket(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
 
+  let outcome: FormState = ok("Bracket generated.");
   await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${g.competitionId}))`);
 
     const existing = await tx
       .select({ roundName: matches.roundName })
       .from(matches)
-      .where(eq(matches.competitionId, g.competitionId));
-    if (existing.some((m) => isKnockoutRound(m.roundName))) return; // already done
+      .where(eq(matches.competitionId, g.competitionId))
+      .limit(500);
+    if (existing.some((m) => isKnockoutRound(m.roundName))) {
+      outcome = fail("A bracket already exists for this competition.");
+      return;
+    }
 
     const teamRows = await tx
       .select({ id: teams.id, seed: teams.seed, displayName: teams.displayName })
       .from(teams)
       .where(eq(teams.competitionId, g.competitionId))
       .orderBy(asc(teams.seed), asc(teams.displayName));
-    if (teamRows.length < 2) return;
+    if (teamRows.length < 2) {
+      outcome = fail("Add at least two teams before seeding a bracket.");
+      return;
+    }
 
     const size = bracketSize(teamRows.length);
     const field = teamRows.slice(0, size); // seeds 1..size in seed order
@@ -143,7 +289,10 @@ export async function generateBracket(fd: FormData): Promise<void> {
       });
     }
     await tx.insert(matches).values(rows);
+    outcome = ok(`Seeded a ${label} bracket (${rows.length} matches).`);
   });
+  if (outcome.error) return outcome;
+
   await recordAudit({
     tenantId: g.tenantId,
     actor: g.actor,
@@ -153,6 +302,7 @@ export async function generateBracket(fd: FormData): Promise<void> {
     summary: "Generated single-elimination bracket",
   });
   revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
+  return outcome;
 }
 
 interface KMatch {
@@ -173,10 +323,14 @@ const loserId = (m: KMatch) => (m.winner === "A" ? m.teamBId : m.teamAId);
  * loops so one call advances as far as the current results allow. When the
  * semifinals complete, also creates the 3rd-place match from the two losers.
  */
-export async function advanceBracket(fd: FormData): Promise<void> {
-  const g = await gate(fd);
-  if (!g) return;
+export async function advanceBracket(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
 
+  let createdTotal = 0;
   await db.transaction(async (tx) => {
     // Serialize concurrent advances for this competition (spec/14 §E1).
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${g.competitionId}))`);
@@ -241,6 +395,7 @@ export async function advanceBracket(fd: FormData): Promise<void> {
         }
         if (rows.length > 0) {
           await tx.insert(matches).values(rows);
+          createdTotal += rows.length;
           created = true;
         }
         break; // re-query and continue from the loop
@@ -249,6 +404,9 @@ export async function advanceBracket(fd: FormData): Promise<void> {
       if (!created) break;
     }
   });
+
+  if (createdTotal === 0)
+    return ok("Nothing to advance yet — finish the current round first.");
 
   await recordAudit({
     tenantId: g.tenantId,
@@ -259,4 +417,5 @@ export async function advanceBracket(fd: FormData): Promise<void> {
     summary: "Advanced bracket winners",
   });
   revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
+  return ok(`Created ${createdTotal} next-round match(es).`);
 }

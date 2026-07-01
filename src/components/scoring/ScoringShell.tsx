@@ -142,6 +142,7 @@ export function ScoringShell({
   online,
   pending,
   error,
+  queuedCount = 0,
   tools,
   score,
   main,
@@ -152,6 +153,8 @@ export function ScoringShell({
   online: boolean;
   pending: boolean;
   error: string | null;
+  /** Locally-applied events not yet accepted by the server. */
+  queuedCount?: number;
   tools?: ReactNode;
   score: ReactNode;
   main: ReactNode;
@@ -166,6 +169,14 @@ export function ScoringShell({
           <span className="truncate">{competitionLabel}</span>
           <span className="flex flex-none items-center gap-2">
             {tools}
+            {queuedCount > 0 ? (
+              <span
+                className="rounded-full border border-amber-500/50 px-1.5 py-0.5 text-[10px] font-medium text-amber-400"
+                title="Events scored while offline — sent automatically on reconnect"
+              >
+                {queuedCount} queued
+              </span>
+            ) : null}
             {pending ? <span aria-hidden>⟳</span> : null}
             <span
               className={`inline-block h-2 w-2 rounded-full ${online ? "bg-green-500" : "bg-amber-500"}`}

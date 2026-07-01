@@ -10,7 +10,7 @@ import { captureError } from "@/lib/observability";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-type BroadcastMessage = {
+export type BroadcastMessage = {
   topic: string;
   event: string;
   payload: unknown;
@@ -35,6 +35,13 @@ async function broadcast(messages: BroadcastMessage[]): Promise<void> {
   }
 }
 
+/** Send a set of already-built messages in one batched HTTP request. */
+export async function broadcastMessages(
+  messages: BroadcastMessage[],
+): Promise<void> {
+  await broadcast(messages);
+}
+
 /**
  * Signal the public match channel that state advanced (spec/14 §B1). We send only
  * the new `lastSequence` — NOT the state — because the realtime transport is
@@ -42,13 +49,42 @@ async function broadcast(messages: BroadcastMessage[]): Promise<void> {
  * state from `GET /api/matches/[id]/state`, so a forged signal causes at most a
  * harmless refetch.
  */
-export async function broadcastState(
+export function stateUpdateMessage(
   matchId: string,
   lastSequence: number,
-): Promise<void> {
-  await broadcast([
-    { topic: `match:${matchId}`, event: "state-update", payload: { lastSequence } },
-  ]);
+): BroadcastMessage {
+  return {
+    topic: `match:${matchId}`,
+    event: "state-update",
+    payload: { lastSequence },
+  };
+}
+
+/** Serve-clock countdown with an absolute deadline (epoch ms). */
+export function serveClockMessage(
+  matchId: string,
+  deadline: number,
+  serveClockSecs: number,
+): BroadcastMessage {
+  return {
+    topic: `match:${matchId}`,
+    event: "serve-clock-start",
+    payload: { deadline, serveClockSecs },
+  };
+}
+
+/** Team time-out countdown (requesting team + absolute deadline). */
+export function timeoutMessage(
+  matchId: string,
+  deadline: number,
+  team: "A" | "B",
+  durationSecs: number,
+): BroadcastMessage {
+  return {
+    topic: `match:${matchId}`,
+    event: "timeout-start",
+    payload: { deadline, team, durationSecs },
+  };
 }
 
 /** Notify the scorer channel that a team tablet has raised an interrupt request. */
@@ -62,36 +98,5 @@ export async function broadcastInterruptRequest(
 ): Promise<void> {
   await broadcast([
     { topic: `match:${matchId}:scorer`, event: "interrupt-request", payload },
-  ]);
-}
-
-/** Announce a serve-clock countdown with an absolute deadline (epoch ms). */
-export async function broadcastServeClock(
-  matchId: string,
-  deadline: number,
-  serveClockSecs: number,
-): Promise<void> {
-  await broadcast([
-    {
-      topic: `match:${matchId}`,
-      event: "serve-clock-start",
-      payload: { deadline, serveClockSecs },
-    },
-  ]);
-}
-
-/** Announce a team time-out countdown (requesting team + absolute deadline). */
-export async function broadcastTimeout(
-  matchId: string,
-  deadline: number,
-  team: "A" | "B",
-  durationSecs: number,
-): Promise<void> {
-  await broadcast([
-    {
-      topic: `match:${matchId}`,
-      event: "timeout-start",
-      payload: { deadline, team, durationSecs },
-    },
   ]);
 }

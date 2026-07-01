@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/authz";
 import { listMembers, adminCount } from "@/lib/access";
 import { setMemberRole, removeMember } from "@/lib/access-actions";
 import { ROLE_LABEL, ROLE_HINT, ASSIGNABLE_ROLES } from "@/lib/roles";
+import { ActionForm } from "@/components/admin/ActionForm";
 import { AddMemberForm } from "@/components/admin/AddMemberForm";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { ui } from "@/components/admin/styles";
@@ -64,10 +65,17 @@ export default async function AccessPage({
                         {ROLE_LABEL[m.role]} · last admin
                       </span>
                     ) : (
-                      <form action={setMemberRole} className="flex items-center gap-1.5">
+                      <ActionForm
+                        action={setMemberRole}
+                        className="flex flex-wrap items-center gap-1.5"
+                      >
                         <input type="hidden" name="tenantSlug" value={tenantSlug} />
                         <input type="hidden" name="userId" value={m.userId} />
+                        <label className="sr-only" htmlFor={`role-${m.userId}`}>
+                          Role for {m.email}
+                        </label>
                         <select
+                          id={`role-${m.userId}`}
                           name="role"
                           defaultValue={m.role}
                           className="rounded-lg border border-border bg-surface px-2 py-1 text-sm"
@@ -81,11 +89,14 @@ export default async function AccessPage({
                         <SubmitButton variant="secondary" pendingLabel="…">
                           Save
                         </SubmitButton>
-                      </form>
+                      </ActionForm>
                     )}
 
                     {!isSelf && !isLastAdmin ? (
-                      <form action={removeMember}>
+                      <ActionForm
+                        action={removeMember}
+                        confirm={`Remove ${m.email}'s access to ${ctx.tenant.name}?`}
+                      >
                         <input type="hidden" name="tenantSlug" value={tenantSlug} />
                         <input type="hidden" name="userId" value={m.userId} />
                         <button
@@ -94,7 +105,7 @@ export default async function AccessPage({
                         >
                           Remove
                         </button>
-                      </form>
+                      </ActionForm>
                     ) : null}
                   </li>
                 );
@@ -114,9 +125,9 @@ export default async function AccessPage({
               ))}
             </ul>
             <p className="mt-3 text-score-dim">
-              Scoring is two-factor: a Scorer account plus each match&apos;s PIN (set
-              on the match page). Give a scorer only the PINs for their court&apos;s
-              matches.
+              Scoring needs a Scorer account. If a match has a PIN set (optional,
+              on the match page), the scorer enters that too — use PINs to limit
+              a scorer to their own court&apos;s matches.
             </p>
           </div>
         </div>
