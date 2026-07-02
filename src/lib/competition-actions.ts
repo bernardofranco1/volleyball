@@ -87,6 +87,11 @@ export async function updateCompetition(
     if (!isGender(genderRaw)) return fail("Invalid gender.");
     gender = genderRaw;
   }
+  // Accent colour: blank clears it, a set value must be a valid hex (it's
+  // injected as a background on the public/admin Matches page).
+  const colorRaw = str(fd, "color");
+  const color = colorRaw ? normalizeHex(colorRaw) : null;
+  if (colorRaw && !color) return fail("Colour must be a hex value like #1a2b3c.");
 
   await db
     .update(competitions)
@@ -95,6 +100,7 @@ export async function updateCompetition(
       venue: str(fd, "venue") || null,
       startDate: dateOrNull(fd, "startDate"),
       endDate: dateOrNull(fd, "endDate"),
+      color,
       ...(gender ? { gender } : {}),
     })
     .where(eq(competitions.id, g.competitionId));

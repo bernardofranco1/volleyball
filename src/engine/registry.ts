@@ -88,6 +88,9 @@ export type MatchRowStatus =
   | "WARMUP"
   | "COIN_TOSS"
   | "LIVE"
+  // Row-only: the engine reports FINISHED, but a scorer's final point parks the
+  // match here until a manager confirms it (spec/17). matchStatusOf never emits it.
+  | "PENDING_CONFIRMATION"
   | "FINISHED"
   | "ABANDONED";
 

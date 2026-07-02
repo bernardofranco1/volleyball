@@ -7,11 +7,12 @@ import {
   requireRole,
 } from "@/lib/authz";
 import { listTenantMatches, type TenantMatchRow } from "@/lib/competitions";
+import { readableTextOn } from "@/lib/colors";
 import { DISCIPLINES } from "@/lib/domain";
 import { getT } from "@/lib/i18n/server";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { LocalTime } from "@/components/LocalTime";
-import { statusBadgeClass, ui } from "@/components/admin/styles";
+import { matchStatusLabel, statusBadgeClass, ui } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +89,19 @@ export default async function MatchesPage({
               {m.scheduledAt ? <LocalTime date={m.scheduledAt} /> : "—"}
             </span>
             <span aria-hidden>·</span>
-            <span className="truncate">{m.competitionName}</span>
+            {m.competitionColor ? (
+              <span
+                className="truncate rounded-full px-2 py-0.5 text-[11px] font-medium"
+                style={{
+                  backgroundColor: m.competitionColor,
+                  color: readableTextOn(m.competitionColor),
+                }}
+              >
+                {m.competitionName}
+              </span>
+            ) : (
+              <span className="truncate">{m.competitionName}</span>
+            )}
             <span aria-hidden>·</span>
             <span>{m.discipline}</span>
           </div>
@@ -103,7 +116,9 @@ export default async function MatchesPage({
                   {m.setsWonA}–{m.setsWonB}
                 </span>
               ) : null}
-              <span className={statusBadgeClass(m.status)}>{m.status}</span>
+              <span className={statusBadgeClass(m.status)}>
+                {matchStatusLabel(m.status, t("match.pendingBadge"))}
+              </span>
             </span>
           </div>
         </Link>

@@ -133,6 +133,7 @@ export default async function CompetitionOverviewPage({
             endDate: competition.endDate,
             gender: competition.gender,
             discipline: competition.discipline,
+            color: competition.color,
           }}
         />
 

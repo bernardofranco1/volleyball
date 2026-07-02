@@ -103,6 +103,7 @@ export const competitions = pgTable(
     startDate: date("start_date"),
     endDate: date("end_date"),
     venue: text("venue"),
+    color: text("color"), // hex accent (nullable) — tints the name on the Matches page
     status: text("status", { enum: ["DRAFT", "ACTIVE", "FINISHED"] })
       .default("DRAFT")
       .notNull(),
@@ -251,7 +252,15 @@ export const matches = pgTable(
     }).notNull(),
 
     status: text("status", {
-      enum: ["SCHEDULED", "WARMUP", "COIN_TOSS", "LIVE", "FINISHED", "ABANDONED"],
+      enum: [
+        "SCHEDULED",
+        "WARMUP",
+        "COIN_TOSS",
+        "LIVE",
+        "PENDING_CONFIRMATION",
+        "FINISHED",
+        "ABANDONED",
+      ],
     })
       .default("SCHEDULED")
       .notNull(),

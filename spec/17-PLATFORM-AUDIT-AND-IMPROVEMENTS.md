@@ -208,3 +208,49 @@ admin were removed afterwards.
 
 Note for future test automation: the events endpoint rate-limits ~30 posts/10s
 per scorer — scripted scoring must be human-paced or it gets designed 429s.
+
+---
+
+# Batch 3 — admin scoring controls, finish workflow, UI (July 2026)
+
+Five requested features (commit after this section):
+
+- **Rewind & re-score (any admin).** New `REWIND {toSequence}` control event,
+  resolved in the shared `createReplayFn` via a "surviving events" pass (single
+  ascending scan; UNDO drops its target, REWIND truncates the tail — nested and
+  repeated rewinds resolve deterministically, no oscillation). `rewindMatch()`
+  appends the REWIND, re-replays, force-refreshes the snapshot, and recomputes
+  derived columns (a FINISHED match rewound mid-play returns to LIVE, `winner`
+  and `finishedAt` cleared). Server action `rewindMatchAction` gated to
+  ADMIN_ROLES (Competition or Tenant admin, any state; scorers cannot). UI: a
+  "Rewind here" control per row of the match-detail event log, with a confirm.
+  The log stays append-only — nothing is deleted. New unit tests cover
+  mid-set/across-boundary rewind, re-score-after-rewind survival, deeper-rewind
+  supersession, and sequence contiguity.
+- **Finish confirmation (manager-gated).** New row-only status
+  `PENDING_CONFIRMATION` (text enum → no migration): a scorer's match-ending
+  point parks the match here (`appendMatchEvent` overrides the FINISHED row
+  status) instead of finalising it. A manager (ADMIN_ROLES) confirms via
+  `confirmMatchResult` on the match-detail page → FINISHED. Pending matches are
+  **excluded** from standings and bracket advancement (both already filter to
+  FINISHED), and show an amber "awaiting confirmation" badge/banner on the
+  match centre, schedule, match detail, and the public scoreboard. Rewinding is
+  the correction path out of a wrong result (any admin), per the chosen model.
+- **Per-competition accent colour.** New nullable `competitions.color`
+  (migration `0001`, applied via the `db:generate`/`db:migrate` workflow — its
+  first real use; also fixed `db:migrate`, which had a CJS top-level-await bug).
+  Colour picker (with an on/off toggle) in the competition Details form,
+  hex-validated. The competition name on each Matches-page card renders as a
+  contrast-safe tinted pill (`readableTextOn`).
+- **"Home" + dashboard mirrors the menu.** `nav.dashboard`/`dashboard.title`
+  relabelled Home in all 5 locales (route unchanged); dashboard cards are now
+  Competitions / Matches / Settings (Scoreboard card dropped).
+- **Mobile hamburger + thinner header.** Below `md`, the nav collapses behind a
+  ☰ button at the top-left (new `MobileNav` client component; slim slide-down
+  panel, closes on link tap); the always-present mobile nav row is gone and the
+  header padding is ~halved on phones. Desktop inline bar unchanged.
+
+i18n: all new strings added across en/fr/de/es/pt. Verified: 140 unit tests,
+lint, tsc, production build, and a 17-check browser pass (Home + dashboard
+cards, accent-colour pill, score→pending→confirm→standings, rewind a finished
+match back to live, mobile hamburger at 390px). QA data + user cleaned up.

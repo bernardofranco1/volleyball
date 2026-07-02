@@ -87,24 +87,51 @@ function isUndoPayload(p: {
 }
 
 /**
+ * REWIND {toSequence} is a control event (not a discipline event, so it isn't
+ * in any `P` union): it truncates the match back to `toSequence`, logically
+ * erasing every event scored after it. Admin "re-score from here" (spec/17).
+ */
+function isRewindPayload(p: {
+  type: string;
+}): p is { type: "REWIND"; toSequence: number } {
+  return p.type === "REWIND";
+}
+
+/**
  * Build the replay function: rebuild match state from the full event log.
- * UNDO events tombstone their target out of the replay (UNDO events themselves
- * are never removed).
+ *
+ * Control events are resolved in one ascending-sequence pass over a growing
+ * "survivors" list (never applied via reduce themselves):
+ *   - UNDO      → drop its target event from the survivors so far
+ *   - REWIND(N) → drop every survivor with sequence > N (truncate the tail)
+ * Events scored *after* a control event are appended normally, so re-scoring
+ * after a rewind survives, and a later/deeper rewind naturally supersedes an
+ * earlier one. The final surviving events are folded through `reduce`.
  */
 export function createReplayFn<S, P extends { type: string }>(
   initialState: (matchId: string) => S,
   reduce: (state: S, event: EngineEvent<P>, config: TournamentConfig) => S,
 ): (matchId: string, events: EngineEvent<P>[], config: TournamentConfig) => S {
   return function replayEvents(matchId, events, config) {
-    const undone = new Set<string>();
+    const survivors: EngineEvent<P>[] = [];
     for (const ev of events) {
-      if (isUndoPayload(ev.payload)) undone.add(ev.payload.targetEventId);
+      if (isUndoPayload(ev.payload)) {
+        const target = ev.payload.targetEventId;
+        const i = survivors.findIndex((s) => s.id === target);
+        if (i !== -1) survivors.splice(i, 1);
+        continue; // control marker — never reduced
+      }
+      if (isRewindPayload(ev.payload)) {
+        const cutoff = ev.payload.toSequence;
+        for (let i = survivors.length - 1; i >= 0; i--) {
+          if (survivors[i].sequence > cutoff) survivors.splice(i, 1);
+        }
+        continue; // control marker — never reduced
+      }
+      survivors.push(ev);
     }
     let state = initialState(matchId);
-    for (const ev of events) {
-      if (ev.payload.type !== "UNDO" && undone.has(ev.id)) continue;
-      state = reduce(state, ev, config);
-    }
+    for (const ev of survivors) state = reduce(state, ev, config);
     return state;
   };
 }

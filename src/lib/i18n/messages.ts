@@ -25,13 +25,14 @@ export const LOCALE_NAMES: Record<Locale, string> = {
 type Dict = Record<string, string>;
 
 const en: Dict = {
-  "nav.dashboard": "Dashboard",
+  "nav.dashboard": "Home",
   "nav.competitions": "Competitions",
   "nav.matches": "Matches",
   "nav.scoreboard": "Scoreboard",
   "nav.settings": "Settings",
   "nav.signOut": "Sign out",
-  "dashboard.title": "Dashboard",
+  "nav.menu": "Menu",
+  "dashboard.title": "Home",
   "dashboard.signedInAs": "Signed in as",
   "dashboard.competitions": "Create & manage competitions",
   "dashboard.matches": "Schedule and score matches",
@@ -161,6 +162,9 @@ const en: Dict = {
   "comp.create": "Create competition",
   "comp.details": "Details",
   "comp.disciplineFixed": "Discipline is fixed once matches use its rule engine",
+  "comp.accentColor": "Accent colour",
+  "comp.accentColorEnable": "Use an accent colour",
+  "comp.accentColorHint": "Tints this competition's name on the Matches page.",
   "comp.finishConfirm":
     "Finish this competition? Public results freeze at the current standings.",
   "comp.teamsCount": "{count} teams",
@@ -326,6 +330,14 @@ const en: Dict = {
   "match.thScore": "Score",
   "match.thActor": "Actor",
   "match.thTime": "Time",
+  "match.thRewind": "Rewind",
+  "match.pendingBadge": "Pending",
+  "match.awaitingConfirmation": "Awaiting manager confirmation",
+  "match.confirmResult": "Confirm final result",
+  "match.confirmResultHint": "A scorer recorded the final point. Confirm to mark the match finished — it then counts toward standings and brackets.",
+  "match.confirmResultConfirm": "Confirm this final result? The match will be marked finished and counted in standings.",
+  "match.rewindHere": "Rewind here",
+  "match.rewindConfirm": "Erase this point and everything after it? Scoring resumes manually from here. This can't be undone.",
   "match.teamColours": "Team colours",
   "match.teamColoursHint": "Shown on the scoreboard. Pick before the match.",
   "match.saveColours": "Save colours",
@@ -378,13 +390,14 @@ const en: Dict = {
 };
 
 const fr: Dict = {
-  "nav.dashboard": "Tableau de bord",
+  "nav.dashboard": "Accueil",
   "nav.competitions": "Compétitions",
   "nav.matches": "Matchs",
   "nav.scoreboard": "Tableau d’affichage",
   "nav.settings": "Paramètres",
   "nav.signOut": "Se déconnecter",
-  "dashboard.title": "Tableau de bord",
+  "nav.menu": "Menu",
+  "dashboard.title": "Accueil",
   "dashboard.signedInAs": "Connecté en tant que",
   "dashboard.competitions": "Créer et gérer les compétitions",
   "dashboard.matches": "Planifier et arbitrer les matchs",
@@ -511,6 +524,9 @@ const fr: Dict = {
   "comp.details": "Détails",
   "comp.disciplineFixed":
     "La discipline est figée dès que des matchs utilisent son moteur de règles",
+  "comp.accentColor": "Couleur d'accent",
+  "comp.accentColorEnable": "Utiliser une couleur d'accent",
+  "comp.accentColorHint": "Colore le nom de cette compétition sur la page Matchs.",
   "comp.finishConfirm":
     "Terminer cette compétition ? Les résultats publics seront figés au classement actuel.",
   "comp.teamsCount": "{count} équipes",
@@ -674,6 +690,14 @@ const fr: Dict = {
   "match.thScore": "Score",
   "match.thActor": "Acteur",
   "match.thTime": "Heure",
+  "match.thRewind": "Reprendre",
+  "match.pendingBadge": "En attente",
+  "match.awaitingConfirmation": "En attente de confirmation du responsable",
+  "match.confirmResult": "Confirmer le résultat final",
+  "match.confirmResultHint": "Un marqueur a enregistré le point final. Confirmez pour clôturer le match — il comptera alors dans les classements et le tableau.",
+  "match.confirmResultConfirm": "Confirmer ce résultat final ? Le match sera clôturé et compté dans les classements.",
+  "match.rewindHere": "Reprendre ici",
+  "match.rewindConfirm": "Effacer ce point et tout ce qui suit ? Le score reprend manuellement à partir d'ici. Cette action est irréversible.",
   "match.teamColours": "Couleurs des équipes",
   "match.teamColoursHint":
     "Affichées sur le tableau. À choisir avant le match.",
@@ -725,13 +749,14 @@ const fr: Dict = {
 };
 
 const de: Dict = {
-  "nav.dashboard": "Übersicht",
+  "nav.dashboard": "Start",
   "nav.competitions": "Wettbewerbe",
   "nav.matches": "Spiele",
   "nav.scoreboard": "Anzeigetafel",
   "nav.settings": "Einstellungen",
   "nav.signOut": "Abmelden",
-  "dashboard.title": "Übersicht",
+  "nav.menu": "Menü",
+  "dashboard.title": "Start",
   "dashboard.signedInAs": "Angemeldet als",
   "dashboard.competitions": "Wettbewerbe erstellen & verwalten",
   "dashboard.matches": "Spiele planen und werten",
@@ -858,6 +883,9 @@ const de: Dict = {
   "comp.details": "Details",
   "comp.disciplineFixed":
     "Die Disziplin ist festgelegt, sobald Spiele ihre Regel-Engine nutzen",
+  "comp.accentColor": "Akzentfarbe",
+  "comp.accentColorEnable": "Akzentfarbe verwenden",
+  "comp.accentColorHint": "Färbt den Namen dieses Wettbewerbs auf der Spiele-Seite.",
   "comp.finishConfirm":
     "Diesen Wettbewerb beenden? Die öffentlichen Ergebnisse werden beim aktuellen Stand eingefroren.",
   "comp.teamsCount": "{count} Teams",
@@ -1022,6 +1050,14 @@ const de: Dict = {
   "match.thScore": "Punkte",
   "match.thActor": "Akteur",
   "match.thTime": "Zeit",
+  "match.thRewind": "Zurücksetzen",
+  "match.pendingBadge": "Ausstehend",
+  "match.awaitingConfirmation": "Warten auf Bestätigung des Managers",
+  "match.confirmResult": "Endergebnis bestätigen",
+  "match.confirmResultHint": "Ein Anschreiber hat den letzten Punkt erfasst. Bestätigen, um das Spiel abzuschließen — es zählt dann für Tabellen und Turnierbaum.",
+  "match.confirmResultConfirm": "Dieses Endergebnis bestätigen? Das Spiel wird abgeschlossen und in den Tabellen gezählt.",
+  "match.rewindHere": "Hier zurücksetzen",
+  "match.rewindConfirm": "Diesen Punkt und alles danach löschen? Die Zählung wird ab hier manuell fortgesetzt. Das kann nicht rückgängig gemacht werden.",
   "match.teamColours": "Teamfarben",
   "match.teamColoursHint":
     "Auf der Anzeigetafel sichtbar. Vor dem Spiel auswählen.",
@@ -1073,13 +1109,14 @@ const de: Dict = {
 };
 
 const es: Dict = {
-  "nav.dashboard": "Panel",
+  "nav.dashboard": "Inicio",
   "nav.competitions": "Competiciones",
   "nav.matches": "Partidos",
   "nav.scoreboard": "Marcador",
   "nav.settings": "Ajustes",
   "nav.signOut": "Cerrar sesión",
-  "dashboard.title": "Panel",
+  "nav.menu": "Menú",
+  "dashboard.title": "Inicio",
   "dashboard.signedInAs": "Sesión iniciada como",
   "dashboard.competitions": "Crear y gestionar competiciones",
   "dashboard.matches": "Programar y arbitrar partidos",
@@ -1206,6 +1243,9 @@ const es: Dict = {
   "comp.details": "Detalles",
   "comp.disciplineFixed":
     "La disciplina queda fijada cuando los partidos usan su motor de reglas",
+  "comp.accentColor": "Color de acento",
+  "comp.accentColorEnable": "Usar un color de acento",
+  "comp.accentColorHint": "Tiñe el nombre de esta competición en la página de Partidos.",
   "comp.finishConfirm":
     "¿Finalizar esta competición? Los resultados públicos se congelan en la clasificación actual.",
   "comp.teamsCount": "{count} equipos",
@@ -1370,6 +1410,14 @@ const es: Dict = {
   "match.thScore": "Marcador",
   "match.thActor": "Actor",
   "match.thTime": "Hora",
+  "match.thRewind": "Rebobinar",
+  "match.pendingBadge": "Pendiente",
+  "match.awaitingConfirmation": "A la espera de confirmación del responsable",
+  "match.confirmResult": "Confirmar resultado final",
+  "match.confirmResultHint": "Un anotador registró el punto final. Confirma para finalizar el partido — entonces contará para clasificaciones y cuadro.",
+  "match.confirmResultConfirm": "¿Confirmar este resultado final? El partido se marcará como finalizado y contará en las clasificaciones.",
+  "match.rewindHere": "Rebobinar aquí",
+  "match.rewindConfirm": "¿Borrar este punto y todo lo posterior? La puntuación se reanuda manualmente desde aquí. Esto no se puede deshacer.",
   "match.teamColours": "Colores de los equipos",
   "match.teamColoursHint":
     "Se muestran en el marcador. Elígelos antes del partido.",
@@ -1421,13 +1469,14 @@ const es: Dict = {
 };
 
 const pt: Dict = {
-  "nav.dashboard": "Painel",
+  "nav.dashboard": "Início",
   "nav.competitions": "Competições",
   "nav.matches": "Jogos",
   "nav.scoreboard": "Placar",
   "nav.settings": "Configurações",
   "nav.signOut": "Sair",
-  "dashboard.title": "Painel",
+  "nav.menu": "Menu",
+  "dashboard.title": "Início",
   "dashboard.signedInAs": "Conectado como",
   "dashboard.competitions": "Criar e gerir competições",
   "dashboard.matches": "Agendar e arbitrar jogos",
@@ -1554,6 +1603,9 @@ const pt: Dict = {
   "comp.details": "Detalhes",
   "comp.disciplineFixed":
     "A disciplina fica fixa assim que os jogos usam o seu motor de regras",
+  "comp.accentColor": "Cor de destaque",
+  "comp.accentColorEnable": "Usar uma cor de destaque",
+  "comp.accentColorHint": "Colore o nome desta competição na página de Jogos.",
   "comp.finishConfirm":
     "Terminar esta competição? Os resultados públicos ficam congelados na classificação atual.",
   "comp.teamsCount": "{count} equipas",
@@ -1718,6 +1770,14 @@ const pt: Dict = {
   "match.thScore": "Pontuação",
   "match.thActor": "Autor",
   "match.thTime": "Hora",
+  "match.thRewind": "Recuar",
+  "match.pendingBadge": "Pendente",
+  "match.awaitingConfirmation": "A aguardar confirmação do responsável",
+  "match.confirmResult": "Confirmar resultado final",
+  "match.confirmResultHint": "Um marcador registou o ponto final. Confirme para encerrar o jogo — passará então a contar para classificações e quadro.",
+  "match.confirmResultConfirm": "Confirmar este resultado final? O jogo será encerrado e contado nas classificações.",
+  "match.rewindHere": "Recuar aqui",
+  "match.rewindConfirm": "Apagar este ponto e tudo depois dele? A pontuação recomeça manualmente a partir daqui. Isto não pode ser desfeito.",
   "match.teamColours": "Cores das equipas",
   "match.teamColoursHint":
     "Mostradas no placar. Escolha antes do jogo.",

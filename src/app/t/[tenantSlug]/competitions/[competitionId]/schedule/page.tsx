@@ -21,7 +21,7 @@ import { CompetitionHeader } from "@/components/admin/CompetitionHeader";
 import { CsvImport } from "@/components/admin/CsvImport";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { LocalTime } from "@/components/LocalTime";
-import { statusBadgeClass, ui } from "@/components/admin/styles";
+import { matchStatusLabel, statusBadgeClass, ui } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
 
@@ -134,7 +134,7 @@ export default async function SchedulePage({
                                 {m.teamAName} vs {m.teamBName}
                               </span>
                               <span className={statusBadgeClass(m.status)}>
-                                {m.status}
+                                {matchStatusLabel(m.status, t("match.pendingBadge"))}
                               </span>
                               {(m.setsWonA > 0 || m.setsWonB > 0) && (
                                 <span className="text-sm text-score-dim">

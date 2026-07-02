@@ -118,6 +118,11 @@ export default async function ScoreboardPage({
       mode={mode}
       poll={poll}
       basePath={basePath}
+      awaitingLabel={
+        match.status === "PENDING_CONFIRMATION"
+          ? "Result awaiting confirmation"
+          : null
+      }
       />
     </>
   );

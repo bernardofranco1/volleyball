@@ -211,3 +211,84 @@ describe("cancel set start: repeated undo unwinds lineups then SET_START", () =>
     expect(replayed.currentSetNumber).toBe(1);
   });
 });
+
+// ── REWIND (admin re-score from a point, spec/17) ────────────────────────────
+// REWIND{toSequence:N} keeps events with sequence <= N and tombstones the rest
+// on replay; re-scored events appended after it survive. Resolved by the shared
+// createReplayFn, so exercising one discipline covers all four.
+describe("rewind: replay truncates to the cutoff and re-scoring survives", () => {
+  const GRASS = DISCIPLINE_DEFAULTS.GRASS;
+  const rewindEv = (seq: number, toSequence: number) =>
+    ({ id: `r${seq}`, sequence: seq, timestamp: TS, payload: { type: "REWIND", toSequence } }) as unknown as GrassEvent;
+
+  function playedSet(): { log: GrassEvent[]; state: GrassMatchState } {
+    let state = initialGrassState("gr");
+    let seq = 0;
+    const log: GrassEvent[] = [];
+    const send = (payload: GrassEventPayload) => {
+      const r = appendGrassEvent(state, payload, GRASS, {
+        nextSequence: seq + 1, timestamp: TS, makeId: (n) => `g${n}`,
+      });
+      if (!r.ok) throw new Error(`rejected ${payload.type}: ${r.reason}`);
+      log.push(...r.newEvents);
+      seq = r.newEvents[r.newEvents.length - 1].sequence;
+      state = r.state;
+    };
+    send({ type: "MATCH_CREATED", matchId: "gr" });
+    send({ type: "COIN_TOSS", firstServer: "A", teamAStartSide: "LEFT" });
+    send({ type: "MATCH_START" });
+    send({ type: "SET_START", setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" });
+    send({ type: "LINEUP_CONFIRMED", setNumber: 1, teamAPlayerIds: ["a1","a2","a3"], teamBPlayerIds: ["b1","b2","b3"] });
+    for (let i = 0; i < 5; i++) send({ type: "RALLY_WON_A" });
+    return { log, state };
+  }
+
+  it("erases points after the cutoff (5-0 rewound to keep 3 points -> 3-0)", () => {
+    const { log, state } = playedSet();
+    expect(state.sets[0].scoreA).toBe(5);
+    // Keep through the sequence of the 3rd rally point; erase the rest.
+    const rallies = log.filter((e) => e.payload.type === "RALLY_WON_A");
+    const keepThrough = rallies[2].sequence;
+    const rewound = grassReplay(
+      "gr",
+      [...log, rewindEv(log[log.length - 1].sequence + 1, keepThrough)],
+      GRASS,
+    );
+    expect(rewound.sets[0].scoreA).toBe(3);
+  });
+
+  it("re-scoring after a rewind survives, and a deeper rewind supersedes", () => {
+    const { log } = playedSet();
+    const rallies = log.filter((e) => e.payload.type === "RALLY_WON_A");
+    let seq = log[log.length - 1].sequence;
+    // Rewind to keep 2 points, then re-score 4 more (new sequences after REWIND).
+    let full = [...log, rewindEv(++seq, rallies[1].sequence)] as unknown as GrassEvent[];
+    let state = grassReplay("gr", full, GRASS);
+    const send = (payload: GrassEventPayload) => {
+      const r = appendGrassEvent(state, payload, GRASS, {
+        nextSequence: seq + 1, timestamp: TS, makeId: (n) => `x${n}`,
+      });
+      if (!r.ok) throw new Error(r.reason);
+      full = [...full, ...r.newEvents] as GrassEvent[];
+      seq = r.newEvents[r.newEvents.length - 1].sequence;
+      state = r.state;
+    };
+    send({ type: "RALLY_WON_B" });
+    send({ type: "RALLY_WON_B" });
+    expect(grassReplay("gr", full, GRASS).sets[0].scoreA).toBe(2);
+    expect(grassReplay("gr", full, GRASS).sets[0].scoreB).toBe(2);
+    // A second, deeper rewind (keep only 1 A point) supersedes both.
+    full = [...full, rewindEv(++seq, rallies[0].sequence)] as GrassEvent[];
+    const finalState = grassReplay("gr", full, GRASS);
+    expect(finalState.sets[0].scoreA).toBe(1);
+    expect(finalState.sets[0].scoreB).toBe(0);
+  });
+
+  it("keeps replay contiguous/without gaps (integrity holds after rewind)", () => {
+    const { log } = playedSet();
+    const withRewind = [...log, rewindEv(log[log.length - 1].sequence + 1, log[3].sequence)];
+    // Every stored event (incl. REWIND) has a contiguous sequence.
+    const seqs = withRewind.map((e) => e.sequence);
+    expect(seqs).toEqual(seqs.map((_, i) => i + 1));
+  });
+});

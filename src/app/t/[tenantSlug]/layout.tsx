@@ -6,6 +6,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { getTenantBySlug } from "@/lib/tenant";
 import { getT } from "@/lib/i18n/server";
 import { LocaleProvider } from "@/lib/i18n/client";
+import { MobileNav } from "@/components/MobileNav";
 
 // Tenant pages are user- and DB-specific, so never prerender at build time.
 export const dynamic = "force-dynamic";
@@ -55,8 +56,16 @@ export default async function TenantLayout({
         data-tenant={tenant.slug}
         className="flex min-h-dvh flex-col"
       >
-        <header className="flex items-center justify-between border-b border-border px-6 py-4">
-          <div className="flex items-center gap-6">
+        <header className="relative flex items-center justify-between border-b border-border px-4 py-2 md:px-6 md:py-4">
+          <div className="flex items-center gap-3 md:gap-6">
+            {/* Mobile: ☰ collapses the nav (saves a UI row). Desktop: hidden. */}
+            <MobileNav
+              menuLabel={t("nav.menu")}
+              links={NAV_LINKS.map(([key, path]) => ({
+                href: `/t/${tenantSlug}/${path}`,
+                label: t(key),
+              }))}
+            />
             <Link
               href={`/t/${tenantSlug}/dashboard`}
               className="flex items-center gap-3"
@@ -104,20 +113,6 @@ export default async function TenantLayout({
             </form>
           </div>
         </header>
-
-        {/* Mobile nav row — the top bar's inline nav is hidden on phones, so
-            without this a phone can only navigate via the dashboard cards. */}
-        <nav className="flex gap-1 overflow-x-auto border-b border-border px-4 py-2 md:hidden">
-          {NAV_LINKS.map(([key, path]) => (
-            <Link
-              key={path}
-              href={`/t/${tenantSlug}/${path}`}
-              className="flex-none rounded-lg px-3 py-1.5 text-sm text-score-dim transition-colors hover:bg-surface-raised hover:text-foreground"
-            >
-              {t(key)}
-            </Link>
-          ))}
-        </nav>
 
         {/* Flex column + min-h-0 so a full-height child (the scoring shell) can
             fill the viewport below the header; normal pages just flow/scroll. */}

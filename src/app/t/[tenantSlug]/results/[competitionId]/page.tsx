@@ -5,7 +5,7 @@ import { getCompetition, listMatches } from "@/lib/competitions";
 import { computeStandings, fmtRatio } from "@/lib/standings";
 import { loadBracket } from "@/lib/tournament";
 import { BracketView } from "@/components/admin/BracketView";
-import { statusBadgeClass, ui } from "@/components/admin/styles";
+import { matchStatusLabel, statusBadgeClass, ui } from "@/components/admin/styles";
 
 // Public, read-only results (no auth — excluded from the proxy redirect).
 export const dynamic = "force-dynamic";
@@ -145,7 +145,7 @@ export default async function PublicResultsPage({
                         {m.setsWonA}–{m.setsWonB}
                       </span>
                     ) : null}
-                    <span className={statusBadgeClass(m.status)}>{m.status}</span>
+                    <span className={statusBadgeClass(m.status)}>{matchStatusLabel(m.status)}</span>
                   </span>
                 </li>
               ))}

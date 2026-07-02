@@ -4,10 +4,11 @@ import { getT } from "@/lib/i18n/server";
 
 // Tenant surfaces. `href` links to a shipped section; `titleKey`/`noteKey` are
 // i18n message keys resolved per the tenant's chosen locale.
+// Mirrors the navigable sections in the top menu (Competitions / Matches /
+// Settings). "Home" itself and the public-only Scoreboard aren't cards here.
 const SECTIONS = [
   { titleKey: "nav.competitions", noteKey: "dashboard.competitions", href: "competitions" },
   { titleKey: "nav.matches", noteKey: "dashboard.matches", href: "matches" },
-  { titleKey: "nav.scoreboard", noteKey: "dashboard.scoreboard" },
   { titleKey: "nav.settings", noteKey: "dashboard.settings", href: "settings" },
 ] as const;
 
@@ -35,7 +36,7 @@ export default async function DashboardPage({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {SECTIONS.map((s) => {
           const href = "href" in s ? s.href : undefined;
           const className =

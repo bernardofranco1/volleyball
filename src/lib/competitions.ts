@@ -166,6 +166,7 @@ export interface TenantMatchRow {
   id: string;
   competitionId: string;
   competitionName: string;
+  competitionColor: string | null;
   discipline: typeof matches.discipline.enumValues[number];
   status: typeof matches.status.enumValues[number];
   teamAName: string;
@@ -218,6 +219,7 @@ export async function listTenantMatches(
       id: matches.id,
       competitionId: matches.competitionId,
       competitionName: competitions.name,
+      competitionColor: competitions.color,
       discipline: matches.discipline,
       status: matches.status,
       teamAName: teamA.displayName,

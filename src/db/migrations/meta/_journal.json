@@ -8,6 +8,13 @@
       "when": 1782945266803,
       "tag": "0000_unique_metal_master",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782968675966,
+      "tag": "0001_overconfident_vampiro",
+      "breakpoints": true
     }
   ]
 }

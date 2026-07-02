@@ -27,6 +27,7 @@ const STATUS_STYLES: Record<string, string> = {
   WARMUP: "border-amber-500/40 text-amber-400",
   COIN_TOSS: "border-amber-500/40 text-amber-400",
   LIVE: "border-green-500/40 text-green-400",
+  PENDING_CONFIRMATION: "border-amber-500/40 text-amber-400",
   ABANDONED: "border-red-500/40 text-red-400",
 };
 
@@ -34,4 +35,13 @@ export function statusBadgeClass(status: string): string {
   return `inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
     STATUS_STYLES[status] ?? "border-border text-score-dim"
   }`;
+}
+
+/** Short human label for a match status badge (raw enum is fine except the
+ *  verbose pending one). Pass a translator for a localized pending label. */
+export function matchStatusLabel(
+  status: string,
+  pendingLabel = "PENDING",
+): string {
+  return status === "PENDING_CONFIRMATION" ? pendingLabel : status;
 }

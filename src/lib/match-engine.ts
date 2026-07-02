@@ -22,6 +22,7 @@ import { type TournamentConfig, resolveConfig } from "@/engine/config";
 import {
   type CommonMatchState,
   type EngineEvent,
+  type MatchRowStatus,
   getEngine,
 } from "@/engine/registry";
 import type { BeachMatchState } from "@/engine/beach/types";
@@ -267,13 +268,16 @@ const SYSTEM_EVENTS = new Set([
 function derivedMatchColumns(
   meta: MatchMeta,
   finalState: CommonMatchState,
-  opts: { includeSnapshot: boolean },
+  opts: { includeSnapshot: boolean; status?: MatchRowStatus },
 ) {
+  // Caller may override the row status (a scorer's final point parks the match
+  // at PENDING_CONFIRMATION even though the engine reports FINISHED).
+  const status = opts.status ?? meta.engine.matchStatusOf(finalState);
   return {
     setsWonA: finalState.setsWonA,
     setsWonB: finalState.setsWonB,
     winner: finalState.winner,
-    status: meta.engine.matchStatusOf(finalState),
+    status,
     ...(opts.includeSnapshot
       ? {
           stateSnapshot: finalState,
@@ -283,7 +287,9 @@ function derivedMatchColumns(
     ...(finalState.matchStartedAt
       ? { startedAt: new Date(finalState.matchStartedAt) }
       : {}),
-    ...(finalState.status === "FINISHED" ? { finishedAt: new Date() } : {}),
+    // Set only when actually FINISHED (not while pending); explicitly cleared
+    // when a rewind takes a match back out of FINISHED.
+    finishedAt: status === "FINISHED" ? new Date() : null,
   };
 }
 
@@ -398,12 +404,17 @@ export async function appendMatchEvent(
     finalState,
     result.newEvents,
   );
+  // Scorer's final point doesn't finalise the result — it parks the match at
+  // PENDING_CONFIRMATION until a manager confirms it (spec/17, feature 5).
+  const engineStatus = meta.engine.matchStatusOf(finalState);
+  const status: MatchRowStatus =
+    engineStatus === "FINISHED" ? "PENDING_CONFIRMATION" : engineStatus;
   try {
     await db.transaction(async (tx) => {
       await tx.insert(events).values(rows);
       await tx
         .update(matches)
-        .set(derivedMatchColumns(meta, finalState, { includeSnapshot }))
+        .set(derivedMatchColumns(meta, finalState, { includeSnapshot, status }))
         .where(eq(matches.id, matchId));
     });
   } catch (err) {
@@ -541,4 +552,66 @@ async function undoLastEvent(
 
   scheduleBroadcast([stateUpdateMessage(matchId, finalState.lastSequence)]);
   return { newEvents: undoEvents, state: finalState };
+}
+
+export class RewindRejectedError extends Error {}
+
+/**
+ * Admin rewind (spec/17): logically erase `fromSequence` and every event after
+ * it, so scoring can be re-done manually from that point. Appends a single
+ * REWIND control event (keeps events with sequence < fromSequence), re-replays,
+ * and force-refreshes the snapshot. A FINISHED match rewound mid-play returns
+ * to LIVE (derived columns + finishedAt recompute from the replayed state).
+ * The event log stays append-only — nothing is deleted.
+ */
+export async function rewindMatch(
+  matchId: string,
+  fromSequence: number,
+  opts: { actor?: Actor; deviceInfo?: string } = {},
+): Promise<AppendOutcome> {
+  const meta = await loadMatchMeta(matchId);
+  const log = await loadEvents(matchId);
+  const maxSeq = log[log.length - 1]?.sequence ?? 0;
+
+  if (!Number.isInteger(fromSequence) || fromSequence <= 1)
+    // seq 1 is MATCH_CREATED — a rewind must keep the match itself.
+    throw new RewindRejectedError("Choose a point after the start of the match.");
+  if (fromSequence > maxSeq)
+    throw new RewindRejectedError("Nothing to erase after that point.");
+
+  const rewind: EngineEvent = {
+    id: newId("evt"),
+    sequence: maxSeq + 1,
+    timestamp: new Date().toISOString(),
+    payload: { type: "REWIND", toSequence: fromSequence - 1 },
+  };
+
+  const finalState = meta.engine.replay(matchId, [...log, rewind], meta.config);
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(events).values({
+        id: rewind.id,
+        matchId,
+        tenantId: meta.tenantId,
+        sequence: rewind.sequence,
+        timestamp: new Date(rewind.timestamp),
+        eventType: "REWIND",
+        payload: rewind.payload,
+        actor: opts.actor ?? "SCORER",
+        deviceInfo: opts.deviceInfo ?? null,
+        ...meta.engine.denormalize(finalState),
+      });
+      await tx
+        .update(matches)
+        // Rewind invalidates the cached snapshot — always rewrite it.
+        .set(derivedMatchColumns(meta, finalState, { includeSnapshot: true }))
+        .where(eq(matches.id, matchId));
+    });
+  } catch (err) {
+    throw toWriteError(err);
+  }
+
+  scheduleBroadcast([stateUpdateMessage(matchId, finalState.lastSequence)]);
+  return { newEvents: [rewind], state: finalState };
 }

@@ -21,12 +21,14 @@ import {
 } from "@/lib/match-session-actions";
 import { qrSvg } from "@/lib/qr";
 import { findSequenceGaps } from "@/lib/integrity";
+import { confirmMatchResult } from "@/lib/match-admin-actions";
 import { getT } from "@/lib/i18n/server";
 import { ActionForm } from "@/components/admin/ActionForm";
+import { RewindToHere } from "@/components/admin/RewindToHere";
 import { CopyButton } from "@/components/CopyButton";
 import { LocalTime } from "@/components/LocalTime";
 import { SubmitButton } from "@/components/admin/SubmitButton";
-import { statusBadgeClass, ui } from "@/components/admin/styles";
+import { matchStatusLabel, statusBadgeClass, ui } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
 
@@ -148,7 +150,9 @@ export default async function MatchDetailPage({
           <h1 className="text-2xl font-semibold tracking-tight">
             {match.teamAName} vs {match.teamBName}
           </h1>
-          <span className={statusBadgeClass(match.status)}>{match.status}</span>
+          <span className={statusBadgeClass(match.status)}>
+            {matchStatusLabel(match.status, t("match.pendingBadge"))}
+          </span>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={`${base}/matches/${matchId}/live`} className={ui.btnPrimary}>
@@ -184,6 +188,30 @@ export default async function MatchDetailPage({
           </>
         )}
       </p>
+
+      {/* A scorer's final point parks the match here until a manager confirms. */}
+      {match.status === "PENDING_CONFIRMATION" && (
+        <div className="mt-6 rounded-xl border border-amber-500/50 bg-amber-500/10 p-4">
+          <h2 className="font-medium text-amber-300">
+            {t("match.awaitingConfirmation")}
+          </h2>
+          <p className="mt-1 text-sm text-score-dim">
+            {t("match.confirmResultHint")}
+          </p>
+          <ActionForm
+            action={confirmMatchResult}
+            confirm={t("match.confirmResultConfirm")}
+            className="mt-3"
+          >
+            <input type="hidden" name="tenantSlug" value={tenantSlug} />
+            <input type="hidden" name="competitionId" value={competitionId} />
+            <input type="hidden" name="matchId" value={matchId} />
+            <SubmitButton pendingLabel={t("common.saving")}>
+              {t("match.confirmResult")}
+            </SubmitButton>
+          </ActionForm>
+        </div>
+      )}
 
       <div className="mt-6 grid max-w-2xl gap-4 sm:grid-cols-2">
         <TeamColorPicker
@@ -382,6 +410,7 @@ export default async function MatchDetailPage({
                   <th className={ui.th}>{t("match.thScore")}</th>
                   <th className={ui.th}>{t("match.thActor")}</th>
                   <th className={ui.th}>{t("match.thTime")}</th>
+                  <th className={ui.th}>{t("match.thRewind")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -400,6 +429,17 @@ export default async function MatchDetailPage({
                     <td className={`${ui.td} text-score-dim`}>{e.actor}</td>
                     <td className={`${ui.td} text-score-dim`}>
                       {new Date(e.timestamp).toUTCString().slice(17, 25)}
+                    </td>
+                    <td className={ui.td}>
+                      {/* Can't rewind to before the match was created (#1). */}
+                      {e.sequence > 1 ? (
+                        <RewindToHere
+                          tenantSlug={tenantSlug}
+                          competitionId={competitionId}
+                          matchId={matchId}
+                          fromSequence={e.sequence}
+                        />
+                      ) : null}
                     </td>
                   </tr>
                 ))}

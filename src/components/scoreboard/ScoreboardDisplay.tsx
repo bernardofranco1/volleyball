@@ -51,6 +51,7 @@ export function ScoreboardDisplay({
   mode,
   poll,
   basePath,
+  awaitingLabel,
 }: {
   matchId: string;
   initialState: BeachMatchState;
@@ -71,6 +72,8 @@ export function ScoreboardDisplay({
   mode: DisplayMode;
   poll: boolean;
   basePath: string;
+  /** Shown when the result is recorded but not yet manager-confirmed. */
+  awaitingLabel?: string | null;
 }) {
   const [state, setState] = useState<BeachMatchState>(initialState);
   const [timeoutInfo, setTimeoutInfo] = useState<{
@@ -209,6 +212,11 @@ export function ScoreboardDisplay({
 
   return (
     <>
+      {awaitingLabel ? (
+        <div className="fixed left-1/2 top-2 z-[60] -translate-x-1/2 rounded-full border border-amber-400/60 bg-amber-500/20 px-4 py-1 text-sm font-medium text-amber-200 backdrop-blur">
+          {awaitingLabel}
+        </div>
+      ) : null}
       {discipline === "INDOOR" ? (
         <IndoorBoard
           teamAName={teamAName}

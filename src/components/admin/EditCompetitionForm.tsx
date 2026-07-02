@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { updateCompetition } from "@/lib/competition-actions";
 import { GENDERS } from "@/lib/domain";
 import { useT } from "@/lib/i18n/client";
@@ -20,9 +21,12 @@ export function EditCompetitionForm({
     endDate: string | null;
     gender: string | null;
     discipline: string;
+    color: string | null;
   };
 }) {
   const t = useT();
+  // A disabled colour input isn't submitted, so unchecking clears the colour.
+  const [colorOn, setColorOn] = useState(Boolean(competition.color));
   return (
     <ActionForm action={updateCompetition} className={ui.card}>
       <h2 className="mb-4 font-medium">{t("comp.details")}</h2>
@@ -106,6 +110,32 @@ export function EditCompetitionForm({
             className={`${ui.input} opacity-60`}
             title={t("comp.disciplineFixed")}
           />
+        </div>
+        <div className="sm:col-span-2">
+          <label className={ui.label} htmlFor="e-color">
+            {t("comp.accentColor")}
+          </label>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-score-dim">
+              <input
+                type="checkbox"
+                checked={colorOn}
+                onChange={(e) => setColorOn(e.target.checked)}
+              />
+              {t("comp.accentColorEnable")}
+            </label>
+            <input
+              id="e-color"
+              name="color"
+              type="color"
+              disabled={!colorOn}
+              defaultValue={competition.color ?? "#3366cc"}
+              className="h-9 w-16 rounded-lg border border-border bg-surface disabled:opacity-40"
+            />
+          </div>
+          <p className="mt-1 text-[11px] text-score-dim">
+            {t("comp.accentColorHint")}
+          </p>
         </div>
       </div>
 
