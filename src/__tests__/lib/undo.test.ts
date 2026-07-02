@@ -139,3 +139,75 @@ describe("shouldSnapshot (snapshot cache write policy)", () => {
     expect(shouldSnapshot(true, 10, live(11), [ev("RALLY_WON_A"), ev("SET_END")])).toBe(true);
   });
 });
+
+import { appendGrassEvent, replayEvents as grassReplay } from "@/engine/grass/reducer";
+import {
+  type GrassEvent,
+  type GrassEventPayload,
+  type GrassMatchState,
+  initialGrassState,
+} from "@/engine/grass/types";
+
+// Regression: the lineup-confirmation step used to trap scorers — no undo was
+// reachable, and cancelling needed to unwind LINEUP_CONFIRMED(s) AND SET_START.
+describe("cancel set start: repeated undo unwinds lineups then SET_START", () => {
+  const GRASS = DISCIPLINE_DEFAULTS.GRASS;
+
+  function build(): { log: GrassEvent[]; state: GrassMatchState } {
+    let state = initialGrassState("g1");
+    let seq = 0;
+    const log: GrassEvent[] = [];
+    const send = (payload: GrassEventPayload) => {
+      const r = appendGrassEvent(state, payload, GRASS, {
+        nextSequence: seq + 1,
+        timestamp: TS,
+        makeId: (s) => `g${s}`,
+      });
+      if (!r.ok) throw new Error(`rejected ${payload.type}: ${r.reason}`);
+      log.push(...r.newEvents);
+      seq = r.newEvents[r.newEvents.length - 1].sequence;
+      state = r.state;
+    };
+    send({ type: "MATCH_CREATED", matchId: "g1" });
+    send({ type: "COIN_TOSS", firstServer: "A", teamAStartSide: "LEFT" });
+    send({ type: "MATCH_START" });
+    send({ type: "SET_START", setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" });
+    send({
+      type: "LINEUP_CONFIRMED",
+      setNumber: 1,
+      teamAPlayerIds: ["a1", "a2", "a3"],
+      teamBPlayerIds: ["b1", "b2", "b3"],
+    });
+    return { log, state };
+  }
+
+  it("peels LINEUP_CONFIRMED first, then SET_START, restoring the pre-set state", () => {
+    const { log, state } = build();
+    expect(state.rallyPhase).toBe("BETWEEN_RALLIES"); // lineups in → ready to play
+
+    let full = [...log] as unknown as EngineEvent[];
+    let seq = log[log.length - 1].sequence;
+    const undoOnce = (expected: string) => {
+      const targets = selectUndoTargets(full);
+      expect(targets.map((t) => t.payload.type)).toEqual([expected]);
+      full = [
+        ...full,
+        ...targets.map((t) => ({
+          id: `u${++seq}`,
+          sequence: seq,
+          timestamp: TS,
+          payload: { type: "UNDO", targetEventId: t.id },
+        })),
+      ] as EngineEvent[];
+    };
+
+    undoOnce("LINEUP_CONFIRMED");
+    undoOnce("SET_START");
+
+    const replayed = grassReplay("g1", full as unknown as GrassEvent[], GRASS);
+    // Back to "match live, set not started" — the Start set 1 banner state.
+    expect(replayed.status).toBe("LIVE");
+    expect(replayed.sets.length).toBe(0);
+    expect(replayed.currentSetNumber).toBe(1);
+  });
+});

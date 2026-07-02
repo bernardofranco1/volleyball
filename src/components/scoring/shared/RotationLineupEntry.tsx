@@ -4,13 +4,18 @@
 // orders in a single LINEUP_CONFIRMED event (position 1 serves first).
 import { useMemo, useState } from "react";
 import type { PlayerLite } from "@/lib/match-provider";
+import { CancelSetStart } from "@/components/scoring/shared/CancelSetStart";
 
-export type LineupDispatch = (payload: {
-  type: "LINEUP_CONFIRMED";
-  setNumber: number;
-  teamAPlayerIds: string[];
-  teamBPlayerIds: string[];
-}) => void;
+export type LineupDispatch = (
+  payload:
+    | {
+        type: "LINEUP_CONFIRMED";
+        setNumber: number;
+        teamAPlayerIds: string[];
+        teamBPlayerIds: string[];
+      }
+    | { type: "UNDO"; targetEventId: string },
+) => void;
 
 export function RotationLineupEntry({
   currentSetNumber,
@@ -88,6 +93,14 @@ export function RotationLineupEntry({
       >
         Confirm lineups &amp; start
       </button>
+      {/* Grass/light confirm both teams in ONE event, so during lineup entry
+          only the SET_START itself needs unwinding. */}
+      <CancelSetStart
+        setNumber={currentSetNumber}
+        undoCount={1}
+        dispatch={dispatch}
+        pending={pending}
+      />
     </div>
   );
 }

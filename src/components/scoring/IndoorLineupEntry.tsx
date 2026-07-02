@@ -6,14 +6,19 @@ import {
   useIndoorMatch,
 } from "@/lib/indoor-match-context";
 import type { TeamId } from "@/engine/indoor/types";
+import { CancelSetStart } from "@/components/scoring/shared/CancelSetStart";
 
 // Shown during LINEUP_PENDING. The scorer (or, later, the team tablet) sets the
 // starting six in rotation order plus an optional libero, per team.
 export function IndoorLineupEntry() {
-  const { state, config, rosterA, rosterB, teamAName, teamBName } =
+  const { state, config, rosterA, rosterB, teamAName, teamBName, dispatch, pending } =
     useIndoorMatch();
   const set = state.sets[state.currentSetNumber - 1];
   if (!set) return null;
+
+  // Unwind everything recorded for this set: each confirmed lineup + SET_START.
+  const undoCount =
+    1 + (set.lineupConfirmedA ? 1 : 0) + (set.lineupConfirmedB ? 1 : 0);
 
   return (
     <div className="rounded-xl border border-border bg-surface-raised p-4">
@@ -41,6 +46,12 @@ export function IndoorLineupEntry() {
           liberoEnabled={config.liberoEnabled}
         />
       </div>
+      <CancelSetStart
+        setNumber={state.currentSetNumber}
+        undoCount={undoCount}
+        dispatch={dispatch}
+        pending={pending}
+      />
     </div>
   );
 }
