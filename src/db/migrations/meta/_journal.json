@@ -15,6 +15,13 @@
       "when": 1782968675966,
       "tag": "0001_overconfident_vampiro",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782971926098,
+      "tag": "0002_yummy_penance",
+      "breakpoints": true
     }
   ]
 }

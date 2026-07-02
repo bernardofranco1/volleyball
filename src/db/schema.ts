@@ -14,8 +14,12 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-// All tables include `tenantId` for row-level multi-tenant isolation
-// (enforced at the API layer, not Postgres RLS — see spec/03-DATABASE.md).
+// All tables include `tenantId` for multi-tenant isolation, enforced at the
+// API layer (the app talks to Postgres over a direct connection as the owner
+// role, which bypasses RLS). RLS is nonetheless ENABLED on every table with no
+// policies, so the PostgREST-exposed anon/authenticated roles get deny-all —
+// the app never uses PostgREST for table data (only Supabase Auth + Realtime
+// broadcast), so this closes the REST exposure without affecting the app.
 // All IDs are cuid2 strings; timestamps are UTC.
 
 // ── Tenants ──────────────────────────────────────────────────────────────────
@@ -25,7 +29,7 @@ export const tenants = pgTable("tenants", {
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}).enableRLS();
 
 export const tenantBranding = pgTable("tenant_branding", {
   tenantId: text("tenant_id")
@@ -36,7 +40,7 @@ export const tenantBranding = pgTable("tenant_branding", {
   secondaryColor: text("secondary_color").default("#ffffff"),
   fontFamily: text("font_family"),
   courtColorOverrides: jsonb("court_color_overrides"),
-});
+}).enableRLS();
 
 // Per-competition scoreboard appearance (configurable from the competition's
 // Scoreboard config tab). All nullable → fall back to per-discipline board
@@ -51,7 +55,7 @@ export const competitionBranding = pgTable("competition_branding", {
   fontColor: text("font_color"),
   fontFamily: text("font_family"),
   logoUrl: text("logo_url"),
-});
+}).enableRLS();
 
 // ── Users & roles ──────────────────────────────────────────────────────────
 
@@ -60,7 +64,7 @@ export const users = pgTable("users", {
   email: text("email").notNull(),
   name: text("name"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}).enableRLS();
 
 export const userTenantRoles = pgTable(
   "user_tenant_roles",
@@ -82,7 +86,7 @@ export const userTenantRoles = pgTable(
     // leads with userId so it can't serve them.
     index("user_tenant_roles_tenant_idx").on(t.tenantId),
   ],
-);
+).enableRLS();
 
 // ── Competitions ─────────────────────────────────────────────────────────────
 
@@ -112,7 +116,7 @@ export const competitions = pgTable(
   // Postgres doesn't auto-index FKs; the competitions list is always
   // tenant-scoped and ordered by creation date.
   (t) => [index("competitions_tenant_idx").on(t.tenantId, t.createdAt)],
-);
+).enableRLS();
 
 // One row per competition. All numeric/boolean fields nullable — null means
 // "use the discipline default" (see src/engine/config.ts).
@@ -180,7 +184,7 @@ export const tournamentConfig = pgTable("tournament_config", {
   // Team tablets
   teamTabletEnabled: boolean("team_tablet_enabled"),
   allowTeamTabletDirectEntry: boolean("allow_team_tablet_direct_entry"),
-});
+}).enableRLS();
 
 // ── Teams & players ──────────────────────────────────────────────────────────
 
@@ -203,7 +207,7 @@ export const teams = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("teams_competition_idx").on(t.competitionId)],
-);
+).enableRLS();
 
 export const players = pgTable("players", {
   id: text("id").primaryKey(),
@@ -226,7 +230,7 @@ export const players = pgTable("players", {
   // One jersey number per team. NULLs are distinct in Postgres, so bench/staff
   // without a number are unaffected. Brief §2.1.
   uniqueIndex("players_team_jersey_uq").on(t.teamId, t.jerseyNumber),
-]);
+]).enableRLS();
 
 // ── Matches ──────────────────────────────────────────────────────────────────
 
@@ -307,7 +311,7 @@ export const matches = pgTable(
         sql`${t.roundName} in ('Round of 64', 'Round of 32', 'Round of 16', 'Quarterfinal', 'Semifinal', 'Final', '3rd Place')`,
       ),
   ],
-);
+).enableRLS();
 
 // ── Events (append-only log) ─────────────────────────────────────────────────
 
@@ -345,7 +349,7 @@ export const events = pgTable(
   // column); a separate single-column index was pure write amplification on
   // the hottest insert path.
   (t) => [unique().on(t.matchId, t.sequence)],
-);
+).enableRLS();
 
 // ── Team tablet access tokens ────────────────────────────────────────────────
 
@@ -366,7 +370,7 @@ export const matchSessions = pgTable(
     revokedAt: timestamp("revoked_at"),
   },
   (t) => [index("match_sessions_match_idx").on(t.matchId)],
-);
+).enableRLS();
 
 // Team-tablet lineups are submitted directly as LINEUP_CONFIRMED events (the
 // event log is the source of truth), so there is no separate submissions table.
@@ -397,7 +401,7 @@ export const interruptRequests = pgTable(
   },
   // Polled by every scorer console — (matchId, status) matches the PENDING scan.
   (t) => [index("interrupt_requests_match_status_idx").on(t.matchId, t.status)],
-);
+).enableRLS();
 
 // ── Pools & standings ────────────────────────────────────────────────────────
 
@@ -415,7 +419,7 @@ export const pools = pgTable(
     roundName: text("round_name"),
   },
   (t) => [index("pools_competition_idx").on(t.competitionId)],
-);
+).enableRLS();
 
 export const poolTeams = pgTable(
   "pool_teams",
@@ -428,7 +432,7 @@ export const poolTeams = pgTable(
       .references(() => teams.id),
   },
   (t) => [primaryKey({ columns: [t.poolId, t.teamId] })],
-);
+).enableRLS();
 
 // ── CSV import log ───────────────────────────────────────────────────────────
 
@@ -450,7 +454,7 @@ export const csvImports = pgTable(
     createdBy: text("created_by"),
   },
   (t) => [index("csv_imports_tenant_idx").on(t.tenantId, t.createdAt)],
-);
+).enableRLS();
 
 // ── Admin audit log (Phase 11) ───────────────────────────────────────────────
 // Append-only record of sensitive admin mutations (lifecycle, deletes, bracket,
@@ -474,7 +478,7 @@ export const auditLog = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("audit_log_tenant_idx").on(t.tenantId, t.createdAt)],
-);
+).enableRLS();
 
 // ── Tenant billing (Phase 11 scaffold — Stripe, "future") ────────────────────
 // One row per tenant, kept in sync by the Stripe webhook. Inert until Stripe is
@@ -494,4 +498,4 @@ export const tenantBilling = pgTable("tenant_billing", {
   stripeSubscriptionId: text("stripe_subscription_id"),
   currentPeriodEnd: timestamp("current_period_end"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}).enableRLS();
