@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { resolveTeamColor } from "@/lib/colors";
+import { useT } from "@/lib/i18n/client";
 
 // Phone-first scoring frame. The scoring surface is used primarily on phones, so
 // it must fit one viewport: a compact score header, a flexible court zone in the
@@ -28,6 +29,7 @@ function TeamScore({
   score: number;
   serving: boolean;
 }) {
+  const t = useT();
   return (
     <div className="min-w-0 text-center">
       <div className="flex items-center justify-center gap-1.5">
@@ -44,7 +46,7 @@ function TeamScore({
       <div
         className="mx-auto mt-1 h-1 w-12 rounded-full"
         style={{ backgroundColor: serving ? color : "transparent" }}
-        aria-label={serving ? "serving" : undefined}
+        aria-label={serving ? t("scoring.serving") : undefined}
       />
     </div>
   );
@@ -161,6 +163,7 @@ export function ScoringShell({
   actions: ReactNode;
   overlay?: ReactNode;
 }) {
+  const t = useT();
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col overflow-hidden">
       {/* Score header (fixed) */}
@@ -172,15 +175,15 @@ export function ScoringShell({
             {queuedCount > 0 ? (
               <span
                 className="rounded-full border border-amber-500/50 px-1.5 py-0.5 text-[10px] font-medium text-amber-400"
-                title="Events scored while offline — sent automatically on reconnect"
+                title={t("scoring.queuedTitle")}
               >
-                {queuedCount} queued
+                {t("scoring.queued", { count: queuedCount })}
               </span>
             ) : null}
             {pending ? <span aria-hidden>⟳</span> : null}
             <span
               className={`inline-block h-2 w-2 rounded-full ${online ? "bg-green-500" : "bg-amber-500"}`}
-              title={online ? "Online" : "Offline — changes queued"}
+              title={online ? t("scoring.online") : t("scoring.offline")}
             />
           </span>
         </div>

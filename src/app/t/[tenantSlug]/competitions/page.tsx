@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { listCompetitions } from "@/lib/competitions";
+import { getT } from "@/lib/i18n/server";
 import { CompetitionFilters } from "@/components/admin/CompetitionFilters";
 import { NewCompetitionForm } from "@/components/admin/NewCompetitionForm";
 import { statusBadgeClass, ui } from "@/components/admin/styles";
@@ -16,6 +17,7 @@ export default async function CompetitionsPage({
 }) {
   const { tenantSlug } = await params;
   const { discipline, status, q } = await searchParams;
+  const { t } = await getT();
   const ctx = await requireRole(
     tenantSlug,
     ADMIN_ROLES,
@@ -33,13 +35,13 @@ export default async function CompetitionsPage({
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
       <div className="mb-8 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Competitions</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("comp.title")}</h1>
           <p className="mt-1 text-sm text-score-dim">
-            Create and manage competitions for {ctx.tenant.name}.
+            {t("comp.subtitle", { tenant: ctx.tenant.name })}
           </p>
         </div>
         <Link href={`/t/${tenantSlug}/dashboard`} className={ui.btnSecondary}>
-          ← Dashboard
+          {t("common.backToDashboard")}
         </Link>
       </div>
 
@@ -51,8 +53,8 @@ export default async function CompetitionsPage({
           {competitions.length === 0 ? (
             <div className={`${ui.card} text-sm text-score-dim`}>
               {discipline || status || q
-                ? "No competitions match these filters."
-                : "No competitions yet. Create one to get started."}
+                ? t("comp.emptyFiltered")
+                : t("comp.empty")}
             </div>
           ) : (
             <ul className="space-y-3">

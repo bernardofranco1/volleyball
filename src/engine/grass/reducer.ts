@@ -3,9 +3,28 @@
  * model with indoor-style rotation/lineup/subs. `reduce` is pure; state is rebuilt
  * by replaying the log. Auto-emitted events (SET_END, MATCH_END, SIDE_SWITCH at the
  * beach thresholds) are computed by `computeAutoEmits` after a scoring event.
+ *
+ * Discipline-agnostic pieces (lifecycle/timeout/sanction cases, win conditions,
+ * append/replay orchestration) live in ../core.
  */
 
 import type { TournamentConfig } from "../config";
+import {
+  applySubstitution,
+  clone,
+  isCommonPayload,
+  reduceCommon,
+} from "../core/baseReducer";
+import {
+  type AppendResult as CoreAppendResult,
+  createAppendFn,
+  createReplayFn,
+} from "../core/factories";
+import {
+  computeEndEmits,
+  isSideSwitchDue,
+  setWinner,
+} from "../core/winConditions";
 import {
   type GrassEvent,
   type GrassEventPayload,
@@ -20,49 +39,16 @@ import {
 } from "./types";
 import { validateGrassEvent } from "./validator";
 
-// ── pure rule predicates (beach-derived, config-driven) ──────────────────────
+// ── pure rule predicates (beach-derived; shared ones re-exported) ────────────
 
-export function setWinTarget(
-  setNumber: SetNumber,
-  config: TournamentConfig,
-): number {
-  return setNumber >= config.bestOf ? config.setScoreTiebreak : config.setScore;
-}
-
-export function setWinner(
-  set: GrassSetState,
-  config: TournamentConfig,
-): TeamId | null {
-  const target = setWinTarget(set.setNumber, config);
-  const lead = config.twoPointLead ? 2 : 1;
-  if (set.scoreA >= target && set.scoreA - set.scoreB >= lead) return "A";
-  if (set.scoreB >= target && set.scoreB - set.scoreA >= lead) return "B";
-  return null;
-}
-
-export function isSideSwitchDue(
-  set: GrassSetState,
-  config: TournamentConfig,
-): boolean {
-  if (!config.sideSwitchEnabled) return false;
-  const interval =
-    set.setNumber >= config.bestOf
-      ? config.sideSwitchTiebreakEvery
-      : config.sideSwitchEvery;
-  if (!interval) return false;
-  const sum = set.scoreA + set.scoreB;
-  return sum > 0 && sum % interval === 0;
-}
-
-export function setsNeededToWin(config: TournamentConfig): number {
-  return Math.floor(config.bestOf / 2) + 1;
-}
+export {
+  isSideSwitchDue,
+  setsNeededToWin,
+  setWinner,
+  setWinTarget,
+} from "../core/winConditions";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-
-function clone<T>(value: T): T {
-  return structuredClone(value);
-}
 
 function newSetState(
   setNumber: SetNumber,
@@ -123,11 +109,6 @@ function applyPoint(set: GrassSetState, winner: TeamId, n: number): GrassSetStat
   return s;
 }
 
-function swapOnCourt(court: string[], outId: string, inId: string): void {
-  const idx = court.indexOf(outId);
-  if (idx >= 0) court[idx] = inId;
-}
-
 // ── main reducer ─────────────────────────────────────────────────────────────
 
 export function reduce(
@@ -142,21 +123,12 @@ export function reduce(
   const set = s.sets[setIdx];
   const n = config.playersPerSide;
 
+  if (isCommonPayload(p)) {
+    reduceCommon(s, p, event.timestamp);
+    return s;
+  }
+
   switch (p.type) {
-    case "MATCH_CREATED":
-      s.status = "COIN_TOSS";
-      return s;
-
-    case "COIN_TOSS":
-      s.status = "READY";
-      s.set1FirstServer = p.firstServer;
-      return s;
-
-    case "MATCH_START":
-      s.status = "LIVE";
-      s.matchStartedAt = event.timestamp;
-      return s;
-
     case "SET_START": {
       const newSet = newSetState(p.setNumber, p.firstServer, p.teamAStartSide);
       newSet.startedAt = event.timestamp;
@@ -187,126 +159,15 @@ export function reduce(
       return s;
     }
 
-    case "REPLAY_POINT":
-      s.rallyPhase = "BETWEEN_RALLIES";
-      return s;
-
-    case "TIMEOUT_REQUEST":
-      if (set) {
-        if (p.team === "A") set.timeoutsUsedA += 1;
-        else set.timeoutsUsedB += 1;
-      }
-      s.activeTimeoutTeam = p.team;
-      s.rallyPhase = "TIMEOUT_ACTIVE";
-      return s;
-
-    case "TIMEOUT_END":
-      s.activeTimeoutTeam = null;
-      s.rallyPhase = "BETWEEN_RALLIES";
-      return s;
-
     case "SIDE_SWITCH":
       if (set) set.teamASide = p.newTeamASide;
       return s;
 
     case "SUBSTITUTION": {
       if (!set) return s;
-      const court = p.team === "A" ? set.courtPositionsA : set.courtPositionsB;
-      const slots = p.team === "A" ? set.subSlotsA : set.subSlotsB;
-      const lineup = p.team === "A" ? set.lineupA : set.lineupB;
-
-      const outIsStarter = lineup.includes(p.outPlayerId);
-      if (outIsStarter && slots[p.outPlayerId] === undefined) {
-        slots[p.outPlayerId] = p.inPlayerId;
-      } else {
-        const starter = Object.keys(slots).find(
-          (k) => slots[k] === p.outPlayerId,
-        );
-        if (starter) slots[starter] = null;
-      }
-      swapOnCourt(court, p.outPlayerId, p.inPlayerId);
-
-      if (!p.isEmergency) {
-        if (p.team === "A") {
-          set.subsUsedA += 1;
-          s.totalMatchSubsA += 1;
-        } else {
-          set.subsUsedB += 1;
-          s.totalMatchSubsB += 1;
-        }
-      }
+      applySubstitution(s, set, p, !p.isEmergency);
       return s;
     }
-
-    case "SET_END": {
-      const idx = p.setNumber - 1;
-      const target = s.sets[idx];
-      if (!target) return s;
-      if (!target.winner) {
-        if (p.winner === "A") s.setsWonA += 1;
-        else s.setsWonB += 1;
-      }
-      if (target.scoreA === 0 && target.scoreB === 0) {
-        target.scoreA = p.scoreA;
-        target.scoreB = p.scoreB;
-      }
-      target.winner = p.winner;
-      target.endedAt = event.timestamp;
-      s.rallyPhase = "SET_BREAK";
-      return s;
-    }
-
-    case "MATCH_END":
-      s.winner = p.winner;
-      s.status = "FINISHED";
-      s.rallyPhase = "MATCH_OVER";
-      return s;
-
-    case "MEDICAL_TIMEOUT":
-      s.medicalTimeoutTeam = p.team;
-      s.rallyPhase = "MEDICAL_TIMEOUT_ACTIVE";
-      return s;
-
-    case "MEDICAL_TIMEOUT_END":
-      s.medicalTimeoutTeam = null;
-      s.rallyPhase = "BETWEEN_RALLIES";
-      return s;
-
-    case "DELAY_WARNING":
-      if (set) {
-        if (p.team === "A")
-          set.delaySanctionsA = Math.max(1, set.delaySanctionsA);
-        else set.delaySanctionsB = Math.max(1, set.delaySanctionsB);
-      }
-      return s;
-
-    case "DELAY_PENALTY":
-      if (set) {
-        if (p.team === "A") set.delaySanctionsA += 1;
-        else set.delaySanctionsB += 1;
-      }
-      return s;
-
-    case "MISCONDUCT_WARNING":
-    case "MISCONDUCT_PENALTY":
-    case "MISCONDUCT_EXPULSION":
-    case "MISCONDUCT_DISQUALIFICATION": {
-      const record = {
-        type: p.type,
-        playerId: p.playerId,
-        setNumber: s.currentSetNumber,
-        scoreA: set?.scoreA ?? 0,
-        scoreB: set?.scoreB ?? 0,
-      };
-      if (p.team === "A") s.misconductA.push(record);
-      else s.misconductB.push(record);
-      return s;
-    }
-
-    case "SERVE_CLOCK_EXPIRE":
-    case "UNDO":
-    case "NOTE":
-      return s;
 
     default:
       return s;
@@ -329,99 +190,27 @@ export function computeAutoEmits(
   const set = activeSet(state);
   if (!set || set.winner) return [];
 
-  const winner = computeSetEnd(set, config);
-  if (winner) {
-    const emits: GrassEventPayload[] = [
-      {
-        type: "SET_END",
-        winner,
-        scoreA: set.scoreA,
-        scoreB: set.scoreB,
-        setNumber: set.setNumber,
-      },
-    ];
-    const setsA = state.setsWonA + (winner === "A" ? 1 : 0);
-    const setsB = state.setsWonB + (winner === "B" ? 1 : 0);
-    const need = setsNeededToWin(config);
-    if (setsA >= need || setsB >= need)
-      emits.push({ type: "MATCH_END", winner, setsA, setsB });
-    return emits;
-  }
+  const end = computeEndEmits(set, state, config);
+  if (end) return end;
 
   if (isSideSwitchDue(set, config))
     return [{ type: "SIDE_SWITCH", newTeamASide: oppositeSide(set.teamASide) }];
   return [];
 }
 
-// ── append orchestration (pure) ──────────────────────────────────────────────
+// ── append orchestration & replay (shared chassis) ───────────────────────────
 
 function isScoringEvent(type: GrassEventPayload["type"]): boolean {
   return type === "RALLY_WON_A" || type === "RALLY_WON_B";
 }
 
-export type AppendResult =
-  | { ok: false; reason: string }
-  | { ok: true; newEvents: GrassEvent[]; state: GrassMatchState };
+export type AppendResult = CoreAppendResult<GrassMatchState, GrassEventPayload>;
 
-export function appendGrassEvent(
-  prevState: GrassMatchState,
-  payload: GrassEventPayload,
-  config: TournamentConfig,
-  opts: {
-    nextSequence: number;
-    timestamp: string;
-    makeId: (sequence: number) => string;
-  },
-): AppendResult {
-  const validation = validateGrassEvent(payload, prevState, config);
-  if (!validation.ok) return { ok: false, reason: validation.reason! };
+export const appendGrassEvent = createAppendFn({
+  validate: validateGrassEvent,
+  reduce,
+  computeAutoEmits,
+  isScoringEvent,
+});
 
-  let seq = opts.nextSequence;
-  const newEvents: GrassEvent[] = [];
-  let state = prevState;
-
-  const primary: GrassEvent = {
-    id: opts.makeId(seq),
-    sequence: seq,
-    timestamp: opts.timestamp,
-    payload,
-  };
-  newEvents.push(primary);
-  state = reduce(state, primary, config);
-  seq += 1;
-
-  if (isScoringEvent(payload.type)) {
-    for (const emit of computeAutoEmits(state, config)) {
-      const ev: GrassEvent = {
-        id: opts.makeId(seq),
-        sequence: seq,
-        timestamp: opts.timestamp,
-        payload: emit,
-      };
-      newEvents.push(ev);
-      state = reduce(state, ev, config);
-      seq += 1;
-    }
-  }
-
-  return { ok: true, newEvents, state };
-}
-
-// ── replay ───────────────────────────────────────────────────────────────────
-
-export function replayEvents(
-  matchId: string,
-  events: GrassEvent[],
-  config: TournamentConfig,
-): GrassMatchState {
-  const undone = new Set<string>();
-  for (const ev of events) {
-    if (ev.payload.type === "UNDO") undone.add(ev.payload.targetEventId);
-  }
-  let state = initialGrassState(matchId);
-  for (const ev of events) {
-    if (ev.payload.type !== "UNDO" && undone.has(ev.id)) continue;
-    state = reduce(state, ev, config);
-  }
-  return state;
-}
+export const replayEvents = createReplayFn(initialGrassState, reduce);

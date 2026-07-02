@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/authz";
 import { listAudit } from "@/lib/audit";
+import { getT } from "@/lib/i18n/server";
 import { ui } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export default async function AuditPage({
   params: Promise<{ tenantSlug: string }>;
 }) {
   const { tenantSlug } = await params;
+  const { t } = await getT();
   const ctx = await requireRole(
     tenantSlug,
     ["TENANT_ADMIN"],
@@ -22,29 +24,29 @@ export default async function AuditPage({
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Audit log</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("audit.title")}</h1>
           <p className="mt-1 text-sm text-score-dim">
-            Recent administrative changes for {ctx.tenant.name}.
+            {t("audit.subtitle", { tenant: ctx.tenant.name })}
           </p>
         </div>
         <Link href={`/t/${tenantSlug}/settings`} className={ui.btnSecondary}>
-          ← Settings
+          {t("common.backToSettings")}
         </Link>
       </div>
 
       {rows.length === 0 ? (
         <div className={`${ui.card} text-sm text-score-dim`}>
-          No audit entries yet.
+          {t("audit.empty")}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full border-collapse">
             <thead className="bg-surface-raised">
               <tr>
-                <th className={ui.th}>When (UTC)</th>
-                <th className={ui.th}>Actor</th>
-                <th className={ui.th}>Action</th>
-                <th className={ui.th}>Detail</th>
+                <th className={ui.th}>{t("audit.when")}</th>
+                <th className={ui.th}>{t("match.thActor")}</th>
+                <th className={ui.th}>{t("audit.action")}</th>
+                <th className={ui.th}>{t("audit.detail")}</th>
               </tr>
             </thead>
             <tbody>

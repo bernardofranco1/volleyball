@@ -40,7 +40,8 @@ npm run build    # production build
 | Script | Purpose |
 |--------|---------|
 | `db:push` | Sync schema to the dev DB (`drizzle-kit push`) |
-| `db:generate` | Generate a migration (use for production, never `push`) |
+| `db:generate` | Generate a migration from schema.ts changes (production path) |
+| `db:migrate` | Apply committed migrations (baseline 0000 marks the pre-migration schema) |
 | `db:seed` | Seed the demo tenant + optional first admin |
 | `db:seed:demo` | Seed 4 competitions with finished + live matches |
 

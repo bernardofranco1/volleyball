@@ -8,20 +8,23 @@ import {
 import { loadMatchRosters } from "@/lib/competitions";
 import { PreMatchCountdownOverlay } from "@/components/scoreboard/PreMatchCountdownOverlay";
 import { ScorerPinGate } from "@/components/scoring/ScorerPinGate";
-import { scorerPinSatisfied } from "@/lib/scorer-pin";
+import { scorerKeyValid, scorerPinSatisfied } from "@/lib/scorer-pin";
 
 export const dynamic = "force-dynamic";
 
 export default async function LiveScoringPage({
   params,
+  searchParams,
 }: {
   params: Promise<{
     tenantSlug: string;
     competitionId: string;
     matchId: string;
   }>;
+  searchParams: Promise<{ key?: string }>;
 }) {
   const { tenantSlug, competitionId, matchId } = await params;
+  const { key } = await searchParams;
 
   // Authorize against the match's tenant (SCORER/admin) — not just "logged in".
   const dest = `/t/${tenantSlug}/competitions/${competitionId}/matches/${matchId}/live`;
@@ -29,7 +32,8 @@ export default async function LiveScoringPage({
 
   // Per-match scorer PIN gate (brief §5.2) — on top of admin login. No-op for
   // matches without a PIN set.
-  if (!(await scorerPinSatisfied(matchId))) {
+  // A signed scorer link (?key=<HMAC of the PIN>) pre-satisfies the PIN gate.
+  if (!(await scorerPinSatisfied(matchId)) && !(await scorerKeyValid(matchId, key))) {
     return (
       <ScorerPinGate
         tenantSlug={tenantSlug}

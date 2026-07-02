@@ -1,0 +1,141 @@
+import { describe, expect, it } from "vitest";
+import { DISCIPLINE_DEFAULTS } from "@/engine/config";
+import {
+  computeAutoEmits,
+  reduce as beachReduce,
+  replayEvents as beachReplay,
+} from "@/engine/beach/reducer";
+import {
+  type BeachEvent,
+  type BeachEventPayload,
+  type BeachMatchState,
+  initialBeachState,
+} from "@/engine/beach/types";
+import { selectUndoTargets } from "@/lib/match-engine";
+import type { EngineEvent } from "@/engine/registry";
+
+const BEACH = DISCIPLINE_DEFAULTS.BEACH;
+const TS = "2026-07-01T10:00:00.000Z";
+
+/** Build a beach log up to the TTO trigger (10-10 → A point → sum 21). */
+function buildLogIntoTto(): { events: BeachEvent[]; state: BeachMatchState } {
+  const events: BeachEvent[] = [];
+  let seq = 0;
+  let state: BeachMatchState = initialBeachState("m1");
+  const apply = (payload: BeachEventPayload) => {
+    seq += 1;
+    const e: BeachEvent = { id: `e${seq}`, sequence: seq, timestamp: TS, payload };
+    events.push(e);
+    state = beachReduce(state, e, BEACH);
+  };
+  const dispatch = (payload: BeachEventPayload) => {
+    apply(payload);
+    for (const em of computeAutoEmits(state, BEACH)) apply(em);
+  };
+  apply({ type: "MATCH_CREATED", matchId: "m1" });
+  apply({ type: "COIN_TOSS", firstServer: "A", teamAStartSide: "LEFT" });
+  apply({ type: "MATCH_START" });
+  apply({ type: "SET_START", setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" });
+  for (let i = 0; i < 10; i++) {
+    dispatch({ type: "RALLY_WON_A" });
+    dispatch({ type: "RALLY_WON_B" });
+  }
+  dispatch({ type: "RALLY_WON_A" }); // sum 21 → auto TTO_START
+  return { events, state };
+}
+
+// Regression: undoing during a TTO used to target the auto-emitted TTO_START
+// only (mis-tapped point survived), and undoing only the rally left the
+// surviving TTO_START replaying the match straight back into TTO_ACTIVE.
+describe("undo during a TTO removes the rally AND its auto-emitted TTO_START", () => {
+  it("selectUndoTargets picks the last scorer event plus trailing auto-emits", () => {
+    const { events, state } = buildLogIntoTto();
+    expect(state.rallyPhase).toBe("TTO_ACTIVE");
+
+    // Sum 21 triggers BOTH the side switch (every 7) and the TTO — the undo
+    // batch must remove the rally and all of its consequences.
+    const targets = selectUndoTargets(events as unknown as EngineEvent[]);
+    expect(targets.map((t) => t.payload.type)).toEqual([
+      "RALLY_WON_A",
+      "SIDE_SWITCH",
+      "TTO_START",
+    ]);
+  });
+
+  it("replaying with both tombstoned exits the TTO and restores the score", () => {
+    const { events } = buildLogIntoTto();
+    const targets = selectUndoTargets(events as unknown as EngineEvent[]);
+    let seq = events[events.length - 1].sequence;
+    const undos: BeachEvent[] = targets.map((t) => ({
+      id: `u${++seq}`,
+      sequence: seq,
+      timestamp: TS,
+      payload: { type: "UNDO", targetEventId: t.id },
+    }));
+
+    const state = beachReplay("m1", [...events, ...undos], BEACH);
+    expect(state.rallyPhase).toBe("BETWEEN_RALLIES");
+    expect(state.ttoActive).toBe(false);
+    const set = state.sets[0];
+    expect(set.scoreA).toBe(10);
+    expect(set.scoreB).toBe(10);
+    // The TTO has NOT been consumed — the next trigger point re-fires it.
+    expect(set.ttoFired).toBe(false);
+  });
+
+  it("a second undo then removes the previous rally (not the TTO bookkeeping)", () => {
+    const { events } = buildLogIntoTto();
+    let log = [...events] as unknown as EngineEvent[];
+    let seq = events[events.length - 1].sequence;
+    const undoOnce = () => {
+      const targets = selectUndoTargets(log);
+      log = [
+        ...log,
+        ...targets.map((t) => ({
+          id: `u${++seq}`,
+          sequence: seq,
+          timestamp: TS,
+          payload: { type: "UNDO", targetEventId: t.id },
+        })),
+      ] as EngineEvent[];
+    };
+    undoOnce(); // removes RALLY_WON_A + TTO_START
+    const second = selectUndoTargets(log);
+    expect(second.map((t) => t.payload.type)).toEqual(["RALLY_WON_B"]);
+  });
+
+  it("returns [] when only system/undone events remain", () => {
+    expect(selectUndoTargets([])).toEqual([]);
+    const onlySystem = [
+      {
+        id: "s1",
+        sequence: 1,
+        timestamp: TS,
+        payload: { type: "SET_END", setNumber: 1, winner: "A", scoreA: 21, scoreB: 10 },
+      },
+    ] as unknown as EngineEvent[];
+    expect(selectUndoTargets(onlySystem)).toEqual([]);
+  });
+});
+
+import { shouldSnapshot } from "@/lib/match-engine";
+
+describe("shouldSnapshot (snapshot cache write policy)", () => {
+  const live = (seq: number) => ({ lastSequence: seq, status: "LIVE" as const });
+  const ev = (type: string): EngineEvent =>
+    ({ id: "x", sequence: 1, timestamp: TS, payload: { type } }) as EngineEvent;
+
+  it("always snapshots when none exists", () => {
+    expect(shouldSnapshot(false, 0, live(1), [ev("RALLY_WON_A")])).toBe(true);
+  });
+  it("skips within the interval, writes at the boundary", () => {
+    expect(shouldSnapshot(true, 10, live(12), [ev("RALLY_WON_A")])).toBe(false);
+    expect(shouldSnapshot(true, 10, live(15), [ev("RALLY_WON_A")])).toBe(true);
+  });
+  it("writes when the match leaves LIVE or on system auto-emits", () => {
+    expect(
+      shouldSnapshot(true, 10, { lastSequence: 11, status: "FINISHED" }, [ev("RALLY_WON_A")]),
+    ).toBe(true);
+    expect(shouldSnapshot(true, 10, live(11), [ev("RALLY_WON_A"), ev("SET_END")])).toBe(true);
+  });
+});

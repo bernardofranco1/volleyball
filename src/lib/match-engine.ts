@@ -287,6 +287,25 @@ function derivedMatchColumns(
   };
 }
 
+/**
+ * Snapshot cache write policy (pure — exported for tests): refresh when no
+ * snapshot exists yet, every SNAPSHOT_EVERY events, whenever the match leaves
+ * LIVE, and on any set/match boundary (system auto-emits).
+ */
+export function shouldSnapshot(
+  hasSnapshot: boolean,
+  snapshotSeq: number,
+  finalState: Pick<CommonMatchState, "lastSequence" | "status">,
+  newEvents: EngineEvent[],
+): boolean {
+  return (
+    !hasSnapshot ||
+    finalState.lastSequence - snapshotSeq >= SNAPSHOT_EVERY ||
+    finalState.status !== "LIVE" ||
+    newEvents.some((ev) => SYSTEM_EVENTS.has(ev.payload.type))
+  );
+}
+
 /** Sequence-conflict detection: only a unique violation on (match, sequence). */
 function toWriteError(err: unknown): Error {
   const code = (err as { code?: string })?.code;
@@ -373,11 +392,12 @@ export async function appendMatchEvent(
   });
 
   const finalState = result.state;
-  const includeSnapshot =
-    meta.snap == null ||
-    finalState.lastSequence - meta.snapshotSeq >= SNAPSHOT_EVERY ||
-    finalState.status !== "LIVE" ||
-    result.newEvents.some((ev) => SYSTEM_EVENTS.has(ev.payload.type));
+  const includeSnapshot = shouldSnapshot(
+    meta.snap != null,
+    meta.snapshotSeq,
+    finalState,
+    result.newEvents,
+  );
   try {
     await db.transaction(async (tx) => {
       await tx.insert(events).values(rows);
@@ -428,14 +448,18 @@ export async function appendMatchEvent(
   return { newEvents: result.newEvents, state: finalState };
 }
 
-/** Append an UNDO targeting the most recent undoable event, then re-replay. */
-async function undoLastEvent(
-  matchId: string,
-  meta: MatchMeta,
-  actor: Actor,
-  deviceInfo?: string,
-): Promise<AppendOutcome> {
-  const log = await loadEvents(matchId);
+/**
+ * Which events an "Undo" removes (pure — exported for tests).
+ *
+ * The target is the most recent *scorer-submitted* undoable event; any
+ * auto-emitted consequences that followed it (SET_END / MATCH_END /
+ * SIDE_SWITCH / TTO_START) are undone with it. Targeting system events
+ * directly used to strand scorers in TTO: undoing during one removed only
+ * TTO_START (the mis-tapped point survived), undoing after ending it removed
+ * TTO_END (straight back into the TTO), and undoing only the rally left the
+ * surviving TTO_START replaying the match back into TTO_ACTIVE.
+ */
+export function selectUndoTargets(log: EngineEvent[]): EngineEvent[] {
   const alreadyUndone = new Set<string>();
   for (const ev of log) {
     if (ev.payload.type === "UNDO")
@@ -443,33 +467,67 @@ async function undoLastEvent(
   }
   const target = [...log]
     .reverse()
-    .find((ev) => ev.payload.type !== "UNDO" && !alreadyUndone.has(ev.id));
-  if (!target) throw new EventRejectedError("Nothing to undo");
+    .find(
+      (ev) =>
+        ev.payload.type !== "UNDO" &&
+        !alreadyUndone.has(ev.id) &&
+        !SYSTEM_EVENTS.has(ev.payload.type),
+    );
+  if (!target) return [];
+  // Auto-emits only ever follow a scoring event in its own append batch, and
+  // `target` is the LAST scorer event — every later system event is its doing.
+  const followers = log.filter(
+    (ev) =>
+      ev.sequence > target.sequence &&
+      SYSTEM_EVENTS.has(ev.payload.type) &&
+      !alreadyUndone.has(ev.id),
+  );
+  return [target, ...followers];
+}
 
-  const nextSeq = (log[log.length - 1]?.sequence ?? 0) + 1;
-  const undoEvent: EngineEvent = {
+/** Append UNDOs for the last scorer action (+ its auto-emits), then re-replay. */
+async function undoLastEvent(
+  matchId: string,
+  meta: MatchMeta,
+  actor: Actor,
+  deviceInfo?: string,
+): Promise<AppendOutcome> {
+  const log = await loadEvents(matchId);
+  const targets = selectUndoTargets(log);
+  if (targets.length === 0) throw new EventRejectedError("Nothing to undo");
+
+  let nextSeq = (log[log.length - 1]?.sequence ?? 0) + 1;
+  const timestamp = new Date().toISOString();
+  const undoEvents: EngineEvent[] = targets.map((t) => ({
     id: newId("evt"),
-    sequence: nextSeq,
-    timestamp: new Date().toISOString(),
-    payload: { type: "UNDO", targetEventId: target.id },
-  };
+    sequence: nextSeq++,
+    timestamp,
+    payload: { type: "UNDO", targetEventId: t.id },
+  }));
 
-  const finalState = meta.engine.replay(matchId, [...log, undoEvent], meta.config);
+  const finalState = meta.engine.replay(
+    matchId,
+    [...log, ...undoEvents],
+    meta.config,
+  );
 
   try {
     await db.transaction(async (tx) => {
-      await tx.insert(events).values({
-        id: undoEvent.id,
-        matchId,
-        tenantId: meta.tenantId,
-        sequence: undoEvent.sequence,
-        timestamp: new Date(undoEvent.timestamp),
-        eventType: "UNDO",
-        payload: undoEvent.payload,
-        actor,
-        deviceInfo: deviceInfo ?? null,
-        ...meta.engine.denormalize(finalState),
-      });
+      const d = meta.engine.denormalize(finalState);
+      await tx.insert(events).values(
+        undoEvents.map((ev) => ({
+          id: ev.id,
+          matchId,
+          tenantId: meta.tenantId,
+          sequence: ev.sequence,
+          timestamp: new Date(ev.timestamp),
+          eventType: "UNDO",
+          payload: ev.payload,
+          actor,
+          deviceInfo: deviceInfo ?? null,
+          ...d,
+        })),
+      );
       await tx
         .update(matches)
         // Always refresh the snapshot after an undo — the old one contains the
@@ -482,5 +540,5 @@ async function undoLastEvent(
   }
 
   scheduleBroadcast([stateUpdateMessage(matchId, finalState.lastSequence)]);
-  return { newEvents: [undoEvent], state: finalState };
+  return { newEvents: undoEvents, state: finalState };
 }

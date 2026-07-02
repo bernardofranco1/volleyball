@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { verifyScorerPin } from "@/lib/scorer-pin-actions";
+import { useT } from "@/lib/i18n/client";
 import { OK } from "@/lib/action-state";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 
@@ -15,6 +16,7 @@ export function ScorerPinGate({
   competitionId: string;
   matchId: string;
 }) {
+  const t = useT();
   const [state, action] = useActionState(verifyScorerPin, OK);
   return (
     <main className="grid min-h-[60vh] place-items-center px-6">
@@ -22,9 +24,9 @@ export function ScorerPinGate({
         action={action}
         className="w-full max-w-xs rounded-2xl border border-border bg-surface-raised p-6"
       >
-        <h1 className="text-lg font-semibold">Scorer PIN</h1>
+        <h1 className="text-lg font-semibold">{t("scoring.pinTitle")}</h1>
         <p className="mb-4 mt-1 text-sm text-score-dim">
-          Enter the 6-digit PIN for this match.
+          {t("scoring.pinPrompt")}
         </p>
         <input type="hidden" name="matchId" value={matchId} />
         <input type="hidden" name="tenantSlug" value={tenantSlug} />
@@ -43,7 +45,7 @@ export function ScorerPinGate({
           <p className="mt-3 text-sm text-red-400">{state.error}</p>
         )}
         <div className="mt-4">
-          <SubmitButton pendingLabel="Checking…">Unlock</SubmitButton>
+          <SubmitButton pendingLabel={t("scoring.checking")}>{t("scoring.unlock")}</SubmitButton>
         </div>
       </form>
     </main>

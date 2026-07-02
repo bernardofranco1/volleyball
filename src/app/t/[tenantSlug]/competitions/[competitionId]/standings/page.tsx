@@ -11,7 +11,9 @@ import {
   generateBracket,
   renamePool,
   savePoolAssignments,
+  seedFromStandings,
 } from "@/lib/tournament-actions";
+import { getT } from "@/lib/i18n/server";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { BracketView } from "@/components/admin/BracketView";
 import { CompetitionHeader } from "@/components/admin/CompetitionHeader";
@@ -36,6 +38,7 @@ export default async function StandingsPage({
   params: Promise<{ tenantSlug: string; competitionId: string }>;
 }) {
   const { tenantSlug, competitionId } = await params;
+  const { t } = await getT();
   const ctx = await requireRole(
     tenantSlug,
     ADMIN_ROLES,
@@ -68,7 +71,7 @@ export default async function StandingsPage({
       {/* Standings */}
       {groups.length === 0 || groups.every((g) => g.rows.length === 0) ? (
         <div className={`${ui.card} text-sm text-score-dim`}>
-          No teams yet — standings appear once matches finish.
+          {t("standings.empty")}
         </div>
       ) : (
         <div className="space-y-8">
@@ -80,7 +83,7 @@ export default async function StandingsPage({
                   <thead className="bg-surface-raised">
                     <tr>
                       <th className={ui.th}>#</th>
-                      <th className={ui.th}>Team</th>
+                      <th className={ui.th}>{t("common.team")}</th>
                       {COLS.map(([label]) => (
                         <th key={label} className={`${ui.th} text-right`}>
                           {label}
@@ -110,8 +113,7 @@ export default async function StandingsPage({
             </section>
           ))}
           <p className="text-xs text-score-dim">
-            Tiebreakers: wins → set ratio → point ratio → head-to-head. Pool
-            tables count intra-pool matches only.
+            {t("standings.tiebreakers")}
           </p>
         </div>
       )}
@@ -119,15 +121,18 @@ export default async function StandingsPage({
       {/* Pools */}
       <section className="mt-10">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-medium">Pools</h2>
+          <h2 className="font-medium">{t("standings.pools")}</h2>
           {pools.length >= 2 && teams.length > 0 && (
             <ActionForm
               action={distributePoolsBySeed}
-              confirm={`Distribute all ${teams.length} teams into ${pools.length} pools by seed (serpentine)? Existing assignments are overwritten.`}
+              confirm={t("standings.distributeConfirm", {
+                teams: teams.length,
+                pools: pools.length,
+              })}
             >
               {hidden}
-              <SubmitButton variant="secondary" pendingLabel="Distributing…">
-                Distribute by seed
+              <SubmitButton variant="secondary" pendingLabel={t("standings.distributing")}>
+                {t("standings.distribute")}
               </SubmitButton>
             </ActionForm>
           )}
@@ -135,29 +140,29 @@ export default async function StandingsPage({
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
           <div className={ui.card}>
             {teams.length === 0 ? (
-              <p className="text-sm text-score-dim">Add teams first.</p>
+              <p className="text-sm text-score-dim">{t("standings.addTeamsFirst")}</p>
             ) : (
               <ActionForm action={savePoolAssignments}>
                 {hidden}
                 <ul className="space-y-2">
-                  {teams.map((t) => (
+                  {teams.map((team) => (
                     <li
-                      key={t.id}
+                      key={team.id}
                       className="flex items-center justify-between gap-3"
                     >
                       <label
-                        htmlFor={`pool-${t.id}`}
+                        htmlFor={`pool-${team.id}`}
                         className="text-sm"
                       >
-                        {t.displayName}
+                        {team.displayName}
                       </label>
                       <select
-                        id={`pool-${t.id}`}
-                        name={`pool-${t.id}`}
-                        defaultValue={t.poolId ?? ""}
+                        id={`pool-${team.id}`}
+                        name={`pool-${team.id}`}
+                        defaultValue={team.poolId ?? ""}
                         className={`${ui.select} w-40`}
                       >
-                        <option value="">— no pool —</option>
+                        <option value="">{t("standings.noPool")}</option>
                         {pools.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
@@ -168,8 +173,8 @@ export default async function StandingsPage({
                   ))}
                 </ul>
                 <div className="mt-4">
-                  <SubmitButton pendingLabel="Saving…">
-                    Save all assignments
+                  <SubmitButton pendingLabel={t("common.saving")}>
+                    {t("standings.saveAssignments")}
                   </SubmitButton>
                 </div>
               </ActionForm>
@@ -178,10 +183,10 @@ export default async function StandingsPage({
 
           <div className="space-y-4">
             <ActionForm action={createPool} className={ui.card} resetOnOk>
-              <h3 className="mb-3 font-medium">New pool</h3>
+              <h3 className="mb-3 font-medium">{t("standings.newPool")}</h3>
               {hidden}
               <label className="sr-only" htmlFor="new-pool-name">
-                Pool name
+                {t("standings.poolName")}
               </label>
               <input
                 id="new-pool-name"
@@ -191,13 +196,13 @@ export default async function StandingsPage({
                 className={ui.input}
               />
               <div className="mt-3">
-                <SubmitButton pendingLabel="Adding…">Create pool</SubmitButton>
+                <SubmitButton pendingLabel={t("common.adding")}>{t("standings.createPool")}</SubmitButton>
               </div>
             </ActionForm>
 
             {pools.length > 0 && (
               <div className={ui.card}>
-                <h3 className="mb-3 font-medium">Manage pools</h3>
+                <h3 className="mb-3 font-medium">{t("standings.managePools")}</h3>
                 <ul className="space-y-3">
                   {pools.map((p) => (
                     <li key={p.id}>
@@ -208,7 +213,7 @@ export default async function StandingsPage({
                         {hidden}
                         <input type="hidden" name="poolId" value={p.id} />
                         <label className="sr-only" htmlFor={`rename-${p.id}`}>
-                          Rename {p.name}
+                          {t("standings.renameLabel", { name: p.name })}
                         </label>
                         <input
                           id={`rename-${p.id}`}
@@ -220,12 +225,12 @@ export default async function StandingsPage({
                           type="submit"
                           className="text-xs text-score-dim hover:text-foreground"
                         >
-                          Rename
+                          {t("common.rename")}
                         </button>
                       </ActionForm>
                       <ActionForm
                         action={deletePool}
-                        confirm={`Delete ${p.name}? Its teams become unpooled.`}
+                        confirm={t("standings.deletePoolConfirm", { name: p.name })}
                         className="mt-1"
                       >
                         {hidden}
@@ -234,7 +239,7 @@ export default async function StandingsPage({
                           type="submit"
                           className="text-xs text-score-dim hover:text-red-400"
                         >
-                          Delete pool
+                          {t("standings.deletePool")}
                         </button>
                       </ActionForm>
                     </li>
@@ -245,35 +250,44 @@ export default async function StandingsPage({
           </div>
         </div>
         <p className="mt-2 text-xs text-score-dim">
-          With pools assigned, “Generate round-robin” on the Schedule tab
-          creates per-pool fixtures, and each pool&apos;s table counts only its own
-          matches.
+          {t("standings.poolsNote")}
         </p>
       </section>
 
       {/* Knockout bracket */}
       <section className="mt-10">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-medium">Knockout bracket</h2>
+          <h2 className="font-medium">{t("standings.bracket")}</h2>
           <div className="flex gap-2">
             {bracket.length === 0 ? (
-              <ActionForm
-                action={generateBracket}
-                confirm="Seed the bracket from the Seed column now? This creates the first-round matches."
-              >
-                {hidden}
-                <SubmitButton pendingLabel="Seeding…">
-                  Generate (single-elim)
-                </SubmitButton>
-              </ActionForm>
+              <>
+                <ActionForm
+                  action={seedFromStandings}
+                  confirm={t("standings.seedConfirm")}
+                >
+                  {hidden}
+                  <SubmitButton variant="secondary" pendingLabel={t("standings.seeding")}>
+                    {t("standings.seedFrom")}
+                  </SubmitButton>
+                </ActionForm>
+                <ActionForm
+                  action={generateBracket}
+                  confirm={t("standings.generateBracketConfirm")}
+                >
+                  {hidden}
+                  <SubmitButton pendingLabel={t("standings.seeding")}>
+                    {t("standings.generateBracket")}
+                  </SubmitButton>
+                </ActionForm>
+              </>
             ) : (
               <ActionForm
                 action={advanceBracket}
-                confirm="Advance winners into the next round?"
+                confirm={t("standings.advanceConfirm")}
               >
                 {hidden}
-                <SubmitButton variant="secondary" pendingLabel="Advancing…">
-                  Advance winners
+                <SubmitButton variant="secondary" pendingLabel={t("standings.advancing")}>
+                  {t("standings.advance")}
                 </SubmitButton>
               </ActionForm>
             )}
@@ -283,10 +297,7 @@ export default async function StandingsPage({
           <BracketView rounds={bracket} matchHref={(id) => `${base}/matches/${id}`} />
         </div>
         <p className="mt-2 text-xs text-score-dim">
-          Seeds come from the teams&apos; Seed column (largest power-of-two field) —
-          update seeds after pool play before generating. Play each round, then
-          “Advance winners” to stage the next; the 3rd-place match is created
-          with the final.
+          {t("standings.bracketNote")}
         </p>
       </section>
     </main>

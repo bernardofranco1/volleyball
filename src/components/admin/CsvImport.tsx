@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { IMPORT_INIT, type ImportState } from "@/lib/action-state";
+import { useT } from "@/lib/i18n/client";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { ui } from "@/components/admin/styles";
 
@@ -23,6 +24,7 @@ export function CsvImport({
   templateHref?: string;
   templateName?: string;
 }) {
+  const t = useT();
   const [state, formAction] = useActionState(action, IMPORT_INIT);
 
   return (
@@ -36,7 +38,7 @@ export function CsvImport({
             download={templateName ?? "template.csv"}
             className="text-score-dim underline hover:text-foreground"
           >
-            Download template
+            {t("csv.downloadTemplate")}
           </a>
         </p>
       )}
@@ -52,8 +54,8 @@ export function CsvImport({
       />
 
       <div className="mt-3">
-        <SubmitButton variant="secondary" pendingLabel="Importing…">
-          Import CSV
+        <SubmitButton variant="secondary" pendingLabel={t("common.importing")}>
+          {t("csv.import")}
         </SubmitButton>
       </div>
 
@@ -61,11 +63,11 @@ export function CsvImport({
 
       {state.summary && (
         <div className="mt-3 text-sm">
-          <p className="text-green-400">{state.summary.ok} rows imported</p>
+          <p className="text-green-400">{t("csv.rowsImported", { count: state.summary.ok })}</p>
           {state.summary.errors > 0 && (
             <details className="mt-1">
               <summary className="cursor-pointer text-red-400">
-                {state.summary.errors} rows skipped
+                {t("csv.rowsSkipped", { count: state.summary.errors })}
               </summary>
               <ul className="mt-1 space-y-0.5 text-xs text-score-dim">
                 {state.summary.messages.slice(0, 25).map((m, i) => (

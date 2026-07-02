@@ -13,6 +13,7 @@ import {
   updateTeam,
 } from "@/lib/team-actions";
 import { importRoster } from "@/lib/csv-actions";
+import { getT } from "@/lib/i18n/server";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { AddTeamForm } from "@/components/admin/AddTeamForm";
 import { AddPlayerForm } from "@/components/admin/AddPlayerForm";
@@ -38,6 +39,7 @@ export default async function TeamsPage({
   params: Promise<{ tenantSlug: string; competitionId: string }>;
 }) {
   const { tenantSlug, competitionId } = await params;
+  const { t } = await getT();
   const ctx = await requireRole(
     tenantSlug,
     ADMIN_ROLES,
@@ -57,15 +59,14 @@ export default async function TeamsPage({
         tenantSlug={tenantSlug}
         competition={competition}
         active="teams"
-        subtitle={` · ${teams.length} teams`}
+        subtitle={` · ${t("comp.teamsCount", { count: teams.length })}`}
       />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
         <section className="space-y-4 lg:order-none order-last">
           {teams.length === 0 ? (
             <div className={`${ui.card} text-sm text-score-dim`}>
-              No teams yet. Add them below — one at a time, several at once, or
-              via CSV import.
+              {t("teams.empty")}
             </div>
           ) : (
             teams.map((team) => {
@@ -85,7 +86,7 @@ export default async function TeamsPage({
                     <input type="hidden" name="teamId" value={team.id} />
                     <div className="flex-1">
                       <label className={ui.label} htmlFor={`name-${team.id}`}>
-                        Name
+                        {t("common.name")}
                       </label>
                       <input
                         id={`name-${team.id}`}
@@ -100,7 +101,7 @@ export default async function TeamsPage({
                         className={ui.label}
                         htmlFor={`country-${team.id}`}
                       >
-                        Country
+                        {t("common.country")}
                       </label>
                       <input
                         id={`country-${team.id}`}
@@ -112,7 +113,7 @@ export default async function TeamsPage({
                     </div>
                     <div>
                       <label className={ui.label} htmlFor={`seed-${team.id}`}>
-                        Seed
+                        {t("common.seed")}
                       </label>
                       <input
                         id={`seed-${team.id}`}
@@ -124,7 +125,7 @@ export default async function TeamsPage({
                       />
                     </div>
                     <SubmitButton variant="secondary" pendingLabel="…">
-                      Save
+                      {t("common.save")}
                     </SubmitButton>
                   </ActionForm>
 
@@ -132,7 +133,7 @@ export default async function TeamsPage({
                   <ul className="mt-4 divide-y divide-border">
                     {roster.length === 0 ? (
                       <li className="py-2 text-sm text-score-dim">
-                        No players yet.
+                        {t("teams.noPlayers")}
                       </li>
                     ) : (
                       roster.map((p) => (
@@ -157,22 +158,22 @@ export default async function TeamsPage({
                               type="number"
                               min={0}
                               defaultValue={p.jerseyNumber ?? ""}
-                              aria-label="Jersey number"
+                              aria-label={t("common.jerseyNumber")}
                               placeholder="#"
                               className={`${ui.input} w-14 px-2 py-1 text-sm`}
                             />
                             <input
                               name="firstName"
                               defaultValue={p.firstName ?? ""}
-                              aria-label="First name"
-                              placeholder="First name"
+                              aria-label={t("common.firstName")}
+                              placeholder={t("common.firstName")}
                               className={`${ui.input} w-28 flex-1 px-2 py-1 text-sm sm:flex-none`}
                             />
                             <input
                               name="lastName"
                               defaultValue={p.lastName ?? ""}
-                              aria-label="Last name"
-                              placeholder="Last name"
+                              aria-label={t("common.lastName")}
+                              placeholder={t("common.lastName")}
                               className={`${ui.input} w-28 flex-1 px-2 py-1 text-sm sm:flex-none`}
                             />
                             <label className="flex items-center gap-1 text-xs text-score-dim">
@@ -180,7 +181,7 @@ export default async function TeamsPage({
                                 type="checkbox"
                                 name="isCaptain"
                                 defaultChecked={p.isCaptain}
-                                aria-label={`${p.fullName} is captain`}
+                                aria-label={t("teams.isCaptain", { name: p.fullName })}
                               />
                               C
                             </label>
@@ -189,21 +190,21 @@ export default async function TeamsPage({
                                 type="checkbox"
                                 name="isLibero"
                                 defaultChecked={p.isLibero}
-                                aria-label={`${p.fullName} is libero`}
+                                aria-label={t("teams.isLibero", { name: p.fullName })}
                               />
                               L
                             </label>
                             <button
                               type="submit"
                               className="text-xs text-score-dim hover:text-foreground"
-                              aria-label={`Save ${p.fullName}`}
+                              aria-label={t("teams.savePlayer", { name: p.fullName })}
                             >
-                              Save
+                              {t("common.save")}
                             </button>
                           </ActionForm>
                           <ActionForm
                             action={deletePlayer}
-                            confirm={`Remove ${p.fullName} from ${team.displayName}?`}
+                            confirm={t("teams.removeConfirm", { player: p.fullName, team: team.displayName })}
                             className="mt-0.5"
                           >
                             <input
@@ -220,9 +221,9 @@ export default async function TeamsPage({
                             <button
                               type="submit"
                               className="text-xs text-score-dim hover:text-red-400"
-                              aria-label={`Remove ${p.fullName}`}
+                              aria-label={t("teams.removePlayer", { name: p.fullName })}
                             >
-                              Remove
+                              {t("common.remove")}
                             </button>
                           </ActionForm>
                         </li>
@@ -239,7 +240,7 @@ export default async function TeamsPage({
                   <div className="mt-4 border-t border-border pt-3">
                     <ActionForm
                       action={deleteTeam}
-                      confirm={`Delete ${team.displayName} and its ${roster.length} player(s)? This cannot be undone.`}
+                      confirm={t("teams.deleteConfirm", { team: team.displayName, count: roster.length })}
                     >
                       <input
                         type="hidden"
@@ -253,7 +254,7 @@ export default async function TeamsPage({
                       />
                       <input type="hidden" name="teamId" value={team.id} />
                       <SubmitButton variant="danger" pendingLabel="…">
-                        Delete team
+                        {t("teams.deleteTeam")}
                       </SubmitButton>
                     </ActionForm>
                   </div>
@@ -267,15 +268,14 @@ export default async function TeamsPage({
           <AddTeamForm tenantSlug={tenantSlug} competitionId={competitionId} />
 
           <ActionForm action={bulkAddTeams} className={ui.card} resetOnOk>
-            <h2 className="mb-1 font-medium">Bulk add teams</h2>
+            <h2 className="mb-1 font-medium">{t("teams.bulkTitle")}</h2>
             <p className="mb-3 text-xs text-score-dim">
-              One team per line, optional “,country” suffix. Existing names are
-              skipped.
+              {t("teams.bulkHint")}
             </p>
             <input type="hidden" name="tenantSlug" value={tenantSlug} />
             <input type="hidden" name="competitionId" value={competitionId} />
             <label className="sr-only" htmlFor="bulk-names">
-              Team names
+              {t("teams.bulkLabel")}
             </label>
             <textarea
               id="bulk-names"
@@ -286,8 +286,8 @@ export default async function TeamsPage({
               className={`${ui.input} font-mono`}
             />
             <div className="mt-3">
-              <SubmitButton variant="secondary" pendingLabel="Adding…">
-                Add all
+              <SubmitButton variant="secondary" pendingLabel={t("common.adding")}>
+                {t("teams.addAll")}
               </SubmitButton>
             </div>
           </ActionForm>
@@ -295,7 +295,7 @@ export default async function TeamsPage({
           <CsvImport
             tenantSlug={tenantSlug}
             competitionId={competitionId}
-            title="Import teams & players"
+            title={t("teams.importTitle")}
             hint="Team,First name,Last name,Jersey,Captain,Libero — teams are created automatically; the John Doe example row is ignored"
             action={importRoster}
             templateHref={ROSTER_TEMPLATE}

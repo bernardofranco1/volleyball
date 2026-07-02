@@ -14,13 +14,14 @@ import { resolveConfig, type TournamentConfig } from "@/engine/config";
 import type { Discipline } from "@/engine/types";
 import { TeamColorPicker } from "@/components/admin/TeamColorPicker";
 import { ScorerPinAdmin } from "@/components/admin/ScorerPinAdmin";
-import { getScorerPin } from "@/lib/scorer-pin";
+import { getScorerPin, scorerPinCookieValue } from "@/lib/scorer-pin";
 import {
   createMatchSession,
   revokeMatchSession,
 } from "@/lib/match-session-actions";
 import { qrSvg } from "@/lib/qr";
 import { findSequenceGaps } from "@/lib/integrity";
+import { getT } from "@/lib/i18n/server";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { CopyButton } from "@/components/CopyButton";
 import { LocalTime } from "@/components/LocalTime";
@@ -61,6 +62,7 @@ export default async function MatchDetailPage({
 }) {
   const { tenantSlug, competitionId, matchId } = await params;
   const { log: logParam } = await searchParams;
+  const { t } = await getT();
   const fullLog = logParam === "full";
   const ctx = await requireRole(
     tenantSlug,
@@ -117,6 +119,13 @@ export default async function MatchDetailPage({
   const log = [...logRows].reverse(); // stored desc for LIMIT; display asc
   const base = `/t/${tenantSlug}/competitions/${competitionId}`;
 
+  // Signed scorer deep-link: scanning it opens the scorer with the PIN gate
+  // pre-satisfied (login + role still required). Rotating the PIN kills it.
+  const scorerLink = pin
+    ? `${origin}${base}/matches/${matchId}/live?key=${scorerPinCookieValue(matchId, pin)}`
+    : null;
+  const scorerLinkQr = scorerLink ? await qrSvg(scorerLink) : null;
+
   // Render a QR per active, non-expired session token (expiry filtered in SQL).
   const tokens = await Promise.all(
     sessions.map(async (s) => {
@@ -131,7 +140,7 @@ export default async function MatchDetailPage({
         href={`${base}/schedule`}
         className="text-sm text-score-dim hover:text-foreground"
       >
-        ← Schedule
+        {t("match.backToSchedule")}
       </Link>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
@@ -143,7 +152,7 @@ export default async function MatchDetailPage({
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={`${base}/matches/${matchId}/live`} className={ui.btnPrimary}>
-            Open Scorer
+            {t("match.openScorer")}
           </Link>
           <a
             href={`/t/${tenantSlug}/scoreboard/${matchId}`}
@@ -151,7 +160,7 @@ export default async function MatchDetailPage({
             rel="noopener noreferrer"
             className={ui.btnSecondary}
           >
-            View Scoreboard
+            {t("match.viewScoreboard")}
           </a>
           <a
             href={`/api/matches/${matchId}/export.pdf`}
@@ -159,7 +168,7 @@ export default async function MatchDetailPage({
             rel="noopener noreferrer"
             className={ui.btnSecondary}
           >
-            Export PDF
+            {t("match.exportPdf")}
           </a>
         </div>
       </div>
@@ -167,7 +176,7 @@ export default async function MatchDetailPage({
       <p className="mt-1 text-sm text-score-dim">
         {competition.name} · {match.discipline}
         {match.roundName ? ` · ${match.roundName}` : ""}
-        {match.courtNumber ? ` · Court ${match.courtNumber}` : ""}
+        {match.courtNumber ? ` · ${t("match.court", { number: match.courtNumber })}` : ""}
         {match.scheduledAt && (
           <>
             {" · "}
@@ -192,12 +201,28 @@ export default async function MatchDetailPage({
           matchId={matchId}
           pin={pin}
         />
+        {scorerLink && scorerLinkQr && (
+          <div className={ui.card}>
+            <h2 className="mb-1 font-medium">{t("match.scorerLink")}</h2>
+            <p className="mb-3 text-[11px] text-score-dim">
+              {t("match.scorerLinkHint")}
+            </p>
+            <div
+              className="mx-auto w-28 overflow-hidden rounded bg-white p-2 [&_svg]:h-full [&_svg]:w-full"
+              // qrcode emits a trusted, self-generated SVG string.
+              dangerouslySetInnerHTML={{ __html: scorerLinkQr }}
+            />
+            <div className="mt-2 text-center">
+              <CopyButton text={scorerLink} label={t("match.copyScorerLink")} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Result */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className={ui.card}>
-          <h2 className="mb-3 font-medium">Result</h2>
+          <h2 className="mb-3 font-medium">{t("match.result")}</h2>
           <div className="flex items-center justify-around text-center">
             <div>
               <div className="text-sm text-score-dim">{match.teamAName}</div>
@@ -205,7 +230,7 @@ export default async function MatchDetailPage({
                 {match.setsWonA}
               </div>
             </div>
-            <div className="text-score-dim">sets</div>
+            <div className="text-score-dim">{t("match.sets")}</div>
             <div>
               <div className="text-sm text-score-dim">{match.teamBName}</div>
               <div className="text-4xl font-bold tabular-nums">
@@ -215,7 +240,7 @@ export default async function MatchDetailPage({
           </div>
           {match.winner && (
             <p className="mt-3 text-center text-sm text-score-dim">
-              Winner:{" "}
+              {t("match.winner")}{" "}
               <span className="text-foreground">
                 {match.winner === "A" ? match.teamAName : match.teamBName}
               </span>
@@ -225,11 +250,11 @@ export default async function MatchDetailPage({
 
         {/* Team tablet QR tokens */}
         <div className={ui.card}>
-          <h2 className="mb-1 font-medium">Team tablet access</h2>
+          <h2 className="mb-1 font-medium">{t("match.tabletAccess")}</h2>
           {config.teamTabletEnabled ? (
             <>
               <p className="mb-4 text-xs text-score-dim">
-                Generate a QR for each team’s tablet. Tokens expire in 12 hours.
+                {t("match.tabletHint")}
               </p>
 
               <div className="flex gap-2">
@@ -244,8 +269,9 @@ export default async function MatchDetailPage({
                     <input type="hidden" name="matchId" value={matchId} />
                     <input type="hidden" name="team" value={team} />
                     <SubmitButton variant="secondary" pendingLabel="…">
-                      Generate QR for{" "}
-                      {team === "A" ? match.teamAName : match.teamBName}
+                      {t("match.generateQr", {
+                        team: team === "A" ? match.teamAName : match.teamBName,
+                      })}
                     </SubmitButton>
                   </ActionForm>
                 ))}
@@ -259,7 +285,7 @@ export default async function MatchDetailPage({
                       className="rounded-lg border border-border p-3"
                     >
                       <div className="mb-2 text-xs font-medium uppercase tracking-wide text-score-dim">
-                        Team {session.team}
+                        {t("match.teamLabel", { team: session.team })}
                       </div>
                       <div
                         className="mx-auto w-32 overflow-hidden rounded bg-white p-2 [&_svg]:h-full [&_svg]:w-full"
@@ -273,7 +299,7 @@ export default async function MatchDetailPage({
                       </div>
                       <ActionForm
                         action={revokeMatchSession}
-                        confirm={`Revoke team ${session.team}'s tablet token? The tablet loses access immediately.`}
+                        confirm={t("match.revokeConfirm", { team: session.team })}
                         className="mt-2"
                       >
                         <input
@@ -296,7 +322,7 @@ export default async function MatchDetailPage({
                           type="submit"
                           className="text-xs text-score-dim hover:text-red-400"
                         >
-                          Revoke
+                          {t("match.revoke")}
                         </button>
                       </ActionForm>
                     </div>
@@ -306,8 +332,7 @@ export default async function MatchDetailPage({
             </>
           ) : (
             <p className="text-xs text-score-dim">
-              Team tablets are disabled for this competition (Scoring rules →
-              team tablet).
+              {t("match.tabletsDisabled")}
             </p>
           )}
         </div>
@@ -316,7 +341,7 @@ export default async function MatchDetailPage({
       {/* Event log */}
       <div className="mt-6">
         <div className="mb-3 flex items-center gap-3">
-          <h2 className="font-medium">Event log</h2>
+          <h2 className="font-medium">{t("match.eventLog")}</h2>
           <span
             className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
               integrity.ok
@@ -325,26 +350,26 @@ export default async function MatchDetailPage({
             }`}
             title={
               integrity.ok
-                ? "Contiguous event log"
+                ? t("match.logContiguous")
                 : `Gaps: ${integrity.gaps.join(", ") || "—"} · Dupes: ${integrity.duplicates.join(", ") || "—"}`
             }
           >
             {integrity.ok
-              ? `✓ ${integrity.count} events`
-              : `⚠ integrity (${integrity.gaps.length} gaps)`}
+              ? t("match.eventsOk", { count: integrity.count })
+              : t("match.integrityWarn", { count: integrity.gaps.length })}
           </span>
           {!fullLog && integrity.count > LOG_PREVIEW_ROWS && (
             <Link
               href={`${base}/matches/${matchId}?log=full`}
               className="text-xs text-score-dim underline hover:text-foreground"
             >
-              Show all {integrity.count} events
+              {t("match.showAll", { count: integrity.count })}
             </Link>
           )}
         </div>
         {log.length === 0 ? (
           <div className={`${ui.card} text-sm text-score-dim`}>
-            No events yet — open the scorer to start the match.
+            {t("match.noEvents")}
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border">
@@ -352,11 +377,11 @@ export default async function MatchDetailPage({
               <thead className="bg-surface-raised">
                 <tr>
                   <th className={ui.th}>#</th>
-                  <th className={ui.th}>Event</th>
-                  <th className={ui.th}>Set</th>
-                  <th className={ui.th}>Score</th>
-                  <th className={ui.th}>Actor</th>
-                  <th className={ui.th}>Time</th>
+                  <th className={ui.th}>{t("match.thEvent")}</th>
+                  <th className={ui.th}>{t("match.thSet")}</th>
+                  <th className={ui.th}>{t("match.thScore")}</th>
+                  <th className={ui.th}>{t("match.thActor")}</th>
+                  <th className={ui.th}>{t("match.thTime")}</th>
                 </tr>
               </thead>
               <tbody>

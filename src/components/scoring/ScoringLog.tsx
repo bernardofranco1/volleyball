@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useT } from "@/lib/i18n/client";
 
 // Read-only scoring log the scorer can open to consult the full chronological
 // record (points, subs, time-outs, TTO, set start/end, notes, sanctions…) in
@@ -52,6 +53,7 @@ export function ScoringLog({
   teamBName: string;
   rosterById?: Map<string, { jerseyNumber: number | null; fullName: string }>;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [evs, setEvs] = useState<LogEvent[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -67,11 +69,11 @@ export function ScoringLog({
       const data = (await res.json()) as { events?: LogEvent[] };
       setEvs(data.events ?? []);
     } catch {
-      setErr("Couldn't load the log.");
+      setErr(t("log.error"));
     } finally {
       setLoading(false);
     }
-  }, [matchId]);
+  }, [matchId, t]);
 
   const openLog = () => {
     setOpen(true);
@@ -189,9 +191,9 @@ export function ScoringLog({
         type="button"
         onClick={openLog}
         className="rounded border border-border px-2 py-0.5 text-[11px] text-score-dim transition-colors hover:text-foreground"
-        title="Open the scoring log"
+        title={t("log.open")}
       >
-        Log
+        {t("log.button")}
       </button>
 
       {open && typeof document !== "undefined"
@@ -199,25 +201,25 @@ export function ScoringLog({
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
               <button
                 type="button"
-                aria-label="Close"
+                aria-label={t("common.close")}
                 onClick={() => setOpen(false)}
                 className="absolute inset-0 bg-black/60"
               />
               <div className="relative z-10 flex max-h-[85dvh] w-full max-w-md flex-col rounded-2xl border border-border bg-surface-raised shadow-2xl">
                 <div className="flex flex-none items-center justify-between gap-3 border-b border-border px-4 py-3">
-                  <span className="text-sm font-semibold">Scoring log</span>
+                  <span className="text-sm font-semibold">{t("log.title")}</span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => void load()}
                       className="rounded px-2 py-1 text-xs text-score-dim hover:text-foreground"
                     >
-                      Refresh
+                      {t("log.refresh")}
                     </button>
                     <button
                       type="button"
                       onClick={() => setOpen(false)}
-                      aria-label="Close"
+                      aria-label={t("common.close")}
                       className="rounded px-2 py-1 text-base leading-none text-score-dim hover:text-foreground"
                     >
                       ✕
@@ -227,11 +229,11 @@ export function ScoringLog({
 
                 <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
                   {loading && !evs ? (
-                    <p className="px-2 py-6 text-center text-sm text-score-dim">Loading…</p>
+                    <p className="px-2 py-6 text-center text-sm text-score-dim">{t("common.loading")}</p>
                   ) : err ? (
                     <p className="px-2 py-6 text-center text-sm text-red-400">{err}</p>
                   ) : visible.length === 0 ? (
-                    <p className="px-2 py-6 text-center text-sm text-score-dim">No events yet.</p>
+                    <p className="px-2 py-6 text-center text-sm text-score-dim">{t("log.empty")}</p>
                   ) : (
                     <ol className="space-y-0.5">
                       {visible.map((e, i) => {
@@ -247,7 +249,7 @@ export function ScoringLog({
                           <li key={e.sequence}>
                             {showSet ? (
                               <div className="mt-2 mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-score-dim first:mt-0">
-                                Set {e.setNumber}
+                                {t("log.set", { set: e.setNumber ?? "" })}
                               </div>
                             ) : null}
                             <div className={`flex items-baseline gap-2 rounded px-2 py-1 text-sm ${toneClass[tone]}`}>

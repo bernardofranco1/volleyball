@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { createTeam } from "@/lib/team-actions";
 import { OK } from "@/lib/action-state";
+import { useT } from "@/lib/i18n/client";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { ui } from "@/components/admin/styles";
 
@@ -13,6 +14,7 @@ export function AddTeamForm({
   tenantSlug: string;
   competitionId: string;
 }) {
+  const t = useT();
   const [state, action] = useActionState(createTeam, OK);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -23,20 +25,20 @@ export function AddTeamForm({
 
   return (
     <form ref={formRef} action={action} className={ui.card}>
-      <h2 className="mb-4 font-medium">Add team</h2>
+      <h2 className="mb-4 font-medium">{t("teams.addTeam")}</h2>
       <input type="hidden" name="tenantSlug" value={tenantSlug} />
       <input type="hidden" name="competitionId" value={competitionId} />
 
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <label className={ui.label} htmlFor="t-name">
-            Display name
+            {t("teams.displayName")}
           </label>
           <input id="t-name" name="displayName" required className={ui.input} />
         </div>
         <div>
           <label className={ui.label} htmlFor="t-country">
-            Country (3-letter)
+            {t("teams.country3")}
           </label>
           <input
             id="t-country"
@@ -48,7 +50,7 @@ export function AddTeamForm({
         </div>
         <div>
           <label className={ui.label} htmlFor="t-seed">
-            Seed
+            {t("common.seed")}
           </label>
           <input
             id="t-seed"
@@ -60,13 +62,13 @@ export function AddTeamForm({
         </div>
         <div>
           <label className={ui.label} htmlFor="t-club">
-            Club (optional)
+            {t("teams.club")}
           </label>
           <input id="t-club" name="clubName" className={ui.input} />
         </div>
         <div>
           <label className={ui.label} htmlFor="t-color">
-            Team colour
+            {t("teams.teamColor")}
           </label>
           <input
             id="t-color"
@@ -81,7 +83,7 @@ export function AddTeamForm({
       {state.error && <p className="mt-3 text-sm text-red-400">{state.error}</p>}
 
       <div className="mt-4">
-        <SubmitButton pendingLabel="Adding…">Add team</SubmitButton>
+        <SubmitButton pendingLabel={t("common.adding")}>{t("teams.addTeam")}</SubmitButton>
       </div>
     </form>
   );

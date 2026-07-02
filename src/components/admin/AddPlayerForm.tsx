@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { createPlayer } from "@/lib/team-actions";
 import { OK } from "@/lib/action-state";
+import { useT } from "@/lib/i18n/client";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { ui } from "@/components/admin/styles";
 
@@ -15,6 +16,7 @@ export function AddPlayerForm({
   competitionId: string;
   teamId: string;
 }) {
+  const t = useT();
   const [state, action] = useActionState(createPlayer, OK);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -31,15 +33,15 @@ export function AddPlayerForm({
 
       <input
         name="firstName"
-        placeholder="First"
+        placeholder={t("teams.firstShort")}
         className={`${ui.input} w-28`}
-        aria-label="First name"
+        aria-label={t("common.firstName")}
       />
       <input
         name="lastName"
-        placeholder="Last"
+        placeholder={t("teams.lastShort")}
         className={`${ui.input} w-28`}
-        aria-label="Last name"
+        aria-label={t("common.lastName")}
       />
       <input
         name="jerseyNumber"
@@ -47,7 +49,7 @@ export function AddPlayerForm({
         min={0}
         placeholder="#"
         className={`${ui.input} w-16`}
-        aria-label="Jersey number"
+        aria-label={t("common.jerseyNumber")}
       />
       <label className="flex items-center gap-1 text-xs text-score-dim">
         <input type="checkbox" name="isCaptain" /> C
@@ -56,7 +58,7 @@ export function AddPlayerForm({
         <input type="checkbox" name="isLibero" /> L
       </label>
       <SubmitButton variant="secondary" pendingLabel="…">
-        Add player
+        {t("teams.addPlayer")}
       </SubmitButton>
       {state.error && (
         <span className="w-full text-xs text-red-400">{state.error}</span>

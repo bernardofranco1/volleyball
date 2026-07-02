@@ -49,11 +49,17 @@ export async function GET(
     );
   }
 
+  // Once every match is finished the CSV is static — let the CDN absorb
+  // spectator downloads; while play is ongoing, stay uncached.
+  const allFinished =
+    matches.length > 0 && matches.every((m) => m.status === "FINISHED");
   return new Response(lines.join("\n"), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="results-${id}.csv"`,
-      "Cache-Control": "no-store",
+      "Cache-Control": allFinished
+        ? "public, s-maxage=300, stale-while-revalidate=3600"
+        : "no-store",
     },
   });
 }

@@ -3,9 +3,28 @@
  * subs with indoor-style switching (no mid-set side switches; the deciding set
  * changes ends at 8). Two scorer-called faults (jump-serve foot fault, front-zone
  * attack arc fault) award the rally to the opponent.
+ *
+ * Discipline-agnostic pieces (lifecycle/timeout/sanction cases, win conditions,
+ * append/replay orchestration) live in ../core.
  */
 
 import type { TournamentConfig } from "../config";
+import {
+  applySubstitution,
+  clone,
+  isCommonPayload,
+  reduceCommon,
+} from "../core/baseReducer";
+import {
+  type AppendResult as CoreAppendResult,
+  createAppendFn,
+  createReplayFn,
+} from "../core/factories";
+import {
+  computeEndEmits,
+  isDecidingSwitchDue,
+  setWinner,
+} from "../core/winConditions";
 import {
   type LightEvent,
   type LightEventPayload,
@@ -21,48 +40,16 @@ import {
 } from "./types";
 import { validateLightEvent } from "./validator";
 
-// ── pure rule predicates ─────────────────────────────────────────────────────
+// ── pure rule predicates (shared ones re-exported) ───────────────────────────
 
-export function setWinTarget(
-  setNumber: SetNumber,
-  config: TournamentConfig,
-): number {
-  return setNumber >= config.bestOf ? config.setScoreTiebreak : config.setScore;
-}
-
-export function setWinner(
-  set: LightSetState,
-  config: TournamentConfig,
-): TeamId | null {
-  const target = setWinTarget(set.setNumber, config);
-  const lead = config.twoPointLead ? 2 : 1;
-  if (set.scoreA >= target && set.scoreA - set.scoreB >= lead) return "A";
-  if (set.scoreB >= target && set.scoreB - set.scoreA >= lead) return "B";
-  return null;
-}
-
-export function setsNeededToWin(config: TournamentConfig): number {
-  return Math.floor(config.bestOf / 2) + 1;
-}
-
-export function isDecidingSwitchDue(
-  set: LightSetState,
-  config: TournamentConfig,
-): boolean {
-  if (set.setNumber < config.bestOf) return false;
-  if (config.sideSwitchDecidingSetAt == null) return false;
-  if (set.decidingSwitchDone) return false;
-  return (
-    Math.max(set.scoreA, set.scoreB) >= config.sideSwitchDecidingSetAt &&
-    set.scoreA + set.scoreB > 0
-  );
-}
+export {
+  isDecidingSwitchDue,
+  setsNeededToWin,
+  setWinner,
+  setWinTarget,
+} from "../core/winConditions";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-
-function clone<T>(value: T): T {
-  return structuredClone(value);
-}
 
 function newSetState(
   setNumber: SetNumber,
@@ -124,11 +111,6 @@ function applyPoint(set: LightSetState, winner: TeamId, n: number): LightSetStat
   return s;
 }
 
-function swapOnCourt(court: string[], outId: string, inId: string): void {
-  const idx = court.indexOf(outId);
-  if (idx >= 0) court[idx] = inId;
-}
-
 // ── main reducer ─────────────────────────────────────────────────────────────
 
 export function reduce(
@@ -144,21 +126,12 @@ export function reduce(
   const set = s.sets[setIdx];
   const n = config.playersPerSide;
 
+  if (isCommonPayload(p)) {
+    reduceCommon(s, p, event.timestamp);
+    return s;
+  }
+
   switch (p.type) {
-    case "MATCH_CREATED":
-      s.status = "COIN_TOSS";
-      return s;
-
-    case "COIN_TOSS":
-      s.status = "READY";
-      s.set1FirstServer = p.firstServer;
-      return s;
-
-    case "MATCH_START":
-      s.status = "LIVE";
-      s.matchStartedAt = event.timestamp;
-      return s;
-
     case "SET_START": {
       const newSet = newSetState(p.setNumber, p.firstServer, p.teamAStartSide);
       newSet.startedAt = event.timestamp;
@@ -197,24 +170,6 @@ export function reduce(
       return s;
     }
 
-    case "REPLAY_POINT":
-      s.rallyPhase = "BETWEEN_RALLIES";
-      return s;
-
-    case "TIMEOUT_REQUEST":
-      if (set) {
-        if (p.team === "A") set.timeoutsUsedA += 1;
-        else set.timeoutsUsedB += 1;
-      }
-      s.activeTimeoutTeam = p.team;
-      s.rallyPhase = "TIMEOUT_ACTIVE";
-      return s;
-
-    case "TIMEOUT_END":
-      s.activeTimeoutTeam = null;
-      s.rallyPhase = "BETWEEN_RALLIES";
-      return s;
-
     case "SIDE_SWITCH":
       if (set) {
         set.teamASide = p.newTeamASide;
@@ -224,102 +179,9 @@ export function reduce(
 
     case "SUBSTITUTION": {
       if (!set) return s;
-      const court = p.team === "A" ? set.courtPositionsA : set.courtPositionsB;
-      const slots = p.team === "A" ? set.subSlotsA : set.subSlotsB;
-      const lineup = p.team === "A" ? set.lineupA : set.lineupB;
-
-      const outIsStarter = lineup.includes(p.outPlayerId);
-      if (outIsStarter && slots[p.outPlayerId] === undefined) {
-        slots[p.outPlayerId] = p.inPlayerId;
-      } else {
-        const starter = Object.keys(slots).find(
-          (k) => slots[k] === p.outPlayerId,
-        );
-        if (starter) slots[starter] = null;
-      }
-      swapOnCourt(court, p.outPlayerId, p.inPlayerId);
-
-      if (!p.isEmergency) {
-        if (p.team === "A") {
-          set.subsUsedA += 1;
-          s.totalMatchSubsA += 1;
-        } else {
-          set.subsUsedB += 1;
-          s.totalMatchSubsB += 1;
-        }
-      }
+      applySubstitution(s, set, p, !p.isEmergency);
       return s;
     }
-
-    case "SET_END": {
-      const idx = p.setNumber - 1;
-      const target = s.sets[idx];
-      if (!target) return s;
-      if (!target.winner) {
-        if (p.winner === "A") s.setsWonA += 1;
-        else s.setsWonB += 1;
-      }
-      if (target.scoreA === 0 && target.scoreB === 0) {
-        target.scoreA = p.scoreA;
-        target.scoreB = p.scoreB;
-      }
-      target.winner = p.winner;
-      target.endedAt = event.timestamp;
-      s.rallyPhase = "SET_BREAK";
-      return s;
-    }
-
-    case "MATCH_END":
-      s.winner = p.winner;
-      s.status = "FINISHED";
-      s.rallyPhase = "MATCH_OVER";
-      return s;
-
-    case "MEDICAL_TIMEOUT":
-      s.medicalTimeoutTeam = p.team;
-      s.rallyPhase = "MEDICAL_TIMEOUT_ACTIVE";
-      return s;
-
-    case "MEDICAL_TIMEOUT_END":
-      s.medicalTimeoutTeam = null;
-      s.rallyPhase = "BETWEEN_RALLIES";
-      return s;
-
-    case "DELAY_WARNING":
-      if (set) {
-        if (p.team === "A")
-          set.delaySanctionsA = Math.max(1, set.delaySanctionsA);
-        else set.delaySanctionsB = Math.max(1, set.delaySanctionsB);
-      }
-      return s;
-
-    case "DELAY_PENALTY":
-      if (set) {
-        if (p.team === "A") set.delaySanctionsA += 1;
-        else set.delaySanctionsB += 1;
-      }
-      return s;
-
-    case "MISCONDUCT_WARNING":
-    case "MISCONDUCT_PENALTY":
-    case "MISCONDUCT_EXPULSION":
-    case "MISCONDUCT_DISQUALIFICATION": {
-      const record = {
-        type: p.type,
-        playerId: p.playerId,
-        setNumber: s.currentSetNumber,
-        scoreA: set?.scoreA ?? 0,
-        scoreB: set?.scoreB ?? 0,
-      };
-      if (p.team === "A") s.misconductA.push(record);
-      else s.misconductB.push(record);
-      return s;
-    }
-
-    case "SERVE_CLOCK_EXPIRE":
-    case "UNDO":
-    case "NOTE":
-      return s;
 
     default:
       return s;
@@ -342,31 +204,15 @@ export function computeAutoEmits(
   const set = activeSet(state);
   if (!set || set.winner) return [];
 
-  const winner = computeSetEnd(set, config);
-  if (winner) {
-    const emits: LightEventPayload[] = [
-      {
-        type: "SET_END",
-        winner,
-        scoreA: set.scoreA,
-        scoreB: set.scoreB,
-        setNumber: set.setNumber,
-      },
-    ];
-    const setsA = state.setsWonA + (winner === "A" ? 1 : 0);
-    const setsB = state.setsWonB + (winner === "B" ? 1 : 0);
-    const need = setsNeededToWin(config);
-    if (setsA >= need || setsB >= need)
-      emits.push({ type: "MATCH_END", winner, setsA, setsB });
-    return emits;
-  }
+  const end = computeEndEmits(set, state, config);
+  if (end) return end;
 
   if (isDecidingSwitchDue(set, config))
     return [{ type: "SIDE_SWITCH", newTeamASide: oppositeSide(set.teamASide) }];
   return [];
 }
 
-// ── append orchestration (pure) ──────────────────────────────────────────────
+// ── append orchestration & replay (shared chassis) ───────────────────────────
 
 function isScoringEvent(type: LightEventPayload["type"]): boolean {
   return (
@@ -377,69 +223,13 @@ function isScoringEvent(type: LightEventPayload["type"]): boolean {
   );
 }
 
-export type AppendResult =
-  | { ok: false; reason: string }
-  | { ok: true; newEvents: LightEvent[]; state: LightMatchState };
+export type AppendResult = CoreAppendResult<LightMatchState, LightEventPayload>;
 
-export function appendLightEvent(
-  prevState: LightMatchState,
-  payload: LightEventPayload,
-  config: TournamentConfig,
-  opts: {
-    nextSequence: number;
-    timestamp: string;
-    makeId: (sequence: number) => string;
-  },
-): AppendResult {
-  const validation = validateLightEvent(payload, prevState, config);
-  if (!validation.ok) return { ok: false, reason: validation.reason! };
+export const appendLightEvent = createAppendFn({
+  validate: validateLightEvent,
+  reduce,
+  computeAutoEmits,
+  isScoringEvent,
+});
 
-  let seq = opts.nextSequence;
-  const newEvents: LightEvent[] = [];
-  let state = prevState;
-
-  const primary: LightEvent = {
-    id: opts.makeId(seq),
-    sequence: seq,
-    timestamp: opts.timestamp,
-    payload,
-  };
-  newEvents.push(primary);
-  state = reduce(state, primary, config);
-  seq += 1;
-
-  if (isScoringEvent(payload.type)) {
-    for (const emit of computeAutoEmits(state, config)) {
-      const ev: LightEvent = {
-        id: opts.makeId(seq),
-        sequence: seq,
-        timestamp: opts.timestamp,
-        payload: emit,
-      };
-      newEvents.push(ev);
-      state = reduce(state, ev, config);
-      seq += 1;
-    }
-  }
-
-  return { ok: true, newEvents, state };
-}
-
-// ── replay ───────────────────────────────────────────────────────────────────
-
-export function replayEvents(
-  matchId: string,
-  events: LightEvent[],
-  config: TournamentConfig,
-): LightMatchState {
-  const undone = new Set<string>();
-  for (const ev of events) {
-    if (ev.payload.type === "UNDO") undone.add(ev.payload.targetEventId);
-  }
-  let state = initialLightState(matchId);
-  for (const ev of events) {
-    if (ev.payload.type !== "UNDO" && undone.has(ev.id)) continue;
-    state = reduce(state, ev, config);
-  }
-  return state;
-}
+export const replayEvents = createReplayFn(initialLightState, reduce);

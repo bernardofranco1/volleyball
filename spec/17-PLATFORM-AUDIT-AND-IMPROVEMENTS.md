@@ -150,3 +150,61 @@ without them; revisit on a future Next upgrade.
   results of finished competitions; per-court scorer day-PINs; coin-toss side
   selector; seed-from-standings bracket option; match-engine integration tests
   (pg-backed); `getClaims()` local JWT verification in the proxy.
+
+---
+
+# Batch 2 — deferred items implemented (July 2026)
+
+Everything from the "Deferred" list above except where noted, plus a scorer-
+reported bug:
+
+- **Undo vs TTO (bug fix)**: undoing now targets the last *scorer* event plus
+  every auto-emitted consequence in its batch (`selectUndoTargets`, tested) —
+  previously undo during a TTO removed only the auto-emitted `TTO_START`
+  (mis-tapped point survived), undo after ending it removed `TTO_END`
+  (straight back into the TTO), and undoing only the rally left the surviving
+  `TTO_START` replaying the match back into TTO. The beach TTO banner also
+  gained an "Undo last point" button. Verified end-to-end in a browser.
+- **Engine core extraction**: `src/engine/core/` (winConditions, baseReducer
+  with the 19 identical cases, append/replay factories); 1,123 duplicated
+  lines deleted across the four reducers (−395 net). Replay compatibility
+  proven by a differential fuzz (240 simulated matches, old vs new engine,
+  deep-equal states and event logs).
+- **Scoring UI consolidation**: `src/components/scoring/shared/`
+  (useArmedConfirm, buttons, PhaseBanners, LiveControls, RotationScoreboard/
+  LineupEntry); the four action bars shrank 1,371 → 486 lines (−397 net).
+- **Coin-toss side selector**: the toss now records which side team A actually
+  starts on (two-step banner) instead of hardcoding LEFT.
+- **i18n sweep**: ~265 new keys × 5 locales (en/fr/de/es/pt) across scoring
+  consoles, competition admin surfaces, match centre, access/audit; new
+  `{placeholder}` interpolation; `useT()` falls back to English outside a
+  LocaleProvider. Still English: server-action FormState messages, engine
+  validator reasons, audit summaries, CSV headers, role/status enum labels.
+- **Seed from standings**: one click writes the Seed column rank-major across
+  pools (winners first) before generating the bracket.
+- **Scorer QR deep-link**: match detail shows a QR + copy-link whose
+  `?key=<HMAC of PIN>` pre-satisfies the PIN gate (login + role still
+  required); rotating the PIN revokes it.
+- **Set-up checklist** on DRAFT competition overviews (teams → pools →
+  schedule → activate).
+- **Pagination** on the tenant-wide match list (50/page, filter-preserving).
+- **Public results caching**: FINISHED competitions serve from a 5-minute
+  `unstable_cache` (tag `results:{id}`); results.csv gets CDN
+  `s-maxage=300` once all matches are finished.
+- **Proxy `getClaims()`**: local ES256 JWT verification against the project's
+  JWKS replaces the per-request Auth round trip for page navigations.
+- **Migrations baseline**: migration `0000` committed and marked applied in
+  prod (`drizzle.__drizzle_migrations`); `db:migrate` fixed (it was broken —
+  top-level await under CJS — i.e. untested) and verified as a clean no-op.
+  Future schema changes: `db:generate` + `db:migrate`, not push.
+- **New pure-logic tests**: `selectUndoTargets`, `shouldSnapshot` (snapshot
+  write policy). Suite: 136 tests.
+
+Verified: 136 unit tests, lint, tsc, production build, and a 27-check browser
+functional pass (auth → competition setup → pools → pool-aware round-robin →
+PIN + deep-link → live beach scoring with the TTO-undo path → public
+scoreboard consistency → mobile viewports). QA data and the temporary QA
+admin were removed afterwards.
+
+Note for future test automation: the events endpoint rate-limits ~30 posts/10s
+per scorer — scripted scoring must be human-paced or it gets designed 429s.

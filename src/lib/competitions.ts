@@ -177,10 +177,14 @@ export interface TenantMatchRow {
   scheduledAt: Date | null;
 }
 
+export const MATCHES_PAGE_SIZE = 50;
+
 /**
  * All matches across a tenant's competitions, with optional discipline/status
- * filters and date ordering — powers the tenant-wide schedule page. "scheduled"
- * groups the pre-live statuses (SCHEDULED/WARMUP/COIN_TOSS).
+ * filters, date ordering, and pagination — powers the tenant-wide schedule
+ * page. "scheduled" groups the pre-live statuses (SCHEDULED/WARMUP/COIN_TOSS).
+ * Fetches one row beyond the page so callers know whether a next page exists
+ * without a COUNT query.
  */
 export async function listTenantMatches(
   tenantId: string,
@@ -188,8 +192,9 @@ export async function listTenantMatches(
     discipline?: string;
     status?: "scheduled" | "live" | "finished";
     order?: "asc" | "desc";
+    page?: number;
   } = {},
-): Promise<TenantMatchRow[]> {
+): Promise<{ rows: TenantMatchRow[]; hasMore: boolean }> {
   const teamA = aliasedTable(teams, "team_a");
   const teamB = aliasedTable(teams, "team_b");
   const conds = [eq(matches.tenantId, tenantId)];
@@ -207,7 +212,8 @@ export async function listTenantMatches(
   else if (opts.status === "scheduled")
     conds.push(inArray(matches.status, ["SCHEDULED", "WARMUP", "COIN_TOSS"]));
   const dir = opts.order === "desc" ? desc : asc;
-  return db
+  const page = Math.max(0, opts.page ?? 0);
+  const rows = await db
     .select({
       id: matches.id,
       competitionId: matches.competitionId,
@@ -227,7 +233,13 @@ export async function listTenantMatches(
     .innerJoin(teamB, eq(teamB.id, matches.teamBId))
     .innerJoin(competitions, eq(competitions.id, matches.competitionId))
     .where(and(...conds))
-    .orderBy(dir(matches.scheduledAt));
+    .orderBy(dir(matches.scheduledAt))
+    .limit(MATCHES_PAGE_SIZE + 1)
+    .offset(page * MATCHES_PAGE_SIZE);
+  return {
+    rows: rows.slice(0, MATCHES_PAGE_SIZE),
+    hasMore: rows.length > MATCHES_PAGE_SIZE,
+  };
 }
 
 export async function getMatch(

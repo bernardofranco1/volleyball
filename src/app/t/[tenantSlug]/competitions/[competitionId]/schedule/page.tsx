@@ -13,6 +13,7 @@ import {
   updateMatchSlot,
 } from "@/lib/schedule-actions";
 import { importSchedule } from "@/lib/csv-actions";
+import { getT } from "@/lib/i18n/server";
 import { toUtcInputValue } from "@/lib/form-data";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { AddMatchForm } from "@/components/admin/AddMatchForm";
@@ -37,6 +38,7 @@ export default async function SchedulePage({
   params: Promise<{ tenantSlug: string; competitionId: string }>;
 }) {
   const { tenantSlug, competitionId } = await params;
+  const { t } = await getT();
   const ctx = await requireRole(
     tenantSlug,
     ADMIN_ROLES,
@@ -55,7 +57,7 @@ export default async function SchedulePage({
   // list; fully-finished rounds start collapsed.
   const groups = new Map<string, MatchRow[]>();
   for (const m of matchList) {
-    const key = m.roundName ?? "Unassigned round";
+    const key = m.roundName ?? t("schedule.unassignedRound");
     const list = groups.get(key) ?? [];
     list.push(m);
     groups.set(key, list);
@@ -67,17 +69,21 @@ export default async function SchedulePage({
         tenantSlug={tenantSlug}
         competition={competition}
         active="schedule"
-        subtitle={` · ${matchList.length} matches`}
+        subtitle={` · ${t("comp.matchesCount", { count: matchList.length })}`}
       />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
         <section className={matchList.length === 0 ? "order-last lg:order-none" : ""}>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-medium">{matchList.length} matches</h2>
+            <h2 className="font-medium">
+              {matchList.length === 1
+                ? t("schedule.oneMatch")
+                : t("comp.matchesCount", { count: matchList.length })}
+            </h2>
             {teams.length >= 2 && (
               <ActionForm
                 action={generateRoundRobin}
-                confirm="Generate round-robin fixtures for every unplayed pairing? With pools, each pool gets its own round-robin."
+                confirm={t("schedule.generateConfirm")}
               >
                 <input type="hidden" name="tenantSlug" value={tenantSlug} />
                 <input
@@ -85,8 +91,8 @@ export default async function SchedulePage({
                   name="competitionId"
                   value={competitionId}
                 />
-                <SubmitButton variant="secondary" pendingLabel="Generating…">
-                  Generate round-robin
+                <SubmitButton variant="secondary" pendingLabel={t("common.generating")}>
+                  {t("schedule.generate")}
                 </SubmitButton>
               </ActionForm>
             )}
@@ -94,8 +100,7 @@ export default async function SchedulePage({
 
           {matchList.length === 0 ? (
             <div className={`${ui.card} text-sm text-score-dim`}>
-              No matches scheduled yet. Create one, generate a round-robin, or
-              import a CSV.
+              {t("schedule.empty")}
             </div>
           ) : (
             <div className="space-y-4">
@@ -106,8 +111,10 @@ export default async function SchedulePage({
                     <summary className="mb-2 cursor-pointer text-sm font-medium text-score-dim">
                       {roundName}{" "}
                       <span className="font-normal">
-                        · {ms.length} match{ms.length === 1 ? "" : "es"}
-                        {allFinished ? " · finished" : ""}
+                        · {ms.length === 1
+                          ? t("schedule.oneMatch")
+                          : t("comp.matchesCount", { count: ms.length })}
+                        {allFinished ? t("schedule.finishedSuffix") : ""}
                       </span>
                     </summary>
                     <ul className="space-y-3">
@@ -141,7 +148,7 @@ export default async function SchedulePage({
                               )}
                             </div>
                             <span className="flex-none text-sm text-primary">
-                              Details →
+                              {t("schedule.details")}
                             </span>
                           </Link>
 
@@ -165,7 +172,7 @@ export default async function SchedulePage({
                                 className={ui.label}
                                 htmlFor={`court-${m.id}`}
                               >
-                                Court
+                                {t("common.court")}
                               </label>
                               <input
                                 id={`court-${m.id}`}
@@ -181,7 +188,7 @@ export default async function SchedulePage({
                                 className={ui.label}
                                 htmlFor={`round-${m.id}`}
                               >
-                                Round
+                                {t("common.round")}
                               </label>
                               <input
                                 id={`round-${m.id}`}
@@ -195,7 +202,7 @@ export default async function SchedulePage({
                                 className={ui.label}
                                 htmlFor={`time-${m.id}`}
                               >
-                                Time (UTC)
+                                {t("schedule.timeUtc")}
                               </label>
                               <input
                                 id={`time-${m.id}`}
@@ -206,14 +213,18 @@ export default async function SchedulePage({
                               />
                             </div>
                             <SubmitButton variant="secondary" pendingLabel="…">
-                              Save
+                              {t("common.save")}
                             </SubmitButton>
                           </ActionForm>
 
                           {m.status === "SCHEDULED" && (
                             <ActionForm
                               action={deleteMatch}
-                              confirm={`Delete match #${m.matchNumber ?? ""} ${m.teamAName} vs ${m.teamBName}?`}
+                              confirm={t("schedule.deleteConfirm", {
+                                number: m.matchNumber ?? "",
+                                teamA: m.teamAName,
+                                teamB: m.teamBName,
+                              })}
                               className="mt-2"
                             >
                               <input
@@ -235,7 +246,7 @@ export default async function SchedulePage({
                                 type="submit"
                                 className="text-xs text-score-dim hover:text-red-400"
                               >
-                                Delete match
+                                {t("schedule.deleteMatch")}
                               </button>
                             </ActionForm>
                           )}
@@ -261,7 +272,7 @@ export default async function SchedulePage({
           <CsvImport
             tenantSlug={tenantSlug}
             competitionId={competitionId}
-            title="Import schedule"
+            title={t("schedule.importTitle")}
             hint="Match number,Team A,Team B,Court number,Group,Phase number,Phase name,Match day,Match time (local)"
             action={importSchedule}
             templateHref={SCHEDULE_TEMPLATE}

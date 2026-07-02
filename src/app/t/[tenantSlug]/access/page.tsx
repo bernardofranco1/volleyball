@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/authz";
 import { listMembers, adminCount } from "@/lib/access";
 import { setMemberRole, removeMember } from "@/lib/access-actions";
 import { ROLE_LABEL, ROLE_HINT, ASSIGNABLE_ROLES } from "@/lib/roles";
+import { getT } from "@/lib/i18n/server";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { AddMemberForm } from "@/components/admin/AddMemberForm";
 import { SubmitButton } from "@/components/admin/SubmitButton";
@@ -16,6 +17,7 @@ export default async function AccessPage({
   params: Promise<{ tenantSlug: string }>;
 }) {
   const { tenantSlug } = await params;
+  const { t } = await getT();
   // Access management is admin-only.
   const ctx = await requireRole(tenantSlug, ["TENANT_ADMIN"], `/t/${tenantSlug}/access`);
 
@@ -28,13 +30,13 @@ export default async function AccessPage({
     <main className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Access</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("access.title")}</h1>
           <p className="mt-1 text-sm text-score-dim">
-            Who can manage, score, and view — for {ctx.tenant.name}.
+            {t("access.subtitle", { tenant: ctx.tenant.name })}
           </p>
         </div>
         <Link href={`/t/${tenantSlug}/settings`} className={ui.btnSecondary}>
-          ← Settings
+          {t("common.backToSettings")}
         </Link>
       </div>
 
@@ -42,7 +44,7 @@ export default async function AccessPage({
         <div>
           <div className="rounded-xl border border-border">
             <div className="border-b border-border px-4 py-2 text-xs uppercase tracking-wide text-score-dim">
-              People with access ({members.length})
+              {t("access.people", { count: members.length })}
             </div>
             <ul className="divide-y divide-border">
               {members.map((m) => {
@@ -53,7 +55,7 @@ export default async function AccessPage({
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">
                         {m.email}
-                        {isSelf ? <span className="text-score-dim"> (you)</span> : null}
+                        {isSelf ? <span className="text-score-dim"> {t("access.you")}</span> : null}
                       </div>
                       {m.name ? (
                         <div className="truncate text-xs text-score-dim">{m.name}</div>
@@ -62,7 +64,7 @@ export default async function AccessPage({
 
                     {isLastAdmin ? (
                       <span className="rounded-full border border-border px-2 py-0.5 text-xs text-score-dim">
-                        {ROLE_LABEL[m.role]} · last admin
+                        {ROLE_LABEL[m.role]} · {t("access.lastAdmin")}
                       </span>
                     ) : (
                       <ActionForm
@@ -72,7 +74,7 @@ export default async function AccessPage({
                         <input type="hidden" name="tenantSlug" value={tenantSlug} />
                         <input type="hidden" name="userId" value={m.userId} />
                         <label className="sr-only" htmlFor={`role-${m.userId}`}>
-                          Role for {m.email}
+                          {t("access.roleFor", { email: m.email })}
                         </label>
                         <select
                           id={`role-${m.userId}`}
@@ -87,7 +89,7 @@ export default async function AccessPage({
                           ))}
                         </select>
                         <SubmitButton variant="secondary" pendingLabel="…">
-                          Save
+                          {t("common.save")}
                         </SubmitButton>
                       </ActionForm>
                     )}
@@ -95,7 +97,7 @@ export default async function AccessPage({
                     {!isSelf && !isLastAdmin ? (
                       <ActionForm
                         action={removeMember}
-                        confirm={`Remove ${m.email}'s access to ${ctx.tenant.name}?`}
+                        confirm={t("access.removeConfirm", { email: m.email, tenant: ctx.tenant.name })}
                       >
                         <input type="hidden" name="tenantSlug" value={tenantSlug} />
                         <input type="hidden" name="userId" value={m.userId} />
@@ -103,7 +105,7 @@ export default async function AccessPage({
                           type="submit"
                           className="text-xs text-score-dim hover:text-red-400"
                         >
-                          Remove
+                          {t("common.remove")}
                         </button>
                       </ActionForm>
                     ) : null}
@@ -115,7 +117,7 @@ export default async function AccessPage({
 
           {/* Role legend */}
           <div className={`${ui.card} mt-4 text-xs`}>
-            <p className="mb-2 font-medium text-foreground">Roles</p>
+            <p className="mb-2 font-medium text-foreground">{t("access.roles")}</p>
             <ul className="space-y-1 text-score-dim">
               {ASSIGNABLE_ROLES.map((r) => (
                 <li key={r}>
@@ -125,9 +127,7 @@ export default async function AccessPage({
               ))}
             </ul>
             <p className="mt-3 text-score-dim">
-              Scoring needs a Scorer account. If a match has a PIN set (optional,
-              on the match page), the scorer enters that too — use PINs to limit
-              a scorer to their own court&apos;s matches.
+              {t("access.pinNote")}
             </p>
           </div>
         </div>

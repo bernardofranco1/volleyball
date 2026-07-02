@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { createMatch } from "@/lib/schedule-actions";
 import { OK } from "@/lib/action-state";
+import { useT } from "@/lib/i18n/client";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { ui } from "@/components/admin/styles";
 
@@ -15,6 +16,7 @@ export function AddMatchForm({
   competitionId: string;
   teams: { id: string; displayName: string }[];
 }) {
+  const t = useT();
   const [state, action] = useActionState(createMatch, OK);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -26,21 +28,21 @@ export function AddMatchForm({
   if (teams.length < 2) {
     return (
       <div className={`${ui.card} text-sm text-score-dim`}>
-        Add at least two teams before scheduling matches.
+        {t("schedule.needTeams")}
       </div>
     );
   }
 
   return (
     <form ref={formRef} action={action} className={ui.card}>
-      <h2 className="mb-4 font-medium">Create match</h2>
+      <h2 className="mb-4 font-medium">{t("schedule.createMatch")}</h2>
       <input type="hidden" name="tenantSlug" value={tenantSlug} />
       <input type="hidden" name="competitionId" value={competitionId} />
 
       <div className="space-y-3">
         <div>
           <label className={ui.label} htmlFor="m-a">
-            Team A
+            {t("schedule.teamA")}
           </label>
           <select id="m-a" name="teamAId" required className={ui.select}>
             {teams.map((t) => (
@@ -52,7 +54,7 @@ export function AddMatchForm({
         </div>
         <div>
           <label className={ui.label} htmlFor="m-b">
-            Team B
+            {t("schedule.teamB")}
           </label>
           <select id="m-b" name="teamBId" required className={ui.select}>
             {teams.map((t) => (
@@ -65,7 +67,7 @@ export function AddMatchForm({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={ui.label} htmlFor="m-court">
-              Court
+              {t("common.court")}
             </label>
             <input
               id="m-court"
@@ -77,7 +79,7 @@ export function AddMatchForm({
           </div>
           <div>
             <label className={ui.label} htmlFor="m-round">
-              Round
+              {t("common.round")}
             </label>
             <input
               id="m-round"
@@ -89,7 +91,7 @@ export function AddMatchForm({
         </div>
         <div>
           <label className={ui.label} htmlFor="m-time">
-            Scheduled at (UTC)
+            {t("schedule.scheduledAt")}
           </label>
           <input
             id="m-time"
@@ -98,7 +100,7 @@ export function AddMatchForm({
             className={ui.input}
           />
           <p className="mt-1 text-[11px] text-score-dim">
-            Enter the time in UTC — lists show it in each viewer&apos;s local time.
+            {t("schedule.utcHint")}
           </p>
         </div>
       </div>
@@ -106,7 +108,7 @@ export function AddMatchForm({
       {state.error && <p className="mt-3 text-sm text-red-400">{state.error}</p>}
 
       <div className="mt-4">
-        <SubmitButton pendingLabel="Creating…">Create match</SubmitButton>
+        <SubmitButton pendingLabel={t("common.creating")}>{t("schedule.createMatch")}</SubmitButton>
       </div>
     </form>
   );

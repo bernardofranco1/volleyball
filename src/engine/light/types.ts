@@ -4,11 +4,10 @@
 // switching (between sets; deciding set changes ends at 8). No libero/VCS/TTO.
 // Adds two scorer-called faults that award the rally to the opponent.
 
-import type { TeamId } from "../types";
+import type { MisconductRecord, SetNumber, Side, TeamId } from "../types";
 
-export type { TeamId };
-export type Side = "LEFT" | "RIGHT";
-export type SetNumber = number;
+export type { MisconductRecord, SetNumber, Side, TeamId } from "../types";
+export { activeSet, oppositeSide, oppositeTeam } from "../types";
 
 export type LightMatchStatus =
   | "SETUP"
@@ -86,18 +85,6 @@ export interface LightEvent {
   sequence: number;
   timestamp: string;
   payload: LightEventPayload;
-}
-
-export interface MisconductRecord {
-  type:
-    | "MISCONDUCT_WARNING"
-    | "MISCONDUCT_PENALTY"
-    | "MISCONDUCT_EXPULSION"
-    | "MISCONDUCT_DISQUALIFICATION";
-  playerId: string;
-  setNumber: SetNumber;
-  scoreA: number;
-  scoreB: number;
 }
 
 export interface LightSetState {
@@ -179,14 +166,3 @@ export function initialLightState(matchId: string): LightMatchState {
   };
 }
 
-export function activeSet(state: LightMatchState): LightSetState | undefined {
-  return state.sets[state.currentSetNumber - 1];
-}
-
-export function oppositeTeam(team: TeamId): TeamId {
-  return team === "A" ? "B" : "A";
-}
-
-export function oppositeSide(side: Side): Side {
-  return side === "LEFT" ? "RIGHT" : "LEFT";
-}

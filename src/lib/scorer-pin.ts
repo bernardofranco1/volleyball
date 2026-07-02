@@ -40,3 +40,19 @@ export async function scorerPinSatisfied(matchId: string): Promise<boolean> {
   const c = (await cookies()).get(scorerPinCookie(matchId))?.value;
   return c === scorerPinCookieValue(matchId, pin);
 }
+
+/**
+ * True when a scorer deep-link `?key=` matches the current PIN's HMAC — lets
+ * an admin hand scorers a QR instead of reading 6-digit PINs aloud per match.
+ * Rotating the PIN invalidates outstanding links. The link only bypasses the
+ * PIN gate; Supabase login + match-tenant role checks still apply.
+ */
+export async function scorerKeyValid(
+  matchId: string,
+  key: string | string[] | undefined,
+): Promise<boolean> {
+  if (typeof key !== "string" || !key) return false;
+  const pin = await getScorerPin(matchId);
+  if (!pin) return false;
+  return key === scorerPinCookieValue(matchId, pin);
+}

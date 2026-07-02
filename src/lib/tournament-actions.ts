@@ -5,6 +5,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { matches, pools, teams } from "@/db/schema";
 import { gateCompetition } from "@/lib/action-gate";
+import { computeStandings } from "@/lib/standings";
 import { recordAudit } from "@/lib/audit";
 import {
   bracketSize,
@@ -418,4 +419,51 @@ export async function advanceBracket(
   });
   revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
   return ok(`Created ${createdTotal} next-round match(es).`);
+}
+
+/**
+ * Write the Seed column from current standings, so the bracket can be
+ * generated from pool results without retyping seeds. Rank-major across
+ * pools: every pool winner first (pools in name order), then the runners-up,
+ * and so on — the standard cross-pool seeding.
+ */
+export async function seedFromStandings(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
+
+  const groups = await computeStandings(g.competitionId);
+  const ranked: string[] = [];
+  const maxRank = Math.max(0, ...groups.map((gr) => gr.rows.length));
+  for (let r = 0; r < maxRank; r++) {
+    for (const gr of groups) {
+      const row = gr.rows[r];
+      if (row) ranked.push(row.teamId);
+    }
+  }
+  if (ranked.length === 0) return fail("No standings yet to seed from.");
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < ranked.length; i++) {
+      await tx
+        .update(teams)
+        .set({ seed: i + 1 })
+        .where(
+          and(eq(teams.id, ranked[i]), eq(teams.competitionId, g.competitionId)),
+        );
+    }
+  });
+
+  await recordAudit({
+    tenantId: g.tenantId,
+    actor: g.actor,
+    action: "bracket.seed_from_standings",
+    entityType: "competition",
+    entityId: g.competitionId,
+    summary: `Seeded ${ranked.length} teams from standings`,
+  });
+  revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
+  return ok(`Seeded ${ranked.length} teams from standings — now generate the bracket.`);
 }

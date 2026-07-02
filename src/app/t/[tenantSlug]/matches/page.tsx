@@ -8,6 +8,7 @@ import {
 } from "@/lib/authz";
 import { listTenantMatches, type TenantMatchRow } from "@/lib/competitions";
 import { DISCIPLINES } from "@/lib/domain";
+import { getT } from "@/lib/i18n/server";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { LocalTime } from "@/components/LocalTime";
 import { statusBadgeClass, ui } from "@/components/admin/styles";
@@ -15,9 +16,9 @@ import { statusBadgeClass, ui } from "@/components/admin/styles";
 export const dynamic = "force-dynamic";
 
 const STATUSES = [
-  { value: "scheduled", label: "Scheduled" },
-  { value: "live", label: "Live" },
-  { value: "finished", label: "Finished" },
+  { value: "scheduled", labelKey: "matches.scheduled" },
+  { value: "live", labelKey: "matches.live" },
+  { value: "finished", labelKey: "matches.finished" },
 ] as const;
 
 export default async function MatchesPage({
@@ -25,10 +26,16 @@ export default async function MatchesPage({
   searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
-  searchParams: Promise<{ discipline?: string; status?: string; order?: string }>;
+  searchParams: Promise<{
+    discipline?: string;
+    status?: string;
+    order?: string;
+    page?: string;
+  }>;
 }) {
   const { tenantSlug } = await params;
-  const { discipline, status, order } = await searchParams;
+  const { discipline, status, order, page: pageParam } = await searchParams;
+  const { t } = await getT();
   const ctx = await requireRole(
     tenantSlug,
     VIEW_ROLES,
@@ -41,10 +48,12 @@ export default async function MatchesPage({
       : undefined;
   const orderDir = order === "desc" ? "desc" : "asc";
 
-  const rows = await listTenantMatches(ctx.tenant.id, {
+  const page = Math.max(0, Number.parseInt(pageParam ?? "0", 10) || 0);
+  const { rows, hasMore } = await listTenantMatches(ctx.tenant.id, {
     discipline,
     status: statusFilter,
     order: orderDir,
+    page,
   });
 
   // Live matches pin to a section on top (unless a status filter says otherwise).
@@ -104,19 +113,19 @@ export default async function MatchesPage({
           <div className="mt-1.5 flex gap-3 text-xs text-score-dim">
             {canManage && (
               <Link href={detail} className="hover:text-foreground">
-                Manage
+                {t("matches.manage")}
               </Link>
             )}
             {canScore && (
               <Link href={`${detail}/live`} className="hover:text-foreground">
-                Score
+                {t("matches.score")}
               </Link>
             )}
             <Link
               href={`/t/${tenantSlug}/scoreboard/${m.id}`}
               className="hover:text-foreground"
             >
-              Board
+              {t("matches.board")}
             </Link>
           </div>
         )}
@@ -132,14 +141,14 @@ export default async function MatchesPage({
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            Match schedule
+            {t("matches.title")}
           </h1>
           <p className="mt-1 text-sm text-score-dim">
-            All matches across {ctx.tenant.name}&apos;s competitions.
+            {t("matches.subtitle", { tenant: ctx.tenant.name })}
           </p>
         </div>
         <Link href={`/t/${tenantSlug}/dashboard`} className={ui.btnSecondary}>
-          ← Dashboard
+          {t("common.backToDashboard")}
         </Link>
       </div>
 
@@ -149,9 +158,9 @@ export default async function MatchesPage({
         className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-border p-3"
       >
         <label className="flex flex-col gap-1 text-xs text-score-dim">
-          Discipline
+          {t("common.discipline")}
           <select name="discipline" defaultValue={discipline ?? ""} className={selectCls}>
-            <option value="">All</option>
+            <option value="">{t("common.all")}</option>
             {DISCIPLINES.map((d) => (
               <option key={d} value={d}>
                 {d}
@@ -160,32 +169,32 @@ export default async function MatchesPage({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-score-dim">
-          Status
+          {t("common.status")}
           <select name="status" defaultValue={statusFilter ?? ""} className={selectCls}>
-            <option value="">All</option>
+            <option value="">{t("common.all")}</option>
             {STATUSES.map((s) => (
               <option key={s.value} value={s.value}>
-                {s.label}
+                {t(s.labelKey)}
               </option>
             ))}
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-score-dim">
-          Order by date
+          {t("matches.orderBy")}
           <select name="order" defaultValue={orderDir} className={selectCls}>
-            <option value="asc">Earliest first</option>
-            <option value="desc">Latest first</option>
+            <option value="asc">{t("matches.earliest")}</option>
+            <option value="desc">{t("matches.latest")}</option>
           </select>
         </label>
         <button type="submit" className={ui.btnSecondary}>
-          Apply
+          {t("common.apply")}
         </button>
         {(discipline || statusFilter || order) && (
           <Link
             href={`/t/${tenantSlug}/matches`}
             className="px-2 py-1.5 text-sm text-score-dim hover:text-foreground"
           >
-            Clear
+            {t("common.clear")}
           </Link>
         )}
       </form>
@@ -194,7 +203,7 @@ export default async function MatchesPage({
         <section className="mb-6">
           <h2 className="mb-2 flex items-center gap-2 text-sm font-medium">
             <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-green-400" />
-            Live now
+            {t("matches.liveNow")}
           </h2>
           <ul className="space-y-2">
             {liveRows.map((m) => (
@@ -207,29 +216,32 @@ export default async function MatchesPage({
       )}
 
       <p className="mb-2 text-xs text-score-dim">
-        {rows.length} match{rows.length === 1 ? "" : "es"}
+        {rows.length === 1
+          ? t("schedule.oneMatch")
+          : t("comp.matchesCount", { count: rows.length })}
+        {page > 0 || hasMore ? t("matches.page", { page: page + 1 }) : ""}
       </p>
 
       {rows.length === 0 ? (
         <div className="rounded-xl border border-border p-8 text-center text-sm text-score-dim">
-          <p>No matches found.</p>
+          <p>{t("matches.empty")}</p>
           <p className="mt-2">
             {discipline || statusFilter ? (
               <Link
                 href={`/t/${tenantSlug}/matches`}
                 className="underline hover:text-foreground"
               >
-                Clear filters
+                {t("matches.clearFilters")}
               </Link>
             ) : canManage ? (
               <Link
                 href={`/t/${tenantSlug}/competitions`}
                 className="underline hover:text-foreground"
               >
-                Create matches from a competition&apos;s Schedule tab →
+                {t("matches.createFrom")}
               </Link>
             ) : (
-              "Check back once the schedule is published."
+              t("matches.checkBack")
             )}
           </p>
         </div>
@@ -241,6 +253,38 @@ export default async function MatchesPage({
             </li>
           ))}
         </ul>
+      )}
+      {(page > 0 || hasMore) && (
+        <nav className="mt-6 flex items-center justify-between text-sm">
+          {page > 0 ? (
+            <Link
+              href={`?${new URLSearchParams({
+                ...(discipline ? { discipline } : {}),
+                ...(statusFilter ? { status: statusFilter } : {}),
+                ...(order ? { order } : {}),
+                ...(page > 1 ? { page: String(page - 1) } : {}),
+              }).toString()}`}
+              className={ui.btnSecondary}
+            >
+              {t("matches.newer")}
+            </Link>
+          ) : (
+            <span />
+          )}
+          {hasMore && (
+            <Link
+              href={`?${new URLSearchParams({
+                ...(discipline ? { discipline } : {}),
+                ...(statusFilter ? { status: statusFilter } : {}),
+                ...(order ? { order } : {}),
+                page: String(page + 1),
+              }).toString()}`}
+              className={ui.btnSecondary}
+            >
+              {t("matches.older")}
+            </Link>
+          )}
+        </nav>
       )}
     </main>
   );

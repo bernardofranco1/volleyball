@@ -4,6 +4,7 @@ import {
   DEFAULT_LOCALE,
   MESSAGES,
   type Locale,
+  type MsgParams,
   isLocale,
   translate,
 } from "./messages";
@@ -18,13 +19,13 @@ export async function getLocale(): Promise<Locale> {
 /** Locale + a bound `t()` for Server Components, plus the merged client dict. */
 export async function getT(): Promise<{
   locale: Locale;
-  t: (key: string) => string;
+  t: (key: string, params?: MsgParams) => string;
   messages: Record<string, string>;
 }> {
   const locale = await getLocale();
   return {
     locale,
-    t: (key: string) => translate(locale, key),
+    t: (key: string, params?: MsgParams) => translate(locale, key, params),
     // English ∪ locale so the client hook has a fallback baked in.
     messages: { ...MESSAGES.en, ...MESSAGES[locale] },
   };

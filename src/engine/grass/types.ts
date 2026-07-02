@@ -3,11 +3,10 @@
 // the beach scoring + side-switch model and adds indoor-style rotation, lineup
 // confirmation, and substitutions (no libero, no VCS, no TTO by default).
 
-import type { TeamId } from "../types";
+import type { MisconductRecord, SetNumber, Side, TeamId } from "../types";
 
-export type { TeamId };
-export type Side = "LEFT" | "RIGHT";
-export type SetNumber = number;
+export type { MisconductRecord, SetNumber, Side, TeamId } from "../types";
+export { activeSet, oppositeSide, oppositeTeam } from "../types";
 
 export type GrassMatchStatus =
   | "SETUP"
@@ -85,18 +84,6 @@ export interface GrassEvent {
   sequence: number;
   timestamp: string;
   payload: GrassEventPayload;
-}
-
-export interface MisconductRecord {
-  type:
-    | "MISCONDUCT_WARNING"
-    | "MISCONDUCT_PENALTY"
-    | "MISCONDUCT_EXPULSION"
-    | "MISCONDUCT_DISQUALIFICATION";
-  playerId: string;
-  setNumber: SetNumber;
-  scoreA: number;
-  scoreB: number;
 }
 
 // ── State shape ──────────────────────────────────────────────────────────────
@@ -181,14 +168,3 @@ export function initialGrassState(matchId: string): GrassMatchState {
   };
 }
 
-export function activeSet(state: GrassMatchState): GrassSetState | undefined {
-  return state.sets[state.currentSetNumber - 1];
-}
-
-export function oppositeTeam(team: TeamId): TeamId {
-  return team === "A" ? "B" : "A";
-}
-
-export function oppositeSide(side: Side): Side {
-  return side === "LEFT" ? "RIGHT" : "LEFT";
-}

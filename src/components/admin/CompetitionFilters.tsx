@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef } from "react";
 import { DISCIPLINES, COMPETITION_STATUSES } from "@/lib/domain";
+import { useT } from "@/lib/i18n/client";
 import { ui } from "@/components/admin/styles";
 
 /**
@@ -19,6 +20,7 @@ export function CompetitionFilters({
   status?: string;
   q?: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -44,21 +46,21 @@ export function CompetitionFilters({
     >
       <div className="min-w-40 flex-1">
         <label className={ui.label} htmlFor="f-q">
-          Search
+          {t("common.search")}
         </label>
         <input
           id="f-q"
           name="q"
           type="search"
           defaultValue={q ?? ""}
-          placeholder="Competition name…"
+          placeholder={t("comp.searchPlaceholder")}
           className={ui.input}
           onBlur={apply}
         />
       </div>
       <div>
         <label className={ui.label} htmlFor="f-discipline">
-          Discipline
+          {t("common.discipline")}
         </label>
         <select
           id="f-discipline"
@@ -67,7 +69,7 @@ export function CompetitionFilters({
           className={ui.select}
           onChange={apply}
         >
-          <option value="">All</option>
+          <option value="">{t("common.all")}</option>
           {DISCIPLINES.map((d) => (
             <option key={d} value={d}>
               {d}
@@ -77,7 +79,7 @@ export function CompetitionFilters({
       </div>
       <div>
         <label className={ui.label} htmlFor="f-status">
-          Status
+          {t("common.status")}
         </label>
         <select
           id="f-status"
@@ -86,7 +88,7 @@ export function CompetitionFilters({
           className={ui.select}
           onChange={apply}
         >
-          <option value="">All</option>
+          <option value="">{t("common.all")}</option>
           {COMPETITION_STATUSES.map((s) => (
             <option key={s} value={s}>
               {s}
@@ -100,7 +102,7 @@ export function CompetitionFilters({
           className={ui.btnSecondary}
           onClick={() => router.push("?")}
         >
-          Clear
+          {t("common.clear")}
         </button>
       )}
     </form>

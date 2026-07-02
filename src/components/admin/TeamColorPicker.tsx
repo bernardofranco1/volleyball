@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { setTeamColors } from "@/lib/team-actions";
 import { OK } from "@/lib/action-state";
+import { useT } from "@/lib/i18n/client";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { ui } from "@/components/admin/styles";
 
@@ -24,12 +25,13 @@ export function TeamColorPicker({
   teamAColor: string | null;
   teamBColor: string | null;
 }) {
+  const t = useT();
   const [state, action] = useActionState(setTeamColors, OK);
   return (
     <form action={action} className={ui.card}>
-      <h2 className="mb-1 font-medium">Team colours</h2>
+      <h2 className="mb-1 font-medium">{t("match.teamColours")}</h2>
       <p className="mb-3 text-[11px] text-score-dim">
-        Shown on the scoreboard. Pick before the match.
+        {t("match.teamColoursHint")}
       </p>
       <input type="hidden" name="tenantSlug" value={tenantSlug} />
       <input type="hidden" name="competitionId" value={competitionId} />
@@ -61,8 +63,8 @@ export function TeamColorPicker({
         </p>
       )}
       <div className="mt-3">
-        <SubmitButton variant="secondary" pendingLabel="Saving…">
-          Save colours
+        <SubmitButton variant="secondary" pendingLabel={t("common.saving")}>
+          {t("match.saveColours")}
         </SubmitButton>
       </div>
     </form>

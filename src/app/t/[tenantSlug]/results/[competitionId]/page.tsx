@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { notFound } from "next/navigation";
 import { getTenantBySlug } from "@/lib/tenant";
 import { getCompetition, listMatches } from "@/lib/competitions";
@@ -28,11 +29,22 @@ export default async function PublicResultsPage({
   const competition = await getCompetition(tenant.id, competitionId);
   if (!competition) notFound();
 
-  const [groups, bracket, matchList] = await Promise.all([
-    computeStandings(competitionId),
-    loadBracket(competitionId),
-    listMatches(competitionId),
-  ]);
+  // The public results of a FINISHED competition are effectively static —
+  // serve spectators from a 5-minute cache instead of recomputing per request.
+  // Live/draft competitions stay fully dynamic.
+  const loadResults = () =>
+    Promise.all([
+      computeStandings(competitionId),
+      loadBracket(competitionId),
+      listMatches(competitionId),
+    ]);
+  const [groups, bracket, matchList] =
+    competition.status === "FINISHED"
+      ? await unstable_cache(loadResults, ["public-results", competitionId], {
+          revalidate: 300,
+          tags: [`results:${competitionId}`],
+        })()
+      : await loadResults();
 
   return (
     <div className="fixed inset-0 z-50 overflow-auto bg-surface text-foreground">

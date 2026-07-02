@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CompetitionTabs } from "@/components/admin/CompetitionTabs";
+import { getT } from "@/lib/i18n/server";
 import { statusBadgeClass } from "@/components/admin/styles";
 
 /**
@@ -8,7 +9,7 @@ import { statusBadgeClass } from "@/components/admin/styles";
  * drifting (previously only Overview had the badge and only Standings had the
  * public links).
  */
-export function CompetitionHeader({
+export async function CompetitionHeader({
   tenantSlug,
   competition,
   active,
@@ -27,6 +28,7 @@ export function CompetitionHeader({
   subtitle?: React.ReactNode;
   actions?: React.ReactNode;
 }) {
+  const { t } = await getT();
   return (
     <>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
@@ -35,7 +37,7 @@ export function CompetitionHeader({
             href={`/t/${tenantSlug}/competitions`}
             className="text-sm text-score-dim hover:text-foreground"
           >
-            ← All competitions
+            {t("comp.backToAll")}
           </Link>
           <div className="mt-1 flex items-center gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">
@@ -53,12 +55,12 @@ export function CompetitionHeader({
             {subtitle}
           </p>
           <p className="mt-1 text-xs text-score-dim">
-            Public:{" "}
+            {t("comp.public")}{" "}
             <Link
               href={`/t/${tenantSlug}/results/${competition.id}`}
               className="underline hover:text-foreground"
             >
-              results page
+              {t("comp.resultsPage")}
             </Link>
             {" · "}
             <a

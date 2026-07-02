@@ -2,6 +2,7 @@
 
 import { updateCompetition } from "@/lib/competition-actions";
 import { GENDERS } from "@/lib/domain";
+import { useT } from "@/lib/i18n/client";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { ui } from "@/components/admin/styles";
@@ -21,16 +22,17 @@ export function EditCompetitionForm({
     discipline: string;
   };
 }) {
+  const t = useT();
   return (
     <ActionForm action={updateCompetition} className={ui.card}>
-      <h2 className="mb-4 font-medium">Details</h2>
+      <h2 className="mb-4 font-medium">{t("comp.details")}</h2>
       <input type="hidden" name="tenantSlug" value={tenantSlug} />
       <input type="hidden" name="competitionId" value={competition.id} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <label className={ui.label} htmlFor="e-name">
-            Name
+            {t("common.name")}
           </label>
           <input
             id="e-name"
@@ -42,7 +44,7 @@ export function EditCompetitionForm({
         </div>
         <div className="sm:col-span-2">
           <label className={ui.label} htmlFor="e-venue">
-            Venue
+            {t("common.venue")}
           </label>
           <input
             id="e-venue"
@@ -53,7 +55,7 @@ export function EditCompetitionForm({
         </div>
         <div>
           <label className={ui.label} htmlFor="e-start">
-            Start date
+            {t("common.startDate")}
           </label>
           <input
             id="e-start"
@@ -65,7 +67,7 @@ export function EditCompetitionForm({
         </div>
         <div>
           <label className={ui.label} htmlFor="e-end">
-            End date
+            {t("common.endDate")}
           </label>
           <input
             id="e-end"
@@ -77,7 +79,7 @@ export function EditCompetitionForm({
         </div>
         <div>
           <label className={ui.label} htmlFor="e-gender">
-            Gender
+            {t("common.gender")}
           </label>
           <select
             id="e-gender"
@@ -94,7 +96,7 @@ export function EditCompetitionForm({
         </div>
         <div>
           <label className={ui.label} htmlFor="e-discipline">
-            Discipline
+            {t("common.discipline")}
           </label>
           <input
             id="e-discipline"
@@ -102,13 +104,13 @@ export function EditCompetitionForm({
             disabled
             aria-readonly
             className={`${ui.input} opacity-60`}
-            title="Discipline is fixed once matches use its rule engine"
+            title={t("comp.disciplineFixed")}
           />
         </div>
       </div>
 
       <div className="mt-4">
-        <SubmitButton pendingLabel="Saving…">Save changes</SubmitButton>
+        <SubmitButton pendingLabel={t("common.saving")}>{t("common.saveChanges")}</SubmitButton>
       </div>
     </ActionForm>
   );

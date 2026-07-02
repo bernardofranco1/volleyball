@@ -12,10 +12,16 @@ if (!url) {
   throw new Error("DATABASE_URL is required to run migrations");
 }
 
-const sql = postgres(url, { max: 1 });
-const db = drizzle(sql);
+// No top-level await — tsx runs this file as CJS (no "type": "module").
+async function main() {
+  const sql = postgres(url!, { max: 1 });
+  const db = drizzle(sql);
+  await migrate(db, { migrationsFolder: "./src/db/migrations" });
+  await sql.end();
+  console.log("✓ Migrations applied");
+}
 
-await migrate(db, { migrationsFolder: "./src/db/migrations" });
-await sql.end();
-
-console.log("✓ Migrations applied");
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

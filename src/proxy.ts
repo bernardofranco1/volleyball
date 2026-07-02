@@ -52,12 +52,14 @@ export async function proxy(request: NextRequest) {
     },
   });
 
+  // Optimistic check: getClaims() verifies the JWT locally against the
+  // project's published ES256 JWKS (no Auth-server round trip on the hot
+  // path), refreshing the session first when it has expired. Real
+  // authorization still happens in authz.ts against the database.
   let user = null;
   try {
-    const {
-      data: { user: u },
-    } = await supabase.auth.getUser();
-    user = u;
+    const { data } = await supabase.auth.getClaims();
+    user = data?.claims ?? null;
   } catch {
     // Supabase unreachable (e.g. local dev without credentials). Treat as
     // unauthenticated so protected routes still redirect to login.

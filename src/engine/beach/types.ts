@@ -5,14 +5,12 @@
 // timeout/challenge counts all come from a resolved `TournamentConfig`
 // (src/engine/config.ts), so the same reducer serves any beach ruleset.
 
-import type { TeamId } from "../types";
+import type { MisconductRecord, SetNumber, Side, TeamId } from "../types";
 
-export type { TeamId };
-/** Physical side of the court a team currently occupies. */
-export type Side = "LEFT" | "RIGHT";
+export type { MisconductRecord, SetNumber, Side, TeamId } from "../types";
+export { activeSet, oppositeSide, oppositeTeam } from "../types";
 /** Beach: each team has two players who serve in alternation. */
 export type PlayerNumber = 1 | 2;
-export type SetNumber = number;
 
 export type BeachMatchStatus =
   | "SETUP"
@@ -85,18 +83,6 @@ export interface BeachEvent {
 }
 
 // ── State shape ──────────────────────────────────────────────────────────────
-
-export interface MisconductRecord {
-  type:
-    | "MISCONDUCT_WARNING"
-    | "MISCONDUCT_PENALTY"
-    | "MISCONDUCT_EXPULSION"
-    | "MISCONDUCT_DISQUALIFICATION";
-  playerId: string;
-  setNumber: SetNumber;
-  scoreA: number;
-  scoreB: number;
-}
 
 export interface BeachSetState {
   setNumber: SetNumber;
@@ -171,14 +157,3 @@ export function initialBeachState(matchId: string): BeachMatchState {
   };
 }
 
-export function activeSet(state: BeachMatchState): BeachSetState | undefined {
-  return state.sets[state.currentSetNumber - 1];
-}
-
-export function oppositeTeam(team: TeamId): TeamId {
-  return team === "A" ? "B" : "A";
-}
-
-export function oppositeSide(side: Side): Side {
-  return side === "LEFT" ? "RIGHT" : "LEFT";
-}
