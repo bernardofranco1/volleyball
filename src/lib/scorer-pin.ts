@@ -15,13 +15,31 @@ export const scorerPinCookie = (matchId: string) => `vbpin_${matchId}`;
  * cookie, and rotating the PIN invalidates outstanding cookies. Keyed off the
  * service-role key (already secret + present in every environment).
  */
-export function scorerPinCookieValue(matchId: string, pin: string): string {
+function hmacKey(): string {
   const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.DATABASE_URL ?? "dev";
+    process.env.PIN_HMAC_SECRET ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.DATABASE_URL;
+  // Fail closed: never sign PIN cookies / deep-links with a guessable constant.
+  // A missing secret would make every PIN-gate bypass token forgeable offline.
+  if (!key)
+    throw new Error(
+      "PIN_HMAC_SECRET (or SUPABASE_SERVICE_ROLE_KEY / DATABASE_URL) must be set to sign scorer PIN tokens.",
+    );
+  return key;
+}
+
+export function scorerPinCookieValue(matchId: string, pin: string): string {
   return crypto
-    .createHmac("sha256", key)
+    .createHmac("sha256", hmacKey())
     .update(`${matchId}:${pin}`)
     .digest("hex");
+}
+
+/** Constant-time compare of two hex HMAC digests of equal length. */
+function timingSafeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
 
 export async function getScorerPin(matchId: string): Promise<string | null> {
@@ -38,7 +56,7 @@ export async function scorerPinSatisfied(matchId: string): Promise<boolean> {
   const pin = await getScorerPin(matchId);
   if (!pin) return true;
   const c = (await cookies()).get(scorerPinCookie(matchId))?.value;
-  return c === scorerPinCookieValue(matchId, pin);
+  return !!c && timingSafeEqualHex(c, scorerPinCookieValue(matchId, pin));
 }
 
 /**
@@ -54,5 +72,5 @@ export async function scorerKeyValid(
   if (typeof key !== "string" || !key) return false;
   const pin = await getScorerPin(matchId);
   if (!pin) return false;
-  return key === scorerPinCookieValue(matchId, pin);
+  return timingSafeEqualHex(key, scorerPinCookieValue(matchId, pin));
 }

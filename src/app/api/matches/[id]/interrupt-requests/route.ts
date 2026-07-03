@@ -52,7 +52,8 @@ export async function POST(
     tenantId: session.tenantId,
     team: body.team,
     requestType: body.requestType,
-    payload: body.note ? { note: body.note } : null,
+    // Cap the free-text note — it comes from a tablet bearer token, untrusted.
+    payload: body.note ? { note: String(body.note).slice(0, 280) } : null,
     status: "PENDING",
   });
   await broadcastInterruptRequest(id, {

@@ -36,40 +36,7 @@ export function InterruptNotifications({
   // failed PATCH lets the request resurface.
   const resolvedRef = useRef<Set<string>>(new Set());
 
-  // Fast path: realtime broadcast.
-  useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-    ensureRealtimeAuth(supabase);
-    const channel = supabase
-      .channel(`match:${matchId}:scorer`, channelConfig())
-      .on(
-        "broadcast",
-        { event: "interrupt-request" },
-        (m: {
-          payload?: { requestId?: string; team?: "A" | "B"; requestType?: string };
-        }) => {
-          const p = m.payload;
-          if (!p?.requestId || !p.team || !p.requestType) return;
-          if (resolvedRef.current.has(p.requestId)) return;
-          const item: Pending = {
-            requestId: p.requestId,
-            team: p.team,
-            requestType: p.requestType,
-          };
-          setPending((prev) =>
-            prev.some((x) => x.requestId === item.requestId)
-              ? prev
-              : [...prev, item],
-          );
-        },
-      )
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [matchId]);
-
-  // Reliable path: poll the authoritative PENDING set.
+  // Authoritative source of truth: poll the scorer GET endpoint (DB-backed).
   const poll = useCallback(async () => {
     try {
       const res = await fetch(`/api/matches/${matchId}/interrupt-requests`, {
@@ -102,6 +69,25 @@ export function InterruptNotifications({
       clearInterval(iv);
     };
   }, [poll, active]);
+
+  // Fast path: a realtime broadcast is only a *signal* — never trust its payload
+  // (any anon-key holder can forge one). On any broadcast, re-fetch the
+  // authoritative PENDING set from the server so forged events can't inject fake
+  // prompts onto the scorer's screen.
+  useEffect(() => {
+    if (!active) return;
+    const supabase = createSupabaseBrowserClient();
+    ensureRealtimeAuth(supabase);
+    const channel = supabase
+      .channel(`match:${matchId}:scorer`, channelConfig())
+      .on("broadcast", { event: "interrupt-request" }, () => {
+        void poll();
+      })
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [matchId, active, poll]);
 
   const resolve = async (requestId: string, status: "APPROVED" | "DENIED") => {
     resolvedRef.current.add(requestId);

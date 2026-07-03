@@ -13,9 +13,10 @@ import type { NextRequest } from "next/server";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { events as eventsTable } from "@/db/schema";
-import { authorizeMatch, SCORING_ROLES } from "@/lib/authz";
+import { ADMIN_ROLES, authorizeMatch, hasRole, SCORING_ROLES } from "@/lib/authz";
 import { sameOriginOk } from "@/lib/http";
 import { rateLimit } from "@/lib/ratelimit";
+import { scorerPinSatisfied } from "@/lib/scorer-pin";
 import {
   EventRejectedError,
   MatchNotFoundError,
@@ -97,6 +98,14 @@ export async function POST(
   ]);
   if (!authed.ok)
     return Response.json({ error: "Forbidden" }, { status: authed.status });
+  // Per-match scorer PIN is an authorization gate, not just a UI screen: a tenant
+  // SCORER must have satisfied the PIN (httpOnly cookie) to post events to THIS
+  // match. Admins manage all matches and bypass. No-PIN matches are ungated.
+  if (
+    !hasRole(authed.auth.roles, ADMIN_ROLES) &&
+    !(await scorerPinSatisfied(id))
+  )
+    return Response.json({ error: "Scorer PIN required" }, { status: 403 });
   if (!allowed)
     return Response.json({ error: "Too many requests" }, { status: 429 });
   if (body === null)
