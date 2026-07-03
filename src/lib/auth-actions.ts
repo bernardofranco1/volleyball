@@ -1,8 +1,10 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase";
 import { getUserPrimaryTenantSlug } from "@/lib/tenant";
+import { rateLimitAuth } from "@/lib/ratelimit";
 
 import { safeRedirect } from "@/lib/http";
 
@@ -21,6 +23,17 @@ export async function login(
 
   if (!email || !password) {
     return { error: "Email and password are required." };
+  }
+
+  // Throttle credential stuffing / password spraying — per account and per IP.
+  const ip =
+    (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  const [byEmail, byIp] = await Promise.all([
+    rateLimitAuth(`login:email:${email.toLowerCase()}`),
+    rateLimitAuth(`login:ip:${ip}`),
+  ]);
+  if (!byEmail || !byIp) {
+    return { error: "Too many attempts. Please wait a minute and try again." };
   }
 
   const supabase = await createSupabaseServerClient();

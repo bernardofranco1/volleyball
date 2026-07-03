@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { matches } from "@/db/schema";
 import { ADMIN_ROLES, SCORING_ROLES, authorizeMatch } from "@/lib/authz";
 import { fail, ok, type FormState } from "@/lib/action-state";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimitAuth } from "@/lib/ratelimit";
 import {
   getScorerPin,
   scorerPinCookie,
@@ -27,11 +27,17 @@ export async function verifyScorerPin(
   if (!authed.ok) return fail("Not allowed.");
 
   // Throttle guesses per user+match — a 6-digit PIN must not be brute-forceable.
-  if (!(await rateLimit(`pin:${authed.auth.user.id}:${matchId}`, 5, 60_000)))
+  if (!(await rateLimitAuth(`pin:${authed.auth.user.id}:${matchId}`)))
     return fail("Too many attempts — wait a minute and try again.");
 
   const stored = await getScorerPin(matchId);
-  if (!stored || str(fd, "pin") !== stored) return fail("Incorrect PIN.");
+  const submitted = str(fd, "pin");
+  if (
+    !stored ||
+    submitted.length !== stored.length ||
+    !crypto.timingSafeEqual(Buffer.from(submitted), Buffer.from(stored))
+  )
+    return fail("Incorrect PIN.");
 
   // Cookie carries an HMAC of the PIN, not the PIN itself.
   (await cookies()).set(

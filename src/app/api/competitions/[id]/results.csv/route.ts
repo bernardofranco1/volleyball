@@ -6,7 +6,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function cell(v: string | number | null): string {
-  const s = v == null ? "" : String(v);
+  let s = v == null ? "" : String(v);
+  // Neutralize spreadsheet formula injection: a leading =, +, -, @, or control
+  // char makes Excel/Sheets evaluate the cell (e.g. =HYPERLINK exfiltration).
+  // Team/round names are user-controlled and this CSV is served publicly.
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

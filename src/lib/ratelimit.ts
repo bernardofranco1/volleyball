@@ -23,6 +23,35 @@ const upstash =
       })
     : null;
 
+// A stricter, fixed sliding window for auth-sensitive actions (login, PIN
+// verification) that must be genuinely un-brute-forceable. The generic
+// `rateLimit` Upstash path is fixed at 30/10s, which is far too loose for these;
+// use `rateLimitAuth` for those keys instead.
+const AUTH_MAX = 5;
+const authUpstash =
+  url && token
+    ? new Ratelimit({
+        redis: new Redis({ url, token }),
+        limiter: Ratelimit.slidingWindow(AUTH_MAX, "60 s"),
+        prefix: "vb_rl_auth",
+        analytics: false,
+      })
+    : null;
+
+/** Strict 5-per-60s limiter for auth-sensitive keys (login, scorer PIN). */
+export async function rateLimitAuth(key: string): Promise<boolean> {
+  if (authUpstash) {
+    try {
+      const { success } = await authUpstash.limit(key);
+      return success;
+    } catch (err) {
+      captureError(err, { scope: "ratelimit-auth", key });
+      return true;
+    }
+  }
+  return memoryLimit(`auth:${key}`, AUTH_MAX, 60_000);
+}
+
 // ── in-memory fallback ────────────────────────────────────────────────────────
 const buckets = new Map<string, { count: number; resetAt: number }>();
 
