@@ -81,6 +81,7 @@ export function IndoorCourt({
       right={buildTeam(leftTeam === "A" ? "B" : "A")}
       attackLine
       ariaLabel="Indoor court"
+      hideTeamNames
     />
   );
 }

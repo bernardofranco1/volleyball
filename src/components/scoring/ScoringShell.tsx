@@ -38,7 +38,7 @@ function TeamScore({
           style={{ backgroundColor: color }}
           aria-hidden
         />
-        <span className="truncate text-xs font-semibold sm:text-sm">{name}</span>
+        <span className="truncate text-lg font-bold sm:text-2xl">{name}</span>
       </div>
       <div className="font-mono text-5xl font-bold leading-none tabular-nums sm:text-6xl">
         {score}

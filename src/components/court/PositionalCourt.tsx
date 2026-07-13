@@ -43,6 +43,8 @@ export interface PositionalCourtProps {
   attackLine?: boolean; // dashed line 1/3 in from the net (3 m indoor, 2 m light)
   restraintLine?: boolean; // dashed line near the baseline (light 1 m jump-serve)
   ariaLabel: string;
+  /** Hide the team-name labels under the court (they duplicate the score strip). */
+  hideTeamNames?: boolean;
 }
 
 // Geometry (viewBox units). Each half is a true square (HALF_W × HALF_W) so the
@@ -188,6 +190,7 @@ export function PositionalCourt({
   attackLine,
   restraintLine,
   ariaLabel,
+  hideTeamNames,
 }: PositionalCourtProps) {
   const leftFill = `var(${left.serving ? surfaceDarkVar : surfaceLightVar})`;
   const rightFill = `var(${right.serving ? surfaceDarkVar : surfaceLightVar})`;
@@ -195,9 +198,11 @@ export function PositionalCourt({
   const atkR = NET_X + HALF_W / 3;
   const resL = COURT_X0 + HALF_W / 6;
   const resR = COURT_X1 - HALF_W / 6;
+  // Reclaim the label band when names are hidden so the court fills the space.
+  const vbH = hideTeamNames ? COURT_Y1 + 8 : VB_H;
 
   return (
-    <svg viewBox={`0 0 320 ${VB_H}`} role="img" aria-label={ariaLabel} className="mx-auto block h-auto w-full max-w-xl max-h-[48dvh]">
+    <svg viewBox={`0 0 320 ${vbH}`} role="img" aria-label={ariaLabel} className="mx-auto block h-auto w-full max-w-xl max-h-[48dvh]">
       {/* Court halves */}
       <rect x={COURT_X0} y={COURT_Y0} width={HALF_W} height={COURT_Y1 - COURT_Y0} fill={leftFill} stroke="rgba(255,255,255,0.55)" strokeWidth={2} />
       <rect x={NET_X} y={COURT_Y0} width={HALF_W} height={COURT_Y1 - COURT_Y0} fill={rightFill} stroke="rgba(255,255,255,0.55)" strokeWidth={2} />
@@ -226,15 +231,19 @@ export function PositionalCourt({
       <HalfMarkers team={left} side="left" />
       <HalfMarkers team={right} side="right" />
 
-      {/* Team names + serving */}
-      <text x={(COURT_X0 + NET_X) / 2} y={NAME_Y} textAnchor="middle" fontSize={12} fontWeight={600} fill="var(--score-active)">
-        {left.name}
-        {left.serving ? " ●" : ""}
-      </text>
-      <text x={(NET_X + COURT_X1) / 2} y={NAME_Y} textAnchor="middle" fontSize={12} fontWeight={600} fill="var(--score-active)">
-        {right.name}
-        {right.serving ? " ●" : ""}
-      </text>
+      {/* Team names + serving (hidden when the score strip already shows them) */}
+      {hideTeamNames ? null : (
+        <>
+          <text x={(COURT_X0 + NET_X) / 2} y={NAME_Y} textAnchor="middle" fontSize={12} fontWeight={600} fill="var(--score-active)">
+            {left.name}
+            {left.serving ? " ●" : ""}
+          </text>
+          <text x={(NET_X + COURT_X1) / 2} y={NAME_Y} textAnchor="middle" fontSize={12} fontWeight={600} fill="var(--score-active)">
+            {right.name}
+            {right.serving ? " ●" : ""}
+          </text>
+        </>
+      )}
     </svg>
   );
 }
