@@ -108,6 +108,7 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
             teamAName={teamAName}
             teamBName={teamBName}
             active={state.status !== "FINISHED"}
+            rosterById={rosterById}
           />
         ) : null
       }

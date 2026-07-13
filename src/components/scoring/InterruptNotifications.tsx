@@ -8,6 +8,13 @@ interface Pending {
   requestId: string;
   team: "A" | "B";
   requestType: string;
+  outPlayerId?: string;
+  inPlayerId?: string;
+}
+
+export interface RosterEntry {
+  jerseyNumber: number | null;
+  fullName: string;
 }
 
 // Surfaces team-tablet interrupt requests to the scorer with approve/deny.
@@ -24,11 +31,14 @@ export function InterruptNotifications({
   teamAName,
   teamBName,
   active = true,
+  rosterById,
 }: {
   matchId: string;
   teamAName: string;
   teamBName: string;
   active?: boolean;
+  /** Resolves a substitution request's player ids to readable labels. */
+  rosterById?: ReadonlyMap<string, RosterEntry>;
 }) {
   const [pending, setPending] = useState<Pending[]>([]);
   // Requests this scorer just resolved — kept briefly so the poll doesn't
@@ -44,7 +54,12 @@ export function InterruptNotifications({
       });
       if (!res.ok) return;
       const data = (await res.json()) as {
-        requests?: { id: string; team: "A" | "B"; requestType: string }[];
+        requests?: {
+          id: string;
+          team: "A" | "B";
+          requestType: string;
+          payload?: { outPlayerId?: string; inPlayerId?: string } | null;
+        }[];
       };
       if (!Array.isArray(data.requests)) return;
       const fresh = data.requests
@@ -53,6 +68,8 @@ export function InterruptNotifications({
           requestId: r.id,
           team: r.team,
           requestType: r.requestType,
+          outPlayerId: r.payload?.outPlayerId,
+          inPlayerId: r.payload?.inPlayerId,
         }));
       setPending(fresh);
     } catch {
@@ -102,6 +119,11 @@ export function InterruptNotifications({
 
   if (pending.length === 0) return null;
   const name = (t: "A" | "B") => (t === "A" ? teamAName : teamBName);
+  const player = (id?: string) => {
+    if (!id) return "?";
+    const p = rosterById?.get(id);
+    return p ? `${p.jerseyNumber ?? "–"} ${p.fullName}` : id;
+  };
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex w-72 flex-col gap-2">
@@ -113,6 +135,11 @@ export function InterruptNotifications({
           <div className="text-sm font-medium">
             {name(p.team)} requests <span className="text-amber-400">{p.requestType}</span>
           </div>
+          {p.requestType === "SUBSTITUTION" && (p.outPlayerId || p.inPlayerId) ? (
+            <div className="mt-0.5 text-xs text-score-dim">
+              {player(p.outPlayerId)} → {player(p.inPlayerId)}
+            </div>
+          ) : null}
           <div className="mt-2 flex gap-2">
             <button
               type="button"

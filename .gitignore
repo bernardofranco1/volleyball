@@ -51,4 +51,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-_validate-timeout.mts
+_validate-*.mts

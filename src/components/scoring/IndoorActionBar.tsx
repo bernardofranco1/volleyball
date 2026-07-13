@@ -120,7 +120,23 @@ export function IndoorActionBar() {
                 {t("scoring.libero")}
               </SecondaryButton>
             ) : null}
-            {/* Challenge (VCS) hidden — brief §6 (engine kept dormant). */}
+            {config.vcsEnabled ? (
+              <SecondaryButton
+                disabled={
+                  (team === "A"
+                    ? set.vcs.challengesRemainingA
+                    : set.vcs.challengesRemainingB) <= 0
+                }
+                onClick={() => dispatch({ type: "VCS_CHALLENGE", team })}
+              >
+                {t("scoring.challenge", {
+                  remaining:
+                    team === "A"
+                      ? set.vcs.challengesRemainingA
+                      : set.vcs.challengesRemainingB,
+                })}
+              </SecondaryButton>
+            ) : null}
           </>
         )}
       </TeamActionsGrid>

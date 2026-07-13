@@ -260,6 +260,42 @@ export default async function CompetitionOverviewPage({
             </div>
           </div>
 
+          {/* Challenges (Video Challenge System) */}
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div>
+              <label className={ui.label} htmlFor="vcsEnabled">
+                {t("comp.vcs")}
+              </label>
+              <select
+                id="vcsEnabled"
+                name="vcsEnabled"
+                defaultValue={triState(configRow?.vcsEnabled)}
+                className={ui.select}
+              >
+                <option value="">
+                  {t("common.default", { value: resolved.vcsEnabled ? "on" : "off" })}
+                </option>
+                <option value="on">{t("common.on")}</option>
+                <option value="off">{t("common.off")}</option>
+              </select>
+            </div>
+            <div>
+              <label className={ui.label} htmlFor="vcsChallengesPerSet">
+                {t("comp.vcsPerSet")}
+              </label>
+              <input
+                id="vcsChallengesPerSet"
+                name="vcsChallengesPerSet"
+                type="number"
+                min={0}
+                max={9}
+                defaultValue={configRow?.vcsChallengesPerSet ?? ""}
+                placeholder={String(resolved.vcsChallengesPerSet)}
+                className={ui.input}
+              />
+            </div>
+          </div>
+
           {/* Time-outs */}
           <div className="mt-4 grid grid-cols-3 gap-4">
             <div>
