@@ -143,7 +143,11 @@ export const tournamentConfig = pgTable("tournament_config", {
 
   // Timeouts
   timeoutsPerSet: integer("timeouts_per_set"),
+  timeoutsPerSetTiebreak: integer("timeouts_per_set_tiebreak"),
   timeoutDurationSecs: integer("timeout_duration_secs"),
+
+  // Set breaks — per-break durations (seconds), index i = break after set i+1.
+  setBreakDurationsSecs: jsonb("set_break_durations_secs").$type<number[]>(),
 
   // Substitutions
   maxSubsPerSet: integer("max_subs_per_set"),

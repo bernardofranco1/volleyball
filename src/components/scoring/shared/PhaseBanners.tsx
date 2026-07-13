@@ -5,10 +5,13 @@
 // LINEUP_PENDING / SETUP / COIN_TOSS / READY / start-set banners.
 // Discipline-specific interstitials (beach TTO, indoor VCS) plug in via
 // `extraPhase`; the live scoring UI stays in each bar.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { oppositeSide, oppositeTeam, type Side, type TeamId } from "@/engine/types";
+import { type TournamentConfig, setBreakSecsAfter } from "@/engine/config";
+import { useCountdown } from "@/components/scoreboard/Countdown";
 import { useT } from "@/lib/i18n/client";
 import { Banner, PrimaryButton, SecondaryButton } from "./buttons";
+import { CountdownOverlay } from "./CountdownOverlay";
 
 /** The slice of a set state the phase banners need (all four engines match). */
 export interface PhaseSet {
@@ -29,6 +32,8 @@ export interface PhaseMatchState {
   currentSetNumber: number;
   set1FirstServer: TeamId | null;
   activeTimeoutTeam: TeamId | null;
+  activeTimeoutStartedAt?: string | null;
+  setBreakStartedAt?: string | null;
   sets: PhaseSet[];
 }
 
@@ -54,6 +59,8 @@ export interface PrePhaseOptions {
   dispatch: PhaseDispatch;
   teamAName: string;
   teamBName: string;
+  /** Resolved config — enables the time-out / set-break countdown + auto-advance. */
+  config?: TournamentConfig;
   /** Which side team A starts on in the set after a break (default: switch ends). */
   nextSetStartSide?: (prev: PhaseSet, nextSetNumber: number) => Side;
   /** Disable "Start next set" while a dispatch is in flight (beach). */
@@ -76,6 +83,7 @@ export function usePrePhaseBanner({
   dispatch,
   teamAName,
   teamBName,
+  config,
   nextSetStartSide,
   nextSetDisabled,
   lineupPendingText,
@@ -86,6 +94,53 @@ export function usePrePhaseBanner({
   const [tossSide, setTossSide] = useState<Side>("LEFT");
   const name = (t: TeamId) => (t === "A" ? teamAName : teamBName);
   const nextSide = nextSetStartSide ?? ((prev: PhaseSet) => oppositeSide(prev.teamAStartSide));
+
+  // Advance to the next set (shared by the manual button and the auto-advance
+  // timer): opposite first-server, side per the discipline's rule.
+  const startNextSet = () => {
+    if (!set) return;
+    const nextSetNumber = state.currentSetNumber + 1;
+    dispatch({
+      type: "SET_START",
+      setNumber: nextSetNumber,
+      firstServer: oppositeTeam(set.firstServer),
+      teamAStartSide: nextSide(set, nextSetNumber),
+    });
+  };
+
+  // ── Time-out & set-break countdowns (drive the floating overlay + auto-advance).
+  // Deadlines derive from the server event timestamp so scorer/tablet/board agree.
+  const timeoutDeadline =
+    config && state.rallyPhase === "TIMEOUT_ACTIVE" && state.activeTimeoutStartedAt
+      ? Date.parse(state.activeTimeoutStartedAt) + config.timeoutDurationSecs * 1000
+      : null;
+  const setBreakDeadline =
+    config && state.rallyPhase === "SET_BREAK" && state.setBreakStartedAt
+      ? Date.parse(state.setBreakStartedAt) +
+        setBreakSecsAfter(config, state.currentSetNumber) * 1000
+      : null;
+  const timeoutMs = useCountdown(timeoutDeadline);
+  const setBreakMs = useCountdown(setBreakDeadline);
+
+  // Fire the auto-advance exactly once per countdown instance (keyed by deadline).
+  const firedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (timeoutDeadline && timeoutMs <= 0) {
+      const key = `to:${timeoutDeadline}`;
+      if (firedRef.current !== key) {
+        firedRef.current = key;
+        dispatch({ type: "TIMEOUT_END", team: state.activeTimeoutTeam ?? "A" });
+      }
+    }
+    if (setBreakDeadline && setBreakMs <= 0) {
+      const key = `sb:${setBreakDeadline}`;
+      if (firedRef.current !== key) {
+        firedRef.current = key;
+        startNextSet();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeoutDeadline, timeoutMs, setBreakDeadline, setBreakMs]);
 
   if (state.status === "FINISHED")
     return (
@@ -99,7 +154,20 @@ export function usePrePhaseBanner({
       </Banner>
     );
 
-  if (state.rallyPhase === "SET_BREAK")
+  if (state.rallyPhase === "SET_BREAK") {
+    // With config we show the floating countdown and auto-advance at 0:00.
+    if (setBreakDeadline)
+      return (
+        <CountdownOverlay
+          title={t("scoring.setBreak")}
+          subtitle={t("scoring.setEnded", {
+            set: set?.setNumber ?? "",
+            setsA: state.setsWonA,
+            setsB: state.setsWonB,
+          })}
+          ms={setBreakMs}
+        />
+      );
     return (
       <Banner>
         <div className="flex flex-col items-center gap-3">
@@ -110,37 +178,31 @@ export function usePrePhaseBanner({
               setsB: state.setsWonB,
             })}
           </span>
-          <PrimaryButton
-            disabled={nextSetDisabled}
-            onClick={() => {
-              if (!set) return;
-              const nextSetNumber = state.currentSetNumber + 1;
-              dispatch({
-                type: "SET_START",
-                setNumber: nextSetNumber,
-                firstServer: oppositeTeam(set.firstServer),
-                teamAStartSide: nextSide(set, nextSetNumber),
-              });
-            }}
-          >
+          <PrimaryButton disabled={nextSetDisabled} onClick={startNextSet}>
             {t("scoring.startNextSet")}
           </PrimaryButton>
         </div>
       </Banner>
     );
+  }
 
-  if (state.rallyPhase === "TIMEOUT_ACTIVE")
+  if (state.rallyPhase === "TIMEOUT_ACTIVE") {
+    const to = state.activeTimeoutTeam ?? "A";
+    if (timeoutDeadline)
+      return (
+        <CountdownOverlay
+          title={`${name(to)} · ${t("scoring.timeoutLabel")}`}
+          ms={timeoutMs}
+        />
+      );
     return (
       <Banner>
-        <PrimaryButton
-          onClick={() =>
-            dispatch({ type: "TIMEOUT_END", team: state.activeTimeoutTeam ?? "A" })
-          }
-        >
-          {t("scoring.endTimeout", { team: name(state.activeTimeoutTeam ?? "A") })}
+        <PrimaryButton onClick={() => dispatch({ type: "TIMEOUT_END", team: to })}>
+          {t("scoring.endTimeout", { team: name(to) })}
         </PrimaryButton>
       </Banner>
     );
+  }
 
   if (extraPhase) return extraPhase;
 

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   DISCIPLINE_DEFAULTS,
   resolveConfig,
+  setBreakSecsAfter,
+  timeoutCapForSet,
   type TournamentConfig,
 } from "@/engine/config";
 import { DISCIPLINES } from "@/engine/types";
@@ -88,5 +90,32 @@ describe("resolveConfig", () => {
     const override: Partial<TournamentConfig> = { setScore: 99 };
     resolveConfig("BEACH", override);
     expect(DISCIPLINE_DEFAULTS.BEACH.setScore).toBe(21);
+  });
+});
+
+describe("timeoutCapForSet", () => {
+  it("uses the normal cap for non-deciding sets and the tie-break cap for the decider", () => {
+    const c = resolveConfig("INDOOR", {
+      timeoutsPerSet: 2,
+      timeoutsPerSetTiebreak: 1,
+    });
+    expect(timeoutCapForSet(c, 1)).toBe(2); // normal set
+    expect(timeoutCapForSet(c, 4)).toBe(2); // still not the decider (bestOf 5)
+    expect(timeoutCapForSet(c, 5)).toBe(1); // deciding set → tie-break cap
+  });
+});
+
+describe("setBreakSecsAfter", () => {
+  const c = resolveConfig("BEACH", { setBreakDurationsSecs: [30, 90] });
+  it("returns the per-break duration by set number", () => {
+    expect(setBreakSecsAfter(c, 1)).toBe(30);
+    expect(setBreakSecsAfter(c, 2)).toBe(90);
+  });
+  it("reuses the last value past the end of the array", () => {
+    expect(setBreakSecsAfter(c, 5)).toBe(90);
+  });
+  it("falls back to 60s when misconfigured", () => {
+    const empty = resolveConfig("BEACH", { setBreakDurationsSecs: [] });
+    expect(setBreakSecsAfter(empty, 1)).toBe(60);
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMatch } from "@/lib/match-context";
+import { timeoutCapForSet } from "@/engine/config";
 import { useT } from "@/lib/i18n/client";
 import { type TeamId, activeSet } from "@/engine/beach/types";
 import {
@@ -37,6 +38,7 @@ export function BeachActionBar({
     dispatch,
     teamAName,
     teamBName,
+    config,
     nextSetDisabled: pending,
     extraPhase:
       state.rallyPhase === "TTO_ACTIVE" ? (
@@ -62,8 +64,9 @@ export function BeachActionBar({
     tapConfirm(team, () =>
       dispatch(team === "A" ? { type: "RALLY_WON_A" } : { type: "RALLY_WON_B" }),
     );
+  const timeoutCap = timeoutCapForSet(config, set.setNumber);
   const timeoutFull = (t: TeamId) =>
-    (t === "A" ? set.timeoutsUsedA : set.timeoutsUsedB) >= config.timeoutsPerSet;
+    (t === "A" ? set.timeoutsUsedA : set.timeoutsUsedB) >= timeoutCap;
 
   return (
     <div className="flex flex-col gap-3">
@@ -88,7 +91,7 @@ export function BeachActionBar({
         >
           {t("scoring.timeoutTeam", {
             team: teamAName,
-            remaining: config.timeoutsPerSet - set.timeoutsUsedA,
+            remaining: timeoutCap - set.timeoutsUsedA,
           })}
         </SecondaryButton>
         <SecondaryButton
@@ -97,7 +100,7 @@ export function BeachActionBar({
         >
           {t("scoring.timeoutTeam", {
             team: teamBName,
-            remaining: config.timeoutsPerSet - set.timeoutsUsedB,
+            remaining: timeoutCap - set.timeoutsUsedB,
           })}
         </SecondaryButton>
       </div>

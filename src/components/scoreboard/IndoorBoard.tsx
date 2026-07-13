@@ -22,6 +22,8 @@ export interface IndoorPlayer {
   name: string;
   serving: boolean;
   libero: boolean;
+  /** Stable player identity — keys the jersey so it slides on rotation. */
+  key?: string;
 }
 
 export interface IndoorRosterEntry {
@@ -132,42 +134,47 @@ function Jersey({ p, teamColor, accent }: { p: IndoorPlayer; teamColor: string; 
   );
 }
 
-function Column({ players, grow, teamColor, accent }: { players: IndoorPlayer[]; grow: number; teamColor: string; accent: string }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center", flex: grow, padding: "1cqmin 0" }}>
-      {players.map((p) => (
-        <Jersey key={p.pos} p={p} teamColor={teamColor} accent={accent} />
-      ))}
-    </div>
-  );
+// Vertical (top→bottom) zone order per half. The right half mirrors the left so
+// the two servers sit diagonally opposite (bottom-left vs top-right) — matching
+// the scorer's PositionalCourt.
+const BACK_ZONES = [5, 6, 1];
+const FRONT_ZONES = [4, 3, 2];
+
+/** Target (x%, y%) of a rotation position within the whole court box. */
+function courtCoord(side: "a" | "b", pos: number): { x: number; y: number } {
+  const isBack = BACK_ZONES.includes(pos);
+  const backOrder = side === "a" ? BACK_ZONES : [...BACK_ZONES].reverse();
+  const frontOrder = side === "a" ? FRONT_ZONES : [...FRONT_ZONES].reverse();
+  const row = (isBack ? backOrder : frontOrder).indexOf(pos);
+  const y = ((row + 0.5) / 3) * 100;
+  // Columns: back is the outer column, front is nearest the net (centre).
+  const backX = side === "a" ? 13 : 87;
+  const frontX = side === "a" ? 37 : 63;
+  return { x: isBack ? backX : frontX, y };
 }
 
-function Half({ rotation, side, teamColor, accent }: { rotation: IndoorPlayer[]; side: "a" | "b"; teamColor: string; accent: string }) {
-  const byPos = (pos: number): IndoorPlayer =>
-    rotation.find((r) => r.pos === pos) ?? { pos, jersey: null, name: "—", serving: false, libero: false };
-  const front = [4, 3, 2].map(byPos); // nearest the net
-  const back = [5, 6, 1].map(byPos); // toward the outside
-  const dash = (
-    <div style={{ width: 0, borderLeft: "0.4cqmin dashed rgba(255,255,255,.45)", alignSelf: "stretch", margin: "1cqmin 0" }} />
-  );
-  const frontCol = <Column players={front} grow={1} teamColor={teamColor} accent={accent} />;
-  const backCol = <Column players={back} grow={2} teamColor={teamColor} accent={accent} />;
+/** Absolutely-positioned jerseys for one half, keyed by player so they slide. */
+function HalfLayer({ rotation, side, teamColor, accent }: { rotation: IndoorPlayer[]; side: "a" | "b"; teamColor: string; accent: string }) {
   return (
-    <div style={{ display: "flex", flex: 1, alignItems: "stretch", minWidth: 0 }}>
-      {side === "a" ? (
-        <>
-          {backCol}
-          {dash}
-          {frontCol}
-        </>
-      ) : (
-        <>
-          {frontCol}
-          {dash}
-          {backCol}
-        </>
-      )}
-    </div>
+    <>
+      {rotation.map((p, i) => {
+        const { x, y } = courtCoord(side, p.pos);
+        return (
+          <div
+            key={p.key ?? `${side}-${i}`}
+            style={{
+              position: "absolute",
+              left: `${x}%`,
+              top: `${y}%`,
+              transform: "translate(-50%, -50%)",
+              transition: "left 550ms cubic-bezier(0.4,0,0.2,1), top 550ms cubic-bezier(0.4,0,0.2,1)",
+            }}
+          >
+            <Jersey p={p} teamColor={teamColor} accent={accent} />
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -367,10 +374,11 @@ export function IndoorBoard(props: IndoorBoardProps) {
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, justifyContent: "center", gap: "2cqmin" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "3cqmin" }}>
         <TeamStatsV to={`${props.timeoutsUsedA}/${props.timeoutsPerSet}`} sub={`${props.subsUsedA}/${props.maxSubsPerSet}`} accent={accent} />
-        <div style={{ display: "flex", height: "56cqmin", aspectRatio: "2/1", border: "0.4cqmin solid rgba(255,255,255,.55)", borderRadius: "0.6cqmin", flex: "none" }}>
-          <Half rotation={props.rotationA} side="a" teamColor={tcA} accent={accent} />
-          <div style={{ width: "0.6cqmin", background: "#fff", alignSelf: "stretch", margin: "0.5cqmin 0" }} />
-          <Half rotation={props.rotationB} side="b" teamColor={tcB} accent={accent} />
+        <div style={{ position: "relative", height: "56cqmin", aspectRatio: "2/1", border: "0.4cqmin solid rgba(255,255,255,.55)", borderRadius: "0.6cqmin", flex: "none" }}>
+          {/* Centre net */}
+          <div style={{ position: "absolute", left: "50%", top: "3%", bottom: "3%", width: "0.6cqmin", background: "#fff", transform: "translateX(-50%)" }} />
+          <HalfLayer rotation={props.rotationA} side="a" teamColor={tcA} accent={accent} />
+          <HalfLayer rotation={props.rotationB} side="b" teamColor={tcB} accent={accent} />
         </div>
         <TeamStatsV to={`${props.timeoutsUsedB}/${props.timeoutsPerSet}`} sub={`${props.subsUsedB}/${props.maxSubsPerSet}`} accent={accent} />
       </div>

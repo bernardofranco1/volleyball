@@ -3,7 +3,7 @@
  * Grass-style gating + the two scorer-called faults (always valid when live).
  */
 
-import type { TournamentConfig } from "../config";
+import { type TournamentConfig, timeoutCapForSet } from "../config";
 import {
   type LightEventPayload,
   type LightMatchState,
@@ -67,7 +67,7 @@ export function validateLightEvent(
       if (!set) return fail("No active set");
       const used =
         payload.team === "A" ? set.timeoutsUsedA : set.timeoutsUsedB;
-      if (used >= config.timeoutsPerSet)
+      if (used >= timeoutCapForSet(config, set.setNumber))
         return fail("Timeout limit reached for this set");
       return OK;
     }

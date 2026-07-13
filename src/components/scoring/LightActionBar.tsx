@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useLightMatch } from "@/lib/light-match-context";
+import { timeoutCapForSet } from "@/engine/config";
 import { useT } from "@/lib/i18n/client";
 import { type TeamId, activeSet, oppositeSide } from "@/engine/light/types";
 import { SecondaryButton } from "@/components/scoring/shared/buttons";
@@ -28,6 +29,7 @@ export function LightActionBar() {
     dispatch,
     teamAName,
     teamBName,
+    config,
     lineupPendingText: t("scoring.lineupConfirm"),
     // Air/Light changes ends only after set 1 + at 8 in the decider (F2): the
     // deciding set keeps the previous side and switches at 8.
@@ -45,8 +47,9 @@ export function LightActionBar() {
       dispatch(team === "A" ? { type: "RALLY_WON_A" } : { type: "RALLY_WON_B" }),
     );
   const tapUndo = () => tapConfirm("UNDO", () => dispatch({ type: "UNDO", targetEventId: "" }));
+  const timeoutCap = timeoutCapForSet(config, set.setNumber);
   const toFull = (t: TeamId) =>
-    (t === "A" ? set.timeoutsUsedA : set.timeoutsUsedB) >= config.timeoutsPerSet;
+    (t === "A" ? set.timeoutsUsedA : set.timeoutsUsedB) >= timeoutCap;
 
   return (
     <div className="flex flex-col gap-3">
@@ -69,7 +72,7 @@ export function LightActionBar() {
             <SecondaryButton disabled={toFull(team)} onClick={() => dispatch({ type: "TIMEOUT_REQUEST", team })}>
               {t("scoring.timeout", {
                 remaining:
-                  config.timeoutsPerSet -
+                  timeoutCap -
                   (team === "A" ? set.timeoutsUsedA : set.timeoutsUsedB),
               })}
             </SecondaryButton>

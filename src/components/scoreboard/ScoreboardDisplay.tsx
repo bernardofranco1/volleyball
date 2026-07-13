@@ -17,7 +17,12 @@ import {
 import type { BoardTheme } from "@/lib/board-theme";
 import type { PlayerLite } from "@/lib/indoor-match-context";
 import type { Discipline } from "@/engine/types";
+import type { TournamentConfig } from "@/engine/config";
 import { useCountdown, formatCountdown } from "@/components/scoreboard/Countdown";
+import {
+  activeCountdown,
+  CountdownOverlay,
+} from "@/components/scoring/shared/CountdownOverlay";
 
 // Display modes are retained for URL compatibility; the broadcast board always
 // shows score + sets + serving, so they no longer change the layout.
@@ -76,10 +81,7 @@ export function ScoreboardDisplay({
   awaitingLabel?: string | null;
 }) {
   const [state, setState] = useState<BeachMatchState>(initialState);
-  const [timeoutInfo, setTimeoutInfo] = useState<{
-    deadline: number;
-    team: "A" | "B";
-  } | null>(null);
+  const [config, setConfig] = useState<TournamentConfig | null>(null);
   const stateRef = useRef(state);
   useEffect(() => {
     stateRef.current = state;
@@ -93,7 +95,11 @@ export function ScoreboardDisplay({
         cache: "no-store",
       });
       if (!res.ok) return;
-      const data = (await res.json()) as { state: BeachMatchState };
+      const data = (await res.json()) as {
+        state: BeachMatchState;
+        config?: TournamentConfig;
+      };
+      if (data.config) setConfig(data.config);
       if (data.state.lastSequence >= stateRef.current.lastSequence)
         setState(data.state);
     } catch {
@@ -126,18 +132,6 @@ export function ScoreboardDisplay({
             void fetchState();
         },
       )
-      .on(
-        "broadcast",
-        { event: "timeout-start" },
-        (msg: { payload?: { deadline?: number; team?: "A" | "B" } }) => {
-          const p = msg.payload;
-          if (
-            typeof p?.deadline === "number" &&
-            (p.team === "A" || p.team === "B")
-          )
-            setTimeoutInfo({ deadline: p.deadline, team: p.team });
-        },
-      )
       .subscribe();
     // Realtime is the instant path, but broadcasts are fire-and-forget — fetch
     // once on mount and run a slow backstop so a missed signal never leaves the
@@ -158,10 +152,10 @@ export function ScoreboardDisplay({
   const preMatchMs = useCountdown(
     scheduledAtMs && !finished && state.status !== "LIVE" ? scheduledAtMs : null,
   );
-  const timeoutMs = useCountdown(timeoutInfo?.deadline ?? null);
-  const timeoutTeam = timeoutInfo?.team ?? null;
-  const showTimeout =
-    timeoutMs > 0 && state.rallyPhase === "TIMEOUT_ACTIVE" && timeoutTeam != null;
+  // Time-out / set-break countdown overlay, driven by authoritative state + config
+  // (deadline from the server event timestamp) — shared with the scorer + tablet.
+  const cd = config ? activeCountdown(state, config) : null;
+  const cdMs = useCountdown(cd?.deadlineMs ?? null);
   const showPreMatch =
     preMatchMs > 0 && !finished && state.status !== "LIVE" && scheduledAtMs != null;
 
@@ -199,6 +193,7 @@ export function ScoreboardDisplay({
         name: p ? surname(p.fullName) : "—",
         serving: iset?.currentServer === team && i === 0,
         libero: p?.isLibero ?? false,
+        key: id,
       };
     });
 
@@ -272,19 +267,15 @@ export function ScoreboardDisplay({
         </div>
       ) : null}
 
-      {showTimeout ? (
-        <div
-          className={`fixed bottom-24 z-[55] rounded-2xl border-2 border-primary bg-surface-raised/95 px-8 py-3 text-center backdrop-blur ${
-            timeoutTeam === "A" ? "left-12" : "right-12"
-          }`}
-        >
-          <div className="text-xs uppercase tracking-[0.3em] text-primary">
-            {timeoutTeam === "A" ? teamAName : teamBName} · Time-out
-          </div>
-          <div className="font-mono text-5xl font-bold tabular-nums">
-            {formatCountdown(timeoutMs)}
-          </div>
-        </div>
+      {cd && cdMs > 0 ? (
+        <CountdownOverlay
+          title={
+            cd.kind === "TIMEOUT"
+              ? `${cd.team === "A" ? teamAName : teamBName} · Time-out`
+              : "Set break"
+          }
+          ms={cdMs}
+        />
       ) : null}
 
       {/* Low-key live/poll toggle (TVs that can't hold a WebSocket). */}

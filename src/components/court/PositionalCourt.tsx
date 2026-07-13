@@ -23,6 +23,8 @@ export interface CourtSlot {
   isServer: boolean;
   isLibero: boolean;
   present: boolean; // false → empty placeholder (incomplete lineup)
+  /** Stable player identity — keys the marker so it *slides* on rotation. */
+  key?: string;
 }
 
 export interface CourtTeam {
@@ -152,13 +154,26 @@ function HalfMarkers({ team, side }: { team: CourtTeam; side: "left" | "right" }
   const back = side === "right" ? [...team.back].reverse() : team.back;
   const frontYs = rowYs(front.length);
   const backYs = rowYs(back.length);
+  // One <g> per player, keyed by player identity and positioned via a CSS
+  // transform. On a side-out the player's target (x,y) changes and the transform
+  // transition slides them from the old zone to the new one — the rotation is
+  // shown, not just applied. Empty slots fall back to a positional key.
+  const items = [
+    ...back.map((s, i) => ({ s, x: backX, y: backYs[i], fb: `${side}-b${i}` })),
+    ...front.map((s, i) => ({ s, x: frontX, y: frontYs[i], fb: `${side}-f${i}` })),
+  ];
   return (
     <g>
-      {back.map((s, i) => (
-        <Marker key={`b${i}`} slot={s} cx={backX} cy={backYs[i]} color={color} />
-      ))}
-      {front.map((s, i) => (
-        <Marker key={`f${i}`} slot={s} cx={frontX} cy={frontYs[i]} color={color} />
+      {items.map(({ s, x, y, fb }) => (
+        <g
+          key={s.key ?? fb}
+          style={{
+            transform: `translate(${x}px, ${y}px)`,
+            transition: "transform 550ms cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+        >
+          <Marker slot={s} cx={0} cy={0} color={color} />
+        </g>
       ))}
     </g>
   );

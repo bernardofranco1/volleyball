@@ -5,6 +5,12 @@ import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
 import type { PlayerLite } from "@/lib/indoor-match-context";
 import type { IndoorMatchState, TeamId } from "@/engine/indoor/types";
+import type { TournamentConfig } from "@/engine/config";
+import { useCountdown } from "@/components/scoreboard/Countdown";
+import {
+  activeCountdown,
+  CountdownOverlay,
+} from "@/components/scoring/shared/CountdownOverlay";
 
 interface InterruptRow {
   id: string;
@@ -40,6 +46,7 @@ export function TeamTablet({
   playersPerSide: number;
 }) {
   const [state, setState] = useState<IndoorMatchState>(initialState);
+  const [config, setConfig] = useState<TournamentConfig | null>(null);
   const [requests, setRequests] = useState<InterruptRow[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const stateRef = useRef(state);
@@ -54,7 +61,11 @@ export function TeamTablet({
         cache: "no-store",
       });
       if (!res.ok) return;
-      const data = (await res.json()) as { state: IndoorMatchState };
+      const data = (await res.json()) as {
+        state: IndoorMatchState;
+        config?: TournamentConfig;
+      };
+      if (data.config) setConfig(data.config);
       if (data.state.lastSequence >= stateRef.current.lastSequence)
         setState(data.state);
     } catch {
@@ -135,6 +146,11 @@ export function TeamTablet({
     lineupRequired && state.rallyPhase === "LINEUP_PENDING" && !ownConfirmed;
   const score = set ? `${set.scoreA}–${set.scoreB}` : "0–0";
 
+  // Time-out / set-break countdown overlay (display-only on the tablet; the
+  // scorer is authoritative). Disables the request buttons beneath it.
+  const cd = config ? activeCountdown(state, config) : null;
+  const cdMs = useCountdown(cd?.deadlineMs ?? null);
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-auto bg-surface p-5 text-foreground">
       <header className="mb-4 flex items-center justify-between">
@@ -168,15 +184,17 @@ export function TeamTablet({
           onResult={setMsg}
         />
       ) : (
-        <section className="rounded-xl border border-border bg-surface-raised p-4">
-          <h2 className="mb-3 font-medium">Request the scorer</h2>
-          <div className="grid grid-cols-2 gap-3">
+        <section className="flex flex-1 flex-col justify-center">
+          <h2 className="mb-4 text-center font-medium text-score-dim">
+            Request the scorer
+          </h2>
+          <div className="mx-auto grid w-full max-w-4xl flex-1 grid-cols-1 items-stretch gap-5 sm:grid-cols-3">
             {REQUESTS.map((r) => (
               <button
                 key={r.type}
                 type="button"
                 onClick={() => sendRequest(r.type)}
-                className="rounded-xl border border-border bg-surface px-4 py-5 text-base font-semibold transition-colors hover:border-primary"
+                className="flex min-h-[8rem] flex-1 items-center justify-center rounded-2xl border-2 border-border bg-surface-raised px-6 text-2xl font-bold transition-colors hover:border-primary active:bg-surface"
               >
                 {r.label}
               </button>
@@ -204,6 +222,13 @@ export function TeamTablet({
             ))}
           </ul>
         </section>
+      ) : null}
+
+      {cd && cdMs > 0 ? (
+        <CountdownOverlay
+          title={cd.kind === "TIMEOUT" ? "Time-out" : "Set break"}
+          ms={cdMs}
+        />
       ) : null}
     </div>
   );

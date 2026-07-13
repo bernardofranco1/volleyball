@@ -17,6 +17,7 @@ import {
   isGender,
   type Gender,
 } from "@/lib/domain";
+import { DISCIPLINE_DEFAULTS } from "@/engine/config";
 import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
 import { fail, ok, type FormState } from "@/lib/action-state";
@@ -176,11 +177,48 @@ export async function updateCompetitionConfig(
       return fail(`Players per side must be ${legal.join(" or ")}.`);
   }
 
+  const timeoutsPerSet = intOrNull(fd, "timeoutsPerSet");
+  if (timeoutsPerSet != null && (timeoutsPerSet < 0 || timeoutsPerSet > 9))
+    return fail("Timeouts per set must be between 0 and 9.");
+  const timeoutsPerSetTiebreak = intOrNull(fd, "timeoutsPerSetTiebreak");
+  if (
+    timeoutsPerSetTiebreak != null &&
+    (timeoutsPerSetTiebreak < 0 || timeoutsPerSetTiebreak > 9)
+  )
+    return fail("Tie-break timeouts must be between 0 and 9.");
+  const timeoutDurationSecs = intOrNull(fd, "timeoutDurationSecs");
+  if (
+    timeoutDurationSecs != null &&
+    (timeoutDurationSecs < 5 || timeoutDurationSecs > 600)
+  )
+    return fail("Timeout duration must be between 5 and 600 seconds.");
+
+  // Per-break set-break durations. Render as many inputs as (bestOf − 1); a fully
+  // blank set means "use discipline defaults" (null), otherwise blanks fall back
+  // to the discipline default for that break.
+  const defaults = DISCIPLINE_DEFAULTS[g.discipline];
+  const effBestOf = bestOf ?? defaults.bestOf;
+  const nBreaks = Math.max(0, effBestOf - 1);
+  const rawBreaks = Array.from({ length: nBreaks }, (_, i) =>
+    intOrNull(fd, `setBreak_${i + 1}`),
+  );
+  let setBreakDurationsSecs: number[] | null = null;
+  if (rawBreaks.some((v) => v != null)) {
+    setBreakDurationsSecs = rawBreaks.map((v, i) => {
+      const val = v ?? defaults.setBreakDurationsSecs[i] ?? 60;
+      return Math.min(3600, Math.max(0, val));
+    });
+  }
+
   const values = {
     bestOf,
     setScore,
     setScoreTiebreak,
     playersPerSide,
+    timeoutsPerSet,
+    timeoutsPerSetTiebreak,
+    timeoutDurationSecs,
+    setBreakDurationsSecs,
     // Tri-state: null = discipline default, true/false = explicit override.
     serveClockEnabled: boolOrNull(fd, "serveClockEnabled"),
     ttoEnabled: boolOrNull(fd, "ttoEnabled"),

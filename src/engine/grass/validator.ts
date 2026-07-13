@@ -4,7 +4,7 @@
  * rules (Rule 15.6 analogue).
  */
 
-import type { TournamentConfig } from "../config";
+import { type TournamentConfig, timeoutCapForSet } from "../config";
 import {
   type GrassEventPayload,
   type GrassMatchState,
@@ -67,7 +67,7 @@ export function validateGrassEvent(
       if (!set) return fail("No active set");
       const used =
         payload.team === "A" ? set.timeoutsUsedA : set.timeoutsUsedB;
-      if (used >= config.timeoutsPerSet)
+      if (used >= timeoutCapForSet(config, set.setNumber))
         return fail("Timeout limit reached for this set");
       return OK;
     }
