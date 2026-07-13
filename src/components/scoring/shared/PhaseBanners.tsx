@@ -50,7 +50,8 @@ export type PhaseDispatch = (
         teamAStartSide: Side;
       }
     | { type: "TIMEOUT_END"; team: TeamId }
-    | { type: "MEDICAL_TIMEOUT_END" },
+    | { type: "MEDICAL_TIMEOUT_END" }
+    | { type: "UNDO"; targetEventId: string },
 ) => void;
 
 export interface PrePhaseOptions {
@@ -94,6 +95,11 @@ export function usePrePhaseBanner({
   const [tossSide, setTossSide] = useState<Side>("LEFT");
   const name = (t: TeamId) => (t === "A" ? teamAName : teamBName);
   const nextSide = nextSetStartSide ?? ((prev: PhaseSet) => oppositeSide(prev.teamAStartSide));
+
+  // Undo the last scorer action — reachable even under the countdown overlays,
+  // so a mis-tapped time-out (or the point that ended a set) can be reverted.
+  // The server resolves the actual target; "" is the standard placeholder.
+  const undo = () => dispatch({ type: "UNDO", targetEventId: "" });
 
   // Advance to the next set (shared by the manual button and the auto-advance
   // timer): opposite first-server, side per the discipline's rule. Guarded
@@ -182,9 +188,12 @@ export function usePrePhaseBanner({
           })}
           ms={setBreakMs}
           action={
-            <SecondaryButton disabled={nextSetDisabled} onClick={startNextSet}>
-              {t("scoring.startNextSet")}
-            </SecondaryButton>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <SecondaryButton disabled={nextSetDisabled} onClick={startNextSet}>
+                {t("scoring.startNextSet")}
+              </SecondaryButton>
+              <SecondaryButton onClick={undo}>{t("scoring.undo")}</SecondaryButton>
+            </div>
           }
         />
       );
@@ -214,11 +223,14 @@ export function usePrePhaseBanner({
           title={`${name(to)} · ${t("scoring.timeoutLabel")}`}
           ms={timeoutMs}
           action={
-            <SecondaryButton
-              onClick={() => dispatch({ type: "TIMEOUT_END", team: to })}
-            >
-              {t("scoring.endTimeout", { team: name(to) })}
-            </SecondaryButton>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <SecondaryButton
+                onClick={() => dispatch({ type: "TIMEOUT_END", team: to })}
+              >
+                {t("scoring.endTimeout", { team: name(to) })}
+              </SecondaryButton>
+              <SecondaryButton onClick={undo}>{t("scoring.undo")}</SecondaryButton>
+            </div>
           }
         />
       );
