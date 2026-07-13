@@ -147,11 +147,10 @@ function courtCoord(side: "a" | "b", pos: number): { x: number; y: number } {
   const frontOrder = side === "a" ? FRONT_ZONES : [...FRONT_ZONES].reverse();
   const row = (isBack ? backOrder : frontOrder).indexOf(pos);
   const y = ((row + 0.5) / 3) * 100;
-  // Columns: back is the outer column; front sits between the net (50%) and the
-  // (schematic) 3 m attack line at 40/60%, so the front row is clearly inside
-  // the front zone rather than straddling the line.
+  // Columns: back is the outer column; front is centred between the net (50%)
+  // and the (schematic) 3 m attack line at 32.5/67.5% → midpoints 41.25/58.75%.
   const backX = side === "a" ? 13 : 87;
-  const frontX = side === "a" ? 45 : 55;
+  const frontX = side === "a" ? 41.25 : 58.75;
   return { x: isBack ? backX : frontX, y };
 }
 
