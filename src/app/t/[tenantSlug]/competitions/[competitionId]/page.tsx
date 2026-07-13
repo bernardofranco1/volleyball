@@ -260,6 +260,86 @@ export default async function CompetitionOverviewPage({
             </div>
           </div>
 
+          {/* Time-outs */}
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            <div>
+              <label className={ui.label} htmlFor="timeoutsPerSet">
+                {t("comp.timeouts")}
+              </label>
+              <input
+                id="timeoutsPerSet"
+                name="timeoutsPerSet"
+                type="number"
+                min={0}
+                max={9}
+                defaultValue={configRow?.timeoutsPerSet ?? ""}
+                placeholder={String(resolved.timeoutsPerSet)}
+                className={ui.input}
+              />
+            </div>
+            <div>
+              <label className={ui.label} htmlFor="timeoutsPerSetTiebreak">
+                {t("comp.timeoutsTiebreak")}
+              </label>
+              <input
+                id="timeoutsPerSetTiebreak"
+                name="timeoutsPerSetTiebreak"
+                type="number"
+                min={0}
+                max={9}
+                defaultValue={configRow?.timeoutsPerSetTiebreak ?? ""}
+                placeholder={String(resolved.timeoutsPerSetTiebreak)}
+                className={ui.input}
+              />
+            </div>
+            <div>
+              <label className={ui.label} htmlFor="timeoutDurationSecs">
+                {t("comp.timeoutDuration")}
+              </label>
+              <input
+                id="timeoutDurationSecs"
+                name="timeoutDurationSecs"
+                type="number"
+                min={5}
+                max={600}
+                defaultValue={configRow?.timeoutDurationSecs ?? ""}
+                placeholder={String(resolved.timeoutDurationSecs)}
+                className={ui.input}
+              />
+            </div>
+          </div>
+
+          {/* Per-break set-break durations (seconds). One input per break. */}
+          {resolved.bestOf > 1 && (
+            <div className="mt-4">
+              <label className={ui.label}>{t("comp.setBreaks")}</label>
+              <div className="grid grid-cols-4 gap-2">
+                {Array.from({ length: resolved.bestOf - 1 }).map((_, i) => (
+                  <div key={i}>
+                    <span className="mb-1 block text-xs text-score-dim">
+                      {t("comp.afterSet", { n: i + 1 })}
+                    </span>
+                    <input
+                      name={`setBreak_${i + 1}`}
+                      type="number"
+                      min={0}
+                      max={3600}
+                      defaultValue={configRow?.setBreakDurationsSecs?.[i] ?? ""}
+                      placeholder={String(
+                        resolved.setBreakDurationsSecs[i] ??
+                          resolved.setBreakDurationsSecs[
+                            resolved.setBreakDurationsSecs.length - 1
+                          ] ??
+                          60,
+                      )}
+                      className={ui.input}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mt-4">
             <SubmitButton pendingLabel={t("common.saving")}>{t("comp.saveRules")}</SubmitButton>
           </div>

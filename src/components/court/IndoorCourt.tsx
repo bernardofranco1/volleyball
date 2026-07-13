@@ -55,6 +55,7 @@ export function IndoorCourt({
       isServer: zone === 1 && serving,
       isLibero: pid != null && pid === liberoId,
       present: pid != null,
+      key: pid ?? undefined,
     };
   };
 

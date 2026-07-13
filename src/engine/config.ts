@@ -29,6 +29,7 @@ export interface TournamentConfig {
 
   // ── Time-outs ──────────────────────────────────────────────────────────────
   timeoutsPerSet: number;
+  timeoutsPerSetTiebreak: number; // cap in the deciding set
   timeoutDurationSecs: number;
 
   // ── Substitutions ──────────────────────────────────────────────────────────
@@ -64,6 +65,12 @@ export interface TournamentConfig {
   // ── Block ──────────────────────────────────────────────────────────────
   blockCountsAsTeamHit: boolean;
 
+  // ── Set breaks ─────────────────────────────────────────────────────────────
+  // Duration (seconds) of the break after each set. Index i = break after set
+  // (i+1). Durations may differ per break (e.g. a longer break before the
+  // deciding set); an index past the array reuses the last value.
+  setBreakDurationsSecs: number[];
+
   // ── Medical ──────────────────────────────────────────────────────────────
   medicalTimeoutSecs: number;
 
@@ -93,7 +100,10 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     ttoTriggerScore: 21,
 
     timeoutsPerSet: 1,
+    timeoutsPerSetTiebreak: 1,
     timeoutDurationSecs: 30,
+
+    setBreakDurationsSecs: [60, 60, 60, 60],
 
     maxSubsPerSet: 0,
     substitutionZoneEnabled: false,
@@ -142,7 +152,10 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     ttoTriggerScore: null,
 
     timeoutsPerSet: 2,
+    timeoutsPerSetTiebreak: 2,
     timeoutDurationSecs: 30,
+
+    setBreakDurationsSecs: [180, 180, 180, 180],
 
     maxSubsPerSet: 6,
     substitutionZoneEnabled: true,
@@ -191,7 +204,10 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     ttoTriggerScore: null,
 
     timeoutsPerSet: 2,
+    timeoutsPerSetTiebreak: 2,
     timeoutDurationSecs: 30,
+
+    setBreakDurationsSecs: [60, 60, 60, 60],
 
     maxSubsPerSet: 4,
     substitutionZoneEnabled: false,
@@ -240,7 +256,10 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     ttoTriggerScore: null,
 
     timeoutsPerSet: 2,
+    timeoutsPerSetTiebreak: 2,
     timeoutDurationSecs: 30,
+
+    setBreakDurationsSecs: [60, 60, 60, 60],
 
     maxSubsPerSet: 4, // 4 for 4-player; 5 for 5-player
     substitutionZoneEnabled: false,
@@ -288,4 +307,27 @@ export function resolveConfig(
   ) as Partial<TournamentConfig>;
 
   return { ...DISCIPLINE_DEFAULTS[discipline], ...overrides };
+}
+
+/** Whether `setNumber` is the deciding (tie-break) set for this config. */
+export function isTiebreakSet(config: TournamentConfig, setNumber: number): boolean {
+  return setNumber >= config.bestOf;
+}
+
+/** Time-out cap for a given set: the tie-break cap in the deciding set. */
+export function timeoutCapForSet(config: TournamentConfig, setNumber: number): number {
+  return isTiebreakSet(config, setNumber)
+    ? config.timeoutsPerSetTiebreak
+    : config.timeoutsPerSet;
+}
+
+/**
+ * Break duration (seconds) after `setNumber` finishes. Index (setNumber-1) into
+ * the per-break array; past the end reuses the last configured value. Falls back
+ * to 60s if the array is empty/misconfigured.
+ */
+export function setBreakSecsAfter(config: TournamentConfig, setNumber: number): number {
+  const arr = config.setBreakDurationsSecs;
+  if (!Array.isArray(arr) || arr.length === 0) return 60;
+  return arr[Math.min(setNumber - 1, arr.length - 1)] ?? arr[arr.length - 1] ?? 60;
 }

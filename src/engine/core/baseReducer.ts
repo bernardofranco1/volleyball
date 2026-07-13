@@ -62,6 +62,10 @@ export interface CommonMatchState<Phase extends string = CommonRallyPhase> {
   winner: TeamId | null;
   activeTimeoutTeam: TeamId | null;
   medicalTimeoutTeam: TeamId | null;
+  /** Event timestamp of the active team time-out (drives the countdown), or null. */
+  activeTimeoutStartedAt?: string | null;
+  /** Event timestamp when the current set break began (drives the countdown). */
+  setBreakStartedAt?: string | null;
   matchStartedAt: string | null;
   misconductA: MisconductRecord[];
   misconductB: MisconductRecord[];
@@ -161,11 +165,13 @@ export function reduceCommon<Phase extends string>(
         else set.timeoutsUsedB += 1;
       }
       s.activeTimeoutTeam = p.team;
+      s.activeTimeoutStartedAt = timestamp;
       s.rallyPhase = "TIMEOUT_ACTIVE";
       return;
 
     case "TIMEOUT_END":
       s.activeTimeoutTeam = null;
+      s.activeTimeoutStartedAt = null;
       s.rallyPhase = "BETWEEN_RALLIES";
       return;
 
@@ -185,6 +191,7 @@ export function reduceCommon<Phase extends string>(
       target.winner = p.winner;
       target.endedAt = timestamp;
       s.rallyPhase = "SET_BREAK";
+      s.setBreakStartedAt = timestamp;
       return;
     }
 

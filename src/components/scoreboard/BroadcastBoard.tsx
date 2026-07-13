@@ -168,9 +168,9 @@ export function BroadcastBoard(props: BoardProps) {
         } as React.CSSProperties
       }
     >
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "3cqmin", height: "100%", gap: "2cqmin" }}>
+      <div style={{ display: "flex", flexDirection: "column", padding: "3cqmin", height: "100%", gap: "2cqmin" }}>
         {/* Top bar (pinned to the top edge) */}
-        <div style={{ display: "flex", alignItems: "center", gap: "1.2cqmin", width: "100%", border: `0.5cqmin solid ${accent}`, borderRadius: "0.8cqmin", padding: "1.2cqmin" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "1.2cqmin", width: "100%", border: `0.5cqmin solid ${accent}`, borderRadius: "0.8cqmin", padding: "1.2cqmin", flex: "none" }}>
           <TeamPlate name={props.teamAName} color={resolveTeamColor(props.teamAColor, "A")} align="left" />
           <div style={{ display: "flex", gap: "1cqmin", flex: "none" }}>
             <SetsWon value={props.setsWonA} />
@@ -179,28 +179,28 @@ export function BroadcastBoard(props: BoardProps) {
           <TeamPlate name={props.teamBName} color={resolveTeamColor(props.teamBColor, "B")} align="right" />
         </div>
 
-        {/* Competition logo — space reserved even when absent */}
-        <div style={{ height: "12cqmin", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {/* Centre block: set indicator + big current-set score, vertically centred */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: "3cqmin", minHeight: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "2.5cqmin" }}>
+            {sq}
+            <div style={{ fontSize: "5.5cqmin", letterSpacing: "0.4cqmin" }}>
+              {props.finished ? "Final" : props.setNumber ? `Set ${props.setNumber}` : "—"}
+            </div>
+            {sq}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "3cqmin", width: "100%" }}>
+            {big(props.scoreA)}
+            <Ladder sets={props.sets} accent={accent} />
+            {big(props.scoreB)}
+          </div>
+        </div>
+
+        {/* Competition logo — space reserved even when absent (bottom) */}
+        <div style={{ height: "12cqmin", flex: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {props.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={props.logoUrl} alt="" style={{ height: "10cqmin", maxWidth: "60cqmin", objectFit: "contain" }} />
           ) : null}
-        </div>
-
-        {/* Set indicator */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "2.5cqmin" }}>
-          {sq}
-          <div style={{ fontSize: "5.5cqmin", letterSpacing: "0.4cqmin" }}>
-            {props.finished ? "Final" : props.setNumber ? `Set ${props.setNumber}` : "—"}
-          </div>
-          {sq}
-        </div>
-
-        {/* Big score + ladder */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "3cqmin", width: "100%" }}>
-          {big(props.scoreA)}
-          <Ladder sets={props.sets} accent={accent} />
-          {big(props.scoreB)}
         </div>
       </div>
     </div>
