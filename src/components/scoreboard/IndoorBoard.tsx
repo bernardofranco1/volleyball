@@ -147,9 +147,11 @@ function courtCoord(side: "a" | "b", pos: number): { x: number; y: number } {
   const frontOrder = side === "a" ? FRONT_ZONES : [...FRONT_ZONES].reverse();
   const row = (isBack ? backOrder : frontOrder).indexOf(pos);
   const y = ((row + 0.5) / 3) * 100;
-  // Columns: back is the outer column, front is nearest the net (centre).
+  // Columns: back is the outer column; front sits between the net (50%) and the
+  // (schematic) 3 m attack line at 40/60%, so the front row is clearly inside
+  // the front zone rather than straddling the line.
   const backX = side === "a" ? 13 : 87;
-  const frontX = side === "a" ? 37 : 63;
+  const frontX = side === "a" ? 45 : 55;
   return { x: isBack ? backX : frontX, y };
 }
 
@@ -375,9 +377,9 @@ export function IndoorBoard(props: IndoorBoardProps) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "3cqmin" }}>
         <TeamStatsV to={`${props.timeoutsUsedA}/${props.timeoutsPerSet}`} sub={`${props.subsUsedA}/${props.maxSubsPerSet}`} accent={accent} />
         <div style={{ position: "relative", height: "56cqmin", aspectRatio: "2/1", border: "0.4cqmin solid rgba(255,255,255,.55)", borderRadius: "0.6cqmin", flex: "none" }}>
-          {/* Dashed 3 m attack lines — 1/3 of each half in from the net */}
-          <div style={{ position: "absolute", left: "33.33%", top: "2%", bottom: "2%", width: 0, borderLeft: "0.4cqmin dashed rgba(255,255,255,.45)" }} />
-          <div style={{ position: "absolute", left: "66.67%", top: "2%", bottom: "2%", width: 0, borderLeft: "0.4cqmin dashed rgba(255,255,255,.45)" }} />
+          {/* Dashed 3 m attack lines — schematic (40% / 60%), not to scale */}
+          <div style={{ position: "absolute", left: "40%", top: "2%", bottom: "2%", width: 0, borderLeft: "0.4cqmin dashed rgba(255,255,255,.45)" }} />
+          <div style={{ position: "absolute", left: "60%", top: "2%", bottom: "2%", width: 0, borderLeft: "0.4cqmin dashed rgba(255,255,255,.45)" }} />
           {/* Centre net */}
           <div style={{ position: "absolute", left: "50%", top: "3%", bottom: "3%", width: "0.6cqmin", background: "#fff", transform: "translateX(-50%)" }} />
           <HalfLayer rotation={props.rotationA} side="a" teamColor={tcA} accent={accent} />

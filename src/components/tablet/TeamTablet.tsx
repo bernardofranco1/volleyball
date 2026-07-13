@@ -5,24 +5,19 @@ import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
 import type { PlayerLite } from "@/lib/indoor-match-context";
 import type { IndoorMatchState, TeamId } from "@/engine/indoor/types";
-import type { TournamentConfig } from "@/engine/config";
+import { type TournamentConfig, timeoutCapForSet } from "@/engine/config";
 import { useCountdown } from "@/components/scoreboard/Countdown";
 import {
   activeCountdown,
   CountdownOverlay,
 } from "@/components/scoring/shared/CountdownOverlay";
+import { SubPanel } from "@/components/scoring/shared/LiveControls";
 
 interface InterruptRow {
   id: string;
   requestType: string;
   status: string;
 }
-
-const REQUESTS = [
-  { type: "TIMEOUT", label: "Time-out" },
-  { type: "SUBSTITUTION", label: "Substitution" },
-  { type: "MEDICAL", label: "Medical" },
-] as const;
 
 export function TeamTablet({
   matchId,
@@ -49,6 +44,7 @@ export function TeamTablet({
   const [config, setConfig] = useState<TournamentConfig | null>(null);
   const [requests, setRequests] = useState<InterruptRow[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
+  const [subOpen, setSubOpen] = useState(false);
   // Server-clock minus device-clock (ms) — see ScoreboardDisplay. Updated only
   // on >1s drift so routine fetches don't churn renders.
   const [clockOffset, setClockOffset] = useState(0);
@@ -135,12 +131,15 @@ export function TeamTablet({
     };
   }, [pollRequests]);
 
-  const sendRequest = async (requestType: string) => {
+  const sendRequest = async (
+    requestType: string,
+    extra?: { outPlayerId: string; inPlayerId: string },
+  ) => {
     setMsg(null);
     const res = await fetch(`/api/matches/${matchId}/interrupt-requests`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, team, requestType }),
+      body: JSON.stringify({ token, team, requestType, ...extra }),
     });
     if (res.ok) {
       setMsg(`${requestType} request sent`);
@@ -166,6 +165,79 @@ export function TeamTablet({
   // deadline is in server-clock terms; shift it into this device's clock.
   const cd = config ? activeCountdown(state, config) : null;
   const cdMs = useCountdown(cd ? cd.deadlineMs - clockOffset : null);
+
+  // Remaining allowances for the active set (drives the quota-gated buttons).
+  // As long as a team has any left, its button works; at 0 it greys out. Null
+  // config ⇒ counters unknown (buttons enabled; the server backstop still gates).
+  const timeoutsLeft =
+    config && set
+      ? timeoutCapForSet(config, set.setNumber) -
+        (team === "A" ? set.timeoutsUsedA : set.timeoutsUsedB)
+      : null;
+  const subsLeft =
+    config && set
+      ? config.maxSubsPerSet - (team === "A" ? set.subsUsedA : set.subsUsedB)
+      : null;
+  const challengesLeft = set
+    ? team === "A"
+      ? set.vcs.challengesRemainingA
+      : set.vcs.challengesRemainingB
+    : null;
+  const vcsOn = config?.vcsEnabled ?? false;
+
+  // Substitution picker (same out/in model as the scorer's SubPanel). Liberos
+  // are excluded — they use a libero replacement, not a substitution.
+  const liberoIds = set
+    ? (team === "A"
+        ? [set.libero.liberoIdA, set.libero.secondLiberoIdA]
+        : [set.libero.liberoIdB, set.libero.secondLiberoIdB]
+      ).filter((x): x is string => Boolean(x))
+    : [];
+  const teamCourt = set
+    ? team === "A"
+      ? set.courtPositionsA
+      : set.courtPositionsB
+    : [];
+  const subsUsed = set ? (team === "A" ? set.subsUsedA : set.subsUsedB) : 0;
+
+  interface TabletAction {
+    type: string;
+    label: string;
+    disabled: boolean;
+    onClick: () => void;
+  }
+  const remLabel = (base: string, n: number | null) =>
+    n == null ? base : `${base} (${Math.max(0, n)} left)`;
+  const actions: TabletAction[] = [
+    {
+      type: "TIMEOUT",
+      label: remLabel("Time-out", timeoutsLeft),
+      disabled: timeoutsLeft != null && timeoutsLeft <= 0,
+      onClick: () => void sendRequest("TIMEOUT"),
+    },
+    {
+      type: "SUBSTITUTION",
+      label: remLabel("Substitution", subsLeft),
+      disabled: subsLeft != null && subsLeft <= 0,
+      onClick: () => setSubOpen(true),
+    },
+    ...(vcsOn
+      ? [
+          {
+            type: "CHALLENGE",
+            label: remLabel("Challenge", challengesLeft),
+            disabled: challengesLeft != null && challengesLeft <= 0,
+            onClick: () => void sendRequest("CHALLENGE"),
+          } as TabletAction,
+        ]
+      : []),
+    {
+      type: "MEDICAL",
+      label: "Medical",
+      disabled: false,
+      onClick: () => void sendRequest("MEDICAL"),
+    },
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-auto bg-surface p-5 text-foreground">
@@ -204,20 +276,35 @@ export function TeamTablet({
           <h2 className="mb-4 text-center font-medium text-score-dim">
             Request the scorer
           </h2>
-          <div className="mx-auto grid w-full max-w-4xl flex-1 grid-cols-1 items-stretch gap-5 sm:grid-cols-3">
-            {REQUESTS.map((r) => (
+          <div className="mx-auto grid w-full max-w-4xl flex-1 grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {actions.map((a) => (
               <button
-                key={r.type}
+                key={a.type}
                 type="button"
-                onClick={() => sendRequest(r.type)}
-                className="flex min-h-[8rem] flex-1 items-center justify-center rounded-2xl border-2 border-border bg-surface-raised px-6 text-2xl font-bold transition-colors hover:border-primary active:bg-surface"
+                disabled={a.disabled}
+                onClick={a.onClick}
+                className="flex min-h-[8rem] flex-1 items-center justify-center rounded-2xl border-2 border-border bg-surface-raised px-6 text-2xl font-bold transition-colors hover:border-primary active:bg-surface disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border"
               >
-                {r.label}
+                {a.label}
               </button>
             ))}
           </div>
         </section>
       )}
+
+      {subOpen && set ? (
+        <SubPanel
+          team={team}
+          roster={roster}
+          court={teamCourt}
+          subsUsed={subsUsed}
+          excludeIds={liberoIds}
+          onSubstitute={(outPlayerId, inPlayerId) =>
+            void sendRequest("SUBSTITUTION", { outPlayerId, inPlayerId })
+          }
+          onClose={() => setSubOpen(false)}
+        />
+      ) : null}
 
       {msg ? <p className="mt-3 text-sm text-score-dim">{msg}</p> : null}
 

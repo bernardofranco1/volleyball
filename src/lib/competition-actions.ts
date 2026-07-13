@@ -192,6 +192,12 @@ export async function updateCompetitionConfig(
     (timeoutDurationSecs < 5 || timeoutDurationSecs > 600)
   )
     return fail("Timeout duration must be between 5 and 600 seconds.");
+  const vcsChallengesPerSet = intOrNull(fd, "vcsChallengesPerSet");
+  if (
+    vcsChallengesPerSet != null &&
+    (vcsChallengesPerSet < 0 || vcsChallengesPerSet > 9)
+  )
+    return fail("Challenges per set must be between 0 and 9.");
 
   // Per-break set-break durations. Render as many inputs as (bestOf − 1); a fully
   // blank set means "use discipline defaults" (null), otherwise blanks fall back
@@ -219,9 +225,11 @@ export async function updateCompetitionConfig(
     timeoutsPerSetTiebreak,
     timeoutDurationSecs,
     setBreakDurationsSecs,
+    vcsChallengesPerSet,
     // Tri-state: null = discipline default, true/false = explicit override.
     serveClockEnabled: boolOrNull(fd, "serveClockEnabled"),
     ttoEnabled: boolOrNull(fd, "ttoEnabled"),
+    vcsEnabled: boolOrNull(fd, "vcsEnabled"),
   };
   // Upsert — a missing config row (legacy competitions) must not silently no-op.
   await db
