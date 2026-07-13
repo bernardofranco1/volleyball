@@ -248,9 +248,12 @@ export function usePrePhaseBanner({
   if (state.rallyPhase === "MEDICAL_TIMEOUT_ACTIVE")
     return (
       <Banner>
-        <PrimaryButton onClick={() => dispatch({ type: "MEDICAL_TIMEOUT_END" })}>
-          {t("scoring.endMedicalTimeout")}
-        </PrimaryButton>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <PrimaryButton onClick={() => dispatch({ type: "MEDICAL_TIMEOUT_END" })}>
+            {t("scoring.endMedicalTimeout")}
+          </PrimaryButton>
+          <SecondaryButton onClick={undo}>{t("scoring.undo")}</SecondaryButton>
+        </div>
       </Banner>
     );
 
