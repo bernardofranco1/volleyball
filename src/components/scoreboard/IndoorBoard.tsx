@@ -154,21 +154,32 @@ function courtCoord(side: "a" | "b", pos: number): { x: number; y: number } {
   return { x: isBack ? backX : frontX, y };
 }
 
+// Court box is height 56cqmin, aspect-ratio 2/1 ⇒ width 112cqmin. Positioning
+// jerseys in these container units lets us animate `transform` (GPU-composited,
+// no per-frame layout) instead of left/top — every jersey glides together.
+const COURT_W_CQ = 112;
+const COURT_H_CQ = 56;
+
 /** Absolutely-positioned jerseys for one half, keyed by player so they slide. */
 function HalfLayer({ rotation, side, teamColor, accent }: { rotation: IndoorPlayer[]; side: "a" | "b"; teamColor: string; accent: string }) {
   return (
     <>
       {rotation.map((p, i) => {
         const { x, y } = courtCoord(side, p.pos);
+        const tx = (x / 100) * COURT_W_CQ;
+        const ty = (y / 100) * COURT_H_CQ;
         return (
           <div
             key={p.key ?? `${side}-${i}`}
             style={{
               position: "absolute",
-              left: `${x}%`,
-              top: `${y}%`,
-              transform: "translate(-50%, -50%)",
-              transition: "left 550ms cubic-bezier(0.4,0,0.2,1), top 550ms cubic-bezier(0.4,0,0.2,1)",
+              left: 0,
+              top: 0,
+              // translate to the target point, then back by half the jersey's own
+              // size to centre it there. Only `transform` animates.
+              transform: `translate(${tx}cqmin, ${ty}cqmin) translate(-50%, -50%)`,
+              transition: "transform 650ms cubic-bezier(0.22, 1, 0.36, 1)",
+              willChange: "transform",
             }}
           >
             <Jersey p={p} teamColor={teamColor} accent={accent} />

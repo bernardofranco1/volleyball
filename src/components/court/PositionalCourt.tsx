@@ -169,7 +169,8 @@ function HalfMarkers({ team, side }: { team: CourtTeam; side: "left" | "right" }
           key={s.key ?? fb}
           style={{
             transform: `translate(${x}px, ${y}px)`,
-            transition: "transform 550ms cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: "transform 650ms cubic-bezier(0.22, 1, 0.36, 1)",
+            willChange: "transform",
           }}
         >
           <Marker slot={s} cx={0} cy={0} color={color} />
