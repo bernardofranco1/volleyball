@@ -178,6 +178,10 @@ export interface IndoorMatchState {
   set1FirstServer: TeamId | null;
   winner: TeamId | null;
   activeTimeoutTeam: TeamId | null;
+  /** Event timestamp of the active team time-out (drives countdowns). */
+  activeTimeoutStartedAt?: string | null;
+  /** Event timestamp when the current set break began (drives countdowns). */
+  setBreakStartedAt?: string | null;
   medicalTimeoutTeam: TeamId | null;
   matchStartedAt: string | null;
   lastSequence: number;

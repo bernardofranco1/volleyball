@@ -96,10 +96,14 @@ export function usePrePhaseBanner({
   const nextSide = nextSetStartSide ?? ((prev: PhaseSet) => oppositeSide(prev.teamAStartSide));
 
   // Advance to the next set (shared by the manual button and the auto-advance
-  // timer): opposite first-server, side per the discipline's rule.
+  // timer): opposite first-server, side per the discipline's rule. Guarded
+  // against starting a set beyond bestOf — a rewind that erases MATCH_END can
+  // leave the FINAL set parked in SET_BREAK with a long-past deadline, and an
+  // unguarded auto-advance would fabricate a phantom extra set.
   const startNextSet = () => {
     if (!set) return;
     const nextSetNumber = state.currentSetNumber + 1;
+    if (config && nextSetNumber > config.bestOf) return;
     dispatch({
       type: "SET_START",
       setNumber: nextSetNumber,
@@ -122,25 +126,35 @@ export function usePrePhaseBanner({
   const timeoutMs = useCountdown(timeoutDeadline);
   const setBreakMs = useCountdown(setBreakDeadline);
 
-  // Fire the auto-advance exactly once per countdown instance (keyed by deadline).
+  // Auto-fire at the DEADLINE via absolute-time timers — deliberately not
+  // derived from the display countdown's tick state (which reports a stale 0
+  // for one frame when a fresh deadline appears; acting on that would end a
+  // time-out the instant it started). A deadline already in the past fires
+  // immediately (scorer loads mid-overdue-timeout → auto-resume). `firedRef`
+  // dedupes per countdown instance across re-renders.
   const firedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (timeoutDeadline && timeoutMs <= 0) {
-      const key = `to:${timeoutDeadline}`;
-      if (firedRef.current !== key) {
-        firedRef.current = key;
-        dispatch({ type: "TIMEOUT_END", team: state.activeTimeoutTeam ?? "A" });
-      }
-    }
-    if (setBreakDeadline && setBreakMs <= 0) {
-      const key = `sb:${setBreakDeadline}`;
-      if (firedRef.current !== key) {
-        firedRef.current = key;
-        startNextSet();
-      }
-    }
+    if (!timeoutDeadline) return;
+    const key = `to:${timeoutDeadline}`;
+    const id = setTimeout(() => {
+      if (firedRef.current === key) return;
+      firedRef.current = key;
+      dispatch({ type: "TIMEOUT_END", team: state.activeTimeoutTeam ?? "A" });
+    }, Math.max(0, timeoutDeadline - Date.now()));
+    return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeoutDeadline, timeoutMs, setBreakDeadline, setBreakMs]);
+  }, [timeoutDeadline]);
+  useEffect(() => {
+    if (!setBreakDeadline) return;
+    const key = `sb:${setBreakDeadline}`;
+    const id = setTimeout(() => {
+      if (firedRef.current === key) return;
+      firedRef.current = key;
+      startNextSet();
+    }, Math.max(0, setBreakDeadline - Date.now()));
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setBreakDeadline]);
 
   if (state.status === "FINISHED")
     return (
@@ -156,7 +170,8 @@ export function usePrePhaseBanner({
 
   if (state.rallyPhase === "SET_BREAK") {
     // With config we show the floating countdown and auto-advance at 0:00.
-    if (setBreakDeadline)
+    // (Not in the beyond-bestOf rewind edge — fall through to the manual banner.)
+    if (setBreakDeadline && config && state.currentSetNumber < config.bestOf)
       return (
         <CountdownOverlay
           title={t("scoring.setBreak")}
@@ -166,6 +181,11 @@ export function usePrePhaseBanner({
             setsB: state.setsWonB,
           })}
           ms={setBreakMs}
+          action={
+            <SecondaryButton disabled={nextSetDisabled} onClick={startNextSet}>
+              {t("scoring.startNextSet")}
+            </SecondaryButton>
+          }
         />
       );
     return (
@@ -193,6 +213,13 @@ export function usePrePhaseBanner({
         <CountdownOverlay
           title={`${name(to)} · ${t("scoring.timeoutLabel")}`}
           ms={timeoutMs}
+          action={
+            <SecondaryButton
+              onClick={() => dispatch({ type: "TIMEOUT_END", team: to })}
+            >
+              {t("scoring.endTimeout", { team: name(to) })}
+            </SecondaryButton>
+          }
         />
       );
     return (

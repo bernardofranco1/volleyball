@@ -108,13 +108,18 @@ function isRewindPayload(p: {
  * after a rewind survives, and a later/deeper rewind naturally supersedes an
  * earlier one. The final surviving events are folded through `reduce`.
  */
-export function createReplayFn<S, P extends { type: string }>(
+export function createReplayFn<
+  S extends { lastSequence: number },
+  P extends { type: string },
+>(
   initialState: (matchId: string) => S,
   reduce: (state: S, event: EngineEvent<P>, config: TournamentConfig) => S,
 ): (matchId: string, events: EngineEvent<P>[], config: TournamentConfig) => S {
   return function replayEvents(matchId, events, config) {
     const survivors: EngineEvent<P>[] = [];
+    let maxSeq = 0;
     for (const ev of events) {
+      if (ev.sequence > maxSeq) maxSeq = ev.sequence;
       if (isUndoPayload(ev.payload)) {
         const target = ev.payload.targetEventId;
         const i = survivors.findIndex((s) => s.id === target);
@@ -132,6 +137,13 @@ export function createReplayFn<S, P extends { type: string }>(
     }
     let state = initialState(matchId);
     for (const ev of survivors) state = reduce(state, ev, config);
+    // lastSequence must mark the LOG head, not the last surviving event.
+    // Control events (UNDO/REWIND) drop survivors, so the fold above can end
+    // below the head; persisting that as snapshot_sequence made the next
+    // snapshot+tail load re-apply the undone events (reduce treats UNDO as a
+    // no-op) — resurrecting undone points on refresh — and would hand out
+    // already-used sequence numbers to the next append.
+    if (maxSeq > state.lastSequence) state = { ...state, lastSequence: maxSeq };
     return state;
   };
 }

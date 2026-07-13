@@ -17,7 +17,7 @@ import {
 import type { BoardTheme } from "@/lib/board-theme";
 import type { PlayerLite } from "@/lib/indoor-match-context";
 import type { Discipline } from "@/engine/types";
-import type { TournamentConfig } from "@/engine/config";
+import { type TournamentConfig, timeoutCapForSet } from "@/engine/config";
 import { useCountdown, formatCountdown } from "@/components/scoreboard/Countdown";
 import {
   activeCountdown,
@@ -82,6 +82,10 @@ export function ScoreboardDisplay({
 }) {
   const [state, setState] = useState<BeachMatchState>(initialState);
   const [config, setConfig] = useState<TournamentConfig | null>(null);
+  // Server-clock minus device-clock (ms). Countdown deadlines derive from
+  // server event timestamps; a drifting TV clock would shift them one-for-one.
+  // Only updated when drift exceeds 1s so routine fetches don't churn renders.
+  const [clockOffset, setClockOffset] = useState(0);
   const stateRef = useRef(state);
   useEffect(() => {
     stateRef.current = state;
@@ -98,7 +102,12 @@ export function ScoreboardDisplay({
       const data = (await res.json()) as {
         state: BeachMatchState;
         config?: TournamentConfig;
+        serverNow?: number;
       };
+      if (typeof data.serverNow === "number") {
+        const off = data.serverNow - Date.now();
+        setClockOffset((prev) => (Math.abs(off - prev) > 1000 ? off : prev));
+      }
       if (data.config) setConfig(data.config);
       if (data.state.lastSequence >= stateRef.current.lastSequence)
         setState(data.state);
@@ -154,8 +163,9 @@ export function ScoreboardDisplay({
   );
   // Time-out / set-break countdown overlay, driven by authoritative state + config
   // (deadline from the server event timestamp) — shared with the scorer + tablet.
+  // The deadline is in server-clock terms; shift it into this device's clock.
   const cd = config ? activeCountdown(state, config) : null;
-  const cdMs = useCountdown(cd?.deadlineMs ?? null);
+  const cdMs = useCountdown(cd ? cd.deadlineMs - clockOffset : null);
   const showPreMatch =
     preMatchMs > 0 && !finished && state.status !== "LIVE" && scheduledAtMs != null;
 
@@ -231,7 +241,12 @@ export function ScoreboardDisplay({
           rosterB={rosterList(rosterB)}
           timeoutsUsedA={iset?.timeoutsUsedA ?? 0}
           timeoutsUsedB={iset?.timeoutsUsedB ?? 0}
-          timeoutsPerSet={timeoutsPerSet}
+          // Tie-break-aware cap: the deciding set may allow fewer time-outs.
+          timeoutsPerSet={
+            config
+              ? timeoutCapForSet(config, state.currentSetNumber)
+              : timeoutsPerSet
+          }
           subsUsedA={iset?.subsUsedA ?? 0}
           subsUsedB={iset?.subsUsedB ?? 0}
           maxSubsPerSet={maxSubsPerSet ?? 6}

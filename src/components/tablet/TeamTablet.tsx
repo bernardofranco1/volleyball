@@ -49,6 +49,9 @@ export function TeamTablet({
   const [config, setConfig] = useState<TournamentConfig | null>(null);
   const [requests, setRequests] = useState<InterruptRow[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
+  // Server-clock minus device-clock (ms) — see ScoreboardDisplay. Updated only
+  // on >1s drift so routine fetches don't churn renders.
+  const [clockOffset, setClockOffset] = useState(0);
   const stateRef = useRef(state);
   useEffect(() => {
     stateRef.current = state;
@@ -64,7 +67,12 @@ export function TeamTablet({
       const data = (await res.json()) as {
         state: IndoorMatchState;
         config?: TournamentConfig;
+        serverNow?: number;
       };
+      if (typeof data.serverNow === "number") {
+        const off = data.serverNow - Date.now();
+        setClockOffset((prev) => (Math.abs(off - prev) > 1000 ? off : prev));
+      }
       if (data.config) setConfig(data.config);
       if (data.state.lastSequence >= stateRef.current.lastSequence)
         setState(data.state);
@@ -88,7 +96,14 @@ export function TeamTablet({
         },
       )
       .subscribe();
+    // Fetch once on mount (delivers `config`, so a tablet loaded mid-timeout /
+    // mid-set-break shows the countdown immediately) and run a slow backstop so
+    // a missed fire-and-forget broadcast never leaves the tablet stale.
+    const first = setTimeout(fetchState, 0);
+    const backstop = setInterval(fetchState, 15000);
     return () => {
+      clearTimeout(first);
+      clearInterval(backstop);
       void supabase.removeChannel(channel);
     };
   }, [matchId, fetchState]);
@@ -147,9 +162,10 @@ export function TeamTablet({
   const score = set ? `${set.scoreA}–${set.scoreB}` : "0–0";
 
   // Time-out / set-break countdown overlay (display-only on the tablet; the
-  // scorer is authoritative). Disables the request buttons beneath it.
+  // scorer is authoritative). Disables the request buttons beneath it. The
+  // deadline is in server-clock terms; shift it into this device's clock.
   const cd = config ? activeCountdown(state, config) : null;
-  const cdMs = useCountdown(cd?.deadlineMs ?? null);
+  const cdMs = useCountdown(cd ? cd.deadlineMs - clockOffset : null);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-auto bg-surface p-5 text-foreground">

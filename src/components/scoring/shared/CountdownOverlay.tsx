@@ -51,11 +51,15 @@ export function CountdownOverlay({
   subtitle,
   ms,
   accent = "var(--primary)",
+  action,
 }: {
   title: string;
   subtitle?: string;
   ms: number;
   accent?: string;
+  /** Optional control INSIDE the square (scorer-only escape hatch, e.g. "Resume
+   *  now"). Display surfaces (tablet, board) omit it. */
+  action?: React.ReactNode;
 }) {
   return (
     <div
@@ -76,6 +80,7 @@ export function CountdownOverlay({
         <div className="font-mono text-6xl font-bold tabular-nums">
           {formatCountdown(ms)}
         </div>
+        {action ? <div className="mt-2">{action}</div> : null}
       </div>
     </div>
   );

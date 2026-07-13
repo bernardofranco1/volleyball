@@ -38,7 +38,9 @@ export async function GET(
       }
     }
     const { state, config } = await loadMatchState(id);
-    return Response.json({ state, config });
+    // serverNow lets clients offset device-clock skew when they turn event
+    // timestamps into countdown deadlines (boards/tablets on drifting clocks).
+    return Response.json({ state, config, serverNow: Date.now() });
   } catch (err) {
     if (err instanceof MatchNotFoundError)
       return Response.json({ error: err.message }, { status: 404 });
