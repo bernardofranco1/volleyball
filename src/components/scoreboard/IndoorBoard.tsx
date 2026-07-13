@@ -377,9 +377,10 @@ export function IndoorBoard(props: IndoorBoardProps) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "3cqmin" }}>
         <TeamStatsV to={`${props.timeoutsUsedA}/${props.timeoutsPerSet}`} sub={`${props.subsUsedA}/${props.maxSubsPerSet}`} accent={accent} />
         <div style={{ position: "relative", height: "56cqmin", aspectRatio: "2/1", border: "0.4cqmin solid rgba(255,255,255,.55)", borderRadius: "0.6cqmin", flex: "none" }}>
-          {/* Dashed 3 m attack lines — schematic (40% / 60%), not to scale */}
-          <div style={{ position: "absolute", left: "40%", top: "2%", bottom: "2%", width: 0, borderLeft: "0.4cqmin dashed rgba(255,255,255,.45)" }} />
-          <div style={{ position: "absolute", left: "60%", top: "2%", bottom: "2%", width: 0, borderLeft: "0.4cqmin dashed rgba(255,255,255,.45)" }} />
+          {/* Dashed 3 m attack lines — schematic: 35% of each half out from the
+              net (net at 50% → lines at 32.5% / 67.5%), not to scale. */}
+          <div style={{ position: "absolute", left: "32.5%", top: "2%", bottom: "2%", width: 0, borderLeft: "0.4cqmin dashed rgba(255,255,255,.45)" }} />
+          <div style={{ position: "absolute", left: "67.5%", top: "2%", bottom: "2%", width: 0, borderLeft: "0.4cqmin dashed rgba(255,255,255,.45)" }} />
           {/* Centre net */}
           <div style={{ position: "absolute", left: "50%", top: "3%", bottom: "3%", width: "0.6cqmin", background: "#fff", transform: "translateX(-50%)" }} />
           <HalfLayer rotation={props.rotationA} side="a" teamColor={tcA} accent={accent} />
