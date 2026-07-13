@@ -90,6 +90,8 @@ export function validateBeachEvent(
         return fail("Match must be started before a set begins");
       if (set && !set.winner && state.sets.length >= payload.setNumber)
         return fail("Current set is still in progress");
+      if (payload.setNumber > config.bestOf)
+        return fail("Match has no set beyond the deciding set");
       return OK;
     }
 

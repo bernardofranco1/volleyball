@@ -73,20 +73,6 @@ export function serveClockMessage(
   };
 }
 
-/** Team time-out countdown (requesting team + absolute deadline). */
-export function timeoutMessage(
-  matchId: string,
-  deadline: number,
-  team: "A" | "B",
-  durationSecs: number,
-): BroadcastMessage {
-  return {
-    topic: `match:${matchId}`,
-    event: "timeout-start",
-    payload: { deadline, team, durationSecs },
-  };
-}
-
 /** Notify the scorer channel that a team tablet has raised an interrupt request. */
 export async function broadcastInterruptRequest(
   matchId: string,

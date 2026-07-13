@@ -7,6 +7,11 @@ import { useCallback, useEffect, useState } from "react";
  * ~4×/sec. The tick is a useCallback scheduled via timers (never a synchronous
  * setState in the effect body); Date.now() lives only inside the tick. When
  * `deadline` is null the hook reports 0.
+ *
+ * NOTE: `remaining` is 0 until the first (0 ms) tick commits — display-only
+ * consumers tolerate the one-frame lag, but anything that must ACT when a
+ * countdown expires (auto TIMEOUT_END / auto next set) must schedule its own
+ * absolute-time timer instead of watching this value hit 0.
  */
 export function useCountdown(deadline: number | null): number {
   const [remaining, setRemaining] = useState(0);

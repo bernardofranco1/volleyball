@@ -375,6 +375,9 @@ export function IndoorBoard(props: IndoorBoardProps) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "3cqmin" }}>
         <TeamStatsV to={`${props.timeoutsUsedA}/${props.timeoutsPerSet}`} sub={`${props.subsUsedA}/${props.maxSubsPerSet}`} accent={accent} />
         <div style={{ position: "relative", height: "56cqmin", aspectRatio: "2/1", border: "0.4cqmin solid rgba(255,255,255,.55)", borderRadius: "0.6cqmin", flex: "none" }}>
+          {/* Dashed 3 m attack lines — 1/3 of each half in from the net */}
+          <div style={{ position: "absolute", left: "33.33%", top: "2%", bottom: "2%", width: 0, borderLeft: "0.4cqmin dashed rgba(255,255,255,.45)" }} />
+          <div style={{ position: "absolute", left: "66.67%", top: "2%", bottom: "2%", width: 0, borderLeft: "0.4cqmin dashed rgba(255,255,255,.45)" }} />
           {/* Centre net */}
           <div style={{ position: "absolute", left: "50%", top: "3%", bottom: "3%", width: "0.6cqmin", background: "#fff", transform: "translateX(-50%)" }} />
           <HalfLayer rotation={props.rotationA} side="a" teamColor={tcA} accent={accent} />

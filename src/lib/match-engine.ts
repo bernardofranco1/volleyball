@@ -36,7 +36,6 @@ import {
   broadcastMessages,
   serveClockMessage,
   stateUpdateMessage,
-  timeoutMessage,
 } from "@/lib/realtime";
 
 export class MatchNotFoundError extends Error {}
@@ -151,9 +150,6 @@ async function loadState(
 ): Promise<CommonMatchState> {
   const hasSnap = meta.snap != null;
   const baseSeq = hasSnap ? meta.snapshotSeq : 0;
-  let state = hasSnap
-    ? (meta.snap as CommonMatchState)
-    : meta.engine.replay(matchId, [], meta.config);
 
   const tail = await db
     .select({
@@ -165,6 +161,32 @@ async function loadState(
     .from(events)
     .where(and(eq(events.matchId, matchId), gt(events.sequence, baseSeq)))
     .orderBy(asc(events.sequence));
+
+  // Control events (UNDO/REWIND) can't be applied incrementally: the discipline
+  // reducers treat them as no-ops, and their targets may sit inside the
+  // snapshot. If any appear past the snapshot (stale snapshot, or one written
+  // before replay stamped lastSequence at the log head), rebuild from the full
+  // log via engine.replay, which resolves them correctly.
+  const hasControl = tail.some((r) => {
+    const t = (r.payload as { type?: string } | null)?.type;
+    return t === "UNDO" || t === "REWIND";
+  });
+  if (!hasSnap || hasControl) {
+    // baseSeq 0 ⇒ the tail already IS the full log.
+    const all = baseSeq === 0 ? tail : await db
+      .select({
+        id: events.id,
+        sequence: events.sequence,
+        timestamp: events.timestamp,
+        payload: events.payload,
+      })
+      .from(events)
+      .where(eq(events.matchId, matchId))
+      .orderBy(asc(events.sequence));
+    return meta.engine.replay(matchId, all.map(toEngineEvent), meta.config);
+  }
+
+  let state = meta.snap as CommonMatchState;
   for (const r of tail) state = meta.engine.reduce(state, toEngineEvent(r), meta.config);
   return state;
 }
@@ -438,22 +460,9 @@ export async function appendMatchEvent(
       ),
     );
   }
-  // Team time-out countdown for the public board (brief §4.3).
-  if (
-    finalState.rallyPhase === "TIMEOUT_ACTIVE" &&
-    payload.type === "TIMEOUT_REQUEST"
-  ) {
-    const team = (payload as { team?: "A" | "B" }).team;
-    if (team)
-      msgs.push(
-        timeoutMessage(
-          matchId,
-          Date.now() + meta.config.timeoutDurationSecs * 1000,
-          team,
-          meta.config.timeoutDurationSecs,
-        ),
-      );
-  }
+  // (Time-out countdowns no longer broadcast a dedicated message: boards and
+  // tablets derive them from `activeTimeoutStartedAt` in the state they refetch
+  // on the state-update signal — one source of truth for every surface.)
   scheduleBroadcast(msgs);
 
   return { newEvents: result.newEvents, state: finalState };
