@@ -3,6 +3,7 @@
 import { Fragment, useLayoutEffect, useRef } from "react";
 import { resolveTeamColor } from "@/lib/colors";
 import type { BoardTheme } from "@/lib/board-theme";
+import { JerseyMarker } from "@/components/scoreboard/JerseyMarker";
 
 // Broadcast board for Beach / Grass / Light (spec/change-requests/08 + 09,
 // matches the approved mocks). Real top bar pinned to the top, past sets
@@ -49,22 +50,6 @@ function prefersReducedMotion() {
   return (
     typeof window !== "undefined" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
-}
-
-function Swatch({ color }: { color: string }) {
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        width: "3.2cqmin",
-        height: "7cqmin",
-        flex: "none",
-        borderRadius: "0.6cqmin",
-        background: color,
-        border: "0.35cqmin solid rgba(255,255,255,.85)",
-      }}
-    />
   );
 }
 
@@ -125,7 +110,7 @@ function TeamPlate({
         padding: "0 1cqmin",
       }}
     >
-      <Swatch color={color} />
+      <JerseyMarker color={color} size="8cqmin" label={name} />
       <div
         style={{
           fontSize: "5.4cqmin",
