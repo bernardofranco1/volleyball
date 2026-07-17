@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { Fragment, useLayoutEffect, useRef } from "react";
 import { resolveTeamColor } from "@/lib/colors";
 import type { BoardTheme } from "@/lib/board-theme";
 
@@ -118,31 +118,42 @@ function SetsWon({ value }: { value: number }) {
 function PastSets({ sets }: { sets: BoardSet[] }) {
   const done = sets.filter((s) => s.winner !== null);
   if (done.length === 0) return null;
+  const score = (v: number, dim: boolean) => (
+    <span
+      style={{
+        fontSize: "3.8cqmin",
+        letterSpacing: "0.1cqmin",
+        opacity: dim ? 0.45 : 1,
+      }}
+    >
+      {v}
+    </span>
+  );
+  // "21   Set 1   13" — label centred, each team's points on its own side.
+  // One shared grid so the columns stay aligned across rows.
   return (
     <div
       style={{
         flex: "none",
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.7cqmin",
-        alignItems: "center",
+        display: "grid",
+        gridTemplateColumns: "auto auto auto",
+        columnGap: "4.6cqmin",
+        rowGap: "0.7cqmin",
+        alignItems: "baseline",
+        justifyContent: "center",
+        justifyItems: "center",
         paddingTop: "0.6cqmin",
+        fontVariantNumeric: "tabular-nums",
       }}
     >
       {done.map((s) => (
-        <div
-          key={s.setNumber}
-          style={{ display: "flex", alignItems: "baseline", gap: "4.6cqmin", fontVariantNumeric: "tabular-nums" }}
-        >
+        <Fragment key={s.setNumber}>
+          {score(s.scoreA, s.winner === "B")}
           <span style={{ fontSize: "2.9cqmin", letterSpacing: "0.25cqmin", fontWeight: 700, opacity: 0.55 }}>
             Set {s.setNumber}
           </span>
-          <span style={{ fontSize: "3.8cqmin", letterSpacing: "0.1cqmin" }}>
-            <span style={{ opacity: s.winner === "B" ? 0.45 : 1 }}>{s.scoreA}</span>
-            <span style={{ opacity: 0.7 }}>-</span>
-            <span style={{ opacity: s.winner === "A" ? 0.45 : 1 }}>{s.scoreB}</span>
-          </span>
-        </div>
+          {score(s.scoreB, s.winner === "A")}
+        </Fragment>
       ))}
     </div>
   );
