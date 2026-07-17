@@ -13,7 +13,7 @@ import {
 } from "@/engine/beach/types";
 import type { PlayerLite } from "@/lib/match-provider";
 import { useT } from "@/lib/i18n/client";
-import { BeachCourt } from "@/components/court/BeachCourt";
+import { BeachCourt, type BeachCourtPlayer } from "@/components/court/BeachCourt";
 import { surnameOf } from "@/components/court/PositionalCourt";
 import { BeachActionBar } from "@/components/scoring/BeachActionBar";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
@@ -101,10 +101,19 @@ export function LiveScoreboard({
           ? t("scoring.playerN", { n: servingSlot })
           : null;
 
-  const courtPair = (team: TeamId): [string, string] | null => {
+  // Court markers show jersey numbers + surnames from the roster right away;
+  // the serve markup appears once the service order is declared (before that
+  // the expected server's identity is unknown).
+  const courtPair = (team: TeamId): BeachCourtPlayer[] | null => {
+    const roster = rosterOf(team);
+    if (roster.length !== 2) return null;
     const ordered = team === "A" ? orderedA : orderedB;
-    if (!ordered) return null;
-    return [surnameOf(ordered[0].fullName), surnameOf(ordered[1].fullName)];
+    const slot = team === servingTeam ? servingSlot : null;
+    return (ordered ?? roster).map((p, i) => ({
+      jersey: p.jerseyNumber,
+      name: surnameOf(p.fullName),
+      serving: ordered != null && slot != null && i === slot - 1,
+    }));
   };
 
   // One-tap service-order declaration (rules: each team declares its order

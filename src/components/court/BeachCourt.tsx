@@ -4,11 +4,19 @@ import { readableTextOn, resolveTeamColor } from "@/lib/colors";
 
 // Clean, functional 16×8 beach court. Shows which side each team occupies and
 // the current serving team (darker sand + dot beside the name). Each team's
-// two markers carry the service-order number (player 1 = the set's first
-// server) in the centre, indoor-style; the player whose turn it is to serve
-// gets the same ring + corner-dot markup as PositionalCourt. Surnames appear
-// beside the markers once the pair's service order has been declared
-// (SERVICE_ORDER) — the slot numbers and serve markup work regardless.
+// two markers carry the player's JERSEY number in the centre, indoor-style,
+// with the surname beside; the player whose turn it is to serve gets the same
+// ring + corner-dot markup as PositionalCourt (only once the pair's service
+// order has been declared — before that the expected server's identity is
+// unknown). Without a two-player roster the markers fall back to anonymous
+// serve-order slots 1/2, with the ring driven by the engine slot.
+export interface BeachCourtPlayer {
+  jersey: number | null;
+  name: string | null;
+  /** This player is expected to serve next (alternating service order). */
+  serving: boolean;
+}
+
 export function BeachCourt({
   teamASide,
   currentServer,
@@ -28,10 +36,10 @@ export function BeachCourt({
   teamBName: string;
   teamAColor: string | null;
   teamBColor: string | null;
-  /** Team A surnames in service order ([player 1, player 2]); null = undeclared. */
-  pairA?: [string, string] | null;
-  /** Team B surnames in service order ([player 1, player 2]); null = undeclared. */
-  pairB?: [string, string] | null;
+  /** Team A players (service order once declared, roster order before); null = no roster. */
+  pairA?: BeachCourtPlayer[] | null;
+  /** Team B players (service order once declared, roster order before); null = no roster. */
+  pairB?: BeachCourtPlayer[] | null;
 }) {
   const leftTeam: TeamId = teamASide === "LEFT" ? "A" : "B";
   const rightTeam: TeamId = leftTeam === "A" ? "B" : "A";
@@ -60,11 +68,15 @@ export function BeachCourt({
           stroke="rgba(255,255,255,0.5)"
           strokeWidth={2}
         />
-        {/* the pair, in service order: marker 1 = the set's first server */}
+        {/* the pair's markers: jersey number centred, surname beside */}
         {([1, 2] as const).map((slot, i) => {
           const dy = [62, 112][i];
-          const name = pair?.[i] ?? null;
-          const isServer = serving && servingSlot === slot;
+          const player = pair?.[i] ?? null;
+          const name = player?.name ?? null;
+          const label = pair ? (player?.jersey ?? "–") : slot;
+          const isServer = pair
+            ? (player?.serving ?? false)
+            : serving && servingSlot === slot;
           return (
             <g key={slot}>
               {isServer ? (
@@ -95,7 +107,7 @@ export function BeachCourt({
                 fill={numColor}
                 style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}
               >
-                {slot}
+                {label}
               </text>
               {isServer ? (
                 <circle
