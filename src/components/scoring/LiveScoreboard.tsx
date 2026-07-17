@@ -1,13 +1,43 @@
 "use client";
 
+import { useMemo } from "react";
 import { useMatch } from "@/lib/match-context";
-import { activeSet } from "@/engine/beach/types";
-import { BeachCourt } from "@/components/court/BeachCourt";
+import {
+  activeSet,
+  currentServerSlot,
+  firstServerPlayerId,
+  oppositeTeam,
+  type BeachSetState,
+  type PlayerNumber,
+  type TeamId,
+} from "@/engine/beach/types";
+import type { PlayerLite } from "@/lib/match-provider";
+import { useT } from "@/lib/i18n/client";
+import { BeachCourt, type BeachCourtPlayer } from "@/components/court/BeachCourt";
+import { surnameOf } from "@/components/court/PositionalCourt";
 import { BeachActionBar } from "@/components/scoring/BeachActionBar";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
+import { SecondaryButton } from "@/components/scoring/shared/buttons";
+
+// Beach serve order (FIVB rule 12.2): "player 1" is whoever the team declares
+// as its first server for the set (SERVICE_ORDER event); player 2 is the
+// pair's other player. Returns the pair in service order, or null until the
+// order is declared (or when the roster isn't the regulation two players).
+function pairInServiceOrder(
+  roster: PlayerLite[],
+  set: BeachSetState | undefined,
+  team: TeamId,
+): [PlayerLite, PlayerLite] | null {
+  if (!set || roster.length !== 2) return null;
+  const firstId = firstServerPlayerId(set, team);
+  if (!firstId) return null;
+  const first = roster.find((p) => p.id === firstId);
+  const second = roster.find((p) => p.id !== firstId);
+  return first && second ? [first, second] : null;
+}
 
 export function LiveScoreboard({
   competitionName,
@@ -22,9 +52,27 @@ export function LiveScoreboard({
   teamAColor: string | null;
   teamBColor: string | null;
 }) {
-  const { matchId, state, config, online, error, pending, queuedCount, serveClockDeadline } =
-    useMatch();
+  const t = useT();
+  const {
+    matchId,
+    state,
+    config,
+    rosterA,
+    rosterB,
+    dispatch,
+    online,
+    error,
+    pending,
+    queuedCount,
+    serveClockDeadline,
+  } = useMatch();
   const set = activeSet(state);
+
+  const rosterById = useMemo(() => {
+    const m = new Map<string, PlayerLite>();
+    for (const p of [...rosterA, ...rosterB]) m.set(p.id, p);
+    return m;
+  }, [rosterA, rosterB]);
 
   const statusLabel =
     state.status === "FINISHED"
@@ -33,6 +81,46 @@ export function LiveScoreboard({
         ? `Set ${set.setNumber}${set.ttoFired ? " · TTO done" : ""}`
         : "Match not started";
 
+  const rosterOf = (team: TeamId) => (team === "A" ? rosterA : rosterB);
+  const orderedA = pairInServiceOrder(rosterA, set, "A");
+  const orderedB = pairInServiceOrder(rosterB, set, "B");
+
+  // The player expected to serve, per the alternating service order.
+  const servingTeam = set && !set.winner ? set.currentServer : null;
+  const servingSlot: PlayerNumber | null = set && servingTeam ? currentServerSlot(set) : null;
+  const orderedServing = servingTeam === "A" ? orderedA : servingTeam === "B" ? orderedB : null;
+  const servingPlayer =
+    orderedServing && servingSlot ? orderedServing[servingSlot - 1] : null;
+  // Named when the order is declared; falls back to the abstract slot.
+  const servingPlayerLabel =
+    state.status === "FINISHED" || !servingTeam
+      ? null
+      : servingPlayer
+        ? servingPlayer.fullName
+        : servingSlot
+          ? t("scoring.playerN", { n: servingSlot })
+          : null;
+
+  const courtPair = (team: TeamId): BeachCourtPlayer[] | null => {
+    const ordered = team === "A" ? orderedA : orderedB;
+    if (!ordered) return null;
+    const slot = team === servingTeam ? servingSlot : null;
+    return ordered.map((p, i) => ({
+      name: surnameOf(p.fullName),
+      serving: slot != null && i === slot - 1,
+    }));
+  };
+
+  // One-tap service-order declaration (rules: each team declares its order
+  // before the set). Prompt for the serving team first, then the receiver.
+  const orderPendingTeam =
+    state.status === "LIVE" && set && !set.winner && servingTeam
+      ? ([servingTeam, oppositeTeam(servingTeam)] as TeamId[]).find(
+          (team) =>
+            rosterOf(team).length === 2 && !firstServerPlayerId(set, team),
+        ) ?? null
+      : null;
+
   return (
     <ScoringShell
       competitionLabel={competitionName}
@@ -40,7 +128,14 @@ export function LiveScoreboard({
       pending={pending}
       error={error}
       queuedCount={queuedCount}
-      tools={<ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} />}
+      tools={
+        <ScoringLog
+          matchId={matchId}
+          teamAName={teamAName}
+          teamBName={teamBName}
+          rosterById={rosterById}
+        />
+      }
       score={
         <ScoreStrip
           teamAName={teamAName}
@@ -52,7 +147,8 @@ export function LiveScoreboard({
           setsWonB={state.setsWonB}
           scoreA={set?.scoreA ?? 0}
           scoreB={set?.scoreB ?? 0}
-          serving={set?.currentServer ?? null}
+          serving={servingTeam}
+          servingPlayer={servingPlayerLabel}
           statusLabel={statusLabel}
           sets={state.sets.map((s) => ({
             setNumber: s.setNumber,
@@ -65,15 +161,41 @@ export function LiveScoreboard({
       main={
         <BeachCourt
           teamASide={set?.teamASide ?? "LEFT"}
-          currentServer={set?.currentServer ?? null}
+          currentServer={servingTeam}
           teamAName={teamAName}
           teamBName={teamBName}
           teamAColor={teamAColor}
           teamBColor={teamBColor}
+          pairA={courtPair("A")}
+          pairB={courtPair("B")}
         />
       }
       actions={
         <div className="flex flex-col gap-2">
+          {orderPendingTeam ? (
+            <div className="flex flex-wrap items-center justify-center gap-2 rounded border border-border bg-surface-raised px-3 py-2">
+              <span className="text-sm text-score-dim">
+                {t("scoring.firstServerPrompt", {
+                  team: orderPendingTeam === "A" ? teamAName : teamBName,
+                })}
+              </span>
+              {rosterOf(orderPendingTeam).map((p) => (
+                <SecondaryButton
+                  key={p.id}
+                  disabled={pending}
+                  onClick={() =>
+                    dispatch({
+                      type: "SERVICE_ORDER",
+                      team: orderPendingTeam,
+                      firstServerPlayerId: p.id,
+                    })
+                  }
+                >
+                  {p.fullName}
+                </SecondaryButton>
+              ))}
+            </div>
+          ) : null}
           {config.serveClockEnabled ? (
             <ServeClockWidget deadline={serveClockDeadline} totalSecs={config.serveClockSecs} />
           ) : null}

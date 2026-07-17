@@ -81,6 +81,9 @@ function newSetState(
     // The first server's player 1 serves first; the other team has not served.
     serverPlayerA: firstServer === "A" ? 1 : null,
     serverPlayerB: firstServer === "B" ? 1 : null,
+    // Slot→player binding is declared per set (SERVICE_ORDER), never carried over.
+    firstServerPlayerIdA: null,
+    firstServerPlayerIdB: null,
     timeoutsUsedA: 0,
     timeoutsUsedB: 0,
     ttoFired: false,
@@ -157,6 +160,15 @@ export function reduce(
     case "RALLY_START":
       s.rallyPhase = "RALLY_LIVE";
       return s;
+
+    case "SERVICE_ORDER": {
+      const set = s.sets[setIdx];
+      if (set) {
+        if (p.team === "A") set.firstServerPlayerIdA = p.firstServerPlayerId;
+        else set.firstServerPlayerIdB = p.firstServerPlayerId;
+      }
+      return s;
+    }
 
     case "RALLY_WON_A":
     case "RALLY_WON_B": {

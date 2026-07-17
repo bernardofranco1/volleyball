@@ -23,11 +23,14 @@ function TeamScore({
   color,
   score,
   serving,
+  serverName,
 }: {
   name: string;
   color: string;
   score: number;
   serving: boolean;
+  /** Serving player (name / label) — shown under the serve bar while serving. */
+  serverName?: string | null;
 }) {
   const t = useT();
   return (
@@ -48,6 +51,11 @@ function TeamScore({
         style={{ backgroundColor: serving ? color : "transparent" }}
         aria-label={serving ? t("scoring.serving") : undefined}
       />
+      {serverName !== undefined ? (
+        <div className="mt-0.5 h-4 truncate text-[11px] leading-tight text-score-dim">
+          {serving && serverName ? `${t("scoring.serveLabel")} ${serverName}` : ""}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -63,6 +71,7 @@ export function ScoreStrip({
   scoreA,
   scoreB,
   serving,
+  servingPlayer,
   statusLabel,
   sets,
 }: {
@@ -77,6 +86,11 @@ export function ScoreStrip({
   scoreA: number;
   scoreB: number;
   serving: "A" | "B" | null;
+  /**
+   * Name/label of the player expected to serve (rules: beach service order,
+   * rotation position 1). Shown under the serving team. Omit to hide the row.
+   */
+  servingPlayer?: string | null;
   statusLabel: string;
   sets: SetLine[];
 }) {
@@ -106,7 +120,13 @@ export function ScoreStrip({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
-        <TeamScore name={left.name} color={left.color} score={left.score} serving={left.serving} />
+        <TeamScore
+          name={left.name}
+          color={left.color}
+          score={left.score}
+          serving={left.serving}
+          serverName={servingPlayer === undefined ? undefined : left.serving ? servingPlayer : null}
+        />
         <div className="px-1 pb-1 text-center">
           <div className="font-mono text-lg font-semibold tabular-nums text-score-dim">
             {left.setsWon}–{right.setsWon}
@@ -115,7 +135,13 @@ export function ScoreStrip({
             {statusLabel}
           </div>
         </div>
-        <TeamScore name={right.name} color={right.color} score={right.score} serving={right.serving} />
+        <TeamScore
+          name={right.name}
+          color={right.color}
+          score={right.score}
+          serving={right.serving}
+          serverName={servingPlayer === undefined ? undefined : right.serving ? servingPlayer : null}
+        />
       </div>
       {sets.length > 0 ? (
         <div className="flex flex-wrap justify-center gap-1">

@@ -3,7 +3,15 @@ import { resolveTeamColor } from "@/lib/colors";
 
 // Clean, functional 16×8 beach court. Shows which side each team occupies and
 // the current serving team (arrow + highlighted server dot). The two player
-// markers per side carry the team's jersey colour.
+// markers per side carry the team's jersey colour. When the pair's service
+// order is known (SERVICE_ORDER declared), the markers are named — dot 1 is
+// the set's first server — and the expected server is ringed.
+export interface BeachCourtPlayer {
+  name: string;
+  /** This player is expected to serve next (rules: alternating service order). */
+  serving: boolean;
+}
+
 export function BeachCourt({
   teamASide,
   currentServer,
@@ -11,6 +19,8 @@ export function BeachCourt({
   teamBName,
   teamAColor,
   teamBColor,
+  pairA,
+  pairB,
 }: {
   teamASide: Side;
   currentServer: TeamId | null;
@@ -18,16 +28,22 @@ export function BeachCourt({
   teamBName: string;
   teamAColor: string | null;
   teamBColor: string | null;
+  /** Team A's players in service order ([player 1, player 2]); null = unknown. */
+  pairA?: BeachCourtPlayer[] | null;
+  /** Team B's players in service order ([player 1, player 2]); null = unknown. */
+  pairB?: BeachCourtPlayer[] | null;
 }) {
   const leftTeam: TeamId = teamASide === "LEFT" ? "A" : "B";
   const rightTeam: TeamId = leftTeam === "A" ? "B" : "A";
   const nameOf = (t: TeamId) => (t === "A" ? teamAName : teamBName);
   const colorOf = (t: TeamId) =>
     resolveTeamColor(t === "A" ? teamAColor : teamBColor, t);
+  const pairOf = (t: TeamId) => (t === "A" ? pairA : pairB) ?? null;
 
   // Each half is a 140×140 square so the court is a true 2:1 rectangle (shorter).
   const half = (x: number, team: TeamId) => {
     const serving = currentServer === team;
+    const pair = pairOf(team);
     return (
       <g>
         <rect
@@ -39,18 +55,47 @@ export function BeachCourt({
           stroke="rgba(255,255,255,0.5)"
           strokeWidth={2}
         />
-        {/* two player markers in the team's jersey colour */}
-        {[62, 112].map((dy) => (
-          <circle
-            key={dy}
-            cx={x + 70}
-            cy={dy}
-            r={11}
-            fill={colorOf(team)}
-            stroke="rgba(255,255,255,0.85)"
-            strokeWidth={2}
-          />
-        ))}
+        {/* two player markers in the team's jersey colour; named + server
+            ringed once the pair's service order is known */}
+        {[62, 112].map((dy, i) => {
+          const player = pair?.[i] ?? null;
+          const isServer = serving && (player?.serving ?? false);
+          // Centred dots when anonymous; shifted left to make room for names.
+          const cx = pair ? x + 40 : x + 70;
+          return (
+            <g key={dy}>
+              {isServer ? (
+                <circle
+                  cx={cx}
+                  cy={dy}
+                  r={14.5}
+                  fill="none"
+                  stroke="var(--primary)"
+                  strokeWidth={2.5}
+                />
+              ) : null}
+              <circle
+                cx={cx}
+                cy={dy}
+                r={11}
+                fill={colorOf(team)}
+                stroke="rgba(255,255,255,0.85)"
+                strokeWidth={2}
+              />
+              {player ? (
+                <text
+                  x={cx + 18}
+                  y={dy + 4}
+                  fontSize={11}
+                  fill="var(--score-active)"
+                  fontWeight={isServer ? 700 : 500}
+                >
+                  {player.name}
+                </text>
+              ) : null}
+            </g>
+          );
+        })}
         <text
           x={x + 70}
           y={172}

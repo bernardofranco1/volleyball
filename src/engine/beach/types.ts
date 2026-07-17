@@ -45,6 +45,11 @@ export type BeachEventPayload =
   | { type: "RALLY_WON_A" }
   | { type: "RALLY_WON_B" }
   | { type: "REPLAY_POINT" }
+  // Declares which roster player serves first for `team` this set (FIVB rule
+  // 12.2: each team's service order is chosen per set). Binds the abstract
+  // serve-order slots (player 1/2) to a real player; re-submittable to correct
+  // a mistaken declaration.
+  | { type: "SERVICE_ORDER"; team: TeamId; firstServerPlayerId: string }
   | { type: "TIMEOUT_REQUEST"; team: TeamId }
   | { type: "TIMEOUT_END"; team: TeamId }
   | { type: "TTO_START" } // auto-emitted by the engine
@@ -97,6 +102,11 @@ export interface BeachSetState {
   // every subsequent side-out won the server alternates.
   serverPlayerA: PlayerNumber | null;
   serverPlayerB: PlayerNumber | null;
+  // Identity of each team's "player 1" (first server) this set, as declared
+  // via SERVICE_ORDER. null = not declared — the UI then falls back to the
+  // abstract slot labels. Player 2 is the pair's other player.
+  firstServerPlayerIdA: string | null;
+  firstServerPlayerIdB: string | null;
 
   timeoutsUsedA: number;
   timeoutsUsedB: number;
@@ -136,6 +146,19 @@ export interface BeachMatchState {
   lastSequence: number;
   misconductA: MisconductRecord[];
   misconductB: MisconductRecord[];
+}
+
+/** Serve-order slot (1 | 2) of the player expected to serve next, or null pre-set. */
+export function currentServerSlot(set: BeachSetState): PlayerNumber | null {
+  return set.currentServer === "A" ? set.serverPlayerA : set.serverPlayerB;
+}
+
+/** The declared first-server playerId for `team` this set, or null. */
+export function firstServerPlayerId(
+  set: BeachSetState,
+  team: TeamId,
+): string | null {
+  return team === "A" ? set.firstServerPlayerIdA : set.firstServerPlayerIdB;
 }
 
 // ── Construction helpers ─────────────────────────────────────────────────────

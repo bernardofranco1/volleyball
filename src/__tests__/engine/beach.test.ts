@@ -156,6 +156,64 @@ describe("beach reducer — serving", () => {
   });
 });
 
+describe("beach reducer — service order (SERVICE_ORDER)", () => {
+  it("binds each team's first server for the set", () => {
+    const m = new TestMatch();
+    m.begin("A", "LEFT");
+    m.apply({ type: "SERVICE_ORDER", team: "A", firstServerPlayerId: "pa1" });
+    m.apply({ type: "SERVICE_ORDER", team: "B", firstServerPlayerId: "pb2" });
+    expect(m.set.firstServerPlayerIdA).toBe("pa1");
+    expect(m.set.firstServerPlayerIdB).toBe("pb2");
+  });
+
+  it("can be re-declared to correct a mistake", () => {
+    const m = new TestMatch();
+    m.begin("A", "LEFT");
+    m.apply({ type: "SERVICE_ORDER", team: "A", firstServerPlayerId: "pa1" });
+    m.apply({ type: "SERVICE_ORDER", team: "A", firstServerPlayerId: "pa2" });
+    expect(m.set.firstServerPlayerIdA).toBe("pa2");
+  });
+
+  it("does not carry over to the next set", () => {
+    const m = new TestMatch();
+    m.begin("A", "LEFT");
+    m.apply({ type: "SERVICE_ORDER", team: "A", firstServerPlayerId: "pa1" });
+    m.score("A", 21); // set 1 → A (auto SET_END)
+    m.startSet(2, "B", "RIGHT");
+    expect(m.set.firstServerPlayerIdA).toBeNull();
+    expect(m.set.firstServerPlayerIdB).toBeNull();
+  });
+
+  it("validator rejects it before the match is live or without a player", () => {
+    const m = new TestMatch();
+    const order = { type: "SERVICE_ORDER", team: "A", firstServerPlayerId: "pa1" } as const;
+    expect(validateBeachEvent(order, m.state, BEACH).ok).toBe(false);
+    m.begin("A", "LEFT");
+    expect(validateBeachEvent(order, m.state, BEACH).ok).toBe(true);
+    expect(
+      validateBeachEvent(
+        { type: "SERVICE_ORDER", team: "A", firstServerPlayerId: "" },
+        m.state,
+        BEACH,
+      ).ok,
+    ).toBe(false);
+  });
+
+  it("survives replay and maps slots to players (slot 1 = declared first server)", () => {
+    const m = new TestMatch();
+    m.begin("A", "LEFT");
+    m.apply({ type: "SERVICE_ORDER", team: "A", firstServerPlayerId: "pa1" });
+    m.apply({ type: "SERVICE_ORDER", team: "B", firstServerPlayerId: "pb2" });
+    m.score("B", 1); // side-out → B slot 1 = pb2
+    m.score("A", 1); // side-out → A slot 2 (pa1's partner)
+    const replayed = replayEvents("m1", m.events, BEACH);
+    const set = activeSet(replayed)!;
+    expect(set.firstServerPlayerIdA).toBe("pa1");
+    expect(set.firstServerPlayerIdB).toBe("pb2");
+    expect([set.currentServer, set.serverPlayerA]).toEqual(["A", 2]);
+  });
+});
+
 describe("beach reducer — side switches", () => {
   it("fires every 7 points in sets 1 & 2", () => {
     const m = new TestMatch();
