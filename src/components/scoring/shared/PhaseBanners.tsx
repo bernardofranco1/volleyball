@@ -14,6 +14,10 @@ import { Banner, PrimaryButton, SecondaryButton } from "./buttons";
 import { CountdownOverlay } from "./CountdownOverlay";
 import { useArmedConfirm } from "./useArmedConfirm";
 
+// Overdue-countdown grace: a deadline more than this far in the past never
+// auto-fires and renders as an inline banner instead of the blocking overlay.
+const AUTOFIRE_GRACE_MS = 10_000;
+
 /** The slice of a set state the phase banners need (all four engines match). */
 export interface PhaseSet {
   setNumber: number;
@@ -141,6 +145,22 @@ export function usePrePhaseBanner({
   const timeoutMs = useCountdown(timeoutDeadline);
   const setBreakMs = useCountdown(setBreakDeadline);
 
+  // A countdown whose deadline is LONG past is not a live interruption — the
+  // scorer only lands on one via an Undo that stepped back into it (or a very
+  // late reload). Rendering the blocking 0:00 overlay there reads as a dead
+  // end, so those fall through to the inline banners (which carry Undo too),
+  // keeping the console usable while stepping back through a finished set.
+  // Staleness = a grace-shifted countdown that has itself run out (keeps the
+  // clock reads inside the countdown hook — render stays pure).
+  const setBreakGraceMs = useCountdown(
+    setBreakDeadline != null ? setBreakDeadline + AUTOFIRE_GRACE_MS : null,
+  );
+  const timeoutGraceMs = useCountdown(
+    timeoutDeadline != null ? timeoutDeadline + AUTOFIRE_GRACE_MS : null,
+  );
+  const setBreakStale = setBreakDeadline != null && setBreakGraceMs <= 0;
+  const timeoutStale = timeoutDeadline != null && timeoutGraceMs <= 0;
+
   // Auto-fire at the DEADLINE via absolute-time timers — deliberately not
   // derived from the display countdown's tick state (which reports a stale 0
   // for one frame when a fresh deadline appears; acting on that would end a
@@ -151,7 +171,6 @@ export function usePrePhaseBanner({
   // scorer had just undone, making Undo appear dead. The overlay's manual
   // buttons (End time-out / Start next set / Undo) stay available instead.
   // `firedRef` dedupes per countdown instance across re-renders.
-  const AUTOFIRE_GRACE_MS = 10_000;
   const firedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!timeoutDeadline) return;
@@ -207,7 +226,12 @@ export function usePrePhaseBanner({
   if (state.rallyPhase === "SET_BREAK") {
     // With config we show the floating countdown and auto-advance at 0:00.
     // (Not in the beyond-bestOf rewind edge — fall through to the manual banner.)
-    if (setBreakDeadline && config && state.currentSetNumber < config.bestOf)
+    if (
+      setBreakDeadline &&
+      !setBreakStale &&
+      config &&
+      state.currentSetNumber < config.bestOf
+    )
       return (
         <CountdownOverlay
           title={t("scoring.setBreak")}
@@ -237,9 +261,12 @@ export function usePrePhaseBanner({
               setsB: state.setsWonB,
             })}
           </span>
-          <PrimaryButton disabled={nextSetDisabled} onClick={startNextSet}>
-            {t("scoring.startNextSet")}
-          </PrimaryButton>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <PrimaryButton disabled={nextSetDisabled} onClick={startNextSet}>
+              {t("scoring.startNextSet")}
+            </PrimaryButton>
+            <SecondaryButton onClick={undo}>{t("scoring.undo")}</SecondaryButton>
+          </div>
         </div>
       </Banner>
     );
@@ -247,7 +274,7 @@ export function usePrePhaseBanner({
 
   if (state.rallyPhase === "TIMEOUT_ACTIVE") {
     const to = state.activeTimeoutTeam ?? "A";
-    if (timeoutDeadline)
+    if (timeoutDeadline && !timeoutStale)
       return (
         <CountdownOverlay
           title={`${name(to)} · ${t("scoring.timeoutLabel")}`}
@@ -266,9 +293,12 @@ export function usePrePhaseBanner({
       );
     return (
       <Banner>
-        <PrimaryButton onClick={() => dispatch({ type: "TIMEOUT_END", team: to })}>
-          {t("scoring.endTimeout", { team: name(to) })}
-        </PrimaryButton>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <PrimaryButton onClick={() => dispatch({ type: "TIMEOUT_END", team: to })}>
+            {t("scoring.endTimeout", { team: name(to) })}
+          </PrimaryButton>
+          <SecondaryButton onClick={undo}>{t("scoring.undo")}</SecondaryButton>
+        </div>
       </Banner>
     );
   }
