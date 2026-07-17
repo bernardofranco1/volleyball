@@ -5,11 +5,11 @@ import { readableTextOn, resolveTeamColor } from "@/lib/colors";
 // Clean, functional 16×8 beach court. Shows which side each team occupies and
 // the current serving team (darker sand + dot beside the name). Each team's
 // two markers carry the player's JERSEY number in the centre, indoor-style,
-// with the surname beside; the player whose turn it is to serve gets the same
-// ring + corner-dot markup as PositionalCourt (only once the pair's service
-// order has been declared — before that the expected server's identity is
-// unknown). Without a two-player roster the markers fall back to anonymous
-// serve-order slots 1/2, with the ring driven by the engine slot.
+// with the surname beside; the player whose turn it is to serve ALWAYS gets
+// the same ring + corner-dot markup as PositionalCourt (until the service
+// order is declared, the caller passes roster order as the assumed order).
+// Without a two-player roster the markers fall back to anonymous serve-order
+// slots 1/2, with the ring driven by the engine slot.
 export interface BeachCourtPlayer {
   jersey: number | null;
   name: string | null;

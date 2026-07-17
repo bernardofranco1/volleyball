@@ -84,14 +84,21 @@ export function LiveScoreboard({
   const rosterOf = (team: TeamId) => (team === "A" ? rosterA : rosterB);
   const orderedA = pairInServiceOrder(rosterA, set, "A");
   const orderedB = pairInServiceOrder(rosterB, set, "B");
+  // The pair as displayed, in service order. Until the order is declared the
+  // roster order stands in (slot 1 = first roster player) so the referees
+  // ALWAYS see a serve indication — the one-tap prompt below confirms or
+  // flips it (dispatching SERVICE_ORDER).
+  const displayPair = (team: TeamId): PlayerLite[] | null => {
+    const roster = rosterOf(team);
+    if (roster.length !== 2) return null;
+    return (team === "A" ? orderedA : orderedB) ?? roster;
+  };
 
   // The player expected to serve, per the alternating service order.
   const servingTeam = set && !set.winner ? set.currentServer : null;
   const servingSlot: PlayerNumber | null = set && servingTeam ? currentServerSlot(set) : null;
-  const orderedServing = servingTeam === "A" ? orderedA : servingTeam === "B" ? orderedB : null;
-  const servingPlayer =
-    orderedServing && servingSlot ? orderedServing[servingSlot - 1] : null;
-  // Named when the order is declared; falls back to the abstract slot.
+  const servingPair = servingTeam ? displayPair(servingTeam) : null;
+  const servingPlayer = servingPair && servingSlot ? servingPair[servingSlot - 1] : null;
   const servingPlayerLabel =
     state.status === "FINISHED" || !servingTeam
       ? null
@@ -101,18 +108,16 @@ export function LiveScoreboard({
           ? t("scoring.playerN", { n: servingSlot })
           : null;
 
-  // Court markers show jersey numbers + surnames from the roster right away;
-  // the serve markup appears once the service order is declared (before that
-  // the expected server's identity is unknown).
+  // Court markers: jersey number + surname per player, ring/dot on the one
+  // whose turn it is to serve.
   const courtPair = (team: TeamId): BeachCourtPlayer[] | null => {
-    const roster = rosterOf(team);
-    if (roster.length !== 2) return null;
-    const ordered = team === "A" ? orderedA : orderedB;
+    const pair = displayPair(team);
+    if (!pair) return null;
     const slot = team === servingTeam ? servingSlot : null;
-    return (ordered ?? roster).map((p, i) => ({
+    return pair.map((p, i) => ({
       jersey: p.jerseyNumber,
       name: surnameOf(p.fullName),
-      serving: ordered != null && slot != null && i === slot - 1,
+      serving: slot != null && i === slot - 1,
     }));
   };
 
