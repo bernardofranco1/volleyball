@@ -132,14 +132,14 @@ function PastSets({ sets }: { sets: BoardSet[] }) {
       {done.map((s) => (
         <div
           key={s.setNumber}
-          style={{ display: "flex", alignItems: "baseline", gap: "1.6cqmin", fontVariantNumeric: "tabular-nums" }}
+          style={{ display: "flex", alignItems: "baseline", gap: "4.6cqmin", fontVariantNumeric: "tabular-nums" }}
         >
           <span style={{ fontSize: "2.9cqmin", letterSpacing: "0.25cqmin", fontWeight: 700, opacity: 0.55 }}>
             Set {s.setNumber}
           </span>
           <span style={{ fontSize: "3.8cqmin", letterSpacing: "0.1cqmin" }}>
             <span style={{ opacity: s.winner === "B" ? 0.45 : 1 }}>{s.scoreA}</span>
-            <span style={{ opacity: 0.7 }}>:</span>
+            <span style={{ opacity: 0.7 }}>-</span>
             <span style={{ opacity: s.winner === "A" ? 0.45 : 1 }}>{s.scoreB}</span>
           </span>
         </div>
