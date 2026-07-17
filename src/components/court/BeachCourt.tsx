@@ -1,20 +1,18 @@
 import type { Side, TeamId } from "@/engine/beach/types";
-import { resolveTeamColor } from "@/lib/colors";
+import type { PlayerNumber } from "@/engine/beach/types";
+import { readableTextOn, resolveTeamColor } from "@/lib/colors";
 
 // Clean, functional 16×8 beach court. Shows which side each team occupies and
-// the current serving team (arrow + highlighted server dot). The two player
-// markers per side carry the team's jersey colour. When the pair's service
-// order is known (SERVICE_ORDER declared), the markers are named — dot 1 is
-// the set's first server — and the expected server is ringed.
-export interface BeachCourtPlayer {
-  name: string;
-  /** This player is expected to serve next (rules: alternating service order). */
-  serving: boolean;
-}
-
+// the current serving team (darker sand + dot beside the name). Each team's
+// two markers carry the service-order number (player 1 = the set's first
+// server) in the centre, indoor-style; the player whose turn it is to serve
+// gets the same ring + corner-dot markup as PositionalCourt. Surnames appear
+// beside the markers once the pair's service order has been declared
+// (SERVICE_ORDER) — the slot numbers and serve markup work regardless.
 export function BeachCourt({
   teamASide,
   currentServer,
+  servingSlot,
   teamAName,
   teamBName,
   teamAColor,
@@ -24,14 +22,16 @@ export function BeachCourt({
 }: {
   teamASide: Side;
   currentServer: TeamId | null;
+  /** Serve-order slot (1 | 2) of the serving team's expected server. */
+  servingSlot: PlayerNumber | null;
   teamAName: string;
   teamBName: string;
   teamAColor: string | null;
   teamBColor: string | null;
-  /** Team A's players in service order ([player 1, player 2]); null = unknown. */
-  pairA?: BeachCourtPlayer[] | null;
-  /** Team B's players in service order ([player 1, player 2]); null = unknown. */
-  pairB?: BeachCourtPlayer[] | null;
+  /** Team A surnames in service order ([player 1, player 2]); null = undeclared. */
+  pairA?: [string, string] | null;
+  /** Team B surnames in service order ([player 1, player 2]); null = undeclared. */
+  pairB?: [string, string] | null;
 }) {
   const leftTeam: TeamId = teamASide === "LEFT" ? "A" : "B";
   const rightTeam: TeamId = leftTeam === "A" ? "B" : "A";
@@ -44,6 +44,11 @@ export function BeachCourt({
   const half = (x: number, team: TeamId) => {
     const serving = currentServer === team;
     const pair = pairOf(team);
+    const color = colorOf(team);
+    const numColor = readableTextOn(color);
+    // Centred markers when anonymous; shifted left to make room for names.
+    const cx = pair ? x + 40 : x + 70;
+    const R = 11;
     return (
       <g>
         <rect
@@ -55,20 +60,18 @@ export function BeachCourt({
           stroke="rgba(255,255,255,0.5)"
           strokeWidth={2}
         />
-        {/* two player markers in the team's jersey colour; named + server
-            ringed once the pair's service order is known */}
-        {[62, 112].map((dy, i) => {
-          const player = pair?.[i] ?? null;
-          const isServer = serving && (player?.serving ?? false);
-          // Centred dots when anonymous; shifted left to make room for names.
-          const cx = pair ? x + 40 : x + 70;
+        {/* the pair, in service order: marker 1 = the set's first server */}
+        {([1, 2] as const).map((slot, i) => {
+          const dy = [62, 112][i];
+          const name = pair?.[i] ?? null;
+          const isServer = serving && servingSlot === slot;
           return (
-            <g key={dy}>
+            <g key={slot}>
               {isServer ? (
                 <circle
                   cx={cx}
                   cy={dy}
-                  r={14.5}
+                  r={R + 2.5}
                   fill="none"
                   stroke="var(--primary)"
                   strokeWidth={2.5}
@@ -77,12 +80,34 @@ export function BeachCourt({
               <circle
                 cx={cx}
                 cy={dy}
-                r={11}
-                fill={colorOf(team)}
+                r={R}
+                fill={color}
                 stroke="rgba(255,255,255,0.85)"
-                strokeWidth={2}
+                strokeWidth={1.5}
               />
-              {player ? (
+              <text
+                x={cx}
+                y={dy}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={11.5}
+                fontWeight={700}
+                fill={numColor}
+                style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}
+              >
+                {slot}
+              </text>
+              {isServer ? (
+                <circle
+                  cx={cx + R - 2}
+                  cy={dy - R + 2}
+                  r={4}
+                  fill="var(--primary)"
+                  stroke="#fff"
+                  strokeWidth={1}
+                />
+              ) : null}
+              {name ? (
                 <text
                   x={cx + 18}
                   y={dy + 4}
@@ -90,7 +115,7 @@ export function BeachCourt({
                   fill="var(--score-active)"
                   fontWeight={isServer ? 700 : 500}
                 >
-                  {player.name}
+                  {name}
                 </text>
               ) : null}
             </g>

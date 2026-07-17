@@ -13,7 +13,7 @@ import {
 } from "@/engine/beach/types";
 import type { PlayerLite } from "@/lib/match-provider";
 import { useT } from "@/lib/i18n/client";
-import { BeachCourt, type BeachCourtPlayer } from "@/components/court/BeachCourt";
+import { BeachCourt } from "@/components/court/BeachCourt";
 import { surnameOf } from "@/components/court/PositionalCourt";
 import { BeachActionBar } from "@/components/scoring/BeachActionBar";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
@@ -101,14 +101,10 @@ export function LiveScoreboard({
           ? t("scoring.playerN", { n: servingSlot })
           : null;
 
-  const courtPair = (team: TeamId): BeachCourtPlayer[] | null => {
+  const courtPair = (team: TeamId): [string, string] | null => {
     const ordered = team === "A" ? orderedA : orderedB;
     if (!ordered) return null;
-    const slot = team === servingTeam ? servingSlot : null;
-    return ordered.map((p, i) => ({
-      name: surnameOf(p.fullName),
-      serving: slot != null && i === slot - 1,
-    }));
+    return [surnameOf(ordered[0].fullName), surnameOf(ordered[1].fullName)];
   };
 
   // One-tap service-order declaration (rules: each team declares its order
@@ -162,6 +158,7 @@ export function LiveScoreboard({
         <BeachCourt
           teamASide={set?.teamASide ?? "LEFT"}
           currentServer={servingTeam}
+          servingSlot={servingSlot}
           teamAName={teamAName}
           teamBName={teamBName}
           teamAColor={teamAColor}
