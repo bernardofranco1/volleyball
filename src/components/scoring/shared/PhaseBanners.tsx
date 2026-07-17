@@ -144,12 +144,18 @@ export function usePrePhaseBanner({
   // Auto-fire at the DEADLINE via absolute-time timers — deliberately not
   // derived from the display countdown's tick state (which reports a stale 0
   // for one frame when a fresh deadline appears; acting on that would end a
-  // time-out the instant it started). A deadline already in the past fires
-  // immediately (scorer loads mid-overdue-timeout → auto-resume). `firedRef`
-  // dedupes per countdown instance across re-renders.
+  // time-out the instant it started). A slightly-overdue deadline still fires
+  // (scorer loads just as a time-out runs out), but a LONG-expired one never
+  // does: the only ways to be parked on one are an Undo that stepped back into
+  // it or a late (re)load, and auto-firing there re-consumed the state the
+  // scorer had just undone, making Undo appear dead. The overlay's manual
+  // buttons (End time-out / Start next set / Undo) stay available instead.
+  // `firedRef` dedupes per countdown instance across re-renders.
+  const AUTOFIRE_GRACE_MS = 10_000;
   const firedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!timeoutDeadline) return;
+    if (Date.now() - timeoutDeadline > AUTOFIRE_GRACE_MS) return;
     const key = `to:${timeoutDeadline}`;
     const id = setTimeout(() => {
       if (firedRef.current === key) return;
@@ -161,6 +167,7 @@ export function usePrePhaseBanner({
   }, [timeoutDeadline]);
   useEffect(() => {
     if (!setBreakDeadline) return;
+    if (Date.now() - setBreakDeadline > AUTOFIRE_GRACE_MS) return;
     const key = `sb:${setBreakDeadline}`;
     const id = setTimeout(() => {
       if (firedRef.current === key) return;

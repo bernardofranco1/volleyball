@@ -366,3 +366,97 @@ describe("undo beyond a completed time-out", () => {
     expect(targets.map((t) => t.payload.type)).toEqual(["TIMEOUT_REQUEST"]);
   });
 });
+
+// Full-flow revalidation: repeated Undo steps back exactly ONE scorer action
+// at a time, straight through a set start, the set break, the set-winning
+// point, and a completed time-out — never stranding the scorer inside a
+// re-triggered interruption.
+describe("stepwise undo through set start, set break and time-outs", () => {
+  function build() {
+    const events: BeachEvent[] = [];
+    let seq = 0;
+    let state: BeachMatchState = initialBeachState("m1");
+    const apply = (payload: BeachEventPayload) => {
+      seq += 1;
+      const e: BeachEvent = { id: `e${seq}`, sequence: seq, timestamp: TS, payload };
+      events.push(e);
+      state = beachReduce(state, e, BEACH);
+    };
+    const dispatch = (payload: BeachEventPayload) => {
+      apply(payload);
+      for (const em of computeAutoEmits(state, BEACH)) apply(em);
+    };
+    apply({ type: "MATCH_CREATED", matchId: "m1" });
+    apply({ type: "COIN_TOSS", firstServer: "A", teamAStartSide: "LEFT" });
+    apply({ type: "MATCH_START" });
+    apply({ type: "SET_START", setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" });
+    dispatch({ type: "RALLY_WON_A" });
+    dispatch({ type: "RALLY_WON_A" });
+    dispatch({ type: "RALLY_WON_A" }); // 3-0
+    dispatch({ type: "TIMEOUT_REQUEST", team: "B" });
+    dispatch({ type: "TIMEOUT_END", team: "B" });
+    for (let i = 0; i < 18; i++) dispatch({ type: "RALLY_WON_A" }); // 21-0 → SET_END
+    dispatch({ type: "SET_START", setNumber: 2, firstServer: "B", teamAStartSide: "RIGHT" });
+    return { events, seqRef: () => seq };
+  }
+
+  it("each undo removes one action; time-outs are never re-entered", () => {
+    const { events } = build();
+    let log = [...events];
+    let seq = log[log.length - 1].sequence;
+
+    const undoOnce = () => {
+      const targets = selectUndoTargets(log as unknown as EngineEvent[]);
+      const undos: BeachEvent[] = targets.map((t) => ({
+        id: `u${++seq}`,
+        sequence: seq,
+        timestamp: TS,
+        payload: { type: "UNDO", targetEventId: t.id },
+      }));
+      log = [...log, ...undos];
+      return {
+        types: targets.map((t) => t.payload.type),
+        state: beachReplay("m1", log as BeachEvent[], BEACH),
+      };
+    };
+
+    // 1. Undo the set-2 start → back to the set break, set 1 decided.
+    let step = undoOnce();
+    expect(step.types).toEqual(["SET_START"]);
+    expect(step.state.rallyPhase).toBe("SET_BREAK");
+    expect(step.state.currentSetNumber).toBe(1);
+    expect(step.state.sets[0].winner).toBe("A");
+
+    // 2. Undo the set-winning point (+ its auto SET_END) → live at 20-0.
+    step = undoOnce();
+    expect(step.types).toContain("RALLY_WON_A");
+    expect(step.types).toContain("SET_END");
+    expect(step.state.rallyPhase).toBe("BETWEEN_RALLIES");
+    expect(step.state.sets[0].winner).toBeNull();
+    expect(step.state.sets[0].scoreA).toBe(20);
+
+    // 3-19. Seventeen more single-rally undos → back to 3-0. Undoing the
+    // rallies at sums 7/14 also removes their auto SIDE_SWITCH — still one
+    // scorer action per tap, and never a timeout phase.
+    for (let expectScore = 19; expectScore >= 3; expectScore--) {
+      step = undoOnce();
+      expect(step.types[0]).toBe("RALLY_WON_A");
+      expect(step.state.sets[0].scoreA).toBe(expectScore);
+      expect(step.state.rallyPhase).toBe("BETWEEN_RALLIES");
+    }
+
+    // 20. Next undo removes the COMPLETED time-out as one unit — the match
+    // must NOT re-enter TIMEOUT_ACTIVE.
+    step = undoOnce();
+    expect(step.types.sort()).toEqual(["TIMEOUT_END", "TIMEOUT_REQUEST"]);
+    expect(step.state.rallyPhase).toBe("BETWEEN_RALLIES");
+    expect(step.state.sets[0].timeoutsUsedB).toBe(0);
+    expect(step.state.sets[0].scoreA).toBe(3);
+
+    // 21. And the next reaches the point scored before the time-out.
+    step = undoOnce();
+    expect(step.types).toEqual(["RALLY_WON_A"]);
+    expect(step.state.sets[0].scoreA).toBe(2);
+    expect(step.state.rallyPhase).toBe("BETWEEN_RALLIES");
+  });
+});
