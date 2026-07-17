@@ -13,8 +13,8 @@ import {
 } from "@/engine/beach/types";
 import type { PlayerLite } from "@/lib/match-provider";
 import { useT } from "@/lib/i18n/client";
+import { pairDisplayName } from "@/lib/player-name";
 import { BeachCourt, type BeachCourtPlayer } from "@/components/court/BeachCourt";
-import { surnameOf } from "@/components/court/PositionalCourt";
 import { BeachActionBar } from "@/components/scoring/BeachActionBar";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
@@ -97,18 +97,13 @@ export function LiveScoreboard({
   // The player expected to serve, per the alternating service order.
   const servingTeam = set && !set.winner ? set.currentServer : null;
   const servingSlot: PlayerNumber | null = set && servingTeam ? currentServerSlot(set) : null;
-  const servingPair = servingTeam ? displayPair(servingTeam) : null;
-  const servingPlayer = servingPair && servingSlot ? servingPair[servingSlot - 1] : null;
-  const servingPlayerLabel =
-    state.status === "FINISHED" || !servingTeam
-      ? null
-      : servingPlayer
-        ? servingPlayer.fullName
-        : servingSlot
-          ? t("scoring.playerN", { n: servingSlot })
-          : null;
 
-  // Court markers: jersey number + surname per player, ring/dot on the one
+  // Players are labelled by the name they're known by — the segment of the
+  // pair team name ("Duda / Ana Patrícia" → "Duda", not the surname Lisboa).
+  const nameOf = (team: TeamId, p: PlayerLite) =>
+    pairDisplayName(team === "A" ? teamAName : teamBName, p.fullName);
+
+  // Court markers: jersey number + known name per player, ring/dot on the one
   // whose turn it is to serve.
   const courtPair = (team: TeamId): BeachCourtPlayer[] | null => {
     const pair = displayPair(team);
@@ -116,7 +111,7 @@ export function LiveScoreboard({
     const slot = team === servingTeam ? servingSlot : null;
     return pair.map((p, i) => ({
       jersey: p.jerseyNumber,
-      name: surnameOf(p.fullName),
+      name: nameOf(team, p),
       serving: slot != null && i === slot - 1,
     }));
   };
@@ -158,7 +153,6 @@ export function LiveScoreboard({
           scoreA={set?.scoreA ?? 0}
           scoreB={set?.scoreB ?? 0}
           serving={servingTeam}
-          servingPlayer={servingPlayerLabel}
           statusLabel={statusLabel}
           sets={state.sets.map((s) => ({
             setNumber: s.setNumber,
@@ -173,8 +167,6 @@ export function LiveScoreboard({
           teamASide={set?.teamASide ?? "LEFT"}
           currentServer={servingTeam}
           servingSlot={servingSlot}
-          teamAName={teamAName}
-          teamBName={teamBName}
           teamAColor={teamAColor}
           teamBColor={teamBColor}
           pairA={courtPair("A")}
@@ -202,7 +194,7 @@ export function LiveScoreboard({
                     })
                   }
                 >
-                  {p.fullName}
+                  {nameOf(orderPendingTeam, p)}
                 </SecondaryButton>
               ))}
             </div>

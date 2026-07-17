@@ -8,7 +8,6 @@ import type { TournamentConfig } from "@/engine/config";
 import { activeSet, type Side, type TeamId } from "@/engine/types";
 import type { PlayerLite } from "@/lib/match-provider";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
-import { surnameOf } from "@/components/court/PositionalCourt";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
@@ -106,18 +105,8 @@ export function RotationScoreboard({
   const statusLabel =
     state.status === "FINISHED" ? "Final" : set ? `Set ${set.setNumber}` : "Match not started";
 
-  // Expected server (rules: the player in position 1, back-right — the slot at
-  // the serving team's rotation index). Named once the lineup is confirmed.
+  // The court diagram marks the expected server (position 1) with a ring.
   const serving = set && !set.winner && state.status !== "FINISHED" ? set.currentServer : null;
-  let servingPlayerLabel: string | null = null;
-  if (set && serving) {
-    const positions = serving === "A" ? set.courtPositionsA : set.courtPositionsB;
-    const rot = (serving === "A" ? set.lastRotA : set.lastRotB) ?? 0;
-    const pid = positions.length > 0 ? positions[((rot % positions.length) + positions.length) % positions.length] : null;
-    const player = pid ? rosterById.get(pid) : null;
-    if (player)
-      servingPlayerLabel = `#${player.jerseyNumber ?? "–"} ${surnameOf(player.fullName)}`;
-  }
 
   let main;
   if (state.rallyPhase === "LINEUP_PENDING") {
@@ -164,7 +153,6 @@ export function RotationScoreboard({
           scoreA={set?.scoreA ?? 0}
           scoreB={set?.scoreB ?? 0}
           serving={serving}
-          servingPlayer={servingPlayerLabel}
           statusLabel={statusLabel}
           sets={state.sets.map((s) => ({
             setNumber: s.setNumber,

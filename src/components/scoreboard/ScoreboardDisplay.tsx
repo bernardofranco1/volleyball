@@ -17,6 +17,7 @@ import {
 import type { BoardTheme } from "@/lib/board-theme";
 import type { PlayerLite } from "@/lib/indoor-match-context";
 import type { Discipline } from "@/engine/types";
+import { pairDisplayName } from "@/lib/player-name";
 import { type TournamentConfig, timeoutCapForSet } from "@/engine/config";
 import { useCountdown, formatCountdown } from "@/components/scoreboard/Countdown";
 import {
@@ -185,7 +186,11 @@ export function ScoreboardDisplay({
         : roster[0];
       const second = roster.find((p) => p.id !== first?.id);
       const player = first && second ? [first, second][slot - 1] : undefined;
-      if (player) servingPlayer = surname(player.fullName);
+      if (player)
+        servingPlayer = pairDisplayName(
+          team === "A" ? teamAName : teamBName,
+          player.fullName,
+        );
     }
   }
 

@@ -3,9 +3,9 @@ import type { PlayerNumber } from "@/engine/beach/types";
 import { readableTextOn, resolveTeamColor } from "@/lib/colors";
 
 // Clean, functional 16×8 beach court. Shows which side each team occupies and
-// the current serving team (darker sand + dot beside the name). Each team's
-// two markers carry the player's JERSEY number in the centre, indoor-style,
-// with the surname beside; the player whose turn it is to serve ALWAYS gets
+// the current serving team (darker sand). Each team's two markers carry the
+// player's JERSEY number in the centre, indoor-style, with the name the
+// player is known by beside; the player whose turn it is to serve ALWAYS gets
 // the same ring + corner-dot markup as PositionalCourt (until the service
 // order is declared, the caller passes roster order as the assumed order).
 // Without a two-player roster the markers fall back to anonymous serve-order
@@ -21,8 +21,6 @@ export function BeachCourt({
   teamASide,
   currentServer,
   servingSlot,
-  teamAName,
-  teamBName,
   teamAColor,
   teamBColor,
   pairA,
@@ -32,8 +30,6 @@ export function BeachCourt({
   currentServer: TeamId | null;
   /** Serve-order slot (1 | 2) of the serving team's expected server. */
   servingSlot: PlayerNumber | null;
-  teamAName: string;
-  teamBName: string;
   teamAColor: string | null;
   teamBColor: string | null;
   /** Team A players (service order once declared, roster order before); null = no roster. */
@@ -43,7 +39,6 @@ export function BeachCourt({
 }) {
   const leftTeam: TeamId = teamASide === "LEFT" ? "A" : "B";
   const rightTeam: TeamId = leftTeam === "A" ? "B" : "A";
-  const nameOf = (t: TeamId) => (t === "A" ? teamAName : teamBName);
   const colorOf = (t: TeamId) =>
     resolveTeamColor(t === "A" ? teamAColor : teamBColor, t);
   const pairOf = (t: TeamId) => (t === "A" ? pairA : pairB) ?? null;
@@ -68,7 +63,7 @@ export function BeachCourt({
           stroke="rgba(255,255,255,0.5)"
           strokeWidth={2}
         />
-        {/* the pair's markers: jersey number centred, surname beside */}
+        {/* the pair's markers: jersey number centred, known name beside */}
         {([1, 2] as const).map((slot, i) => {
           const dy = [62, 112][i];
           const player = pair?.[i] ?? null;
@@ -133,23 +128,15 @@ export function BeachCourt({
             </g>
           );
         })}
-        <text
-          x={x + 70}
-          y={172}
-          textAnchor="middle"
-          fontSize={12}
-          fill="var(--score-active)"
-          fontWeight={600}
-        >
-          {nameOf(team)}
-        </text>
+        {/* Team names intentionally not repeated here — the score strip above
+            already names both pairs. */}
       </g>
     );
   };
 
   return (
     <svg
-      viewBox="0 0 320 184"
+      viewBox="0 0 320 166"
       role="img"
       aria-label="Beach court"
       className="mx-auto block h-auto w-full max-w-xl max-h-[48dvh]"
