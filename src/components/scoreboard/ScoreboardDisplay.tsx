@@ -169,6 +169,26 @@ export function ScoreboardDisplay({
   const showPreMatch =
     preMatchMs > 0 && !finished && state.status !== "LIVE" && scheduledAtMs != null;
 
+  // Beach: surname of the player expected to serve — underlined in the top
+  // bar's pair name. Same rule as the scorer console: the declared service
+  // order (SERVICE_ORDER) when known, roster order assumed until then.
+  let servingPlayer: string | null = null;
+  if (discipline === "BEACH" && set && !set.winner) {
+    const team = set.currentServer;
+    const slot = team === "A" ? set.serverPlayerA : set.serverPlayerB;
+    const roster = (team === "A" ? rosterA : rosterB) ?? [];
+    if (slot && roster.length === 2) {
+      const firstId =
+        team === "A" ? set.firstServerPlayerIdA : set.firstServerPlayerIdB;
+      const first = firstId
+        ? roster.find((p) => p.id === firstId)
+        : roster[0];
+      const second = roster.find((p) => p.id !== first?.id);
+      const player = first && second ? [first, second][slot - 1] : undefined;
+      if (player) servingPlayer = surname(player.fullName);
+    }
+  }
+
   const setsLadder: BoardSet[] = state.sets.map((s) => ({
     setNumber: s.setNumber,
     scoreA: s.scoreA,
@@ -263,6 +283,7 @@ export function ScoreboardDisplay({
           scoreA={set?.scoreA ?? 0}
           scoreB={set?.scoreB ?? 0}
           serving={set?.currentServer ?? null}
+          servingPlayer={servingPlayer}
           setNumber={set?.setNumber ?? null}
           sets={setsLadder}
           logoUrl={logoUrl}

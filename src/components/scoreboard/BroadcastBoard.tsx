@@ -32,6 +32,12 @@ export interface BoardProps {
   scoreA: number;
   scoreB: number;
   serving: "A" | "B" | null;
+  /**
+   * Beach: surname of the player expected to serve. When it matches a
+   * "Surname / Surname" segment of the serving team's name, that segment is
+   * underlined in the top bar. Ignored (no underline) otherwise.
+   */
+  servingPlayer?: string | null;
   setNumber: number | null;
   sets: BoardSet[];
   logoUrl: string | null;
@@ -62,7 +68,51 @@ function Swatch({ color }: { color: string }) {
   );
 }
 
-function TeamPlate({ name, color, align }: { name: string; color: string; align: "left" | "right" }) {
+// Underline the pair-name segment matching the serving player's surname
+// ("Mol / Sørum" + "Sørum" → Mol / <u>Sørum</u>). Falls back to the plain name
+// when the name isn't a pair or no segment matches.
+function nameWithServerUnderline(name: string, server: string): React.ReactNode {
+  const parts = name.split("/").map((p) => p.trim());
+  if (parts.length < 2) return name;
+  const idx = parts.findIndex((p) =>
+    p.toLowerCase().includes(server.toLowerCase()),
+  );
+  if (idx === -1) return name;
+  return parts.map((p, i) => (
+    <Fragment key={i}>
+      {i > 0 ? " / " : ""}
+      {i === idx ? (
+        <span
+          style={{
+            // Kept tight: the plate clips at a .92 line-height, so a deeper
+            // offset falls outside the line box and disappears.
+            textDecorationLine: "underline",
+            textUnderlineOffset: "0.35cqmin",
+            textDecorationThickness: "0.35cqmin",
+            textDecorationSkipInk: "none",
+          }}
+        >
+          {p}
+        </span>
+      ) : (
+        p
+      )}
+    </Fragment>
+  ));
+}
+
+function TeamPlate({
+  name,
+  color,
+  align,
+  servingPlayer,
+}: {
+  name: string;
+  color: string;
+  align: "left" | "right";
+  /** Surname of this team's serving player — underlined within the pair name. */
+  servingPlayer?: string | null;
+}) {
   return (
     <div
       style={{
@@ -88,7 +138,7 @@ function TeamPlate({ name, color, align }: { name: string; color: string; align:
           WebkitBoxOrient: "vertical",
         }}
       >
-        {name}
+        {servingPlayer ? nameWithServerUnderline(name, servingPlayer) : name}
       </div>
     </div>
   );
@@ -296,12 +346,22 @@ export function BroadcastBoard(props: BoardProps) {
       <div style={{ display: "flex", flexDirection: "column", padding: "3cqmin", height: "100%", gap: "2cqmin" }}>
         {/* Top bar (pinned to the top edge) */}
         <div style={{ display: "flex", alignItems: "center", gap: "1.2cqmin", width: "100%", border: `0.5cqmin solid ${accent}`, borderRadius: "0.8cqmin", padding: "1.2cqmin", flex: "none" }}>
-          <TeamPlate name={props.teamAName} color={resolveTeamColor(props.teamAColor, "A")} align="left" />
+          <TeamPlate
+            name={props.teamAName}
+            color={resolveTeamColor(props.teamAColor, "A")}
+            align="left"
+            servingPlayer={props.serving === "A" && !props.finished ? props.servingPlayer : null}
+          />
           <div style={{ display: "flex", gap: "1cqmin", flex: "none" }}>
             <SetsWon value={props.setsWonA} />
             <SetsWon value={props.setsWonB} />
           </div>
-          <TeamPlate name={props.teamBName} color={resolveTeamColor(props.teamBColor, "B")} align="right" />
+          <TeamPlate
+            name={props.teamBName}
+            color={resolveTeamColor(props.teamBColor, "B")}
+            align="right"
+            servingPlayer={props.serving === "B" && !props.finished ? props.servingPlayer : null}
+          />
         </div>
 
         {/* Completed sets, stacked directly under the top bar */}

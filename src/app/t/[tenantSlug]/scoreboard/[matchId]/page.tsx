@@ -76,7 +76,8 @@ export default async function ScoreboardPage({
   // Branding and (indoor) rosters are independent — fetch in parallel.
   const [branding, rosters] = await Promise.all([
     getCompetitionBranding(match.competitionId),
-    view.discipline === "INDOOR"
+    // Indoor: rotation grids. Beach: serving-player underline in the top bar.
+    view.discipline === "INDOOR" || view.discipline === "BEACH"
       ? loadMatchRosters(matchId)
       : Promise.resolve({ rosterA: [], rosterB: [] }),
   ]);

@@ -142,7 +142,6 @@ export function BeachCourt({
           fontWeight={600}
         >
           {nameOf(team)}
-          {serving ? " ⬤" : ""}
         </text>
       </g>
     );
