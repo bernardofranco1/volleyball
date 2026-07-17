@@ -214,33 +214,37 @@ export function BroadcastBoard(props: BoardProps) {
 
   const boardRef = useRef<HTMLDivElement>(null);
   const logoBarRef = useRef<HTMLDivElement>(null);
+  const cellRef = useRef<HTMLDivElement>(null);
   const ballRef = useRef<HTMLImageElement>(null);
   const prevServingRef = useRef<"A" | "B" | null>(null);
-  const mountedRef = useRef(false);
-  // Rect from the previous render — the FLIP "from" when the ball switches sides.
-  const lastBallRectRef = useRef<DOMRect | null>(null);
 
   const showBall = props.serving !== null && !props.finished;
 
-  // Ball V-flight on side-out: FLIP from the old side, bounce at bottom-centre
-  // just above the logo bar, half a spin per leg.
+  // Ball V-flight on side-out: from the OLD side, bounce at bottom-centre just
+  // above the logo bar, half a spin per leg. The departure point is the ball's
+  // new laid-out position mirrored across the set-label cell's centre — the two
+  // side anchors are exactly symmetric (right/left: calc(100% + 6cqmin)), and
+  // the flight only runs on a genuine A↔B flip, so the mirror IS the old side.
+  // (A previously-recorded rect was used here, but it could capture the ball
+  // mid-animation, making a quick second side-out fly same-side → vertex →
+  // same-side instead of crossing.)
   useLayoutEffect(() => {
     const prev = prevServingRef.current;
-    const wasMounted = mountedRef.current;
     prevServingRef.current = props.serving;
-    mountedRef.current = true;
 
     const ball = ballRef.current;
     const board = boardRef.current;
     const logoBar = logoBarRef.current;
-    if (!wasMounted || prev === null || props.serving === null || prev === props.serving) return;
-    if (!ball || !board || !logoBar) return;
-    const from = lastBallRectRef.current;
-    if (!from) return;
+    const cell = cellRef.current;
+    if (prev === null || props.serving === null || prev === props.serving) return;
+    if (!ball || !board || !logoBar || !cell) return;
     if (prefersReducedMotion()) return;
 
+    // Cancel any in-flight animation FIRST so the rects below are pure layout.
     ball.getAnimations().forEach((a) => a.cancel());
     const to = ball.getBoundingClientRect();
+    const cellCentreX = cell.getBoundingClientRect().left + cell.getBoundingClientRect().width / 2;
+    const fromLeft = 2 * cellCentreX - to.left - to.width; // mirror = old side
     const bb = board.getBoundingClientRect();
     const lb = logoBar.getBoundingClientRect();
     const midX = bb.left + bb.width / 2 - to.width / 2;
@@ -248,7 +252,7 @@ export function BroadcastBoard(props: BoardProps) {
     ball.animate(
       [
         {
-          transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) rotate(0deg)`,
+          transform: `translate(${fromLeft - to.left}px, 0) rotate(0deg)`,
           easing: "cubic-bezier(.55,0,.85,.5)", // dive: ease-in
         },
         {
@@ -261,12 +265,6 @@ export function BroadcastBoard(props: BoardProps) {
       { duration: 900 }
     );
   }, [props.serving]);
-
-  // Record the ball's rect after every render (after the flight effect above
-  // has consumed the previous one).
-  useLayoutEffect(() => {
-    lastBallRectRef.current = ballRef.current?.getBoundingClientRect() ?? null;
-  });
 
   return (
     <div
@@ -312,6 +310,7 @@ export function BroadcastBoard(props: BoardProps) {
         >
           <RollingScore value={props.scoreA} gridArea="2 / 1" />
           <div
+            ref={cellRef}
             style={{
               gridArea: "2 / 2",
               position: "relative",
