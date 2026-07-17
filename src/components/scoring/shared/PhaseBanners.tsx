@@ -12,6 +12,7 @@ import { useCountdown } from "@/components/scoreboard/Countdown";
 import { useT } from "@/lib/i18n/client";
 import { Banner, PrimaryButton, SecondaryButton } from "./buttons";
 import { CountdownOverlay } from "./CountdownOverlay";
+import { useArmedConfirm } from "./useArmedConfirm";
 
 /** The slice of a set state the phase banners need (all four engines match). */
 export interface PhaseSet {
@@ -93,6 +94,9 @@ export function usePrePhaseBanner({
   const t = useT();
   // Side chosen for team A at the coin toss; consumed by the set-1 start banner.
   const [tossSide, setTossSide] = useState<Side>("LEFT");
+  // Armed confirm for the match-won banner's Undo (un-finishing a match is
+  // consequential enough to warrant a second tap).
+  const { armed, tapConfirm } = useArmedConfirm();
   const name = (t: TeamId) => (t === "A" ? teamAName : teamBName);
   const nextSide = nextSetStartSide ?? ((prev: PhaseSet) => oppositeSide(prev.teamAStartSide));
 
@@ -110,6 +114,11 @@ export function usePrePhaseBanner({
     if (!set) return;
     const nextSetNumber = state.currentSetNumber + 1;
     if (config && nextSetNumber > config.bestOf) return;
+    // Mark this break's deadline as consumed: if an undo of the SET_START
+    // brings the match back to this SAME (now long-expired) break, the
+    // auto-advance below must not instantly re-start the set — that made
+    // Undo appear to do nothing and blocked undoing the set-winning point.
+    if (setBreakDeadline) firedRef.current = `sb:${setBreakDeadline}`;
     dispatch({
       type: "SET_START",
       setNumber: nextSetNumber,
@@ -163,14 +172,28 @@ export function usePrePhaseBanner({
   }, [setBreakDeadline]);
 
   if (state.status === "FINISHED")
+    // The winning point ends the match with no confirmation step, so the
+    // banner must keep a way out: Undo (two-tap) reverts a mis-tapped final
+    // point and brings the match back to LIVE. (The result itself still awaits
+    // manager confirmation before it counts — spec/17 feature 5.)
     return (
       <Banner>
-        🏆{" "}
-        {t("scoring.matchWon", {
-          team: name(state.winner ?? "A"),
-          setsA: state.setsWonA,
-          setsB: state.setsWonB,
-        })}
+        <div className="flex flex-col items-center gap-3">
+          <span>
+            🏆{" "}
+            {t("scoring.matchWon", {
+              team: name(state.winner ?? "A"),
+              setsA: state.setsWonA,
+              setsB: state.setsWonB,
+            })}
+          </span>
+          <SecondaryButton
+            armed={armed === "UNDO"}
+            onClick={() => tapConfirm("UNDO", undo)}
+          >
+            {armed === "UNDO" ? t("scoring.confirmUndo") : t("scoring.undoLastPoint")}
+          </SecondaryButton>
+        </div>
       </Banner>
     );
 

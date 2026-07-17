@@ -292,3 +292,77 @@ describe("rewind: replay truncates to the cutoff and re-scoring survives", () =>
     expect(seqs).toEqual(seqs.map((_, i) => i + 1));
   });
 });
+
+// A completed time-out must be undone as one unit (END + REQUEST): peeling
+// only the END dropped the scorer back into an expired time-out whose auto-end
+// timer re-fired instantly, so Undo could never reach the point before it.
+describe("undo beyond a completed time-out", () => {
+  function buildLogWithTimeout(alsoMedical = false) {
+    const events: BeachEvent[] = [];
+    let seq = 0;
+    let state: BeachMatchState = initialBeachState("m1");
+    const apply = (payload: BeachEventPayload) => {
+      seq += 1;
+      const e: BeachEvent = { id: `e${seq}`, sequence: seq, timestamp: TS, payload };
+      events.push(e);
+      state = beachReduce(state, e, BEACH);
+    };
+    apply({ type: "MATCH_CREATED", matchId: "m1" });
+    apply({ type: "COIN_TOSS", firstServer: "A", teamAStartSide: "LEFT" });
+    apply({ type: "MATCH_START" });
+    apply({ type: "SET_START", setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" });
+    apply({ type: "RALLY_WON_A" });
+    apply({ type: "TIMEOUT_REQUEST", team: "B" });
+    apply({ type: "TIMEOUT_END", team: "B" });
+    if (alsoMedical) {
+      apply({ type: "MEDICAL_TIMEOUT", team: "A" });
+      apply({ type: "MEDICAL_TIMEOUT_END" });
+    }
+    return { events, state };
+  }
+
+  it("targets TIMEOUT_END together with its TIMEOUT_REQUEST", () => {
+    const { events, state } = buildLogWithTimeout();
+    expect(state.rallyPhase).toBe("BETWEEN_RALLIES");
+    const targets = selectUndoTargets(events as unknown as EngineEvent[]);
+    expect(targets.map((t) => t.payload.type).sort()).toEqual([
+      "TIMEOUT_END",
+      "TIMEOUT_REQUEST",
+    ]);
+  });
+
+  it("replaying with the pair tombstoned removes the time-out entirely", () => {
+    const { events } = buildLogWithTimeout();
+    const targets = selectUndoTargets(events as unknown as EngineEvent[]);
+    let seq = events[events.length - 1].sequence;
+    const undos: BeachEvent[] = targets.map((t) => ({
+      id: `u${++seq}`,
+      sequence: seq,
+      timestamp: TS,
+      payload: { type: "UNDO", targetEventId: t.id },
+    }));
+    const state = beachReplay("m1", [...events, ...undos], BEACH);
+    expect(state.rallyPhase).toBe("BETWEEN_RALLIES");
+    expect(state.sets[0].timeoutsUsedB).toBe(0);
+    expect(state.sets[0].scoreA).toBe(1); // the point before survives...
+    // ...and the NEXT undo reaches it.
+    const next = selectUndoTargets([...events, ...undos] as unknown as EngineEvent[]);
+    expect(next.map((t) => t.payload.type)).toEqual(["RALLY_WON_A"]);
+  });
+
+  it("pairs MEDICAL_TIMEOUT_END with MEDICAL_TIMEOUT the same way", () => {
+    const { events } = buildLogWithTimeout(true);
+    const targets = selectUndoTargets(events as unknown as EngineEvent[]);
+    expect(targets.map((t) => t.payload.type).sort()).toEqual([
+      "MEDICAL_TIMEOUT",
+      "MEDICAL_TIMEOUT_END",
+    ]);
+  });
+
+  it("undo DURING a time-out still targets only the TIMEOUT_REQUEST", () => {
+    const { events } = buildLogWithTimeout();
+    const during = events.filter((e) => e.payload.type !== "TIMEOUT_END");
+    const targets = selectUndoTargets(during as unknown as EngineEvent[]);
+    expect(targets.map((t) => t.payload.type)).toEqual(["TIMEOUT_REQUEST"]);
+  });
+});

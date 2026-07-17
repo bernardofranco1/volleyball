@@ -478,6 +478,12 @@ export async function appendMatchEvent(
  * TTO_START (the mis-tapped point survived), undoing after ending it removed
  * TTO_END (straight back into the TTO), and undoing only the rally left the
  * surviving TTO_START replaying the match back into TTO_ACTIVE.
+ *
+ * A COMPLETED (team/medical) time-out is undone as one unit: its END together
+ * with the REQUEST that opened it. Peeling only the END used to drop the
+ * scorer back into a time-out whose countdown deadline had already passed, so
+ * the auto-end timer re-fired instantly and Undo appeared to do nothing —
+ * making it impossible to reach the point scored before the time-out.
  */
 export function selectUndoTargets(log: EngineEvent[]): EngineEvent[] {
   const alreadyUndone = new Set<string>();
@@ -494,6 +500,21 @@ export function selectUndoTargets(log: EngineEvent[]): EngineEvent[] {
         !SYSTEM_EVENTS.has(ev.payload.type),
     );
   if (!target) return [];
+  const OPENER: Record<string, string> = {
+    TIMEOUT_END: "TIMEOUT_REQUEST",
+    MEDICAL_TIMEOUT_END: "MEDICAL_TIMEOUT",
+  };
+  const openerType = OPENER[target.payload.type];
+  const opener = openerType
+    ? [...log]
+        .reverse()
+        .find(
+          (ev) =>
+            ev.sequence < target.sequence &&
+            ev.payload.type === openerType &&
+            !alreadyUndone.has(ev.id),
+        )
+    : undefined;
   // Auto-emits only ever follow a scoring event in its own append batch, and
   // `target` is the LAST scorer event — every later system event is its doing.
   const followers = log.filter(
@@ -502,7 +523,7 @@ export function selectUndoTargets(log: EngineEvent[]): EngineEvent[] {
       SYSTEM_EVENTS.has(ev.payload.type) &&
       !alreadyUndone.has(ev.id),
   );
-  return [target, ...followers];
+  return [target, ...(opener ? [opener] : []), ...followers];
 }
 
 /** Append UNDOs for the last scorer action (+ its auto-emits), then re-replay. */
