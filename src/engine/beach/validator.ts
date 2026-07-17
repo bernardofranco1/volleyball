@@ -54,6 +54,14 @@ export function validateBeachEvent(
         return fail("No timeout is active");
       return OK;
 
+    case "SERVICE_ORDER": {
+      if (state.status !== "LIVE") return fail("Match is not live");
+      if (!set || set.winner) return fail("No active set");
+      if (!payload.firstServerPlayerId)
+        return fail("A first-server player is required");
+      return OK;
+    }
+
     case "VCS_CHALLENGE": {
       if (!config.vcsEnabled) return fail("Video Challenge System is disabled");
       if (!set) return fail("No active set");

@@ -138,6 +138,11 @@ export function ScoringLog({
         return { text: `Coin toss — ${tn(p.firstServer)} to serve`, tone: "info" };
       case "LINEUP_CONFIRMED":
         return { text: `Lineup confirmed — ${tn(team)}`, tone: "info" };
+      case "SERVICE_ORDER":
+        return {
+          text: `First server — ${tn(team)}: ${playerName(p.firstServerPlayerId)}`,
+          tone: "info",
+        };
       case "SIDE_SWITCH":
         return { text: "Switched sides", tone: "info" };
       case "JUMP_SERVE_FOOT_FAULT":

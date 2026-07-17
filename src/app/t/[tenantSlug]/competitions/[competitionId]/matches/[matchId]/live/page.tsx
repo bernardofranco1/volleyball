@@ -138,15 +138,18 @@ export default async function LiveScoringPage({
       );
     }
     case "BEACH": {
-      const [{ MatchProvider }, { LiveScoreboard }] = await Promise.all([
+      const [{ MatchProvider }, { LiveScoreboard }, rosters] = await Promise.all([
         import("@/lib/match-context"),
         import("@/components/scoring/LiveScoreboard"),
+        loadMatchRosters(matchId),
       ]);
       return (
         <MatchProvider
           matchId={view.matchId}
           initialState={view.state}
           config={view.config}
+          rosterA={rosters.rosterA}
+          rosterB={rosters.rosterB}
           teamAName={view.teamAName}
           teamBName={view.teamBName}
           teamAColor={view.teamAColor}
