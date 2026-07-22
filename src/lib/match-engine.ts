@@ -271,6 +271,9 @@ export async function loadMatchView(matchId: string): Promise<MatchView> {
 export interface AppendOutcome {
   newEvents: EngineEvent[];
   state: CommonMatchState;
+  /** For UNDO appends: the payload types of the events that were removed, in
+   * undo order — lets the scorer console show exactly what was undone. */
+  undone?: string[];
 }
 
 const SYSTEM_EVENTS = new Set([
@@ -279,6 +282,24 @@ const SYSTEM_EVENTS = new Set([
   "SIDE_SWITCH",
   "TTO_START",
 ]);
+
+// Set-start bookkeeping: scorer-submitted events with no effect on the score.
+// The set-break countdown auto-dispatches SET_START, and beach/rotation set
+// starts add SERVICE_ORDER / LINEUP_CONFIRMED on top — so after a set boundary
+// the scorer's "undo the last point" sits beneath a pile of events they never
+// consciously created. A scope:"point" undo sweeps through these in one batch.
+const BOOKKEEPING_EVENTS = new Set([
+  "SET_START",
+  "SERVICE_ORDER",
+  "LINEUP_CONFIRMED",
+]);
+
+// Match lifecycle events a scope:"point" sweep must never cross: reaching one
+// means there is no earlier rally/action to undo, and silently unwinding the
+// match setup (coin toss, match start) is never what "undo last point" means.
+const LIFECYCLE_EVENTS = new Set(["MATCH_CREATED", "COIN_TOSS", "MATCH_START"]);
+
+export type UndoScope = "single" | "point";
 
 /**
  * Derived matches-row columns written on every change. The heavyweight
@@ -376,7 +397,16 @@ export async function appendMatchEvent(
   // UNDO removes a prior event, so the post-state requires a full re-replay
   // (the snapshot already includes the target's effect; reduce can't undo it).
   if (payload.type === "UNDO") {
-    return undoLastEvent(matchId, meta, opts.actor ?? "SCORER", opts.deviceInfo);
+    // `scope` is a request-time hint (never persisted): "point" sweeps
+    // set-start bookkeeping and the last real action in one atomic batch.
+    const scope: UndoScope = payload.scope === "point" ? "point" : "single";
+    return undoLastEvent(
+      matchId,
+      meta,
+      opts.actor ?? "SCORER",
+      scope,
+      opts.deviceInfo,
+    );
   }
 
   const prevState = await loadState(matchId, meta);
@@ -484,46 +514,77 @@ export async function appendMatchEvent(
  * scorer back into a time-out whose countdown deadline had already passed, so
  * the auto-end timer re-fired instantly and Undo appeared to do nothing —
  * making it impossible to reach the point scored before the time-out.
+ *
+ * scope "point" (the scorer's Undo button) additionally sweeps set-start
+ * bookkeeping (SET_START / SERVICE_ORDER / LINEUP_CONFIRMED) sitting on top of
+ * the stack and undoes the last real action beneath it in ONE atomic batch.
+ * Without this, undoing the set-winning point after the next set (auto-)started
+ * took several taps through events with no visible effect — and impatient
+ * re-taps silently ate rallies of the finished set. The sweep never crosses a
+ * match-lifecycle event (nothing point-like left to undo → only the
+ * bookkeeping itself is removed, i.e. the set start is cancelled).
+ * scope "single" (the default; used by CancelSetStart's counted loop) keeps
+ * the strict one-scorer-event-per-undo behaviour.
  */
-export function selectUndoTargets(log: EngineEvent[]): EngineEvent[] {
+export function selectUndoTargets(
+  log: EngineEvent[],
+  scope: UndoScope = "single",
+): EngineEvent[] {
   const alreadyUndone = new Set<string>();
   for (const ev of log) {
     if (ev.payload.type === "UNDO")
       alreadyUndone.add(ev.payload.targetEventId as string);
   }
-  const target = [...log]
-    .reverse()
-    .find(
+  const reversed = [...log].reverse();
+  const nextTarget = (consumed: Set<string>) =>
+    reversed.find(
       (ev) =>
         ev.payload.type !== "UNDO" &&
-        !alreadyUndone.has(ev.id) &&
+        !consumed.has(ev.id) &&
         !SYSTEM_EVENTS.has(ev.payload.type),
     );
-  if (!target) return [];
+
+  const consumed = new Set(alreadyUndone);
+  const swept: EngineEvent[] = [];
+  let target = nextTarget(consumed);
+  if (scope === "point") {
+    while (target && BOOKKEEPING_EVENTS.has(target.payload.type)) {
+      swept.push(target);
+      consumed.add(target.id);
+      target = nextTarget(consumed);
+    }
+    if (target && LIFECYCLE_EVENTS.has(target.payload.type)) target = undefined;
+  }
+  if (!target && swept.length === 0) return [];
+
   const OPENER: Record<string, string> = {
     TIMEOUT_END: "TIMEOUT_REQUEST",
     MEDICAL_TIMEOUT_END: "MEDICAL_TIMEOUT",
   };
-  const openerType = OPENER[target.payload.type];
-  const opener = openerType
-    ? [...log]
-        .reverse()
-        .find(
+  const openerType = target ? OPENER[target.payload.type] : undefined;
+  const terminal = target;
+  const opener =
+    openerType && terminal
+      ? reversed.find(
           (ev) =>
-            ev.sequence < target.sequence &&
+            ev.sequence < terminal.sequence &&
             ev.payload.type === openerType &&
             !alreadyUndone.has(ev.id),
         )
-    : undefined;
+      : undefined;
+
+  const targets = terminal ? [...swept, terminal] : swept;
   // Auto-emits only ever follow a scoring event in its own append batch, and
-  // `target` is the LAST scorer event — every later system event is its doing.
+  // the deepest target is the LAST scorer event beneath any swept bookkeeping —
+  // every later surviving system event is its doing.
+  const minSeq = Math.min(...targets.map((t) => t.sequence));
   const followers = log.filter(
     (ev) =>
-      ev.sequence > target.sequence &&
+      ev.sequence > minSeq &&
       SYSTEM_EVENTS.has(ev.payload.type) &&
       !alreadyUndone.has(ev.id),
   );
-  return [target, ...(opener ? [opener] : []), ...followers];
+  return [...targets, ...(opener ? [opener] : []), ...followers];
 }
 
 /** Append UNDOs for the last scorer action (+ its auto-emits), then re-replay. */
@@ -531,10 +592,11 @@ async function undoLastEvent(
   matchId: string,
   meta: MatchMeta,
   actor: Actor,
+  scope: UndoScope,
   deviceInfo?: string,
 ): Promise<AppendOutcome> {
   const log = await loadEvents(matchId);
-  const targets = selectUndoTargets(log);
+  const targets = selectUndoTargets(log, scope);
   if (targets.length === 0) throw new EventRejectedError("Nothing to undo");
 
   let nextSeq = (log[log.length - 1]?.sequence ?? 0) + 1;
@@ -581,7 +643,11 @@ async function undoLastEvent(
   }
 
   scheduleBroadcast([stateUpdateMessage(matchId, finalState.lastSequence)]);
-  return { newEvents: undoEvents, state: finalState };
+  return {
+    newEvents: undoEvents,
+    state: finalState,
+    undone: targets.map((t) => t.payload.type),
+  };
 }
 
 export class RewindRejectedError extends Error {}

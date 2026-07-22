@@ -74,7 +74,7 @@ export type GrassEventPayload =
   | { type: "MISCONDUCT_PENALTY"; team: TeamId; playerId: string }
   | { type: "MISCONDUCT_EXPULSION"; team: TeamId; playerId: string }
   | { type: "MISCONDUCT_DISQUALIFICATION"; team: TeamId; playerId: string }
-  | { type: "UNDO"; targetEventId: string }
+  | { type: "UNDO"; targetEventId: string; scope?: "single" | "point" }
   | { type: "NOTE"; text: string };
 
 export type GrassEventType = GrassEventPayload["type"];

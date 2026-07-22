@@ -87,7 +87,7 @@ export type IndoorEventPayload =
   | { type: "MISCONDUCT_DISQUALIFICATION"; team: TeamId; playerId: string }
   | { type: "VCS_CHALLENGE"; team: TeamId }
   | { type: "VCS_RESULT"; upheld: boolean; team: TeamId }
-  | { type: "UNDO"; targetEventId: string }
+  | { type: "UNDO"; targetEventId: string; scope?: "single" | "point" }
   | { type: "NOTE"; text: string };
 
 export type IndoorEventType = IndoorEventPayload["type"];

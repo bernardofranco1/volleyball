@@ -97,8 +97,14 @@ export type CommonEventPayload =
   | { type: "MISCONDUCT_EXPULSION"; team: TeamId; playerId: string }
   | { type: "MISCONDUCT_DISQUALIFICATION"; team: TeamId; playerId: string }
   | { type: "SERVE_CLOCK_EXPIRE" }
-  | { type: "UNDO"; targetEventId: string }
+  // `scope` is a request-time hint only (never persisted): "point" asks the
+  // server to sweep set-start bookkeeping and undo the last real action in one
+  // batch; absent/"single" keeps the one-event-at-a-time behaviour.
+  | { type: "UNDO"; targetEventId: string; scope?: UndoScope }
   | { type: "NOTE"; text: string };
+
+/** How far a client-requested UNDO reaches (see selectUndoTargets). */
+export type UndoScope = "single" | "point";
 
 const COMMON_EVENT_TYPES: ReadonlySet<string> = new Set<
   CommonEventPayload["type"]

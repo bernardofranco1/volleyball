@@ -122,7 +122,7 @@ export async function POST(
   }
 
   try {
-    const { state, newEvents } = await appendMatchEvent(id, body.payload, {
+    const { state, newEvents, undone } = await appendMatchEvent(id, body.payload, {
       actor: "SCORER",
       // Attribute the entry to the signed-in user — the event log is the
       // match's legal record and must say who scored it.
@@ -132,6 +132,9 @@ export async function POST(
       state,
       events: newEvents,
       autoEmitted: newEvents.slice(1).map((e) => e.payload),
+      // For UNDO: what was actually removed (event types, undo order) — the
+      // scorer console surfaces this so a wrong-target undo is visible at once.
+      ...(undone ? { undone } : {}),
     });
   } catch (err) {
     if (err instanceof MatchNotFoundError)

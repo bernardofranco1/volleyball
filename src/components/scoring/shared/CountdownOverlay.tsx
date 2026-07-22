@@ -40,35 +40,42 @@ export function activeCountdown(
 }
 
 /**
- * Full-screen, semi-transparent blocker with a centred countdown square. The
- * backdrop captures pointer events, so every control beneath is effectively
- * disabled while a time-out / set break is counting down (brief request). Used
- * on the scorer console, team tablets and the public scoreboard so all three
- * show the same floating countdown.
+ * Non-blocking countdown card floating over the court zone. Replaces the old
+ * full-screen dim+blur blocker, which hid the score/court on every surface for
+ * the whole time-out and trapped the tablet's request buttons: the wrapper
+ * ignores ALL pointer events (taps pass through), so everything around the
+ * card stays legible and operable. Used by the scorer console, team tablets
+ * and the public scoreboard so all three show the same floating clock; on the
+ * scorer the controls live in the bottom action-bar banner, never in the card.
+ *
+ * The accent border carries WHO called it (calling team's colour for a team
+ * time-out; theme primary for set breaks). The digits pulse over the final
+ * five seconds (stilled under prefers-reduced-motion).
  */
-export function CountdownOverlay({
+export function FloatingCountdown({
   title,
   subtitle,
   ms,
   accent = "var(--primary)",
-  action,
+  className = "top-[38%]",
 }: {
   title: string;
   subtitle?: string;
   ms: number;
   accent?: string;
-  /** Optional control INSIDE the square (scorer-only escape hatch, e.g. "Resume
-   *  now"). Display surfaces (tablet, board) omit it. */
-  action?: React.ReactNode;
+  /** Vertical anchor of the card (Tailwind positioning classes). Defaults to
+   *  mid-board for TVs; the scorer console passes a court-zone anchor. */
+  className?: string;
 }) {
+  const urgent = ms > 0 && ms <= 5000;
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      role="alertdialog"
+      className={`pointer-events-none fixed inset-x-0 z-[70] flex justify-center ${className}`}
+      role="timer"
       aria-label={title}
     >
       <div
-        className="flex min-w-[min(70vw,20rem)] flex-col items-center gap-2 rounded-3xl border-2 bg-surface-raised/95 px-10 py-8 text-center shadow-2xl"
+        className="flex flex-col items-center gap-1 rounded-2xl border-2 bg-surface-raised/90 px-8 py-4 text-center shadow-2xl backdrop-blur"
         style={{ borderColor: accent }}
       >
         <div className="text-xs uppercase tracking-[0.3em] text-score-dim">
@@ -77,10 +84,13 @@ export function CountdownOverlay({
         {subtitle ? (
           <div className="text-sm font-medium text-foreground">{subtitle}</div>
         ) : null}
-        <div className="font-mono text-6xl font-bold tabular-nums">
+        <div
+          className={`font-mono text-5xl font-bold tabular-nums sm:text-6xl ${
+            urgent ? "animate-pulse text-red-300 motion-reduce:animate-none" : ""
+          }`}
+        >
           {formatCountdown(ms)}
         </div>
-        {action ? <div className="mt-2">{action}</div> : null}
       </div>
     </div>
   );

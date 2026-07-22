@@ -64,6 +64,8 @@ export interface MatchContextValue<S, P> {
   queuedCount: number;
   serveClockDeadline: number | null;
   error: string | null;
+  /** Event types removed by the latest UNDO (auto-clears) — undo feedback. */
+  undoneNotice: string[] | null;
 }
 
 export interface MatchProviderProps<S> {
@@ -113,12 +115,28 @@ export function createMatchProvider<
       null,
     );
     const [error, setError] = useState<string | null>(null);
+    const [undoneNotice, setUndoneNotice] = useState<string[] | null>(null);
 
     const queue = useRef<P[]>([]);
     const stateRef = useRef(state);
     useEffect(() => {
       stateRef.current = state;
     }, [state]);
+
+    // Undo feedback: show what the last UNDO removed, then clear it. The timer
+    // lives in a ref so back-to-back undos restart it instead of stacking.
+    const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const flashUndone = useCallback((types: string[]) => {
+      setUndoneNotice(types);
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
+      noticeTimer.current = setTimeout(() => setUndoneNotice(null), 5000);
+    }, []);
+    useEffect(
+      () => () => {
+        if (noticeTimer.current) clearTimeout(noticeTimer.current);
+      },
+      [],
+    );
 
     // Queued-but-unsent events survive a reload/navigation while offline —
     // previously they lived only in a ref and were silently lost.
@@ -134,7 +152,7 @@ export function createMatchProvider<
     }, [storageKey]);
 
     const resync = useCallback(
-      async (since?: number) => {
+      async (since?: number, opts?: { force?: boolean }) => {
         try {
           const url =
             since != null
@@ -144,7 +162,16 @@ export function createMatchProvider<
           if (res.status === 204) return; // already up to date
           if (!res.ok) return;
           const data = (await res.json()) as { state: S };
-          setState(data.state);
+          // Monotonic guard: a resync that raced a write (e.g. an UNDO in
+          // flight) can come back with an OLDER state; applying it re-showed
+          // the undone point and scorers "retried", removing extra points. It
+          // also keeps optimistic local events awaiting flush from being
+          // clobbered. `force` (server rejected our event) restores authority.
+          if (
+            opts?.force ||
+            data.state.lastSequence >= stateRef.current.lastSequence
+          )
+            setState(data.state);
         } catch {
           /* offline — keep optimistic state */
         }
@@ -167,12 +194,16 @@ export function createMatchProvider<
               error?: string;
             };
             setError(body.error ?? `Request failed (${res.status})`);
-            await resync();
+            // Rejected ⇒ our optimistic state is wrong; force past the
+            // monotonic guard to restore the server's authoritative state.
+            await resync(undefined, { force: true });
             return true; // delivered — the server rejected it, don't retry
           }
-          const data = (await res.json()) as { state: S };
+          const data = (await res.json()) as { state: S; undone?: string[] };
           setState(data.state);
           setError(null);
+          if (payload.type === "UNDO" && Array.isArray(data.undone))
+            flashUndone(data.undone);
           return true;
         } catch {
           queue.current.push(payload);
@@ -182,7 +213,7 @@ export function createMatchProvider<
           setPending(false);
         }
       },
-      [matchId, resync, persistQueue],
+      [matchId, resync, persistQueue, flashUndone],
     );
 
     // Posts are serialized through a promise chain: two quick taps otherwise
@@ -328,6 +359,7 @@ export function createMatchProvider<
         queuedCount,
         serveClockDeadline,
         error,
+        undoneNotice,
       }),
       [
         matchId,
@@ -345,6 +377,7 @@ export function createMatchProvider<
         queuedCount,
         serveClockDeadline,
         error,
+        undoneNotice,
       ],
     );
 

@@ -9,7 +9,7 @@ import { type TournamentConfig, timeoutCapForSet } from "@/engine/config";
 import { useCountdown } from "@/components/scoreboard/Countdown";
 import {
   activeCountdown,
-  CountdownOverlay,
+  FloatingCountdown,
 } from "@/components/scoring/shared/CountdownOverlay";
 import { SubPanel } from "@/components/scoring/shared/LiveControls";
 
@@ -327,8 +327,11 @@ export function TeamTablet({
         </section>
       ) : null}
 
+      {/* Non-blocking clock: the tablet's request buttons (sub, time-out,
+          medical) stay usable during the interruption — exactly when a coach
+          wants to queue a substitution. */}
       {cd && cdMs > 0 ? (
-        <CountdownOverlay
+        <FloatingCountdown
           title={cd.kind === "TIMEOUT" ? "Time-out" : "Set break"}
           ms={cdMs}
         />

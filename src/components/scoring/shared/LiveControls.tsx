@@ -26,6 +26,7 @@ export function LiveScoreGrid({
   teamAColor,
   teamBColor,
   armedPointLabel,
+  confirmUndoLabel,
 }: {
   teamASide: Side;
   armed: Armed;
@@ -38,6 +39,9 @@ export function LiveScoreGrid({
   teamAColor: string | null;
   teamBColor: string | null;
   armedPointLabel?: (teamName: string) => string;
+  /** Armed label for Undo — the bars make it explicit at a fresh-set boundary
+   * ("Undo last point of set N?"), where undo reopens the previous set. */
+  confirmUndoLabel?: string;
 }) {
   const t = useT();
   const armedLabel =
@@ -60,7 +64,9 @@ export function LiveScoreGrid({
       {scoreBtn(order[0])}
       <div className="flex flex-col justify-center gap-1.5">
         <SecondaryButton armed={armed === "UNDO"} onClick={onUndo} disabled={pending}>
-          {armed === "UNDO" ? t("scoring.confirmUndo") : t("scoring.undo")}
+          {armed === "UNDO"
+            ? (confirmUndoLabel ?? t("scoring.confirmUndo"))
+            : t("scoring.undo")}
         </SecondaryButton>
         <SecondaryButton
           onClick={() => {

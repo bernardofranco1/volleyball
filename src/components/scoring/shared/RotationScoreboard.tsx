@@ -7,10 +7,12 @@ import { useMemo } from "react";
 import type { TournamentConfig } from "@/engine/config";
 import { activeSet, type Side, type TeamId } from "@/engine/types";
 import type { PlayerLite } from "@/lib/match-provider";
+import { useT } from "@/lib/i18n/client";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
+import { describeUndone } from "@/components/scoring/shared/undoneNotice";
 
 /** The slice of a set state the scoreboard needs (grass & light both match). */
 export interface RotationSet {
@@ -74,6 +76,7 @@ export function RotationScoreboard({
     error: string | null;
     queuedCount: number;
     serveClockDeadline: number | null;
+    undoneNotice: string[] | null;
   };
   Court: React.ComponentType<RotationCourtProps>;
   lineupEntry: React.ReactNode;
@@ -94,7 +97,9 @@ export function RotationScoreboard({
     error,
     queuedCount,
     serveClockDeadline,
+    undoneNotice,
   } = ctx;
+  const t = useT();
   const set = activeSet(state);
   const rosterById = useMemo(() => {
     const m = new Map<string, PlayerLite>();
@@ -137,6 +142,7 @@ export function RotationScoreboard({
       online={online}
       pending={pending}
       error={error}
+      notice={describeUndone(t, undoneNotice)}
       queuedCount={queuedCount}
       tools={
         <ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} rosterById={rosterById} />

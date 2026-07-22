@@ -30,6 +30,9 @@ export function LightActionBar() {
     teamAName,
     teamBName,
     config,
+    pending,
+    teamAColor,
+    teamBColor,
     lineupPendingText: t("scoring.lineupConfirm"),
     // Air/Light changes ends only after set 1 + at 8 in the decider (F2): the
     // deciding set keeps the previous side and switches at 8.
@@ -46,10 +49,21 @@ export function LightActionBar() {
     tapConfirm(team, () =>
       dispatch(team === "A" ? { type: "RALLY_WON_A" } : { type: "RALLY_WON_B" }),
     );
-  const tapUndo = () => tapConfirm("UNDO", () => dispatch({ type: "UNDO", targetEventId: "" }));
+  // scope "point": sweep set-start bookkeeping (SET_START / LINEUP_CONFIRMED)
+  // and undo the last real action in one atomic server-side batch.
+  const tapUndo = () =>
+    tapConfirm("UNDO", () =>
+      dispatch({ type: "UNDO", targetEventId: "", scope: "point" }),
+    );
   const timeoutCap = timeoutCapForSet(config, set.setNumber);
   const toFull = (t: TeamId) =>
     (t === "A" ? set.timeoutsUsedA : set.timeoutsUsedB) >= timeoutCap;
+  // At a fresh-set boundary (0-0, later set) the point-scoped undo reopens the
+  // previous set — the armed label says so before the scorer commits.
+  const confirmUndoLabel =
+    set.scoreA + set.scoreB === 0 && set.setNumber > 1
+      ? t("scoring.confirmUndoPoint", { set: set.setNumber - 1 })
+      : undefined;
 
   return (
     <div className="flex flex-col gap-3">
@@ -64,6 +78,7 @@ export function LightActionBar() {
         teamBName={teamBName}
         teamAColor={teamAColor}
         teamBColor={teamBColor}
+        confirmUndoLabel={confirmUndoLabel}
       />
 
       <TeamActionsGrid>

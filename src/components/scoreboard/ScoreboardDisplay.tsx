@@ -22,8 +22,9 @@ import { type TournamentConfig, timeoutCapForSet } from "@/engine/config";
 import { useCountdown, formatCountdown } from "@/components/scoreboard/Countdown";
 import {
   activeCountdown,
-  CountdownOverlay,
+  FloatingCountdown,
 } from "@/components/scoring/shared/CountdownOverlay";
+import { resolveTeamColor } from "@/lib/colors";
 
 // Display modes are retained for URL compatibility; the broadcast board always
 // shows score + sets + serving, so they no longer change the layout.
@@ -308,12 +309,25 @@ export function ScoreboardDisplay({
         </div>
       ) : null}
 
+      {/* Floating countdown over the board's centre — score, sets and serve
+          stay visible around it. Team time-outs borrow the calling team's
+          colour; the set-break card recaps the set that just ended. */}
       {cd && cdMs > 0 ? (
-        <CountdownOverlay
+        <FloatingCountdown
           title={
             cd.kind === "TIMEOUT"
               ? `${cd.team === "A" ? teamAName : teamBName} · Time-out`
               : "Set break"
+          }
+          subtitle={
+            cd.kind === "SET_BREAK" && set
+              ? `Set ${set.setNumber} · ${set.scoreA}–${set.scoreB}`
+              : undefined
+          }
+          accent={
+            cd.kind === "TIMEOUT" && cd.team
+              ? resolveTeamColor(cd.team === "A" ? teamAColor : teamBColor, cd.team)
+              : undefined
           }
           ms={cdMs}
         />

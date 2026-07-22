@@ -21,6 +21,7 @@ import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
 import { SecondaryButton } from "@/components/scoring/shared/buttons";
+import { describeUndone } from "@/components/scoring/shared/undoneNotice";
 
 // Beach serve order (FIVB rule 12.2): "player 1" is whoever the team declares
 // as its first server for the set (SERVICE_ORDER event); player 2 is the
@@ -65,6 +66,7 @@ export function LiveScoreboard({
     pending,
     queuedCount,
     serveClockDeadline,
+    undoneNotice,
   } = useMatch();
   const set = activeSet(state);
 
@@ -117,9 +119,14 @@ export function LiveScoreboard({
   };
 
   // One-tap service-order declaration (rules: each team declares its order
-  // before the set). Prompt for the serving team first, then the receiver.
+  // before the set). Prompt for the serving team first, then the receiver —
+  // but ONLY until the set's first rally: once play is underway the serving
+  // players are established on court and the question is no longer pertinent
+  // (it used to linger through whole running matches when skipped). The
+  // display falls back to roster order; SERVICE_ORDER stays re-submittable.
+  const beforeFirstRally = set != null && set.scoreA + set.scoreB === 0;
   const orderPendingTeam =
-    state.status === "LIVE" && set && !set.winner && servingTeam
+    state.status === "LIVE" && set && !set.winner && servingTeam && beforeFirstRally
       ? ([servingTeam, oppositeTeam(servingTeam)] as TeamId[]).find(
           (team) =>
             rosterOf(team).length === 2 && !firstServerPlayerId(set, team),
@@ -132,6 +139,7 @@ export function LiveScoreboard({
       online={online}
       pending={pending}
       error={error}
+      notice={describeUndone(t, undoneNotice)}
       queuedCount={queuedCount}
       tools={
         <ScoringLog

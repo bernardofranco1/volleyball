@@ -2,7 +2,9 @@
 
 import { useMemo } from "react";
 import { useIndoorMatch } from "@/lib/indoor-match-context";
+import { useT } from "@/lib/i18n/client";
 import { activeSet } from "@/engine/indoor/types";
+import { describeUndone } from "@/components/scoring/shared/undoneNotice";
 import { IndoorCourt } from "@/components/court/IndoorCourt";
 import { IndoorActionBar } from "@/components/scoring/IndoorActionBar";
 import { IndoorLineupEntry } from "@/components/scoring/IndoorLineupEntry";
@@ -27,7 +29,9 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
     error,
     queuedCount,
     serveClockDeadline,
+    undoneNotice,
   } = useIndoorMatch();
+  const t = useT();
   const set = activeSet(state);
   const rosterById = useMemo(() => {
     const m = new Map<string, (typeof rosterA)[number]>();
@@ -67,6 +71,7 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
       online={online}
       pending={pending}
       error={error}
+      notice={describeUndone(t, undoneNotice)}
       queuedCount={queuedCount}
       tools={
         <ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} rosterById={rosterById} />

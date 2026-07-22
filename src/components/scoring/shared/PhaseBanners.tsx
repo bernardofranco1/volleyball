@@ -9,9 +9,10 @@ import { useEffect, useRef, useState } from "react";
 import { oppositeSide, oppositeTeam, type Side, type TeamId } from "@/engine/types";
 import { type TournamentConfig, setBreakSecsAfter } from "@/engine/config";
 import { useCountdown } from "@/components/scoreboard/Countdown";
+import { resolveTeamColor } from "@/lib/colors";
 import { useT } from "@/lib/i18n/client";
 import { Banner, PrimaryButton, SecondaryButton } from "./buttons";
-import { CountdownOverlay } from "./CountdownOverlay";
+import { FloatingCountdown } from "./CountdownOverlay";
 import { useArmedConfirm } from "./useArmedConfirm";
 
 // Overdue-countdown grace: a deadline more than this far in the past never
@@ -56,7 +57,7 @@ export type PhaseDispatch = (
       }
     | { type: "TIMEOUT_END"; team: TeamId }
     | { type: "MEDICAL_TIMEOUT_END" }
-    | { type: "UNDO"; targetEventId: string },
+    | { type: "UNDO"; targetEventId: string; scope?: "single" | "point" },
 ) => void;
 
 export interface PrePhaseOptions {
@@ -71,6 +72,12 @@ export interface PrePhaseOptions {
   nextSetStartSide?: (prev: PhaseSet, nextSetNumber: number) => Side;
   /** Disable "Start next set" while a dispatch is in flight (beach). */
   nextSetDisabled?: boolean;
+  /** A post is in flight — disables the Undo buttons so impatient re-taps
+   * can't queue extra undos (each would remove one more scorer action). */
+  pending?: boolean;
+  /** Team colours — the floating time-out clock borrows the calling team's. */
+  teamAColor?: string | null;
+  teamBColor?: string | null;
   /** Copy for the LINEUP_PENDING banner; omit for disciplines without lineups. */
   lineupPendingText?: string;
   /** Discipline-specific interstitial banner (beach TTO, indoor VCS), or null. */
@@ -92,22 +99,39 @@ export function usePrePhaseBanner({
   config,
   nextSetStartSide,
   nextSetDisabled,
+  pending = false,
+  teamAColor = null,
+  teamBColor = null,
   lineupPendingText,
   extraPhase,
 }: PrePhaseOptions): React.ReactElement | null {
   const t = useT();
   // Side chosen for team A at the coin toss; consumed by the set-1 start banner.
   const [tossSide, setTossSide] = useState<Side>("LEFT");
-  // Armed confirm for the match-won banner's Undo (un-finishing a match is
-  // consequential enough to warrant a second tap).
+  // Every banner Undo is two-tap armed: undoing here reopens a finished set or
+  // removes an interruption, and single-tap buttons let impatient re-taps on a
+  // slow connection silently unwind extra actions.
   const { armed, tapConfirm } = useArmedConfirm();
   const name = (t: TeamId) => (t === "A" ? teamAName : teamBName);
   const nextSide = nextSetStartSide ?? ((prev: PhaseSet) => oppositeSide(prev.teamAStartSide));
 
   // Undo the last scorer action — reachable even under the countdown overlays,
   // so a mis-tapped time-out (or the point that ended a set) can be reverted.
-  // The server resolves the actual target; "" is the standard placeholder.
-  const undo = () => dispatch({ type: "UNDO", targetEventId: "" });
+  // scope "point": the server sweeps set-start bookkeeping (SET_START /
+  // SERVICE_ORDER / LINEUP_CONFIRMED) and the last real action in ONE batch,
+  // so "undo the set-winning point" is one confirmed tap even after the next
+  // set auto-started. The server resolves the target; "" is the placeholder.
+  const undo = () =>
+    dispatch({ type: "UNDO", targetEventId: "", scope: "point" });
+  const undoButton = (label: string, confirmLabel: string) => (
+    <SecondaryButton
+      armed={armed === "UNDO"}
+      disabled={pending}
+      onClick={() => tapConfirm("UNDO", undo)}
+    >
+      {armed === "UNDO" ? confirmLabel : label}
+    </SecondaryButton>
+  );
 
   // Advance to the next set (shared by the manual button and the auto-advance
   // timer): opposite first-server, side per the discipline's rule. Guarded
@@ -213,93 +237,81 @@ export function usePrePhaseBanner({
               setsB: state.setsWonB,
             })}
           </span>
-          <SecondaryButton
-            armed={armed === "UNDO"}
-            onClick={() => tapConfirm("UNDO", undo)}
-          >
-            {armed === "UNDO" ? t("scoring.confirmUndo") : t("scoring.undoLastPoint")}
-          </SecondaryButton>
+          {undoButton(
+            t("scoring.undoLastPoint"),
+            t("scoring.confirmUndoPoint", { set: state.currentSetNumber }),
+          )}
         </div>
       </Banner>
     );
 
   if (state.rallyPhase === "SET_BREAK") {
-    // With config we show the floating countdown and auto-advance at 0:00.
-    // (Not in the beyond-bestOf rewind edge — fall through to the manual banner.)
-    if (
-      setBreakDeadline &&
+    // A live countdown floats over the court (non-blocking; auto-advance still
+    // fires at 0:00) while the controls stay in the bottom banner — the score
+    // strip and court remain legible. No clock once the deadline is long past
+    // (Undo stepped back into the break) or in the beyond-bestOf rewind edge.
+    const showClock =
+      setBreakDeadline != null &&
       !setBreakStale &&
-      config &&
-      state.currentSetNumber < config.bestOf
-    )
-      return (
-        <CountdownOverlay
-          title={t("scoring.setBreak")}
-          subtitle={t("scoring.setEnded", {
-            set: set?.setNumber ?? "",
-            setsA: state.setsWonA,
-            setsB: state.setsWonB,
-          })}
-          ms={setBreakMs}
-          action={
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <SecondaryButton disabled={nextSetDisabled} onClick={startNextSet}>
-                {t("scoring.startNextSet")}
-              </SecondaryButton>
-              <SecondaryButton onClick={undo}>{t("scoring.undo")}</SecondaryButton>
-            </div>
-          }
-        />
-      );
+      config != null &&
+      state.currentSetNumber < config.bestOf;
     return (
-      <Banner>
-        <div className="flex flex-col items-center gap-3">
-          <span>
-            {t("scoring.setEnded", {
-              set: set?.setNumber ?? "",
-              setsA: state.setsWonA,
-              setsB: state.setsWonB,
-            })}
-          </span>
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <PrimaryButton disabled={nextSetDisabled} onClick={startNextSet}>
-              {t("scoring.startNextSet")}
-            </PrimaryButton>
-            <SecondaryButton onClick={undo}>{t("scoring.undo")}</SecondaryButton>
+      <>
+        {showClock ? (
+          <FloatingCountdown
+            title={t("scoring.setBreak")}
+            ms={setBreakMs}
+            className="top-[34%]"
+          />
+        ) : null}
+        <Banner>
+          <div className="flex flex-col items-center gap-3">
+            <span>
+              {t("scoring.setEnded", {
+                set: set?.setNumber ?? "",
+                setsA: state.setsWonA,
+                setsB: state.setsWonB,
+              })}
+            </span>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <PrimaryButton disabled={nextSetDisabled} onClick={startNextSet}>
+                {t("scoring.startNextSet")}
+              </PrimaryButton>
+              {undoButton(
+                t("scoring.undo"),
+                t("scoring.confirmUndoPoint", { set: state.currentSetNumber }),
+              )}
+            </div>
           </div>
-        </div>
-      </Banner>
+        </Banner>
+      </>
     );
   }
 
   if (state.rallyPhase === "TIMEOUT_ACTIVE") {
     const to = state.activeTimeoutTeam ?? "A";
-    if (timeoutDeadline && !timeoutStale)
-      return (
-        <CountdownOverlay
-          title={`${name(to)} · ${t("scoring.timeoutLabel")}`}
-          ms={timeoutMs}
-          action={
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <SecondaryButton
-                onClick={() => dispatch({ type: "TIMEOUT_END", team: to })}
-              >
-                {t("scoring.endTimeout", { team: name(to) })}
-              </SecondaryButton>
-              <SecondaryButton onClick={undo}>{t("scoring.undo")}</SecondaryButton>
-            </div>
-          }
-        />
-      );
+    // Passive clock over the court in the calling team's colour; End/Undo stay
+    // in the bottom banner (thumb zone). Auto-end still fires at 0:00.
+    const showClock = timeoutDeadline != null && !timeoutStale;
     return (
-      <Banner>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <PrimaryButton onClick={() => dispatch({ type: "TIMEOUT_END", team: to })}>
-            {t("scoring.endTimeout", { team: name(to) })}
-          </PrimaryButton>
-          <SecondaryButton onClick={undo}>{t("scoring.undo")}</SecondaryButton>
-        </div>
-      </Banner>
+      <>
+        {showClock ? (
+          <FloatingCountdown
+            title={`${name(to)} · ${t("scoring.timeoutLabel")}`}
+            ms={timeoutMs}
+            accent={resolveTeamColor(to === "A" ? teamAColor : teamBColor, to)}
+            className="top-[34%]"
+          />
+        ) : null}
+        <Banner>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <PrimaryButton onClick={() => dispatch({ type: "TIMEOUT_END", team: to })}>
+              {t("scoring.endTimeout", { team: name(to) })}
+            </PrimaryButton>
+            {undoButton(t("scoring.undo"), t("scoring.confirmUndo"))}
+          </div>
+        </Banner>
+      </>
     );
   }
 
@@ -312,7 +324,7 @@ export function usePrePhaseBanner({
           <PrimaryButton onClick={() => dispatch({ type: "MEDICAL_TIMEOUT_END" })}>
             {t("scoring.endMedicalTimeout")}
           </PrimaryButton>
-          <SecondaryButton onClick={undo}>{t("scoring.undo")}</SecondaryButton>
+          {undoButton(t("scoring.undo"), t("scoring.confirmUndo"))}
         </div>
       </Banner>
     );

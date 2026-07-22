@@ -144,6 +144,7 @@ export function ScoringShell({
   online,
   pending,
   error,
+  notice,
   queuedCount = 0,
   tools,
   score,
@@ -155,6 +156,8 @@ export function ScoringShell({
   online: boolean;
   pending: boolean;
   error: string | null;
+  /** Transient confirmation (e.g. what the last Undo removed), or null. */
+  notice?: string | null;
   /** Locally-applied events not yet accepted by the server. */
   queuedCount?: number;
   tools?: ReactNode;
@@ -190,6 +193,11 @@ export function ScoringShell({
         {error ? (
           <p role="alert" className="mb-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-sm text-red-300">
             {error}
+          </p>
+        ) : null}
+        {notice ? (
+          <p role="status" className="mb-1.5 rounded-lg bg-sky-500/10 px-3 py-1.5 text-sm text-sky-300">
+            {notice}
           </p>
         ) : null}
         {score}
