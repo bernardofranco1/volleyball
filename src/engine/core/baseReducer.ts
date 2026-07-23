@@ -8,6 +8,8 @@
 // libero, lineups, side switches, TTO, …) stay in the discipline reducers.
 
 import type { MisconductRecord, SetNumber, Side, TeamId } from "../types";
+import type { TournamentConfig } from "../config";
+import { setWinTarget, setsNeededToWin } from "./winConditions";
 
 // ── shared helpers ───────────────────────────────────────────────────────────
 
@@ -88,6 +90,9 @@ export type CommonEventPayload =
       setNumber: SetNumber;
     }
   | { type: "MATCH_END"; winner: TeamId; setsA: number; setsB: number }
+  // `team` forfeits/retires; the opponent wins the match (FIVB rule 6.4).
+  // FORFEIT = default (no-show / refusal); RETIREMENT = unable to continue.
+  | { type: "FORFEIT"; team: TeamId; reason: ForfeitReason }
   | { type: "MEDICAL_TIMEOUT"; team: TeamId }
   | { type: "MEDICAL_TIMEOUT_END" }
   | { type: "DELAY_WARNING"; team: TeamId }
@@ -106,6 +111,9 @@ export type CommonEventPayload =
 /** How far a client-requested UNDO reaches (see selectUndoTargets). */
 export type UndoScope = "single" | "point";
 
+/** Why a team's match ended early (FIVB 6.4.2 default / 6.4.3 retirement). */
+export type ForfeitReason = "FORFEIT" | "RETIREMENT";
+
 const COMMON_EVENT_TYPES: ReadonlySet<string> = new Set<
   CommonEventPayload["type"]
 >([
@@ -117,6 +125,7 @@ const COMMON_EVENT_TYPES: ReadonlySet<string> = new Set<
   "TIMEOUT_END",
   "SET_END",
   "MATCH_END",
+  "FORFEIT",
   "MEDICAL_TIMEOUT",
   "MEDICAL_TIMEOUT_END",
   "DELAY_WARNING",
@@ -143,6 +152,7 @@ export function reduceCommon<Phase extends string>(
   s: CommonMatchState<Phase | CommonRallyPhase>,
   p: CommonEventPayload,
   timestamp: string,
+  config: TournamentConfig,
 ): void {
   const set = s.sets[s.currentSetNumber - 1];
 
@@ -206,6 +216,37 @@ export function reduceCommon<Phase extends string>(
       s.status = "FINISHED";
       s.rallyPhase = "MATCH_OVER";
       return;
+
+    case "FORFEIT": {
+      // FIVB rule 6.4: the opponent wins. Points/sets already scored are kept
+      // (6.4.3 retirement); the open set closes with the opponent raised to
+      // exactly what they needed to win it, and the winner's sets tally jumps
+      // to the match-winning count. Unplayed sets are not materialized — the
+      // event itself records the forfeit in the log and on the report.
+      const winner: TeamId = p.team === "A" ? "B" : "A";
+      if (set && !set.winner) {
+        const target = setWinTarget(set.setNumber, config);
+        const lead = config.twoPointLead ? 2 : 1;
+        if (winner === "A")
+          set.scoreA = Math.max(set.scoreA, target, set.scoreB + lead);
+        else set.scoreB = Math.max(set.scoreB, target, set.scoreA + lead);
+        set.winner = winner;
+        set.endedAt = timestamp;
+        if (winner === "A") s.setsWonA += 1;
+        else s.setsWonB += 1;
+      }
+      const need = setsNeededToWin(config);
+      if (winner === "A") s.setsWonA = Math.max(s.setsWonA, need);
+      else s.setsWonB = Math.max(s.setsWonB, need);
+      s.winner = winner;
+      s.status = "FINISHED";
+      s.rallyPhase = "MATCH_OVER";
+      // Clear any live interruption the forfeit landed in.
+      s.activeTimeoutTeam = null;
+      s.activeTimeoutStartedAt = null;
+      s.medicalTimeoutTeam = null;
+      return;
+    }
 
     case "MEDICAL_TIMEOUT":
       s.medicalTimeoutTeam = p.team;

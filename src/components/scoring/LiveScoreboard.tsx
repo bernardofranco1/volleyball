@@ -22,6 +22,10 @@ import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
 import { SecondaryButton } from "@/components/scoring/shared/buttons";
 import { describeUndone } from "@/components/scoring/shared/undoneNotice";
+import {
+  ShortcutProvider,
+  ShortcutSettingsButton,
+} from "@/components/scoring/shared/shortcuts-context";
 
 // Beach serve order (FIVB rule 12.2): "player 1" is whoever the team declares
 // as its first server for the set (SERVICE_ORDER event); player 2 is the
@@ -134,6 +138,7 @@ export function LiveScoreboard({
       : null;
 
   return (
+    <ShortcutProvider>
     <ScoringShell
       competitionLabel={competitionName}
       online={online}
@@ -142,12 +147,15 @@ export function LiveScoreboard({
       notice={describeUndone(t, undoneNotice)}
       queuedCount={queuedCount}
       tools={
-        <ScoringLog
-          matchId={matchId}
-          teamAName={teamAName}
-          teamBName={teamBName}
-          rosterById={rosterById}
-        />
+        <>
+          <ScoringLog
+            matchId={matchId}
+            teamAName={teamAName}
+            teamBName={teamBName}
+            rosterById={rosterById}
+          />
+          <ShortcutSettingsButton />
+        </>
       }
       score={
         <ScoreStrip
@@ -229,5 +237,6 @@ export function LiveScoreboard({
         ) : null
       }
     />
+    </ShortcutProvider>
   );
 }

@@ -13,6 +13,10 @@ import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
 import { describeUndone } from "@/components/scoring/shared/undoneNotice";
+import {
+  ShortcutProvider,
+  ShortcutSettingsButton,
+} from "@/components/scoring/shared/shortcuts-context";
 
 /** The slice of a set state the scoreboard needs (grass & light both match). */
 export interface RotationSet {
@@ -137,6 +141,7 @@ export function RotationScoreboard({
   }
 
   return (
+    <ShortcutProvider>
     <ScoringShell
       competitionLabel={`${competitionName} · ${disciplineLabel} ${config.playersPerSide}v${config.playersPerSide}`}
       online={online}
@@ -145,7 +150,10 @@ export function RotationScoreboard({
       notice={describeUndone(t, undoneNotice)}
       queuedCount={queuedCount}
       tools={
-        <ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} rosterById={rosterById} />
+        <>
+          <ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} rosterById={rosterById} />
+          <ShortcutSettingsButton />
+        </>
       }
       score={
         <ScoreStrip
@@ -188,5 +196,6 @@ export function RotationScoreboard({
         ) : null
       }
     />
+    </ShortcutProvider>
   );
 }

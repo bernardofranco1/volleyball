@@ -136,7 +136,7 @@ export function reduce(
   const setIdx = s.currentSetNumber - 1;
 
   if (isCommonPayload(p)) {
-    reduceCommon(s, p, event.timestamp);
+    reduceCommon(s, p, event.timestamp, config);
     return s;
   }
 

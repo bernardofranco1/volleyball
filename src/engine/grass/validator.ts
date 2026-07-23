@@ -131,6 +131,15 @@ export function validateGrassEvent(
       return OK;
     }
 
+    case "FORFEIT":
+      // Allowed from COIN_TOSS onward — a no-show default (6.4.2) is recorded
+      // before any toss or start; only unset-up or finished matches reject.
+      if (state.status === "SETUP")
+        return fail("Match must be set up before a forfeit can be recorded");
+      if (state.status === "FINISHED")
+        return fail("Match is already finished");
+      return OK;
+
     default:
       return OK;
   }

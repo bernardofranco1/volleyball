@@ -4,7 +4,7 @@
 // arms a button, the second (within ARM_MS) commits; otherwise it auto-disarms.
 import { useEffect, useState } from "react";
 
-export type Armed = "A" | "B" | "UNDO" | null;
+export type Armed = "A" | "B" | "UNDO" | "REPLAY" | null;
 export const ARM_MS = 3000;
 
 export function useArmedConfirm() {

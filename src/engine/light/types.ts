@@ -66,6 +66,7 @@ export type LightEventPayload =
       setNumber: SetNumber;
     }
   | { type: "MATCH_END"; winner: TeamId; setsA: number; setsB: number }
+  | { type: "FORFEIT"; team: TeamId; reason: "FORFEIT" | "RETIREMENT" }
   | { type: "SERVE_CLOCK_EXPIRE" }
   | { type: "DELAY_WARNING"; team: TeamId }
   | { type: "DELAY_PENALTY"; team: TeamId }

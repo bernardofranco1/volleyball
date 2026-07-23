@@ -18,6 +18,8 @@ import {
   SelectRow,
 } from "@/components/scoring/shared/buttons";
 import { usePrePhaseBanner } from "@/components/scoring/shared/PhaseBanners";
+import { ForfeitControl } from "@/components/scoring/shared/ForfeitControl";
+import { useShortcut } from "@/components/scoring/shared/shortcuts-context";
 import { useArmedConfirm } from "@/components/scoring/shared/useArmedConfirm";
 import {
   LiveScoreGrid,
@@ -35,6 +37,19 @@ export function IndoorActionBar() {
 
   const set = activeSet(state);
   const name = (t: TeamId) => (t === "A" ? teamAName : teamBName);
+
+  const tap = (team: TeamId) =>
+    tapConfirm(team, () =>
+      dispatch(team === "A" ? { type: "RALLY_WON_A" } : { type: "RALLY_WON_B" }),
+    );
+  // scope "point": sweep set-start bookkeeping (SET_START / LINEUP_CONFIRMED)
+  // and undo the last real action in one atomic server-side batch.
+  const tapUndo = () =>
+    tapConfirm("UNDO", () =>
+      dispatch({ type: "UNDO", targetEventId: "", scope: "point" }),
+    );
+  const tapReplay = () =>
+    tapConfirm("REPLAY", () => dispatch({ type: "REPLAY_POINT" }));
 
   const phase = usePrePhaseBanner({
     state,
@@ -76,20 +91,48 @@ export function IndoorActionBar() {
         </Banner>
       ) : null,
   });
-  if (phase) return phase;
+  // ── keyboard shortcuts: bound to what's on screen (left/right follow the
+  // court sides); every handler goes through the same two-tap arming as touch.
+  const live = !phase && !!set && state.status === "LIVE";
+  const leftTeam: TeamId = set?.teamASide === "RIGHT" ? "B" : "A";
+  const rightTeam: TeamId = leftTeam === "A" ? "B" : "A";
+  const requestTimeout = (team: TeamId) => {
+    if (!set) return;
+    const cap = timeoutCapForSet(config, set.setNumber);
+    if ((team === "A" ? set.timeoutsUsedA : set.timeoutsUsedB) >= cap) return;
+    dispatch({ type: "TIMEOUT_REQUEST", team });
+  };
+  const promptNote = () => {
+    const text = window.prompt(t("scoring.note"));
+    if (text) dispatch({ type: "NOTE", text });
+  };
+  useShortcut("pointLeft", live ? () => tap(leftTeam) : null);
+  useShortcut("pointRight", live ? () => tap(rightTeam) : null);
+  useShortcut("replay", live ? tapReplay : null);
+  useShortcut("undo", live ? tapUndo : null);
+  useShortcut("timeoutLeft", live ? () => requestTimeout(leftTeam) : null);
+  useShortcut("timeoutRight", live ? () => requestTimeout(rightTeam) : null);
+  useShortcut("note", live ? promptNote : null);
+
+  const forfeit = (
+    <ForfeitControl
+      status={state.status}
+      teamAName={teamAName}
+      teamBName={teamBName}
+      dispatch={dispatch}
+      pending={pending}
+    />
+  );
+  if (phase)
+    return (
+      <div className="flex flex-col gap-2">
+        {phase}
+        {forfeit}
+      </div>
+    );
   if (!set) return null; // unreachable — usePrePhaseBanner covers it
 
   // ── live scoring ──────────────────────────────────────────────────────────
-  const tap = (team: TeamId) =>
-    tapConfirm(team, () =>
-      dispatch(team === "A" ? { type: "RALLY_WON_A" } : { type: "RALLY_WON_B" }),
-    );
-  // scope "point": sweep set-start bookkeeping (SET_START / LINEUP_CONFIRMED)
-  // and undo the last real action in one atomic server-side batch.
-  const tapUndo = () =>
-    tapConfirm("UNDO", () =>
-      dispatch({ type: "UNDO", targetEventId: "", scope: "point" }),
-    );
   const timeoutCap = timeoutCapForSet(config, set.setNumber);
   const toFull = (t: TeamId) =>
     (t === "A" ? set.timeoutsUsedA : set.timeoutsUsedB) >= timeoutCap;
@@ -107,6 +150,7 @@ export function IndoorActionBar() {
         armed={armed}
         onPoint={tap}
         onUndo={tapUndo}
+        onReplay={tapReplay}
         onNote={(text) => dispatch({ type: "NOTE", text })}
         pending={pending}
         teamAName={teamAName}
@@ -172,6 +216,7 @@ export function IndoorActionBar() {
       {liberoTeam ? (
         <LiberoPanel team={liberoTeam} onClose={() => setLiberoTeam(null)} />
       ) : null}
+      {forfeit}
     </div>
   );
 }

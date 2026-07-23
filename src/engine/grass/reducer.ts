@@ -124,7 +124,7 @@ export function reduce(
   const n = config.playersPerSide;
 
   if (isCommonPayload(p)) {
-    reduceCommon(s, p, event.timestamp);
+    reduceCommon(s, p, event.timestamp, config);
     return s;
   }
 

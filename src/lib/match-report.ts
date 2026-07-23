@@ -25,6 +25,8 @@ export interface ReportEvent {
   timestamp: Date;
   actor: string;
   notes: string | null;
+  /** Raw event payload — the log export reads team/reason/detail from it. */
+  payload: Record<string, unknown> | null;
 }
 
 export interface MatchReportData {
@@ -92,6 +94,7 @@ export async function loadMatchReport(
       timestamp: events.timestamp,
       actor: events.actor,
       notes: events.notes,
+      payload: events.payload,
     })
     .from(events)
     .where(eq(events.matchId, matchId))

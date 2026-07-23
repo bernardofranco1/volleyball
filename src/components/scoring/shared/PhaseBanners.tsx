@@ -13,6 +13,7 @@ import { resolveTeamColor } from "@/lib/colors";
 import { useT } from "@/lib/i18n/client";
 import { Banner, PrimaryButton, SecondaryButton } from "./buttons";
 import { FloatingCountdown } from "./CountdownOverlay";
+import { ShortcutAction } from "./shortcuts-context";
 import { useArmedConfirm } from "./useArmedConfirm";
 
 // Overdue-countdown grace: a deadline more than this far in the past never
@@ -123,6 +124,8 @@ export function usePrePhaseBanner({
   // set auto-started. The server resolves the target; "" is the placeholder.
   const undo = () =>
     dispatch({ type: "UNDO", targetEventId: "", scope: "point" });
+  // Keyboard path for banner undos — same two-tap arming as the button.
+  const undoShortcut = () => tapConfirm("UNDO", undo);
   const undoButton = (label: string, confirmLabel: string) => (
     <SecondaryButton
       armed={armed === "UNDO"}
@@ -137,11 +140,13 @@ export function usePrePhaseBanner({
   // timer): opposite first-server, side per the discipline's rule. Guarded
   // against starting a set beyond bestOf — a rewind that erases MATCH_END can
   // leave the FINAL set parked in SET_BREAK with a long-past deadline, and an
-  // unguarded auto-advance would fabricate a phantom extra set.
+  // unguarded auto-advance would fabricate a phantom extra set. The DECIDING
+  // set never auto-starts either: FIVB rules call for a new coin toss before
+  // it, so the set-break banner shows the re-toss instead (DecidingSetToss).
   const startNextSet = () => {
     if (!set) return;
     const nextSetNumber = state.currentSetNumber + 1;
-    if (config && nextSetNumber > config.bestOf) return;
+    if (config && nextSetNumber >= config.bestOf) return;
     // Mark this break's deadline as consumed: if an undo of the SET_START
     // brings the match back to this SAME (now long-expired) break, the
     // auto-advance below must not instantly re-start the set — that made
@@ -229,6 +234,7 @@ export function usePrePhaseBanner({
     return (
       <Banner>
         <div className="flex flex-col items-center gap-3">
+          <ShortcutAction id="undo" run={undoShortcut} />
           <span>
             🏆{" "}
             {t("scoring.matchWon", {
@@ -255,6 +261,10 @@ export function usePrePhaseBanner({
       !setBreakStale &&
       config != null &&
       state.currentSetNumber < config.bestOf;
+    // FIVB rules: the deciding set gets a NEW coin toss — never auto-started,
+    // and the manual button is replaced by the two-step re-toss.
+    const nextIsDecider =
+      config != null && state.currentSetNumber + 1 === config.bestOf;
     return (
       <>
         {showClock ? (
@@ -266,6 +276,10 @@ export function usePrePhaseBanner({
         ) : null}
         <Banner>
           <div className="flex flex-col items-center gap-3">
+            {!nextIsDecider ? (
+              <ShortcutAction id="advance" run={startNextSet} />
+            ) : null}
+            <ShortcutAction id="undo" run={undoShortcut} />
             <span>
               {t("scoring.setEnded", {
                 set: set?.setNumber ?? "",
@@ -273,10 +287,27 @@ export function usePrePhaseBanner({
                 setsB: state.setsWonB,
               })}
             </span>
+            {nextIsDecider ? (
+              <DecidingSetToss
+                teamAName={teamAName}
+                teamBName={teamBName}
+                disabled={nextSetDisabled}
+                onStart={(firstServer, teamAStartSide) =>
+                  dispatch({
+                    type: "SET_START",
+                    setNumber: state.currentSetNumber + 1,
+                    firstServer,
+                    teamAStartSide,
+                  })
+                }
+              />
+            ) : null}
             <div className="flex flex-wrap items-center justify-center gap-2">
-              <PrimaryButton disabled={nextSetDisabled} onClick={startNextSet}>
-                {t("scoring.startNextSet")}
-              </PrimaryButton>
+              {!nextIsDecider ? (
+                <PrimaryButton disabled={nextSetDisabled} onClick={startNextSet}>
+                  {t("scoring.startNextSet")}
+                </PrimaryButton>
+              ) : null}
               {undoButton(
                 t("scoring.undo"),
                 t("scoring.confirmUndoPoint", { set: state.currentSetNumber }),
@@ -305,6 +336,8 @@ export function usePrePhaseBanner({
         ) : null}
         <Banner>
           <div className="flex flex-wrap items-center justify-center gap-2">
+            <ShortcutAction id="advance" run={() => dispatch({ type: "TIMEOUT_END", team: to })} />
+            <ShortcutAction id="undo" run={undoShortcut} />
             <PrimaryButton onClick={() => dispatch({ type: "TIMEOUT_END", team: to })}>
               {t("scoring.endTimeout", { team: name(to) })}
             </PrimaryButton>
@@ -321,6 +354,8 @@ export function usePrePhaseBanner({
     return (
       <Banner>
         <div className="flex flex-wrap items-center justify-center gap-2">
+          <ShortcutAction id="advance" run={() => dispatch({ type: "MEDICAL_TIMEOUT_END" })} />
+          <ShortcutAction id="undo" run={undoShortcut} />
           <PrimaryButton onClick={() => dispatch({ type: "MEDICAL_TIMEOUT_END" })}>
             {t("scoring.endMedicalTimeout")}
           </PrimaryButton>
@@ -339,6 +374,7 @@ export function usePrePhaseBanner({
   if (state.status === "SETUP")
     return (
       <Banner>
+        <ShortcutAction id="advance" run={() => dispatch({ type: "MATCH_CREATED", matchId: state.matchId })} />
         <PrimaryButton onClick={() => dispatch({ type: "MATCH_CREATED", matchId: state.matchId })}>
           {t("scoring.setUpMatch")}
         </PrimaryButton>
@@ -360,6 +396,7 @@ export function usePrePhaseBanner({
   if (state.status === "READY")
     return (
       <Banner>
+        <ShortcutAction id="advance" run={() => dispatch({ type: "MATCH_START" })} />
         <PrimaryButton onClick={() => dispatch({ type: "MATCH_START" })}>
           {t("scoring.startMatch")}
         </PrimaryButton>
@@ -368,7 +405,26 @@ export function usePrePhaseBanner({
 
   // status LIVE but no active (unfinished) set yet → start the set. Set 1 uses
   // the side chosen at the coin toss; later sets derive from the previous set.
+  // The deciding set (reachable here via rewind/undo edges) re-tosses instead.
   if (!set || set.winner) {
+    if (config && state.currentSetNumber === config.bestOf)
+      return (
+        <Banner>
+          <DecidingSetToss
+            teamAName={teamAName}
+            teamBName={teamBName}
+            disabled={nextSetDisabled}
+            onStart={(firstServer, teamAStartSide) =>
+              dispatch({
+                type: "SET_START",
+                setNumber: state.currentSetNumber,
+                firstServer,
+                teamAStartSide,
+              })
+            }
+          />
+        </Banner>
+      );
     const prev = state.sets[state.currentSetNumber - 2];
     const teamAStartSide =
       state.currentSetNumber === 1
@@ -395,6 +451,69 @@ export function usePrePhaseBanner({
   }
 
   return null;
+}
+
+// ── deciding-set re-toss ─────────────────────────────────────────────────────
+
+/**
+ * Two-step re-toss shown before the deciding set (FIVB: a NEW coin toss
+ * decides first service and sides — the platform used to auto-alternate).
+ * Same interaction as the match coin toss: who serves, then team A's side.
+ */
+function DecidingSetToss({
+  teamAName,
+  teamBName,
+  disabled,
+  onStart,
+}: {
+  teamAName: string;
+  teamBName: string;
+  disabled?: boolean;
+  onStart: (firstServer: TeamId, teamAStartSide: Side) => void;
+}) {
+  const t = useT();
+  const [firstServer, setFirstServer] = useState<TeamId | null>(null);
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <span className="text-xs uppercase tracking-wide text-score-dim">
+        {t("scoring.deciderToss")}
+      </span>
+      {firstServer === null ? (
+        <>
+          <span className="text-sm text-score-dim">{t("scoring.coinTossWhoServes")}</span>
+          <div className="flex flex-wrap justify-center gap-2">
+            <PrimaryButton disabled={disabled} onClick={() => setFirstServer("A")}>
+              {t("scoring.teamServes", { team: teamAName })}
+            </PrimaryButton>
+            <PrimaryButton disabled={disabled} onClick={() => setFirstServer("B")}>
+              {t("scoring.teamServes", { team: teamBName })}
+            </PrimaryButton>
+          </div>
+        </>
+      ) : (
+        <>
+          <span className="text-sm text-score-dim">
+            {t("scoring.coinTossSide", {
+              server: firstServer === "A" ? teamAName : teamBName,
+              team: teamAName,
+            })}
+          </span>
+          <div className="flex flex-wrap justify-center gap-2">
+            <PrimaryButton disabled={disabled} onClick={() => onStart(firstServer, "LEFT")}>
+              {t("scoring.left")}
+            </PrimaryButton>
+            <PrimaryButton disabled={disabled} onClick={() => onStart(firstServer, "RIGHT")}>
+              {t("scoring.right")}
+            </PrimaryButton>
+          </div>
+          <SecondaryButton onClick={() => setFirstServer(null)}>
+            {t("scoring.back")}
+          </SecondaryButton>
+        </>
+      )}
+    </div>
+  );
 }
 
 // ── coin toss ────────────────────────────────────────────────────────────────

@@ -174,6 +174,14 @@ export default async function MatchDetailPage({
           >
             {t("match.exportPdf")}
           </a>
+          <a
+            href={`/api/matches/${matchId}/export.pdf?type=log`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={ui.btnSecondary}
+          >
+            {t("match.exportLogPdf")}
+          </a>
         </div>
       </div>
 

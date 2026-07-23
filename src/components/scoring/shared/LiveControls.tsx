@@ -19,6 +19,7 @@ export function LiveScoreGrid({
   armed,
   onPoint,
   onUndo,
+  onReplay,
   onNote,
   pending,
   teamAName,
@@ -32,6 +33,8 @@ export function LiveScoreGrid({
   armed: Armed;
   onPoint: (team: TeamId) => void;
   onUndo: () => void;
+  /** Replay the rally (no score/serve change) — REPLAY_POINT, two-tap armed. */
+  onReplay?: () => void;
   onNote: (text: string) => void;
   pending: boolean;
   teamAName: string;
@@ -68,6 +71,15 @@ export function LiveScoreGrid({
             ? (confirmUndoLabel ?? t("scoring.confirmUndo"))
             : t("scoring.undo")}
         </SecondaryButton>
+        {onReplay ? (
+          <SecondaryButton
+            armed={armed === "REPLAY"}
+            onClick={onReplay}
+            disabled={pending}
+          >
+            {armed === "REPLAY" ? t("scoring.confirmReplay") : t("scoring.replayPoint")}
+          </SecondaryButton>
+        ) : null}
         <SecondaryButton
           onClick={() => {
             const text = window.prompt(t("scoring.note"));

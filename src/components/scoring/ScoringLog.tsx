@@ -134,6 +134,13 @@ export function ScoringLog({
       case "MATCH_END":
       case "MATCH_OVER":
         return { text: "Match end", tone: "info" };
+      case "FORFEIT":
+        return {
+          text: `${p.reason === "RETIREMENT" ? "Retirement" : "Forfeit"} — ${tn(team)}`,
+          tone: "sanction",
+        };
+      case "REPLAY_POINT":
+        return { text: "Point replayed", tone: "info" };
       case "COIN_TOSS":
         return { text: `Coin toss — ${tn(p.firstServer)} to serve`, tone: "info" };
       case "LINEUP_CONFIRMED":

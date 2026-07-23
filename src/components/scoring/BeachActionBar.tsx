@@ -12,6 +12,11 @@ import {
 import { usePrePhaseBanner } from "@/components/scoring/shared/PhaseBanners";
 import { useArmedConfirm } from "@/components/scoring/shared/useArmedConfirm";
 import { LiveScoreGrid } from "@/components/scoring/shared/LiveControls";
+import { ForfeitControl } from "@/components/scoring/shared/ForfeitControl";
+import {
+  ShortcutAction,
+  useShortcut,
+} from "@/components/scoring/shared/shortcuts-context";
 
 export function BeachActionBar({
   teamAName,
@@ -36,6 +41,12 @@ export function BeachActionBar({
     tapConfirm("UNDO", () =>
       dispatch({ type: "UNDO", targetEventId: "", scope: "point" }),
     );
+  const tap = (team: TeamId) =>
+    tapConfirm(team, () =>
+      dispatch(team === "A" ? { type: "RALLY_WON_A" } : { type: "RALLY_WON_B" }),
+    );
+  const tapReplay = () =>
+    tapConfirm("REPLAY", () => dispatch({ type: "REPLAY_POINT" }));
 
   const phase = usePrePhaseBanner({
     state,
@@ -54,6 +65,8 @@ export function BeachActionBar({
         // The server undoes the rally AND its auto-emitted TTO_START together.
         <Banner>
           <div className="flex flex-col items-center gap-2">
+            <ShortcutAction id="advance" run={() => dispatch({ type: "TTO_END" })} />
+            <ShortcutAction id="undo" run={tapUndo} />
             <PrimaryButton onClick={() => dispatch({ type: "TTO_END" })}>
               {t("scoring.endTto")}
             </PrimaryButton>
@@ -64,14 +77,49 @@ export function BeachActionBar({
         </Banner>
       ) : null,
   });
-  if (phase) return phase;
+
+  // ── keyboard shortcuts: bound to what's on screen (left/right follow the
+  // court sides); every handler goes through the same two-tap arming as touch.
+  const live = !phase && !!set && state.status === "LIVE";
+  const leftTeam: TeamId = set?.teamASide === "RIGHT" ? "B" : "A";
+  const rightTeam: TeamId = leftTeam === "A" ? "B" : "A";
+  const requestTimeout = (team: TeamId) => {
+    if (!set) return;
+    const cap = timeoutCapForSet(config, set.setNumber);
+    if ((team === "A" ? set.timeoutsUsedA : set.timeoutsUsedB) >= cap) return;
+    dispatch({ type: "TIMEOUT_REQUEST", team });
+  };
+  const promptNote = () => {
+    const text = window.prompt(t("scoring.note"));
+    if (text) dispatch({ type: "NOTE", text });
+  };
+  useShortcut("pointLeft", live ? () => tap(leftTeam) : null);
+  useShortcut("pointRight", live ? () => tap(rightTeam) : null);
+  useShortcut("replay", live ? tapReplay : null);
+  useShortcut("undo", live ? tapUndo : null);
+  useShortcut("timeoutLeft", live ? () => requestTimeout(leftTeam) : null);
+  useShortcut("timeoutRight", live ? () => requestTimeout(rightTeam) : null);
+  useShortcut("note", live ? promptNote : null);
+
+  const forfeit = (
+    <ForfeitControl
+      status={state.status}
+      teamAName={teamAName}
+      teamBName={teamBName}
+      dispatch={dispatch}
+      pending={pending}
+    />
+  );
+  if (phase)
+    return (
+      <div className="flex flex-col gap-2">
+        {phase}
+        {forfeit}
+      </div>
+    );
   if (!set) return null; // unreachable — usePrePhaseBanner covers it
 
   // ── live scoring (BETWEEN_RALLIES / RALLY_LIVE) ───────────────────────────
-  const tap = (team: TeamId) =>
-    tapConfirm(team, () =>
-      dispatch(team === "A" ? { type: "RALLY_WON_A" } : { type: "RALLY_WON_B" }),
-    );
   const timeoutCap = timeoutCapForSet(config, set.setNumber);
   const timeoutFull = (t: TeamId) =>
     (t === "A" ? set.timeoutsUsedA : set.timeoutsUsedB) >= timeoutCap;
@@ -89,6 +137,7 @@ export function BeachActionBar({
         armed={armed}
         onPoint={tap}
         onUndo={tapUndo}
+        onReplay={tapReplay}
         onNote={(text) => dispatch({ type: "NOTE", text })}
         pending={pending}
         teamAName={teamAName}
@@ -119,6 +168,7 @@ export function BeachActionBar({
           })}
         </SecondaryButton>
       </div>
+      {forfeit}
     </div>
   );
 }

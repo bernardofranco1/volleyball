@@ -5,6 +5,10 @@ import { useIndoorMatch } from "@/lib/indoor-match-context";
 import { useT } from "@/lib/i18n/client";
 import { activeSet } from "@/engine/indoor/types";
 import { describeUndone } from "@/components/scoring/shared/undoneNotice";
+import {
+  ShortcutProvider,
+  ShortcutSettingsButton,
+} from "@/components/scoring/shared/shortcuts-context";
 import { IndoorCourt } from "@/components/court/IndoorCourt";
 import { IndoorActionBar } from "@/components/scoring/IndoorActionBar";
 import { IndoorLineupEntry } from "@/components/scoring/IndoorLineupEntry";
@@ -66,6 +70,7 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
   }
 
   return (
+    <ShortcutProvider>
     <ScoringShell
       competitionLabel={`${competitionName} · Indoor`}
       online={online}
@@ -74,7 +79,10 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
       notice={describeUndone(t, undoneNotice)}
       queuedCount={queuedCount}
       tools={
-        <ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} rosterById={rosterById} />
+        <>
+          <ScoringLog matchId={matchId} teamAName={teamAName} teamBName={teamBName} rosterById={rosterById} />
+          <ShortcutSettingsButton />
+        </>
       }
       score={
         <ScoreStrip
@@ -118,5 +126,6 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
         ) : null
       }
     />
+    </ShortcutProvider>
   );
 }
