@@ -17,7 +17,6 @@ import { pairDisplayName } from "@/lib/player-name";
 import { BeachCourt, type BeachCourtPlayer } from "@/components/court/BeachCourt";
 import { BeachActionBar } from "@/components/scoring/BeachActionBar";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
-import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
 import { SecondaryButton } from "@/components/scoring/shared/buttons";
@@ -69,7 +68,6 @@ export function LiveScoreboard({
     error,
     pending,
     queuedCount,
-    serveClockDeadline,
     undoneNotice,
   } = useMatch();
   const set = activeSet(state);
@@ -214,9 +212,6 @@ export function LiveScoreboard({
                 </SecondaryButton>
               ))}
             </div>
-          ) : null}
-          {config.serveClockEnabled ? (
-            <ServeClockWidget deadline={serveClockDeadline} totalSecs={config.serveClockSecs} />
           ) : null}
           <BeachActionBar
             teamAName={teamAName}

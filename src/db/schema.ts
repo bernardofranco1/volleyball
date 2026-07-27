@@ -140,6 +140,7 @@ export const tournamentConfig = pgTable("tournament_config", {
   // TTO
   ttoEnabled: boolean("tto_enabled"),
   ttoTriggerScore: integer("tto_trigger_score"),
+  ttoDurationSecs: integer("tto_duration_secs"),
 
   // Timeouts
   timeoutsPerSet: integer("timeouts_per_set"),

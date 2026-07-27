@@ -1,15 +1,24 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useMatch } from "@/lib/match-context";
 import { timeoutCapForSet } from "@/engine/config";
 import { useT } from "@/lib/i18n/client";
 import { type TeamId, activeSet } from "@/engine/beach/types";
+import { useCountdown } from "@/components/scoreboard/Countdown";
 import {
   Banner,
   PrimaryButton,
   SecondaryButton,
 } from "@/components/scoring/shared/buttons";
-import { usePrePhaseBanner } from "@/components/scoring/shared/PhaseBanners";
+import {
+  activeCountdown,
+  FloatingCountdown,
+} from "@/components/scoring/shared/CountdownOverlay";
+import {
+  AUTOFIRE_GRACE_MS,
+  usePrePhaseBanner,
+} from "@/components/scoring/shared/PhaseBanners";
 import { useArmedConfirm } from "@/components/scoring/shared/useArmedConfirm";
 import { LiveScoreGrid } from "@/components/scoring/shared/LiveControls";
 import { ForfeitControl } from "@/components/scoring/shared/ForfeitControl";
@@ -48,6 +57,37 @@ export function BeachActionBar({
   const tapReplay = () =>
     tapConfirm("REPLAY", () => dispatch({ type: "REPLAY_POINT" }));
 
+  // ── Technical time-out countdown (beach rule 15.4.2: 30 s by default, or the
+  // competition's configured length). The deadline comes from the TTO_START
+  // event timestamp via the shared resolver, so the scorer console, team
+  // tablets and the public board all show the SAME clock. It auto-ends at 0:00
+  // exactly like a team time-out; a deadline long in the past never fires (the
+  // only ways to sit on one are an Undo that stepped back into it or a late
+  // reload — auto-firing there would re-consume what was just undone).
+  const cd = activeCountdown(state, config);
+  const ttoDeadline = cd?.kind === "TTO" ? cd.deadlineMs : null;
+  const ttoMs = useCountdown(ttoDeadline);
+  const ttoGraceMs = useCountdown(
+    ttoDeadline != null ? ttoDeadline + AUTOFIRE_GRACE_MS : null,
+  );
+  const ttoStale = ttoDeadline != null && ttoGraceMs <= 0;
+  const ttoFiredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ttoDeadline) return;
+    if (Date.now() - ttoDeadline > AUTOFIRE_GRACE_MS) return;
+    const key = `tto:${ttoDeadline}`;
+    const id = setTimeout(
+      () => {
+        if (ttoFiredRef.current === key) return;
+        ttoFiredRef.current = key;
+        dispatch({ type: "TTO_END" });
+      },
+      Math.max(0, ttoDeadline - Date.now()),
+    );
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ttoDeadline]);
+
   const phase = usePrePhaseBanner({
     state,
     set,
@@ -63,18 +103,29 @@ export function BeachActionBar({
       state.rallyPhase === "TTO_ACTIVE" ? (
         // A mis-tapped point can be what triggered this TTO — offer Undo here.
         // The server undoes the rally AND its auto-emitted TTO_START together.
-        <Banner>
-          <div className="flex flex-col items-center gap-2">
-            <ShortcutAction id="advance" run={() => dispatch({ type: "TTO_END" })} />
-            <ShortcutAction id="undo" run={tapUndo} />
-            <PrimaryButton onClick={() => dispatch({ type: "TTO_END" })}>
-              {t("scoring.endTto")}
-            </PrimaryButton>
-            <SecondaryButton armed={armed === "UNDO"} onClick={tapUndo} disabled={pending}>
-              {armed === "UNDO" ? t("scoring.confirmUndo") : t("scoring.undoLastPoint")}
-            </SecondaryButton>
-          </div>
-        </Banner>
+        <>
+          {ttoDeadline != null && !ttoStale ? (
+            // Passive clock over the court (theme accent: a TTO belongs to
+            // neither team); End/Undo stay in the bottom banner's thumb zone.
+            <FloatingCountdown
+              title={t("scoring.ttoLabel")}
+              ms={ttoMs}
+              className="top-[34%]"
+            />
+          ) : null}
+          <Banner>
+            <div className="flex flex-col items-center gap-2">
+              <ShortcutAction id="advance" run={() => dispatch({ type: "TTO_END" })} />
+              <ShortcutAction id="undo" run={tapUndo} />
+              <PrimaryButton onClick={() => dispatch({ type: "TTO_END" })}>
+                {t("scoring.endTto")}
+              </PrimaryButton>
+              <SecondaryButton armed={armed === "UNDO"} onClick={tapUndo} disabled={pending}>
+                {armed === "UNDO" ? t("scoring.confirmUndo") : t("scoring.undoLastPoint")}
+              </SecondaryButton>
+            </div>
+          </Banner>
+        </>
       ) : null,
   });
 

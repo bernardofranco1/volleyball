@@ -1,0 +1,1 @@
+ALTER TABLE "tournament_config" ADD COLUMN "tto_duration_secs" integer;

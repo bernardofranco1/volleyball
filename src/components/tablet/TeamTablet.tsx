@@ -332,7 +332,13 @@ export function TeamTablet({
           wants to queue a substitution. */}
       {cd && cdMs > 0 ? (
         <FloatingCountdown
-          title={cd.kind === "TIMEOUT" ? "Time-out" : "Set break"}
+          title={
+            cd.kind === "TIMEOUT"
+              ? "Time-out"
+              : cd.kind === "TTO"
+                ? "Technical time-out"
+                : "Set break"
+          }
           ms={cdMs}
         />
       ) : null}

@@ -15,13 +15,16 @@ describe("DISCIPLINE_DEFAULTS", () => {
     );
   });
 
-  it("beach: best of 3, 21-point sets, TTO on, 5s serve clock, 2 players", () => {
+  it("beach: best of 3, 21-point sets, 30s TTO, no serve clock, 2 players", () => {
     const c = DISCIPLINE_DEFAULTS.BEACH;
     expect(c.bestOf).toBe(3);
     expect(c.setScore).toBe(21);
     expect(c.setScoreTiebreak).toBe(15);
     expect(c.ttoEnabled).toBe(true);
-    expect(c.serveClockSecs).toBe(5);
+    expect(c.ttoTriggerScore).toBe(21);
+    expect(c.ttoDurationSecs).toBe(30); // FIVB beach rule 15.4.2
+    // Beach is scored without a serve clock (no widget on the beach console).
+    expect(c.serveClockEnabled).toBe(false);
     expect(c.playersPerSide).toBe(2);
     expect(c.blockCountsAsTeamHit).toBe(true);
   });

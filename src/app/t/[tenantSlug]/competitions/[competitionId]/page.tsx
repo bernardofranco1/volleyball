@@ -224,23 +224,27 @@ export default async function CompetitionOverviewPage({
           {/* Tri-state: empty = discipline default; a saved checkbox used to
               freeze the resolved value as a permanent override. */}
           <div className="mt-4 grid grid-cols-2 gap-4">
-            <div>
-              <label className={ui.label} htmlFor="serveClockEnabled">
-                {t("comp.serveClock")}
-              </label>
-              <select
-                id="serveClockEnabled"
-                name="serveClockEnabled"
-                defaultValue={triState(configRow?.serveClockEnabled)}
-                className={ui.select}
-              >
-                <option value="">
-                  {t("common.default", { value: resolved.serveClockEnabled ? "on" : "off" })}
-                </option>
-                <option value="on">{t("common.on")}</option>
-                <option value="off">{t("common.off")}</option>
-              </select>
-            </div>
+            {/* Beach is scored without a serve clock — the beach console has no
+                serve-clock widget, so the toggle is hidden rather than inert. */}
+            {discipline !== "BEACH" && (
+              <div>
+                <label className={ui.label} htmlFor="serveClockEnabled">
+                  {t("comp.serveClock")}
+                </label>
+                <select
+                  id="serveClockEnabled"
+                  name="serveClockEnabled"
+                  defaultValue={triState(configRow?.serveClockEnabled)}
+                  className={ui.select}
+                >
+                  <option value="">
+                    {t("common.default", { value: resolved.serveClockEnabled ? "on" : "off" })}
+                  </option>
+                  <option value="on">{t("common.on")}</option>
+                  <option value="off">{t("common.off")}</option>
+                </select>
+              </div>
+            )}
             <div>
               <label className={ui.label} htmlFor="ttoEnabled">
                 {t("comp.tto")}
@@ -257,6 +261,24 @@ export default async function CompetitionOverviewPage({
                 <option value="on">{t("common.on")}</option>
                 <option value="off">{t("common.off")}</option>
               </select>
+            </div>
+            {/* TTO length — drives the countdown on the scorer console and the
+                public board. FIVB beach default is 30 s (rule 15.4.2); a
+                different length needs FIVB approval for official events. */}
+            <div>
+              <label className={ui.label} htmlFor="ttoDurationSecs">
+                {t("comp.ttoDuration")}
+              </label>
+              <input
+                id="ttoDurationSecs"
+                name="ttoDurationSecs"
+                type="number"
+                min={5}
+                max={600}
+                defaultValue={configRow?.ttoDurationSecs ?? ""}
+                placeholder={String(resolved.ttoDurationSecs)}
+                className={ui.input}
+              />
             </div>
           </div>
 

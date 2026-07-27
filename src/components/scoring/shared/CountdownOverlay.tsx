@@ -9,18 +9,30 @@ export interface CountdownStateLike {
   activeTimeoutTeam?: "A" | "B" | null;
   activeTimeoutStartedAt?: string | null;
   setBreakStartedAt?: string | null;
+  /** Beach only — set by TTO_START. */
+  ttoStartedAt?: string | null;
   currentSetNumber: number;
 }
 
 /**
- * The active time-out / set-break countdown for a match state, or null. The
- * deadline derives from the server event timestamp so scorer, tablet and board
- * all show the same clock.
+ * The active time-out / technical time-out / set-break countdown for a match
+ * state, or null. The deadline derives from the server event timestamp so
+ * scorer, tablet and board all show the same clock.
  */
 export function activeCountdown(
   state: CountdownStateLike,
   config: TournamentConfig,
-): { kind: "TIMEOUT" | "SET_BREAK"; deadlineMs: number; team: "A" | "B" | null } | null {
+): {
+  kind: "TIMEOUT" | "TTO" | "SET_BREAK";
+  deadlineMs: number;
+  team: "A" | "B" | null;
+} | null {
+  if (state.rallyPhase === "TTO_ACTIVE" && state.ttoStartedAt)
+    return {
+      kind: "TTO",
+      deadlineMs: Date.parse(state.ttoStartedAt) + config.ttoDurationSecs * 1000,
+      team: null, // nobody calls a TTO — it is automatic
+    };
   if (state.rallyPhase === "TIMEOUT_ACTIVE" && state.activeTimeoutStartedAt)
     return {
       kind: "TIMEOUT",

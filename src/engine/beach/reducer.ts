@@ -180,12 +180,16 @@ export function reduce(
 
     case "TTO_START":
       s.ttoActive = true;
+      // The event timestamp (not the device clock) anchors the countdown, so
+      // scorer, tablet and board all read the same remaining time.
+      s.ttoStartedAt = event.timestamp;
       if (s.sets[setIdx]) s.sets[setIdx].ttoFired = true;
       s.rallyPhase = "TTO_ACTIVE";
       return s;
 
     case "TTO_END":
       s.ttoActive = false;
+      s.ttoStartedAt = null;
       s.rallyPhase = "BETWEEN_RALLIES";
       return s;
 

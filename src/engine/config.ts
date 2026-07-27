@@ -26,6 +26,7 @@ export interface TournamentConfig {
   // ── Technical time-out (TTO) ───────────────────────────────────────────────
   ttoEnabled: boolean;
   ttoTriggerScore: number | null;
+  ttoDurationSecs: number; // drives the TTO countdown (scorer + board)
 
   // ── Time-outs ──────────────────────────────────────────────────────────────
   timeoutsPerSet: number;
@@ -98,6 +99,11 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
 
     ttoEnabled: true, // toggle off for non-official competitions
     ttoTriggerScore: 21,
+    // Beach rule 15.4.2: in sets 1 and 2, one 30-second Technical Time-Out is
+    // applied automatically when the point sum reaches 21 (Beach Pro Tour
+    // Elite16 / FIVB competitions). Organizers may run a different length only
+    // with FIVB approval — hence the per-competition override.
+    ttoDurationSecs: 30,
 
     timeoutsPerSet: 1,
     timeoutsPerSetTiebreak: 1,
@@ -117,7 +123,9 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     liberoEnabled: false,
     liberoCount: 0,
 
-    serveClockEnabled: true,
+    // Beach is scored without a serve clock on court — the widget was removed
+    // from the beach console, so leave the broadcast off by default too.
+    serveClockEnabled: false,
     serveClockSecs: 5,
 
     vcsEnabled: false,
@@ -150,6 +158,7 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
 
     ttoEnabled: false,
     ttoTriggerScore: null,
+    ttoDurationSecs: 30, // unused while ttoEnabled is false
 
     timeoutsPerSet: 2,
     timeoutsPerSetTiebreak: 2,
@@ -202,6 +211,7 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
 
     ttoEnabled: false,
     ttoTriggerScore: null,
+    ttoDurationSecs: 30, // unused while ttoEnabled is false
 
     timeoutsPerSet: 2,
     timeoutsPerSetTiebreak: 2,
@@ -254,6 +264,7 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
 
     ttoEnabled: false,
     ttoTriggerScore: null,
+    ttoDurationSecs: 30, // unused while ttoEnabled is false
 
     timeoutsPerSet: 2,
     timeoutsPerSetTiebreak: 2,

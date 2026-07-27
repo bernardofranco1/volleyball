@@ -142,6 +142,10 @@ export interface BeachMatchState {
   /** Event timestamp when the current set break began (drives countdowns). */
   setBreakStartedAt?: string | null;
   ttoActive: boolean;
+  /** Event timestamp of the running technical time-out (drives countdowns).
+   *  Optional: snapshots written before TTO countdowns existed lack it, and a
+   *  replayed TTO_START always sets it. */
+  ttoStartedAt?: string | null;
   medicalTimeoutTeam: TeamId | null;
   matchStartedAt: string | null;
   lastSequence: number;
@@ -177,6 +181,7 @@ export function initialBeachState(matchId: string): BeachMatchState {
     winner: null,
     activeTimeoutTeam: null,
     ttoActive: false,
+    ttoStartedAt: null,
     medicalTimeoutTeam: null,
     matchStartedAt: null,
     lastSequence: 0,

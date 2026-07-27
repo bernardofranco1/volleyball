@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { DISCIPLINE_DEFAULTS, resolveConfig } from "@/engine/config";
+import {
+  DISCIPLINE_DEFAULTS,
+  resolveConfig,
+  timeoutCapForSet,
+} from "@/engine/config";
 import {
   appendBeachEvent,
   computeAutoEmits,
@@ -268,6 +272,17 @@ describe("beach reducer — TTO", () => {
     expect(m.set.ttoFired).toBe(true);
   });
 
+  it("TTO records its start timestamp (drives the countdown) and clears it on end", () => {
+    const m = new TestMatch();
+    m.begin("A", "LEFT");
+    bringToSum21(m);
+    // The event timestamp — not a device clock — anchors the shared countdown.
+    expect(m.state.ttoStartedAt).toBe(TS);
+    m.apply({ type: "TTO_END" });
+    expect(m.state.ttoStartedAt).toBeNull();
+    expect(m.state.rallyPhase).toBe("BETWEEN_RALLIES");
+  });
+
   it("TTO does not fire in the deciding set", () => {
     const m = new TestMatch();
     m.begin("A", "LEFT");
@@ -355,6 +370,79 @@ describe("beach validator", () => {
     );
     expect(second.ok).toBe(false);
     expect(second.reason).toMatch(/limit/i);
+  });
+
+  // FIVB beach rule 15.1: ONE 30-second time-out per team per set — including
+  // the deciding set (15.4.3), where the automatic TTO does not exist. The
+  // allowance is per team and resets every set; the TTO and medical time-outs
+  // must never eat into it.
+  it("gives each team exactly one time-out per set, in every set of the match", () => {
+    const m = new TestMatch();
+    m.begin("A", "LEFT");
+    const canRequest = (team: TeamId) =>
+      validateBeachEvent({ type: "TIMEOUT_REQUEST", team }, m.state, BEACH).ok;
+    const useTimeout = (team: TeamId) => {
+      m.apply({ type: "TIMEOUT_REQUEST", team });
+      m.apply({ type: "TIMEOUT_END", team });
+    };
+
+    // Set 1 — one each, independently tracked.
+    expect(canRequest("A")).toBe(true);
+    useTimeout("A");
+    expect(canRequest("A")).toBe(false);
+    expect(canRequest("B")).toBe(true); // A's time-out is not B's
+    useTimeout("B");
+    expect(canRequest("B")).toBe(false);
+    expect([m.set.timeoutsUsedA, m.set.timeoutsUsedB]).toEqual([1, 1]);
+
+    // Set 2 — the allowance resets.
+    m.score("A", 21);
+    m.startSet(2, "B", "RIGHT");
+    expect([m.set.timeoutsUsedA, m.set.timeoutsUsedB]).toEqual([0, 0]);
+    useTimeout("A");
+    expect(canRequest("A")).toBe(false);
+    expect(canRequest("B")).toBe(true);
+
+    // Deciding set — the tie-break cap applies and is also one.
+    m.score("B", 21);
+    m.startSet(3, "A", "LEFT");
+    expect(timeoutCapForSet(BEACH, 3)).toBe(1);
+    useTimeout("B");
+    expect(canRequest("B")).toBe(false);
+    expect(canRequest("A")).toBe(true);
+  });
+
+  it("TTO and medical time-outs do not consume a team's time-out", () => {
+    const m = new TestMatch();
+    m.begin("A", "LEFT");
+    // 11-10 (sum 21) → the automatic TTO fires.
+    for (let i = 0; i < 10; i++) {
+      m.dispatch({ type: "RALLY_WON_A" });
+      m.dispatch({ type: "RALLY_WON_B" });
+    }
+    expect(m.dispatch({ type: "RALLY_WON_A" })).toContain("TTO_START");
+    m.apply({ type: "TTO_END" });
+    m.apply({ type: "MEDICAL_TIMEOUT", team: "A" });
+    m.apply({ type: "MEDICAL_TIMEOUT_END" });
+    expect([m.set.timeoutsUsedA, m.set.timeoutsUsedB]).toEqual([0, 0]);
+    expect(
+      validateBeachEvent({ type: "TIMEOUT_REQUEST", team: "A" }, m.state, BEACH).ok,
+    ).toBe(true);
+  });
+
+  it("undoing a time-out gives the allowance back", () => {
+    const m = new TestMatch();
+    m.begin("A", "LEFT");
+    const req = m.apply({ type: "TIMEOUT_REQUEST", team: "A" });
+    const end = m.apply({ type: "TIMEOUT_END", team: "A" });
+    m.apply({ type: "UNDO", targetEventId: end.id });
+    m.apply({ type: "UNDO", targetEventId: req.id });
+    const state = replayEvents("m1", m.events, BEACH);
+    const set = activeSet(state)!;
+    expect(set.timeoutsUsedA).toBe(0);
+    expect(
+      validateBeachEvent({ type: "TIMEOUT_REQUEST", team: "A" }, state, BEACH).ok,
+    ).toBe(true);
   });
 
   it("rejects VCS when disabled and allows it when enabled", () => {

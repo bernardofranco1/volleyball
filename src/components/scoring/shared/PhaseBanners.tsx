@@ -18,7 +18,9 @@ import { useArmedConfirm } from "./useArmedConfirm";
 
 // Overdue-countdown grace: a deadline more than this far in the past never
 // auto-fires and renders as an inline banner instead of the blocking overlay.
-const AUTOFIRE_GRACE_MS = 10_000;
+// Exported so discipline-specific interstitials (the beach TTO) apply the same
+// staleness rule to their own countdowns.
+export const AUTOFIRE_GRACE_MS = 10_000;
 
 /** The slice of a set state the phase banners need (all four engines match). */
 export interface PhaseSet {

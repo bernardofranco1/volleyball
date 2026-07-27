@@ -192,6 +192,12 @@ export async function updateCompetitionConfig(
     (timeoutDurationSecs < 5 || timeoutDurationSecs > 600)
   )
     return fail("Timeout duration must be between 5 and 600 seconds.");
+  const ttoDurationSecs = intOrNull(fd, "ttoDurationSecs");
+  if (
+    ttoDurationSecs != null &&
+    (ttoDurationSecs < 5 || ttoDurationSecs > 600)
+  )
+    return fail("Technical time-out duration must be between 5 and 600 seconds.");
   const vcsChallengesPerSet = intOrNull(fd, "vcsChallengesPerSet");
   if (
     vcsChallengesPerSet != null &&
@@ -224,6 +230,7 @@ export async function updateCompetitionConfig(
     timeoutsPerSet,
     timeoutsPerSetTiebreak,
     timeoutDurationSecs,
+    ttoDurationSecs,
     setBreakDurationsSecs,
     vcsChallengesPerSet,
     // Tri-state: null = discipline default, true/false = explicit override.

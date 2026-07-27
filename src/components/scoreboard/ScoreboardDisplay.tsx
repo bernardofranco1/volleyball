@@ -317,7 +317,9 @@ export function ScoreboardDisplay({
           title={
             cd.kind === "TIMEOUT"
               ? `${cd.team === "A" ? teamAName : teamBName} · Time-out`
-              : "Set break"
+              : cd.kind === "TTO"
+                ? "Technical time-out"
+                : "Set break"
           }
           subtitle={
             cd.kind === "SET_BREAK" && set
