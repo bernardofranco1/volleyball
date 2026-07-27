@@ -172,24 +172,32 @@ function HalfMarkers({ team, side }: { team: CourtTeam; side: "left" | "right" }
   const back = side === "right" ? [...team.back].reverse() : team.back;
   const frontYs = rowYs(front.length);
   const backYs = rowYs(back.length);
-  // Two nested <g> per player, keyed by player identity: the outer one carries
-  // the X component of the move, the inner one the Y component, each with its
-  // own easing (.court-rot-x / .court-rot-y in globals.css). The player's target
-  // zone changes on rotation and the transitions carry them there — along the
-  // rotation ring, because the two axes resolve at different rates, so a move to
-  // a diagonally-placed zone sweeps round instead of cutting across the court.
-  // Empty slots fall back to a positional key (nothing to follow).
+  // One <g> per player, keyed by player identity and placed by a CSS transform:
+  // on a rotation the target (x,y) changes and the transition carries the player
+  // from their old zone to the new one. Empty slots fall back to a positional key.
   const items = [
     ...back.map((s, i) => ({ s, x: backX, y: backYs[i], fb: `${side}-b${i}` })),
     ...front.map((s, i) => ({ s, x: frontX, y: frontYs[i], fb: `${side}-f${i}` })),
   ];
+  // CRITICAL: emit the players in a STABLE order, not in zone order. Zone order
+  // reshuffles on every rotation, which makes React move the keyed nodes — and a
+  // DOM move is a remove + re-insert, which CANCELS the node's running CSS
+  // transition. The moved players then snapped to their new zone while the rest
+  // glided ("the front row materialises, the others animate"). Sorting by the
+  // element key keeps document order identical across rotations, so nothing is
+  // ever moved and every player animates from exactly where they stood.
+  const ordered = [...items].sort((a, b) =>
+    (a.s.key ?? a.fb).localeCompare(b.s.key ?? b.fb),
+  );
   return (
     <g>
-      {items.map(({ s, x, y, fb }) => (
-        <g key={s.key ?? fb} className="court-rot-x" style={{ transform: `translate(${x}px, 0px)` }}>
-          <g className="court-rot-y" style={{ transform: `translate(0px, ${y}px)` }}>
-            <Marker slot={s} cx={0} cy={0} color={color} />
-          </g>
+      {ordered.map(({ s, x, y, fb }) => (
+        <g
+          key={s.key ?? fb}
+          className="court-rotate"
+          style={{ transform: `translate(${x}px, ${y}px)` }}
+        >
+          <Marker slot={s} cx={0} cy={0} color={color} />
         </g>
       ))}
     </g>

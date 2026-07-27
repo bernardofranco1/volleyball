@@ -163,34 +163,42 @@ function courtCoord(side: "a" | "b", pos: number): { x: number; y: number } {
 const COURT_W_CQ = 112;
 const COURT_H_CQ = 56;
 
-/** Absolutely-positioned jerseys for one half, keyed by player so they slide. */
+/**
+ * Absolutely-positioned jerseys for one half, keyed by player so they slide.
+ *
+ * Rendered in a STABLE order (by key), never in rotation order: rotation order
+ * reshuffles every point, React would move the keyed nodes, and a DOM move
+ * cancels the running CSS transition — the moved jerseys would jump while the
+ * others glided. Position comes from the transform alone, so document order is
+ * free to stay fixed.
+ */
 function HalfLayer({ rotation, side, teamColor, accent }: { rotation: IndoorPlayer[]; side: "a" | "b"; teamColor: string; accent: string }) {
+  const ordered = [...rotation].sort((a, b) =>
+    (a.key ?? "").localeCompare(b.key ?? ""),
+  );
   return (
     <>
-      {rotation.map((p, i) => {
+      {ordered.map((p, i) => {
         const { x, y } = courtCoord(side, p.pos);
         const tx = (x / 100) * COURT_W_CQ;
         const ty = (y / 100) * COURT_H_CQ;
         return (
-          // Same two-axis motion as the scorer's court (.court-rot-x / -y in
-          // globals.css): the outer element carries X, the inner one Y, each with
-          // its own easing, so the six jerseys sweep round the rotation ring
-          // together — and a diagonal move arcs rather than cutting across.
-          // Centring is applied innermost so it never animates.
+          // Same motion as the scorer's court (.court-rotate in globals.css): one
+          // transform, one easing, one duration for every jersey, so all six
+          // leave together and travel at a matching rate. Centring is applied on
+          // an inner element so it never takes part in the animation.
           <div
             key={p.key ?? `${side}-${i}`}
-            className="court-rot-x"
+            className="court-rotate"
             style={{
               position: "absolute",
               left: 0,
               top: 0,
-              transform: `translateX(${tx}cqmin)`,
+              transform: `translate(${tx}cqmin, ${ty}cqmin)`,
             }}
           >
-            <div className="court-rot-y" style={{ transform: `translateY(${ty}cqmin)` }}>
-              <div style={{ transform: "translate(-50%, -50%)" }}>
-                <Jersey p={p} teamColor={teamColor} accent={accent} />
-              </div>
+            <div style={{ transform: "translate(-50%, -50%)" }}>
+              <Jersey p={p} teamColor={teamColor} accent={accent} />
             </div>
           </div>
         );
