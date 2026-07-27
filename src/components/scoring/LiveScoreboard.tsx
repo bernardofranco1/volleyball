@@ -16,6 +16,7 @@ import { useT } from "@/lib/i18n/client";
 import { pairDisplayName } from "@/lib/player-name";
 import { BeachCourt, type BeachCourtPlayer } from "@/components/court/BeachCourt";
 import { BeachActionBar } from "@/components/scoring/BeachActionBar";
+import { useResultSignOff } from "@/components/scoring/shared/ResultSignOff";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
@@ -120,6 +121,26 @@ export function LiveScoreboard({
     }));
   };
 
+  // Post-match scoresheet sign-off (spec/20): with the match over, the court
+  // zone becomes the white signing area for both captains and the 1st referee.
+  const signOff = useResultSignOff({
+    matchId,
+    finished: state.status === "FINISHED",
+    policy: config.resultSignatures,
+    teamAName,
+    teamBName,
+    rosterA,
+    rosterB,
+    sets: state.sets.map((s) => ({
+      setNumber: s.setNumber,
+      scoreA: s.scoreA,
+      scoreB: s.scoreB,
+    })),
+    setsWonA: state.setsWonA,
+    setsWonB: state.setsWonB,
+    winner: state.winner,
+  });
+
   // One-tap service-order declaration (rules: each team declares its order
   // before the set). Prompt for the serving team first, then the receiver —
   // but ONLY until the set's first rally: once play is underway the serving
@@ -177,15 +198,17 @@ export function LiveScoreboard({
         />
       }
       main={
-        <BeachCourt
-          teamASide={set?.teamASide ?? "LEFT"}
-          currentServer={servingTeam}
-          servingSlot={servingSlot}
-          teamAColor={teamAColor}
-          teamBColor={teamBColor}
-          pairA={courtPair("A")}
-          pairB={courtPair("B")}
-        />
+        signOff.panel ?? (
+          <BeachCourt
+            teamASide={set?.teamASide ?? "LEFT"}
+            currentServer={servingTeam}
+            servingSlot={servingSlot}
+            teamAColor={teamAColor}
+            teamBColor={teamBColor}
+            pairA={courtPair("A")}
+            pairB={courtPair("B")}
+          />
+        )
       }
       actions={
         <div className="flex flex-col gap-2">
@@ -218,6 +241,8 @@ export function LiveScoreboard({
             teamBName={teamBName}
             teamAColor={teamAColor}
             teamBColor={teamBColor}
+            finishedExtra={signOff.finishedExtra}
+            finishedUndoHidden={signOff.finishedUndoHidden}
           />
         </div>
       }

@@ -17,7 +17,10 @@ import {
   isGender,
   type Gender,
 } from "@/lib/domain";
-import { DISCIPLINE_DEFAULTS } from "@/engine/config";
+import {
+  DISCIPLINE_DEFAULTS,
+  isResultSignaturePolicy,
+} from "@/engine/config";
 import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
 import { fail, ok, type FormState } from "@/lib/action-state";
@@ -198,6 +201,13 @@ export async function updateCompetitionConfig(
     (ttoDurationSecs < 5 || ttoDurationSecs > 600)
   )
     return fail("Technical time-out duration must be between 5 and 600 seconds.");
+  // Scoresheet-signature obligation: "" = discipline default (null override).
+  const rawSignatures = str(fd, "resultSignatures");
+  if (rawSignatures && !isResultSignaturePolicy(rawSignatures))
+    return fail("Pick a valid scoresheet-signature setting.");
+  const resultSignatures = isResultSignaturePolicy(rawSignatures)
+    ? rawSignatures
+    : null;
   const vcsChallengesPerSet = intOrNull(fd, "vcsChallengesPerSet");
   if (
     vcsChallengesPerSet != null &&
@@ -231,6 +241,7 @@ export async function updateCompetitionConfig(
     timeoutsPerSetTiebreak,
     timeoutDurationSecs,
     ttoDurationSecs,
+    resultSignatures,
     setBreakDurationsSecs,
     vcsChallengesPerSet,
     // Tri-state: null = discipline default, true/false = explicit override.

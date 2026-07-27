@@ -27,6 +27,8 @@ export interface PlayerLite {
   fullName: string;
   jerseyNumber: number | null;
   isLibero: boolean;
+  /** Team captain per the roster — pre-selects the signer on the sign-off panel. */
+  isCaptain?: boolean;
 }
 
 interface ClientState {

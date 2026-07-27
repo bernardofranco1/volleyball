@@ -17,6 +17,7 @@ import { ADMIN_ROLES, authorizeMatch, hasRole, SCORING_ROLES } from "@/lib/authz
 import { sameOriginOk } from "@/lib/http";
 import { rateLimit } from "@/lib/ratelimit";
 import { scorerPinSatisfied } from "@/lib/scorer-pin";
+import { resultLocked } from "@/lib/match-signatures";
 import {
   EventRejectedError,
   MatchNotFoundError,
@@ -118,6 +119,18 @@ export async function POST(
     return Response.json(
       { error: "Event type not accepted from client" },
       { status: 422 },
+    );
+  }
+  // A signed scoresheet is the official record of the result: no further event
+  // — not even an UNDO — may touch the match. An admin must reopen it first,
+  // which invalidates the signatures with a recorded reason (spec/20).
+  if (await resultLocked(id)) {
+    return Response.json(
+      {
+        error:
+          "The scoresheet is signed — an admin must reopen the match before it can change.",
+      },
+      { status: 409 },
     );
   }
 

@@ -1,5 +1,16 @@
 import type { Discipline } from "./types";
 
+/** Obligation to sign the scoresheet before a result is official. */
+export const RESULT_SIGNATURE_POLICIES = ["REQUIRED", "OPTIONAL", "OFF"] as const;
+export type ResultSignaturePolicy = (typeof RESULT_SIGNATURE_POLICIES)[number];
+
+export function isResultSignaturePolicy(v: unknown): v is ResultSignaturePolicy {
+  return (
+    typeof v === "string" &&
+    (RESULT_SIGNATURE_POLICIES as readonly string[]).includes(v)
+  );
+}
+
 /**
  * The fully-resolved configuration the engine reads at runtime.
  *
@@ -27,6 +38,17 @@ export interface TournamentConfig {
   ttoEnabled: boolean;
   ttoTriggerScore: number | null;
   ttoDurationSecs: number; // drives the TTO countdown (scorer + board)
+
+  // ── Result approval (scoresheet signatures) ────────────────────────────────
+  /**
+   * Whether the final result must be signed on the scorer device before it
+   * counts as official (beach/indoor scoresheet APPROVAL block):
+   *   REQUIRED — both captains + the 1st referee must sign; a manager can still
+   *              confirm without them, but only with a recorded reason.
+   *   OPTIONAL — signing is offered on the console but never blocks.
+   *   OFF      — no signing flow (disciplines with no scoresheet in use).
+   */
+  resultSignatures: ResultSignaturePolicy;
 
   // ── Time-outs ──────────────────────────────────────────────────────────────
   timeoutsPerSet: number;
@@ -105,6 +127,8 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     // with FIVB approval — hence the per-competition override.
     ttoDurationSecs: 30,
 
+    resultSignatures: "REQUIRED", // FIVB beach scoresheet APPROVAL block
+
     timeoutsPerSet: 1,
     timeoutsPerSetTiebreak: 1,
     timeoutDurationSecs: 30,
@@ -160,6 +184,8 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     ttoTriggerScore: null,
     ttoDurationSecs: 30, // unused while ttoEnabled is false
 
+    resultSignatures: "REQUIRED", // FIVB indoor scoresheet APPROVAL block
+
     timeoutsPerSet: 2,
     timeoutsPerSetTiebreak: 2,
     timeoutDurationSecs: 30,
@@ -213,6 +239,8 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     ttoTriggerScore: null,
     ttoDurationSecs: 30, // unused while ttoEnabled is false
 
+    resultSignatures: "OFF", // no scoresheet in use for Grass yet
+
     timeoutsPerSet: 2,
     timeoutsPerSetTiebreak: 2,
     timeoutDurationSecs: 30,
@@ -265,6 +293,8 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     ttoEnabled: false,
     ttoTriggerScore: null,
     ttoDurationSecs: 30, // unused while ttoEnabled is false
+
+    resultSignatures: "OFF", // no scoresheet in use for Light/Air yet
 
     timeoutsPerSet: 2,
     timeoutsPerSetTiebreak: 2,

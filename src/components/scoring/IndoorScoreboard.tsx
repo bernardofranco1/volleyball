@@ -11,6 +11,7 @@ import {
 } from "@/components/scoring/shared/shortcuts-context";
 import { IndoorCourt } from "@/components/court/IndoorCourt";
 import { IndoorActionBar } from "@/components/scoring/IndoorActionBar";
+import { useResultSignOff } from "@/components/scoring/shared/ResultSignOff";
 import { IndoorLineupEntry } from "@/components/scoring/IndoorLineupEntry";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
@@ -46,8 +47,30 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
   const statusLabel =
     state.status === "FINISHED" ? "Final" : set ? `Set ${set.setNumber}` : "Match not started";
 
+  // Post-match scoresheet sign-off (spec/20): the court zone becomes the white
+  // signing area for both captains and the 1st referee.
+  const signOff = useResultSignOff({
+    matchId,
+    finished: state.status === "FINISHED",
+    policy: config.resultSignatures,
+    teamAName,
+    teamBName,
+    rosterA,
+    rosterB,
+    sets: state.sets.map((s) => ({
+      setNumber: s.setNumber,
+      scoreA: s.scoreA,
+      scoreB: s.scoreB,
+    })),
+    setsWonA: state.setsWonA,
+    setsWonB: state.setsWonB,
+    winner: state.winner,
+  });
+
   let main;
-  if (state.rallyPhase === "LINEUP_PENDING") {
+  if (signOff.panel) {
+    main = signOff.panel;
+  } else if (state.rallyPhase === "LINEUP_PENDING") {
     main = <IndoorLineupEntry />;
   } else if (set && set.courtPositionsA.length > 0) {
     main = (
@@ -111,7 +134,10 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
           {config.serveClockEnabled ? (
             <ServeClockWidget deadline={serveClockDeadline} totalSecs={config.serveClockSecs} />
           ) : null}
-          <IndoorActionBar />
+          <IndoorActionBar
+            finishedExtra={signOff.finishedExtra}
+            finishedUndoHidden={signOff.finishedUndoHidden}
+          />
         </div>
       }
       overlay={

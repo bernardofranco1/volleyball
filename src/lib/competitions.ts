@@ -253,6 +253,8 @@ export async function getMatch(
       discipline: string;
       teamAColor: string | null;
       teamBColor: string | null;
+      confirmedVia: "SIGNATURES" | "ADMIN" | null;
+      confirmedAt: Date | null;
     })
   | null
 > {
@@ -277,6 +279,9 @@ export async function getMatch(
       matchNumber: matches.matchNumber,
       teamAColor: teamA.color,
       teamBColor: teamB.color,
+      // Result approval (spec/20) — drives the sign-off / reopen panel.
+      confirmedVia: matches.confirmedVia,
+      confirmedAt: matches.confirmedAt,
     })
     .from(matches)
     .innerJoin(teamA, eq(teamA.id, matches.teamAId))
@@ -286,10 +291,21 @@ export async function getMatch(
   return rows[0] ?? null;
 }
 
-/** Both teams' players (for the indoor scoreboard rotation). */
+interface PlayerLiteRow {
+  id: string;
+  fullName: string;
+  jerseyNumber: number | null;
+  isLibero: boolean;
+  isCaptain: boolean;
+}
+
+/**
+ * Both teams' players (indoor scoreboard rotation, beach service order, and the
+ * post-match signature panel — which pre-selects the captain).
+ */
 export async function loadMatchRosters(matchId: string): Promise<{
-  rosterA: { id: string; fullName: string; jerseyNumber: number | null; isLibero: boolean }[];
-  rosterB: { id: string; fullName: string; jerseyNumber: number | null; isLibero: boolean }[];
+  rosterA: PlayerLiteRow[];
+  rosterB: PlayerLiteRow[];
 }> {
   const m = (
     await db
@@ -306,6 +322,7 @@ export async function loadMatchRosters(matchId: string): Promise<{
       fullName: players.fullName,
       jerseyNumber: players.jerseyNumber,
       isLibero: players.isLibero,
+      isCaptain: players.isCaptain,
     })
     .from(players)
     .where(inArray(players.teamId, [m.teamAId, m.teamBId]));
@@ -317,6 +334,7 @@ export async function loadMatchRosters(matchId: string): Promise<{
         fullName: r.fullName,
         jerseyNumber: r.jerseyNumber,
         isLibero: r.isLibero,
+        isCaptain: r.isCaptain,
       }));
   return { rosterA: lite(m.teamAId), rosterB: lite(m.teamBId) };
 }

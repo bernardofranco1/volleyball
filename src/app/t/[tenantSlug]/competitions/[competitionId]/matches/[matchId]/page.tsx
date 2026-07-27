@@ -21,7 +21,15 @@ import {
 } from "@/lib/match-session-actions";
 import { qrSvg } from "@/lib/qr";
 import { findSequenceGaps } from "@/lib/integrity";
-import { confirmMatchResult } from "@/lib/match-admin-actions";
+import {
+  confirmMatchResult,
+  reopenMatchResult,
+} from "@/lib/match-admin-actions";
+import {
+  loadSignatures,
+  SIGNATURE_ROLES,
+  signatureRoleLabel,
+} from "@/lib/match-signatures";
 import { getT } from "@/lib/i18n/server";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { RewindToHere } from "@/components/admin/RewindToHere";
@@ -73,7 +81,7 @@ export default async function MatchDetailPage({
   );
 
   // One round of concurrent fetches; access is gated (notFound) before render.
-  const [competition, match, seqRows, logRows, sessions, origin, pin] =
+  const [competition, match, seqRows, logRows, sessions, origin, pin, signatures] =
     await Promise.all([
       getCompetition(ctx.tenant.id, competitionId),
       getMatch(ctx.tenant.id, matchId),
@@ -108,6 +116,7 @@ export default async function MatchDetailPage({
         ),
       resolveOrigin(),
       getScorerPin(matchId),
+      loadSignatures(matchId),
     ]);
   if (!competition) notFound();
   if (!match || match.competitionId !== competitionId) notFound();
@@ -118,6 +127,10 @@ export default async function MatchDetailPage({
     (configRow ?? {}) as unknown as Partial<TournamentConfig>,
   );
   const integrity = findSequenceGaps(seqRows.map((r) => r.sequence));
+  // Scoresheet approval (spec/20): obligation comes from the competition config,
+  // the signatures themselves from match_signatures (live rows only).
+  const signaturePolicy = config.resultSignatures;
+  const confirmedVia = match.confirmedVia;
   const log = [...logRows].reverse(); // stored desc for LIMIT; display asc
   const base = `/t/${tenantSlug}/competitions/${competitionId}`;
 
@@ -197,7 +210,8 @@ export default async function MatchDetailPage({
         )}
       </p>
 
-      {/* A scorer's final point parks the match here until a manager confirms. */}
+      {/* A scorer's final point parks the match here until the scoresheet is
+          signed on the console or a manager confirms it (spec/20). */}
       {match.status === "PENDING_CONFIRMATION" && (
         <div className="mt-6 rounded-xl border border-amber-500/50 bg-amber-500/10 p-4">
           <h2 className="font-medium text-amber-300">
@@ -206,6 +220,32 @@ export default async function MatchDetailPage({
           <p className="mt-1 text-sm text-score-dim">
             {t("match.confirmResultHint")}
           </p>
+          {signaturePolicy !== "OFF" && (
+            <ul className="mt-3 flex flex-col gap-1 text-sm">
+              {SIGNATURE_ROLES.map((role) => {
+                const sig = signatures.find((x) => x.role === role);
+                return (
+                  <li key={role} className="flex items-center gap-2">
+                    <span aria-hidden>{sig ? "✓" : "○"}</span>
+                    <span className="text-score-dim">
+                      {signatureRoleLabel(role)}:
+                    </span>
+                    <span>
+                      {sig
+                        ? `${sig.signerName}${
+                            sig.intent === "PROTEST"
+                              ? " — under protest"
+                              : sig.intent === "REFUSED"
+                                ? " — refused to sign"
+                                : ""
+                          }`
+                        : t("match.signatureMissing")}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           <ActionForm
             action={confirmMatchResult}
             confirm={t("match.confirmResultConfirm")}
@@ -214,8 +254,71 @@ export default async function MatchDetailPage({
             <input type="hidden" name="tenantSlug" value={tenantSlug} />
             <input type="hidden" name="competitionId" value={competitionId} />
             <input type="hidden" name="matchId" value={matchId} />
+            {/* Confirming without the required signatures is an override — it
+                has to say why, and the reason goes into the audit log. */}
+            {signaturePolicy === "REQUIRED" &&
+              signatures.length < SIGNATURE_ROLES.length && (
+                <label className="mb-2 block text-sm">
+                  <span className={ui.label}>{t("match.overrideReason")}</span>
+                  <input
+                    name="reason"
+                    maxLength={300}
+                    className={ui.input}
+                    placeholder={t("match.overrideReasonHint")}
+                  />
+                </label>
+              )}
             <SubmitButton pendingLabel={t("common.saving")}>
               {t("match.confirmResult")}
+            </SubmitButton>
+          </ActionForm>
+        </div>
+      )}
+
+      {/* A confirmed result can be corrected only by reopening it, which
+          invalidates the signatures (kept on record) — spec/20. */}
+      {match.status === "FINISHED" && (
+        <div className="mt-6 rounded-xl border border-border p-4">
+          <h2 className="font-medium">
+            {confirmedVia === "SIGNATURES"
+              ? t("match.signedTitle")
+              : t("match.confirmedTitle")}
+          </h2>
+          {signatures.length > 0 && (
+            <ul className="mt-2 flex flex-col gap-1 text-sm text-score-dim">
+              {signatures.map((sig) => (
+                <li key={sig.role}>
+                  {signatureRoleLabel(sig.role)}: {sig.signerName}
+                  {sig.intent === "PROTEST"
+                    ? " — under protest"
+                    : sig.intent === "REFUSED"
+                      ? " — refused to sign"
+                      : ""}
+                  {sig.remarks ? ` (${sig.remarks})` : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-sm text-score-dim">{t("match.reopenHint")}</p>
+          <ActionForm
+            action={reopenMatchResult}
+            confirm={t("match.reopenConfirm")}
+            className="mt-3"
+          >
+            <input type="hidden" name="tenantSlug" value={tenantSlug} />
+            <input type="hidden" name="competitionId" value={competitionId} />
+            <input type="hidden" name="matchId" value={matchId} />
+            <label className="mb-2 block text-sm">
+              <span className={ui.label}>{t("match.reopenReason")}</span>
+              <input
+                name="reason"
+                maxLength={300}
+                className={ui.input}
+                placeholder={t("match.reopenReasonHint")}
+              />
+            </label>
+            <SubmitButton pendingLabel={t("common.saving")}>
+              {t("match.reopen")}
             </SubmitButton>
           </ActionForm>
         </div>

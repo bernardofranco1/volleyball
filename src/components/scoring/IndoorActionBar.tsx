@@ -27,7 +27,14 @@ import {
   TeamActionsGrid,
 } from "@/components/scoring/shared/LiveControls";
 
-export function IndoorActionBar() {
+export function IndoorActionBar({
+  finishedExtra,
+  finishedUndoHidden,
+}: {
+  /** Scoresheet sign-off entry shown in the match-won banner (spec/20). */
+  finishedExtra?: React.ReactNode;
+  finishedUndoHidden?: boolean;
+} = {}) {
   const t = useT();
   const { state, config, dispatch, pending, teamAName, teamBName, teamAColor, teamBColor, rosterA, rosterB } =
     useIndoorMatch();
@@ -62,6 +69,8 @@ export function IndoorActionBar() {
     teamAColor,
     teamBColor,
     lineupPendingText: t("scoring.lineupWait"),
+    finishedExtra,
+    finishedUndoHidden,
     extraPhase:
       state.rallyPhase === "VCS_ACTIVE" && set ? (
         <Banner>

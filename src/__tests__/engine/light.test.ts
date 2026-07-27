@@ -290,3 +290,52 @@ describe("light append orchestrator", () => {
     expect(res.newEvents.map((e) => e.payload.type)).toEqual(["ATTACK_ARC_FAULT"]);
   });
 });
+
+// Rotation follows every point WON — rules 8.6.2 (side-out) + 10.2.2 (serving
+// team wins → the player who served rotates and the next one serves). This is
+// the rule that separates Air/Light from indoor, beach and grass, so it is
+// pinned end-to-end: a service run must walk the whole lineup, and the two
+// scorer-called faults must rotate the team they award the point to.
+describe("light reducer — rotation follows every point (8.6.2 + 10.2.2)", () => {
+  const serverOf = (m: TestMatch): string | null => {
+    const s = m.set;
+    const rot = s.currentServer === "A" ? s.lastRotA : s.lastRotB;
+    const lineup = s.currentServer === "A" ? s.courtPositionsA : s.courtPositionsB;
+    return rot == null ? null : (lineup[rot] ?? null);
+  };
+
+  it("a service run walks the serving team through its whole lineup", () => {
+    const m = new TestMatch();
+    m.ready("A", "LEFT");
+    const seen = [serverOf(m)];
+    for (let i = 0; i < 4; i++) {
+      m.score("A", 1); // A wins WHILE serving → must rotate every time
+      seen.push(serverOf(m));
+    }
+    // Four players, so the fifth service returns to the first player.
+    expect(seen).toEqual(["a1", "a2", "a3", "a4", "a1"]);
+    expect(m.set.currentServer).toBe("A");
+  });
+
+  it("the receiving team starts at its position 1, then advances per point", () => {
+    const m = new TestMatch();
+    m.ready("A", "LEFT");
+    m.score("B", 1); // side-out: B's first service of the set
+    expect(serverOf(m)).toBe("b1");
+    m.score("B", 1); // B wins while serving → rotates
+    expect(serverOf(m)).toBe("b2");
+  });
+
+  it("a jump-serve foot fault rotates the team it awards the point to", () => {
+    const m = new TestMatch();
+    m.ready("A", "LEFT");
+    m.score("A", 1); // A now on rotation index 1
+    expect(serverOf(m)).toBe("a2");
+    m.dispatch({ type: "ATTACK_ARC_FAULT", team: "B" }); // point to A, still serving
+    expect(m.set.currentServer).toBe("A");
+    expect(serverOf(m)).toBe("a3");
+    m.dispatch({ type: "JUMP_SERVE_FOOT_FAULT", team: "A" }); // point + serve to B
+    expect(m.set.currentServer).toBe("B");
+    expect(serverOf(m)).toBe("b1");
+  });
+});

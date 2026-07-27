@@ -6,6 +6,12 @@ import { aliasedTable, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { competitions, events, matches, teams, tenants } from "@/db/schema";
 import { loadMatchState } from "@/lib/match-engine";
+import {
+  loadOfficials,
+  loadSignatures,
+  type OfficialRecord,
+  type SignatureRecord,
+} from "@/lib/match-signatures";
 
 export interface ReportSet {
   setNumber: number;
@@ -29,6 +35,15 @@ export interface ReportEvent {
   payload: Record<string, unknown> | null;
 }
 
+/** APPROVAL block of the official scoresheet (spec/20). */
+export interface ReportApproval {
+  /** How the result became official, or null while it is still pending. */
+  confirmedVia: "SIGNATURES" | "ADMIN" | null;
+  confirmedAt: Date | null;
+  officials: OfficialRecord[];
+  signatures: SignatureRecord[];
+}
+
 export interface MatchReportData {
   matchId: string;
   discipline: string;
@@ -47,6 +62,7 @@ export interface MatchReportData {
   winner: "A" | "B" | null;
   sets: ReportSet[];
   events: ReportEvent[];
+  approval: ReportApproval;
 }
 
 export class MatchReportNotFound extends Error {}
@@ -69,6 +85,8 @@ export async function loadMatchReport(
       scheduledAt: matches.scheduledAt,
       startedAt: matches.startedAt,
       finishedAt: matches.finishedAt,
+      confirmedAt: matches.confirmedAt,
+      confirmedVia: matches.confirmedVia,
       setsWonA: matches.setsWonA,
       setsWonB: matches.setsWonB,
       winner: matches.winner,
@@ -99,6 +117,13 @@ export async function loadMatchReport(
     .from(events)
     .where(eq(events.matchId, matchId))
     .orderBy(asc(events.sequence));
+
+  // Officials + signatures for the APPROVAL block. Retained forever, so a
+  // reprint of an old sheet shows exactly who signed it and when.
+  const [officials, signatures] = await Promise.all([
+    loadOfficials(matchId),
+    loadSignatures(matchId),
+  ]);
 
   // Per-set detail from an engine replay (beach only — best effort).
   let sets: ReportSet[] = [];
@@ -134,6 +159,12 @@ export async function loadMatchReport(
     winner: m.winner,
     sets,
     events: evRows as ReportEvent[],
+    approval: {
+      confirmedVia: m.confirmedVia,
+      confirmedAt: m.confirmedAt,
+      officials,
+      signatures,
+    },
   };
 }
 

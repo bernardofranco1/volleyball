@@ -94,10 +94,18 @@ function applyPoint(set: LightSetState, winner: TeamId, n: number): LightSetStat
   else s.scoreB += 1;
 
   // Air/Light: the team that wins the rally ALWAYS rotates clockwise and serves
-  // next — including when it was already serving (FIVB Light Volleyball rule;
-  // brief §7 / Appendix A, confirmed by the product owner). This differs from
-  // indoor/beach, where the server continues on a won rally. A team's first
-  // service in a set uses index 0; every subsequent win advances one position.
+  // next — including when it was already serving. Two clauses of the Light
+  // Volleyball Competition Rules 2022-2025 together make rotation follow EVERY
+  // point won, not just a side-out:
+  //   8.6.2  the receiving team that wins a rally rotates and serves (side-out);
+  //   10.2.2 "when the serving team wins the rally, the player who served before
+  //          rotates, and the player who moves from front-right (position 2) to
+  //          back-right (position 1) serves".
+  // (8.6.3 adds that a point gained from an opponent's penalty rotates too —
+  // penalties award no point in this engine, so the scorer records the point and
+  // rotation follows from it.) This differs from indoor/beach/grass, where the
+  // server continues after a won rally. A team's first service in a set uses
+  // index 0; every subsequent win advances one position.
   s.currentServer = winner;
   if (winner === "A") {
     const next = s.lastRotA === null ? 0 : (s.lastRotA + 1) % n;

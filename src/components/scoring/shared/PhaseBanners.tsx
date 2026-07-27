@@ -85,6 +85,10 @@ export interface PrePhaseOptions {
   lineupPendingText?: string;
   /** Discipline-specific interstitial banner (beach TTO, indoor VCS), or null. */
   extraPhase?: React.ReactElement | null;
+  /** Extra control in the match-won banner (the scoresheet sign-off entry). */
+  finishedExtra?: React.ReactNode;
+  /** Hide the match-won Undo — a signed scoresheet locks the match (spec/20). */
+  finishedUndoHidden?: boolean;
 }
 
 /**
@@ -107,6 +111,8 @@ export function usePrePhaseBanner({
   teamBColor = null,
   lineupPendingText,
   extraPhase,
+  finishedExtra,
+  finishedUndoHidden = false,
 }: PrePhaseOptions): React.ReactElement | null {
   const t = useT();
   // Side chosen for team A at the coin toss; consumed by the set-1 start banner.
@@ -245,10 +251,15 @@ export function usePrePhaseBanner({
               setsB: state.setsWonB,
             })}
           </span>
-          {undoButton(
-            t("scoring.undoLastPoint"),
-            t("scoring.confirmUndoPoint", { set: state.currentSetNumber }),
-          )}
+          {finishedExtra}
+          {/* Undo disappears once the scoresheet is signed: the result is a
+              signed document and the server refuses further events. */}
+          {finishedUndoHidden
+            ? null
+            : undoButton(
+                t("scoring.undoLastPoint"),
+                t("scoring.confirmUndoPoint", { set: state.currentSetNumber }),
+              )}
         </div>
       </Banner>
     );

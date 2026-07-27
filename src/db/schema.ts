@@ -142,6 +142,11 @@ export const tournamentConfig = pgTable("tournament_config", {
   ttoTriggerScore: integer("tto_trigger_score"),
   ttoDurationSecs: integer("tto_duration_secs"),
 
+  // Obligation to sign the scoresheet before the result is official (spec/20).
+  resultSignatures: text("result_signatures", {
+    enum: ["REQUIRED", "OPTIONAL", "OFF"],
+  }),
+
   // Timeouts
   timeoutsPerSet: integer("timeouts_per_set"),
   timeoutsPerSetTiebreak: integer("timeouts_per_set_tiebreak"),
@@ -298,6 +303,13 @@ export const matches = pgTable(
     phaseName: text("phase_name"),
     scorerPin: text("scorer_pin"), // per-match 6-digit scorer gate (brief §5.2)
 
+    // Result approval (spec/20). A scorer's final point parks the match at
+    // PENDING_CONFIRMATION; it becomes FINISHED either when the scoresheet is
+    // signed (SIGNATURES) or when a manager confirms it (ADMIN).
+    confirmedAt: timestamp("confirmed_at"),
+    confirmedBy: text("confirmed_by"),
+    confirmedVia: text("confirmed_via", { enum: ["SIGNATURES", "ADMIN"] }),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
@@ -406,6 +418,107 @@ export const interruptRequests = pgTable(
   },
   // Polled by every scorer console — (matchId, status) matches the PENDING scan.
   (t) => [index("interrupt_requests_match_status_idx").on(t.matchId, t.status)],
+).enableRLS();
+
+// ── Result approval: officials & scoresheet signatures (spec/20) ─────────────
+
+/**
+ * Match officials as printed in the scoresheet APPROVAL block. Today only the
+ * 1st referee is captured — typed at the table when the scoresheet is signed
+ * (`source: MANUAL`) — but the roles the beach and indoor sheets carry are all
+ * modelled so the later "officials arrive with the match data" import has a
+ * home to write to (`source: IMPORT`) with no schema change.
+ */
+export const matchOfficials = pgTable(
+  "match_officials",
+  {
+    id: text("id").primaryKey(),
+    matchId: text("match_id")
+      .notNull()
+      .references(() => matches.id),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    role: text("role", {
+      enum: [
+        "FIRST_REFEREE",
+        "SECOND_REFEREE",
+        "SCORER",
+        "ASSISTANT_SCORER",
+        "THIRD_REFEREE",
+        "CHALLENGE_REFEREE",
+        "LINE_JUDGE_1",
+        "LINE_JUDGE_2",
+        "LINE_JUDGE_3",
+        "LINE_JUDGE_4",
+      ],
+    }).notNull(),
+    name: text("name").notNull(),
+    // Printed by the beach sheet (Country) and the indoor sheet (Level). Both
+    // optional — name only is required today.
+    country: text("country"),
+    level: text("level"),
+    source: text("source", { enum: ["MANUAL", "IMPORT"] })
+      .default("MANUAL")
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdBy: text("created_by"),
+  },
+  (t) => [unique("match_officials_role").on(t.matchId, t.role)],
+).enableRLS();
+
+/**
+ * Signatures collected on the scorer device after the match: both captains and
+ * the 1st referee. Retained permanently — they are part of the official
+ * document, so a superseded signature is INVALIDATED (never deleted).
+ *
+ * `resultDigest` + `signedSequence` bind a signature to one exact state of the
+ * event log, so a later undo/rewind cannot silently re-attribute consent to a
+ * different score: reopening a signed match invalidates all three.
+ *
+ * `strokes` holds vector polylines normalised to the pad (0..1), not a raster
+ * image — it draws crisply into the PDF and never reaches a CDN.
+ */
+export const matchSignatures = pgTable(
+  "match_signatures",
+  {
+    id: text("id").primaryKey(),
+    matchId: text("match_id")
+      .notNull()
+      .references(() => matches.id),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    role: text("role", {
+      enum: ["TEAM_A_CAPTAIN", "TEAM_B_CAPTAIN", "FIRST_REFEREE"],
+    }).notNull(),
+    signerName: text("signer_name").notNull(),
+    signerPlayerId: text("signer_player_id").references(() => players.id),
+    // Vector strokes, or null when the signer refused to sign.
+    strokes: jsonb("strokes").$type<{
+      pad: { w: number; h: number };
+      strokes: number[][][];
+    }>(),
+    intent: text("intent", { enum: ["ACCEPT", "PROTEST", "REFUSED"] })
+      .default("ACCEPT")
+      .notNull(),
+    remarks: text("remarks"),
+    signedAt: timestamp("signed_at").defaultNow().notNull(),
+    signedSequence: integer("signed_sequence").notNull(),
+    resultDigest: text("result_digest").notNull(),
+    // The authenticated session that captured the signature on the device.
+    capturedBy: text("captured_by"),
+    deviceInfo: text("device_info"),
+    invalidatedAt: timestamp("invalidated_at"),
+    invalidatedReason: text("invalidated_reason"),
+  },
+  (t) => [
+    index("match_signatures_match_idx").on(t.matchId),
+    // One live signature per role; invalidated ones stay for the record.
+    uniqueIndex("match_signatures_live_role")
+      .on(t.matchId, t.role)
+      .where(sql`${t.invalidatedAt} is null`),
+  ],
 ).enableRLS();
 
 // ── Pools & standings ────────────────────────────────────────────────────────

@@ -78,7 +78,8 @@ function duration(data: MatchReportData): string {
   return h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
 }
 
-function renderPdf(data: MatchReportData): Promise<Buffer> {
+/** Exported for the render tests (no DB, fabricated data). */
+export function renderPdf(data: MatchReportData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: PAGE.margin });
     const chunks: Buffer[] = [];
@@ -196,6 +197,9 @@ function renderPdf(data: MatchReportData): Promise<Buffer> {
       }
     }
 
+    // ── Approval (scoresheet signatures) ────────────────────────────────────
+    renderApproval(doc, data, left, width, heading);
+
     // ── Full event log ──────────────────────────────────────────────────────
     heading("Event log");
     if (data.events.length === 0) {
@@ -225,6 +229,162 @@ function renderPdf(data: MatchReportData): Promise<Buffer> {
 
     doc.end();
   });
+}
+
+// ── Approval block (spec/20) ────────────────────────────────────────────────
+// The paper sheet's APPROVAL / SIGNATURES box: who signed, as what, when, and
+// the mark itself. Signatures are stored as vector polylines normalised to the
+// pad box, so they are drawn here with plain PDF path operators — no raster
+// image, and crisp at any print size.
+
+const SIG_BOX = { w: 150, h: 48 };
+
+function drawSignature(
+  doc: PDFKit.PDFDocument,
+  strokes: { pad: { w: number; h: number }; strokes: number[][][] } | null,
+  x: number,
+  y: number,
+  w = SIG_BOX.w,
+  h = SIG_BOX.h,
+) {
+  // Signature line, always drawn — an empty box is itself a statement.
+  doc.save().lineWidth(0.5).strokeColor(RULE);
+  doc.moveTo(x, y + h).lineTo(x + w, y + h).stroke();
+  doc.restore();
+  if (!strokes || strokes.strokes.length === 0) return;
+  // Fit the pad's aspect ratio inside the box (pad coords are 0..1 by 0..ratio).
+  const ratio = strokes.pad.h || 0.32;
+  const scale = Math.min(w, h / ratio);
+  const ox = x + (w - scale) / 2;
+  const oy = y + (h - scale * ratio) / 2;
+  doc.save().lineWidth(1).strokeColor(INK).lineJoin("round").lineCap("round");
+  for (const stroke of strokes.strokes) {
+    if (stroke.length === 0) continue;
+    doc.moveTo(ox + stroke[0][0] * scale, oy + stroke[0][1] * scale);
+    if (stroke.length === 1) {
+      // A dot: a hairline segment so it shows up at print size.
+      doc.lineTo(ox + stroke[0][0] * scale + 0.6, oy + stroke[0][1] * scale);
+    } else {
+      for (const p of stroke.slice(1))
+        doc.lineTo(ox + p[0] * scale, oy + p[1] * scale);
+    }
+    doc.stroke();
+  }
+  doc.restore();
+}
+
+function intentNote(intent: string): string {
+  if (intent === "PROTEST") return " (signed under protest)";
+  if (intent === "REFUSED") return " (refused to sign)";
+  return "";
+}
+
+function renderApproval(
+  doc: PDFKit.PDFDocument,
+  data: MatchReportData,
+  left: number,
+  width: number,
+  heading: (text: string) => void,
+) {
+  const { approval } = data;
+  heading("Approval");
+
+  const status =
+    approval.confirmedVia === "SIGNATURES"
+      ? `Result confirmed by signature — ${fmtDateTime(approval.confirmedAt)}`
+      : approval.confirmedVia === "ADMIN"
+        ? `Result confirmed by a competition manager — ${fmtDateTime(approval.confirmedAt)}`
+        : "Result not confirmed yet.";
+  doc.fillColor(DIM).font("Helvetica").fontSize(9).text(status, left, doc.y);
+  doc.moveDown(0.5);
+
+  const referee = approval.officials.find((o) => o.role === "FIRST_REFEREE");
+  const sigOf = (role: string) => approval.signatures.find((s) => s.role === role);
+
+  // Three boxes side by side where the page allows: A captain, B captain, 1st ref.
+  const entries = [
+    {
+      label: `${data.teamAName} — captain`,
+      sig: sigOf("TEAM_A_CAPTAIN"),
+      fallbackName: null as string | null,
+    },
+    {
+      label: `${data.teamBName} — captain`,
+      sig: sigOf("TEAM_B_CAPTAIN"),
+      fallbackName: null as string | null,
+    },
+    {
+      label: "First referee",
+      sig: sigOf("FIRST_REFEREE"),
+      fallbackName: referee?.name ?? null,
+    },
+  ];
+
+  const boxW = Math.min(SIG_BOX.w, (width - 24) / 3);
+  const boxH = SIG_BOX.h;
+  ensureSpace(doc, boxH + 46);
+  const top = doc.y;
+  entries.forEach((entry, i) => {
+    const x = left + i * (boxW + 12);
+    doc
+      .fillColor(DIM)
+      .font("Helvetica")
+      .fontSize(8)
+      .text(entry.label.toUpperCase(), x, top, { width: boxW, ellipsis: true });
+    drawSignature(doc, entry.sig?.strokes ?? null, x, top + 12, boxW, boxH);
+    const name = entry.sig?.signerName ?? entry.fallbackName ?? "—";
+    doc
+      .fillColor(INK)
+      .font("Helvetica")
+      .fontSize(8)
+      .text(`${name}${entry.sig ? intentNote(entry.sig.intent) : ""}`, x, top + boxH + 16, {
+        width: boxW,
+        ellipsis: true,
+      });
+    if (entry.sig)
+      doc
+        .fillColor(DIM)
+        .fontSize(7)
+        .text(fmtDateTime(entry.sig.signedAt), x, top + boxH + 26, {
+          width: boxW,
+          ellipsis: true,
+        });
+  });
+  doc.y = top + boxH + 40;
+
+  // Remarks that came with a protest or a refusal belong on the sheet.
+  const remarks = approval.signatures.filter((s) => s.remarks);
+  if (remarks.length > 0) {
+    doc.moveDown(0.4);
+    doc.fillColor(DIM).font("Helvetica-Bold").fontSize(8).text("REMARKS", left, doc.y);
+    for (const s of remarks) {
+      ensureSpace(doc, 14);
+      doc
+        .fillColor(INK)
+        .font("Helvetica")
+        .fontSize(8)
+        .text(`${s.signerName}${intentNote(s.intent)}: ${s.remarks}`, left, doc.y, {
+          width,
+        });
+    }
+  }
+
+  // Verification trail: the digest ties this printed sheet to one exact state of
+  // the event log, so a reprint can be checked against the data.
+  const first = approval.signatures[0];
+  if (first) {
+    doc.moveDown(0.4);
+    doc
+      .fillColor(DIM)
+      .font("Helvetica")
+      .fontSize(7)
+      .text(
+        `Signed at event #${first.signedSequence} · result digest ${first.resultDigest.slice(0, 16)}`,
+        left,
+        doc.y,
+        { width },
+      );
+  }
 }
 
 // ── Event-log document (?type=log) ──────────────────────────────────────────

@@ -262,6 +262,31 @@ export default async function CompetitionOverviewPage({
                 <option value="off">{t("common.off")}</option>
               </select>
             </div>
+            {/* Obligation to sign the scoresheet after the match (spec/20).
+                Offered for the disciplines whose consoles carry the signing
+                flow — beach and indoor. */}
+            {(discipline === "BEACH" || discipline === "INDOOR") && (
+              <div>
+                <label className={ui.label} htmlFor="resultSignatures">
+                  {t("comp.resultSignatures")}
+                </label>
+                <select
+                  id="resultSignatures"
+                  name="resultSignatures"
+                  defaultValue={configRow?.resultSignatures ?? ""}
+                  className={ui.select}
+                >
+                  <option value="">
+                    {t("common.default", {
+                      value: t(`comp.sig.${resolved.resultSignatures}`),
+                    })}
+                  </option>
+                  <option value="REQUIRED">{t("comp.sig.REQUIRED")}</option>
+                  <option value="OPTIONAL">{t("comp.sig.OPTIONAL")}</option>
+                  <option value="OFF">{t("comp.sig.OFF")}</option>
+                </select>
+              </div>
+            )}
             {/* TTO length — drives the countdown on the scorer console and the
                 public board. FIVB beach default is 30 s (rule 15.4.2); a
                 different length needs FIVB approval for official events. */}

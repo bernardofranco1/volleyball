@@ -313,9 +313,15 @@ function derivedMatchColumns(
   finalState: CommonMatchState,
   opts: { includeSnapshot: boolean; status?: MatchRowStatus },
 ) {
-  // Caller may override the row status (a scorer's final point parks the match
-  // at PENDING_CONFIRMATION even though the engine reports FINISHED).
-  const status = opts.status ?? meta.engine.matchStatusOf(finalState);
+  // A finished match is never written straight to FINISHED: the result waits at
+  // PENDING_CONFIRMATION until the scoresheet is signed or a manager confirms
+  // it. This is the DEFAULT (not just the append path's override) because undo
+  // and rewind write these columns too — they used to re-derive a bare
+  // FINISHED and silently skip the confirmation step (spec/20).
+  const engineStatus = meta.engine.matchStatusOf(finalState);
+  const status =
+    opts.status ??
+    (engineStatus === "FINISHED" ? "PENDING_CONFIRMATION" : engineStatus);
   return {
     setsWonA: finalState.setsWonA,
     setsWonB: finalState.setsWonB,
@@ -331,8 +337,13 @@ function derivedMatchColumns(
       ? { startedAt: new Date(finalState.matchStartedAt) }
       : {}),
     // Set only when actually FINISHED (not while pending); explicitly cleared
-    // when a rewind takes a match back out of FINISHED.
+    // when a rewind takes a match back out of FINISHED — together with the
+    // approval columns, which would otherwise claim a confirmation of a result
+    // that no longer exists.
     finishedAt: status === "FINISHED" ? new Date() : null,
+    ...(status === "FINISHED"
+      ? {}
+      : { confirmedAt: null, confirmedBy: null, confirmedVia: null }),
   };
 }
 

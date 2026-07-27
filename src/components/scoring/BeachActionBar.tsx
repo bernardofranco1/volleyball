@@ -32,11 +32,16 @@ export function BeachActionBar({
   teamBName,
   teamAColor,
   teamBColor,
+  finishedExtra,
+  finishedUndoHidden,
 }: {
   teamAName: string;
   teamBName: string;
   teamAColor: string | null;
   teamBColor: string | null;
+  /** Scoresheet sign-off entry shown in the match-won banner (spec/20). */
+  finishedExtra?: React.ReactNode;
+  finishedUndoHidden?: boolean;
 }) {
   const t = useT();
   const { state, config, dispatch, pending } = useMatch();
@@ -99,6 +104,8 @@ export function BeachActionBar({
     pending,
     teamAColor,
     teamBColor,
+    finishedExtra,
+    finishedUndoHidden,
     extraPhase:
       state.rallyPhase === "TTO_ACTIVE" ? (
         // A mis-tapped point can be what triggered this TTO — offer Undo here.
