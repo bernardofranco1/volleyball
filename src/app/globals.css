@@ -82,3 +82,36 @@ body {
 [data-theme="light"] .theme-icon-light {
   display: inline;
 }
+
+/*
+ * Rotation motion (spec/08 "Court art") — shared by the scorer's SVG court and
+ * the indoor broadcast board so both surfaces rotate identically.
+ *
+ * The X and Y components of a move live on NESTED elements with DIFFERENT
+ * easing curves. That is what bends the path: a player travelling to a
+ * diagonally-placed zone sweeps around the rotation ring instead of cutting
+ * straight across the middle of the court, and a move along one axis (the usual
+ * case once the zones are ordered correctly) stays perfectly straight. Only
+ * `transform` animates, so the whole rotation is GPU-composited.
+ */
+.court-rot-x {
+  transition: transform 700ms cubic-bezier(0.36, 0.02, 0.24, 1);
+  will-change: transform;
+}
+.court-rot-y {
+  transition: transform 700ms cubic-bezier(0.14, 0.62, 0.28, 1);
+  will-change: transform;
+}
+/* The serve marker hands over as the players LAND (700ms move → the fade runs
+   440-660ms), instead of teleporting to the new server the instant a point is
+   scored. Reduced motion snaps it, like the move itself. */
+.court-serve {
+  transition: opacity 220ms ease-out 440ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .court-rot-x,
+  .court-rot-y,
+  .court-serve {
+    transition: none;
+  }
+}

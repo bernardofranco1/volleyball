@@ -7,17 +7,31 @@ import {
   type CourtSlot,
   type CourtTeam,
 } from "@/components/court/PositionalCourt";
+import { LIGHT_ZONES } from "@/components/court/zones";
 
-// Light court (4- or 5-player) — players on a real court, position 1 = server
-// (courtPositions[lastRot]) with the rest following the rotation. Front line is
-// 2·3 (4-player) or 2·3·4 (5-player); back line is 1·4 or 1·5. Dashed attack
+// Light/Air court (4- or 5-player) — players on a real court, position 1 = server
+// (courtPositions[lastRot]) with the rest following the rotation. Dashed attack
 // line (2 m) and a faint service-restraint line near the baseline.
-// back ends with position 1 so the server renders at the back (bottom for the
-// left team → diagonal mirror across the net).
-const LAYOUT: Record<number, { front: number[]; back: number[] }> = {
-  4: { front: [2, 3], back: [4, 1] },
-  5: { front: [2, 3, 4], back: [5, 1] },
-};
+//
+// Zone geometry follows the rulebook diagrams (Light Volleyball Competition
+// Rules 2022-2025, 8.4.1 four players / 8.4.2 five players): "positions 1 and 2
+// are in the same line; positions 3 and 4 are in the same line" (4-player) and
+// "positions 1 and 2 are in the same line; positions 4 and 5 are in the same
+// line" (5-player). Each column is listed top → bottom, and for the left team
+// the team's right-hand side renders at the BOTTOM (so position 1 — the server —
+// sits back-bottom, mirrored across the net for the right team). Right-side
+// zones therefore come LAST in both columns:
+//
+//        4-player            5-player
+//        ┌──────┬──────┐     ┌──────┬──────┐
+//   top  │  4   │  3   │     │  5   │  4   │
+//        │      │      │     │      │  3   │
+//   bot  │  1   │  2   │     │  1   │  2   │
+//        └ back ┴ front┘     └ back ┴ front┘  (net to the right)
+//
+// This also makes the rotation a clean ring: every step of 2→1→4→3→2 moves to an
+// adjacent zone, so players sweep round the court instead of crossing it.
+const LAYOUT = LIGHT_ZONES;
 
 export function LightCourt({
   courtPositionsA,
@@ -63,6 +77,9 @@ export function LightCourt({
         isServer: posNum === 1 && serving,
         isLibero: false,
         present: pid != null,
+        // Player identity keys the marker so it SLIDES to its new zone on
+        // rotation instead of the zone's contents swapping in place.
+        key: pid ?? undefined,
       };
     };
 

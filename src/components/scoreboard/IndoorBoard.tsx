@@ -5,6 +5,7 @@ import { resolveTeamColor } from "@/lib/colors";
 import type { BoardTheme } from "@/lib/board-theme";
 import type { BoardSet } from "@/components/scoreboard/BroadcastBoard";
 import { useFitText } from "@/components/scoreboard/useFitText";
+import { INDOOR_ZONES } from "@/components/court/zones";
 
 // Indoor-exclusive board — court formation (spec/change-requests/08, matches the
 // approved mock). Positions 1–6 as jerseys on a 2:1 court (net in the middle,
@@ -93,21 +94,23 @@ function Jersey({ p, teamColor, accent }: { p: IndoorPlayer; teamColor: string; 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5cqmin", width: "15cqmin" }}>
       <div style={{ position: "relative", width: "7.5cqmin", height: "7cqmin" }}>
-        {serving ? (
-          <span
-            style={{
-              position: "absolute",
-              top: "-0.8cqmin",
-              right: "-0.8cqmin",
-              width: "2.8cqmin",
-              height: "2.8cqmin",
-              borderRadius: "50%",
-              background: accent,
-              border: "0.3cqmin solid #fff",
-              zIndex: 1,
-            }}
-          />
-        ) : null}
+        {/* Always rendered and opacity-crossfaded so the serve dot hands over as
+            the jerseys LAND, instead of jumping to the new server at t=0. */}
+        <span
+          className="court-serve"
+          style={{
+            position: "absolute",
+            top: "-0.8cqmin",
+            right: "-0.8cqmin",
+            width: "2.8cqmin",
+            height: "2.8cqmin",
+            borderRadius: "50%",
+            background: accent,
+            border: "0.3cqmin solid #fff",
+            zIndex: 1,
+            opacity: serving ? 1 : 0,
+          }}
+        />
         <svg viewBox="0 0 64 60" width="100%" height="100%" style={{ display: "block" }}>
           <path
             d="M21 4 L26 9 Q32 12 38 9 L43 4 L60 14 L53 25 L47 21.5 L47 56 L17 56 L17 21.5 L11 25 L4 14 Z"
@@ -137,8 +140,8 @@ function Jersey({ p, teamColor, accent }: { p: IndoorPlayer; teamColor: string; 
 // Vertical (top→bottom) zone order per half. The right half mirrors the left so
 // the two servers sit diagonally opposite (bottom-left vs top-right) — matching
 // the scorer's PositionalCourt.
-const BACK_ZONES = [5, 6, 1];
-const FRONT_ZONES = [4, 3, 2];
+const BACK_ZONES = INDOOR_ZONES.back;
+const FRONT_ZONES = INDOOR_ZONES.front;
 
 /** Target (x%, y%) of a rotation position within the whole court box. */
 function courtCoord(side: "a" | "b", pos: number): { x: number; y: number } {
@@ -169,20 +172,26 @@ function HalfLayer({ rotation, side, teamColor, accent }: { rotation: IndoorPlay
         const tx = (x / 100) * COURT_W_CQ;
         const ty = (y / 100) * COURT_H_CQ;
         return (
+          // Same two-axis motion as the scorer's court (.court-rot-x / -y in
+          // globals.css): the outer element carries X, the inner one Y, each with
+          // its own easing, so the six jerseys sweep round the rotation ring
+          // together — and a diagonal move arcs rather than cutting across.
+          // Centring is applied innermost so it never animates.
           <div
             key={p.key ?? `${side}-${i}`}
+            className="court-rot-x"
             style={{
               position: "absolute",
               left: 0,
               top: 0,
-              // translate to the target point, then back by half the jersey's own
-              // size to centre it there. Only `transform` animates.
-              transform: `translate(${tx}cqmin, ${ty}cqmin) translate(-50%, -50%)`,
-              transition: "transform 650ms cubic-bezier(0.22, 1, 0.36, 1)",
-              willChange: "transform",
+              transform: `translateX(${tx}cqmin)`,
             }}
           >
-            <Jersey p={p} teamColor={teamColor} accent={accent} />
+            <div className="court-rot-y" style={{ transform: `translateY(${ty}cqmin)` }}>
+              <div style={{ transform: "translate(-50%, -50%)" }}>
+                <Jersey p={p} teamColor={teamColor} accent={accent} />
+              </div>
+            </div>
           </div>
         );
       })}

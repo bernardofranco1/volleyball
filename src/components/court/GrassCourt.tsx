@@ -7,16 +7,14 @@ import {
   type CourtSlot,
   type CourtTeam,
 } from "@/components/court/PositionalCourt";
+import { GRASS_ZONES } from "@/components/court/zones";
 
 // Grass court (3v3 / 4v4) — players placed on a real court in rotation order:
 // position 1 is the server (courtPositions[lastRot]) and the rest follow the
 // rotation. No attack line (beach-style rules), no libero.
 // front = nearest the net, back = baseline; back ends with position 1 so the
 // server renders at the back (bottom for the left team → diagonal mirror).
-const LAYOUT: Record<number, { front: number[]; back: number[] }> = {
-  3: { front: [3], back: [2, 1] }, // 1 front, 2 back
-  4: { front: [2, 3], back: [4, 1] },
-};
+const LAYOUT = GRASS_ZONES;
 
 export function GrassCourt({
   courtPositionsA,
@@ -62,6 +60,9 @@ export function GrassCourt({
         isServer: posNum === 1 && serving,
         isLibero: false,
         present: pid != null,
+        // Player identity keys the marker so it SLIDES to its new zone on
+        // rotation instead of the zone's contents swapping in place.
+        key: pid ?? undefined,
       };
     };
 

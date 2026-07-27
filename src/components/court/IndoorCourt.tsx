@@ -7,13 +7,13 @@ import {
   type CourtSlot,
   type CourtTeam,
 } from "@/components/court/PositionalCourt";
+import { INDOOR_ZONES } from "@/components/court/zones";
 
-// Indoor court — the six rotation zones placed on a real court (Rule 7.4): front
-// row 4·3·2 nearest the net, back row 5·6·1 toward the baseline. Position 1
-// (back-right) serves; the libero shows as a hollow ring. courtPositions[i] is
-// the player in position i+1.
-const FRONT = [4, 3, 2];
-const BACK = [5, 6, 1];
+// Indoor court — the six rotation zones placed on a real court (Rule 7.4).
+// Geometry lives in ./zones (shared with the broadcast board); position 1
+// (back-right) serves, the libero shows as a hollow ring, and courtPositions[i]
+// is the player in position i+1.
+const { front: FRONT, back: BACK } = INDOOR_ZONES;
 
 export function IndoorCourt({
   courtPositionsA,

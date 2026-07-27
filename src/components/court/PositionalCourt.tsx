@@ -99,9 +99,18 @@ function Marker({
 
   return (
     <g>
-      {slot.isServer ? (
-        <circle cx={cx} cy={cy} r={R + 2.5} fill="none" stroke="var(--primary)" strokeWidth={2.5} />
-      ) : null}
+      {/* Always rendered, opacity-crossfaded: on a rotation the ring/ball must
+          arrive WITH the new server rather than jumping there at t=0. */}
+      <circle
+        className="court-serve"
+        cx={cx}
+        cy={cy}
+        r={R + 2.5}
+        fill="none"
+        stroke="var(--primary)"
+        strokeWidth={2.5}
+        opacity={slot.isServer && slot.present ? 1 : 0}
+      />
       <circle
         cx={cx}
         cy={cy}
@@ -128,9 +137,16 @@ function Marker({
           {slot.posLabel}
         </text>
       ) : null}
-      {slot.isServer ? (
-        <circle cx={cx + R - 2} cy={cy - R + 2} r={4} fill="var(--primary)" stroke="#fff" strokeWidth={1} />
-      ) : null}
+      <circle
+        className="court-serve"
+        cx={cx + R - 2}
+        cy={cy - R + 2}
+        r={4}
+        fill="var(--primary)"
+        stroke="#fff"
+        strokeWidth={1}
+        opacity={slot.isServer && slot.present ? 1 : 0}
+      />
       {slot.isLibero ? (
         <text x={cx + R - 1} y={cy + R + 1} textAnchor="middle" fontSize={7} fontWeight={700} fill={color}>
           L
@@ -156,10 +172,13 @@ function HalfMarkers({ team, side }: { team: CourtTeam; side: "left" | "right" }
   const back = side === "right" ? [...team.back].reverse() : team.back;
   const frontYs = rowYs(front.length);
   const backYs = rowYs(back.length);
-  // One <g> per player, keyed by player identity and positioned via a CSS
-  // transform. On a side-out the player's target (x,y) changes and the transform
-  // transition slides them from the old zone to the new one — the rotation is
-  // shown, not just applied. Empty slots fall back to a positional key.
+  // Two nested <g> per player, keyed by player identity: the outer one carries
+  // the X component of the move, the inner one the Y component, each with its
+  // own easing (.court-rot-x / .court-rot-y in globals.css). The player's target
+  // zone changes on rotation and the transitions carry them there — along the
+  // rotation ring, because the two axes resolve at different rates, so a move to
+  // a diagonally-placed zone sweeps round instead of cutting across the court.
+  // Empty slots fall back to a positional key (nothing to follow).
   const items = [
     ...back.map((s, i) => ({ s, x: backX, y: backYs[i], fb: `${side}-b${i}` })),
     ...front.map((s, i) => ({ s, x: frontX, y: frontYs[i], fb: `${side}-f${i}` })),
@@ -167,15 +186,10 @@ function HalfMarkers({ team, side }: { team: CourtTeam; side: "left" | "right" }
   return (
     <g>
       {items.map(({ s, x, y, fb }) => (
-        <g
-          key={s.key ?? fb}
-          style={{
-            transform: `translate(${x}px, ${y}px)`,
-            transition: "transform 650ms cubic-bezier(0.22, 1, 0.36, 1)",
-            willChange: "transform",
-          }}
-        >
-          <Marker slot={s} cx={0} cy={0} color={color} />
+        <g key={s.key ?? fb} className="court-rot-x" style={{ transform: `translate(${x}px, 0px)` }}>
+          <g className="court-rot-y" style={{ transform: `translate(0px, ${y}px)` }}>
+            <Marker slot={s} cx={0} cy={0} color={color} />
+          </g>
         </g>
       ))}
     </g>
