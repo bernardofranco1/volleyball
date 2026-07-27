@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  fitStrokes,
   parseStrokes,
   resultDigest,
   resultFingerprint,
@@ -188,5 +189,59 @@ describe("signature obligation per discipline", () => {
       expect(["REQUIRED", "OPTIONAL", "OFF"]).toContain(
         resolveConfig(d).resultSignatures,
       );
+  });
+});
+
+// ── Placing ink on the page (spec/20) ───────────────────────────────────────
+// Strokes are stored in a UNIT SQUARE (x and y both 0..1). `fitStrokes` maps them
+// into a page box, letterboxed so the ink is never stretched and clamped so a
+// signature can never spill over neighbouring cells of the scoresheet — the bug
+// that made the first exports illegible was a y axis normalised 0..1 but drawn as
+// though it were 0..pad.h, which multiplied the ink ~3x out of its box.
+describe("fitStrokes", () => {
+  const pad = { w: 1, h: 0.32 };
+  const box = { x: 100, y: 200, w: 150, h: 48 };
+
+  it("keeps every point inside the box", () => {
+    const full = fitStrokes(
+      { pad, strokes: [[[0, 0], [1, 1], [0.5, 0.5], [1, 0], [0, 1]]] },
+      box,
+    );
+    for (const [x, y] of full[0]) {
+      expect(x).toBeGreaterThanOrEqual(box.x);
+      expect(x).toBeLessThanOrEqual(box.x + box.w);
+      expect(y).toBeGreaterThanOrEqual(box.y);
+      expect(y).toBeLessThanOrEqual(box.y + box.h);
+    }
+  });
+
+  it("letterboxes to the pad's aspect ratio instead of stretching", () => {
+    // Pad ratio 0.32; the box is 150x48 (ratio 0.32) → a perfect fit, so the
+    // corners land on the box corners.
+    const [line] = fitStrokes({ pad, strokes: [[[0, 0], [1, 1]]] }, box);
+    expect(line[0][0]).toBeCloseTo(100);
+    expect(line[0][1]).toBeCloseTo(200);
+    expect(line[1][0]).toBeCloseTo(250);
+    expect(line[1][1]).toBeCloseTo(248);
+  });
+
+  it("centres the ink when the box is a different shape", () => {
+    // A tall box: the width binds, so the drawing is vertically centred.
+    const tall = { x: 0, y: 0, w: 100, h: 100 };
+    const [line] = fitStrokes({ pad, strokes: [[[0, 0], [1, 1]]] }, tall);
+    expect(line[0][0]).toBeCloseTo(0);
+    expect(line[1][0]).toBeCloseTo(100);
+    // Drawn height is 100 * 0.32 = 32, centred in 100 → 34..66.
+    expect(line[0][1]).toBeCloseTo(34);
+    expect(line[1][1]).toBeCloseTo(66);
+  });
+
+  it("survives a nonsense pad ratio", () => {
+    const [line] = fitStrokes(
+      { pad: { w: 0, h: 0 }, strokes: [[[0.5, 0.5]]] },
+      box,
+    );
+    expect(Number.isFinite(line[0][0])).toBe(true);
+    expect(Number.isFinite(line[0][1])).toBe(true);
   });
 });

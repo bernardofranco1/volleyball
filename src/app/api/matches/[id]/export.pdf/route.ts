@@ -12,6 +12,7 @@ import {
   isInterruption,
   loadMatchReport,
 } from "@/lib/match-report";
+import { renderScoresheetPdf, drawSignatureInBox } from "@/lib/scoresheet-pdf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,11 +38,23 @@ export async function GET(
     throw err;
   }
 
-  // ?type=log → the chronological event-log document (readable one-line-per-
-  // event record, for protests/officiating); default → the match report.
-  const variant = req.nextUrl.searchParams.get("type") === "log" ? "log" : "report";
-  const pdf = variant === "log" ? await renderLogPdf(data) : await renderPdf(data);
-  const filename = variant === "log" ? `match-${id}-log.pdf` : `match-${id}.pdf`;
+  // ?type=sheet → the official scoresheet (the document the officials sign and
+  // hand in); ?type=log → the chronological event-log record (for protests);
+  // default → the internal match report.
+  const typeParam = req.nextUrl.searchParams.get("type");
+  const variant = typeParam === "log" ? "log" : typeParam === "sheet" ? "sheet" : "report";
+  const pdf =
+    variant === "log"
+      ? await renderLogPdf(data)
+      : variant === "sheet"
+        ? await renderScoresheetPdf(data)
+        : await renderPdf(data);
+  const filename =
+    variant === "log"
+      ? `match-${id}-log.pdf`
+      : variant === "sheet"
+        ? `scoresheet-${id}.pdf`
+        : `match-${id}.pdf`;
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
@@ -251,26 +264,9 @@ function drawSignature(
   doc.save().lineWidth(0.5).strokeColor(RULE);
   doc.moveTo(x, y + h).lineTo(x + w, y + h).stroke();
   doc.restore();
-  if (!strokes || strokes.strokes.length === 0) return;
-  // Fit the pad's aspect ratio inside the box (pad coords are 0..1 by 0..ratio).
-  const ratio = strokes.pad.h || 0.32;
-  const scale = Math.min(w, h / ratio);
-  const ox = x + (w - scale) / 2;
-  const oy = y + (h - scale * ratio) / 2;
-  doc.save().lineWidth(1).strokeColor(INK).lineJoin("round").lineCap("round");
-  for (const stroke of strokes.strokes) {
-    if (stroke.length === 0) continue;
-    doc.moveTo(ox + stroke[0][0] * scale, oy + stroke[0][1] * scale);
-    if (stroke.length === 1) {
-      // A dot: a hairline segment so it shows up at print size.
-      doc.lineTo(ox + stroke[0][0] * scale + 0.6, oy + stroke[0][1] * scale);
-    } else {
-      for (const p of stroke.slice(1))
-        doc.lineTo(ox + p[0] * scale, oy + p[1] * scale);
-    }
-    doc.stroke();
-  }
-  doc.restore();
+  // Ink is placed and clipped by the scoresheet helper: one implementation of
+  // the unit-square → page-box contract for both documents.
+  drawSignatureInBox(doc, strokes, { x, y, w, h });
 }
 
 function intentNote(intent: string): string {

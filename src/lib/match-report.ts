@@ -2,9 +2,9 @@
 // best-effort engine replay for per-set detail; no PDF concerns here (the route
 // owns PDFKit, which is nodejs-only). Beach-only set detail for now; other
 // disciplines fall back to the denormalised matches row.
-import { aliasedTable, asc, eq } from "drizzle-orm";
+import { aliasedTable, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { competitions, events, matches, teams, tenants } from "@/db/schema";
+import { competitions, events, matches, players, teams, tenants } from "@/db/schema";
 import { loadMatchState } from "@/lib/match-engine";
 import {
   loadOfficials,
@@ -13,6 +13,14 @@ import {
   type SignatureRecord,
 } from "@/lib/match-signatures";
 
+export interface ReportPlayer {
+  id: string;
+  fullName: string;
+  jerseyNumber: number | null;
+  isCaptain: boolean;
+  isLibero: boolean;
+}
+
 export interface ReportSet {
   setNumber: number;
   scoreA: number;
@@ -20,6 +28,11 @@ export interface ReportSet {
   winner: "A" | "B" | null;
   startedAt: string | null;
   endedAt: string | null;
+  /** Team time-outs used in this set (official sheet's RESULTS block). */
+  timeoutsUsedA: number;
+  timeoutsUsedB: number;
+  /** Beach only: the automatic technical time-out fired in this set. */
+  ttoFired: boolean;
 }
 
 export interface ReportEvent {
@@ -52,6 +65,10 @@ export interface MatchReportData {
   teamAName: string;
   teamBName: string;
   roundName: string | null;
+  matchNumber: number | null;
+  phaseName: string | null;
+  venue: string | null;
+  gender: string | null;
   courtNumber: number | null;
   scheduledAt: Date | null;
   startedAt: Date | null;
@@ -63,6 +80,8 @@ export interface MatchReportData {
   sets: ReportSet[];
   events: ReportEvent[];
   approval: ReportApproval;
+  rosterA: ReportPlayer[];
+  rosterB: ReportPlayer[];
 }
 
 export class MatchReportNotFound extends Error {}
@@ -78,9 +97,15 @@ export async function loadMatchReport(
       status: matches.status,
       competitionName: competitions.name,
       tenantName: tenants.name,
+      teamAId: matches.teamAId,
+      teamBId: matches.teamBId,
       teamAName: teamA.displayName,
       teamBName: teamB.displayName,
       roundName: matches.roundName,
+      matchNumber: matches.matchNumber,
+      phaseName: matches.phaseName,
+      venue: competitions.venue,
+      gender: competitions.gender,
       courtNumber: matches.courtNumber,
       scheduledAt: matches.scheduledAt,
       startedAt: matches.startedAt,
@@ -118,6 +143,32 @@ export async function loadMatchReport(
     .where(eq(events.matchId, matchId))
     .orderBy(asc(events.sequence));
 
+  // Rosters for the TEAMS block of the official sheet — jersey, name, captain.
+  const rosterRows = await db
+    .select({
+      id: players.id,
+      teamId: players.teamId,
+      fullName: players.fullName,
+      jerseyNumber: players.jerseyNumber,
+      isCaptain: players.isCaptain,
+      isLibero: players.isLibero,
+    })
+    .from(players)
+    .where(inArray(players.teamId, [m.teamAId, m.teamBId]))
+    .orderBy(asc(players.jerseyNumber));
+  const rosterOf = (teamId: string): ReportPlayer[] =>
+    rosterRows
+      .filter((r) => r.teamId === teamId)
+      .map((r) => ({
+        id: r.id,
+        fullName: r.fullName,
+        jerseyNumber: r.jerseyNumber,
+        isCaptain: r.isCaptain,
+        isLibero: r.isLibero,
+      }));
+  const rosterA = rosterOf(m.teamAId);
+  const rosterB = rosterOf(m.teamBId);
+
   // Officials + signatures for the APPROVAL block. Retained forever, so a
   // reprint of an old sheet shows exactly who signed it and when.
   const [officials, signatures] = await Promise.all([
@@ -136,6 +187,9 @@ export async function loadMatchReport(
       winner: s.winner,
       startedAt: s.startedAt,
       endedAt: s.endedAt,
+      timeoutsUsedA: s.timeoutsUsedA ?? 0,
+      timeoutsUsedB: s.timeoutsUsedB ?? 0,
+      ttoFired: (s as { ttoFired?: boolean }).ttoFired ?? false,
     }));
   } catch {
     // Unsupported discipline / replay failure → leave sets empty.
@@ -149,6 +203,10 @@ export async function loadMatchReport(
     teamAName: m.teamAName,
     teamBName: m.teamBName,
     roundName: m.roundName,
+    matchNumber: m.matchNumber,
+    phaseName: m.phaseName,
+    venue: m.venue,
+    gender: m.gender,
     courtNumber: m.courtNumber,
     scheduledAt: m.scheduledAt,
     startedAt: m.startedAt,
@@ -165,6 +223,8 @@ export async function loadMatchReport(
       officials,
       signatures,
     },
+    rosterA,
+    rosterB,
   };
 }
 

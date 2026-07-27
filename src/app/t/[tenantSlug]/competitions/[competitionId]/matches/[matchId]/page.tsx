@@ -179,6 +179,15 @@ export default async function MatchDetailPage({
           >
             {t("match.viewScoreboard")}
           </a>
+          {/* The official document the officials sign and hand in (spec/20). */}
+          <a
+            href={`/api/matches/${matchId}/export.pdf?type=sheet`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={ui.btnSecondary}
+          >
+            {t("match.exportScoresheet")}
+          </a>
           <a
             href={`/api/matches/${matchId}/export.pdf`}
             target="_blank"

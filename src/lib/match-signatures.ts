@@ -110,6 +110,38 @@ function round4(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
 
+/** A rectangle on the page (PDF points) that a signature must stay inside. */
+export interface StrokeBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Map unit-square strokes onto a page box, letterboxed to the pad's aspect ratio
+ * so the ink is never stretched — and clamped to the box, so a signature can
+ * never spill over neighbouring cells of the scoresheet. Returns polylines in
+ * page coordinates.
+ */
+export function fitStrokes(
+  strokes: SignatureStrokes,
+  box: StrokeBox,
+): number[][][] {
+  const ratio =
+    strokes.pad.w > 0 && strokes.pad.h > 0 ? strokes.pad.h / strokes.pad.w : 0.32;
+  // Whichever dimension binds first decides the drawn size.
+  const drawW = box.h / ratio <= box.w ? box.h / ratio : box.w;
+  const drawH = drawW * ratio;
+  const ox = box.x + (box.w - drawW) / 2;
+  const oy = box.y + (box.h - drawH) / 2;
+  const clampX = (v: number) => Math.min(box.x + box.w, Math.max(box.x, v));
+  const clampY = (v: number) => Math.min(box.y + box.h, Math.max(box.y, v));
+  return strokes.strokes.map((stroke) =>
+    stroke.map(([px, py]) => [clampX(ox + px * drawW), clampY(oy + py * drawH)]),
+  );
+}
+
 /** The slice of any engine state a signature attests to (all four match it). */
 export interface SignableState {
   matchId: string;

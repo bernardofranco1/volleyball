@@ -1,10 +1,15 @@
 "use client";
 
 /**
- * White signing area (spec/20). Captures a signature as VECTOR polylines
- * normalised to the pad box (0..1 on both axes), not a raster image: it prints
- * crisply into the scoresheet PDF at any size, stays a couple of KB in the
- * database, and never has to go near an image pipeline.
+ * White signing area (spec/20). Captures a signature as VECTOR polylines in a
+ * UNIT SQUARE — x and y both 0..1 as a fraction of the pad box — rather than a
+ * raster image: it prints crisply into the scoresheet at any size, stays a couple
+ * of KB in the database, and never goes near an image pipeline. `pad` carries the
+ * box's aspect ratio so a renderer can letterbox the ink instead of stretching it.
+ *
+ * Both axes are normalised the SAME way on purpose: mixing "x in 0..1, y in
+ * 0..ratio" is what previously pushed most of the ink outside the pad's viewBox
+ * on screen and outside its box in the PDF.
  *
  * Pointer Events only, with one active pointer at a time — a second touch (a
  * resting palm) is ignored rather than drawn. `touch-action: none` stops the
@@ -111,9 +116,12 @@ export function SignaturePad({
       >
         {/* Signing baseline, like the box on the paper sheet. */}
         <div className="pointer-events-none absolute inset-x-6 bottom-[22%] border-b border-dashed border-neutral-300" />
+        {/* Unit-square viewBox, stretched to the box: point (x,y) lands exactly
+            where the pointer was. Ink width is given in screen pixels via
+            non-scaling-stroke, so it stays a real pen line at any pad size. */}
         <svg
           className="pointer-events-none absolute inset-0 h-full w-full"
-          viewBox={`0 0 1 ${PAD_RATIO}`}
+          viewBox="0 0 1 1"
           preserveAspectRatio="none"
           aria-hidden
         >
@@ -123,7 +131,7 @@ export function SignaturePad({
               d={pathOf(stroke)}
               fill="none"
               stroke="#111111"
-              strokeWidth={0.006}
+              strokeWidth={2.6}
               strokeLinecap="round"
               strokeLinejoin="round"
               vectorEffect="non-scaling-stroke"

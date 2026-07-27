@@ -112,14 +112,38 @@ default, and leaving `FINISHED` clears `confirmed_at/by/via`.
 - `DELETE ?role=` → clears one signature before the set is complete (a re-do).
   Once confirmed, only `reopenMatchResult` can change anything.
 
-## Report PDF
+## Exports
 
-`renderPdf` gains an **Approval** section: three signature boxes (both captains
-+ 1st referee) with the mark drawn as vectors, the signer's name, the intent
-note, the signing time, a REMARKS list for protests/refusals, and the
-verification trail (`signed at event #N · result digest …`). `loadMatchReport`
-now loads officials + signatures. Nothing signature-related is exposed on the
-public results page or `results.csv`.
+Three documents come off `/api/matches/[id]/export.pdf`:
+
+| Variant | What it is |
+|---|---|
+| `?type=sheet` | **The official scoresheet** — the document the officials sign and hand in. Landscape A4, modelled on the FIVB *Beach Volleyball International Scoresheet* and the indoor sheet (VSR 3.16): header (competition / match no. / date / site / court / gender / phase / round), TEAMS with both rosters (captain and libero marked), SET RECORD (start, end, duration, points, winner, time-outs, TTO), RESULTS (per-set points, totals, sets won, winning team, match start/end/total), SANCTIONS, REMARKS (protest and refusal statements), GAME INTERRUPTIONS & COURT SWITCHES, and APPROVAL. Renderer: `src/lib/scoresheet-pdf.ts`. |
+| default | The internal match report (unchanged, plus the same approval block). |
+| `?type=log` | The chronological event-log record, for protests. |
+
+**Signatures are encapsulated.** Each one is drawn inside its own bordered
+square, in the pad's own aspect ratio so the ink fills the box, with the box set
+as a PDF clipping region — a signature physically cannot run over a neighbouring
+cell. `fitStrokes` (in `match-signatures.ts`) is the single implementation of the
+unit-square → page-box mapping and is shared by both documents; it letterboxes so
+the ink is never stretched and clamps every point into the box.
+
+**Stroke coordinate contract:** x and y are both `0..1` as a fraction of the pad;
+`pad` carries only the aspect ratio. Getting this wrong is what broke the first
+version — the pad stored y in `0..1` but drew it in a `0 0 1 0.32` viewBox (ink
+below the top third vanished on screen) and the PDF multiplied y as though it were
+`0..0.32` (ink sprawled ~3× outside its box, over the rest of the sheet).
+`signature-pad.test.tsx` and the `fitStrokes` tests pin both ends.
+
+The layout paginates: blocks check the room left before drawing, rosters longer
+than six names split into two columns, and the approval block is never split
+across pages. Nothing signature-related is exposed on the public results page or
+`results.csv`.
+
+Not yet built: the per-rally point-run grid (the numbered strips where each point
+is struck through). Every rally is in the event log with score, server team and
+server number, so it is a rendering job with no data work.
 
 ## Tests
 

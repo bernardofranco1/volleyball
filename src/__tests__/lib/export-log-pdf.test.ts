@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderLogPdf, renderPdf } from "@/app/api/matches/[id]/export.pdf/route";
+import { renderScoresheetPdf } from "@/lib/scoresheet-pdf";
 import type { MatchReportData, ReportEvent } from "@/lib/match-report";
 
 // Render-level test of the event-log PDF: fabricated match data through the
@@ -36,6 +37,10 @@ const DATA: MatchReportData = {
   teamAName: "Rossi / Bianchi",
   teamBName: "Silva / Costa",
   roundName: "Final",
+  matchNumber: 108,
+  phaseName: "Main Draw",
+  venue: "Centre Court",
+  gender: "FEMALE",
   courtNumber: 1,
   scheduledAt: TS,
   startedAt: TS,
@@ -46,6 +51,14 @@ const DATA: MatchReportData = {
   winner: "A",
   sets: [],
   approval: { confirmedVia: null, confirmedAt: null, officials: [], signatures: [] },
+  rosterA: [
+    { id: "p1", fullName: "Marco Rossi", jerseyNumber: 1, isCaptain: true, isLibero: false },
+    { id: "p2", fullName: "Luca Bianchi", jerseyNumber: 2, isCaptain: false, isLibero: false },
+  ],
+  rosterB: [
+    { id: "p3", fullName: "João Silva", jerseyNumber: 1, isCaptain: true, isLibero: false },
+    { id: "p4", fullName: "Pedro Costa", jerseyNumber: 2, isCaptain: false, isLibero: false },
+  ],
   events: [
     ev(1, "MATCH_CREATED", { matchId: "m1" }, null, null),
     ev(2, "COIN_TOSS", { firstServer: "A", teamAStartSide: "LEFT" }, null, null),
@@ -89,6 +102,9 @@ const SIGNED: MatchReportData = {
       winner: "A",
       startedAt: TS.toISOString(),
       endedAt: TS.toISOString(),
+      timeoutsUsedA: 1,
+      timeoutsUsedB: 0,
+      ttoFired: true,
     },
     {
       setNumber: 2,
@@ -97,6 +113,9 @@ const SIGNED: MatchReportData = {
       winner: "A",
       startedAt: TS.toISOString(),
       endedAt: TS.toISOString(),
+      timeoutsUsedA: 1,
+      timeoutsUsedB: 0,
+      ttoFired: true,
     },
   ],
   approval: {
@@ -170,5 +189,56 @@ describe("match report approval block", () => {
       approval: { confirmedVia: "ADMIN", confirmedAt: TS, officials: [], signatures: [] },
     });
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  });
+});
+
+// ── Official scoresheet (?type=sheet) ───────────────────────────────────────
+
+describe("official scoresheet export", () => {
+  it("renders the signed sheet in landscape with every block", async () => {
+    const pdf = await renderScoresheetPdf(SIGNED);
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    // A4 landscape: 842 x 595pt (MediaBox width > height).
+    const head = pdf.subarray(0, 2000).toString("latin1");
+    expect(head).toMatch(/MediaBox\s*\[\s*0\s+0\s+841\.89\s+595\.28\s*\]/);
+    expect(pdf.length).toBeGreaterThan(3000);
+  });
+
+  it("draws more ink when signatures are present", async () => {
+    const signed = await renderScoresheetPdf(SIGNED);
+    const unsigned = await renderScoresheetPdf(DATA);
+    expect(signed.length).toBeGreaterThan(unsigned.length);
+  });
+
+  it("renders with no roster, no sets and no signatures", async () => {
+    const bare = await renderScoresheetPdf({
+      ...DATA,
+      sets: [],
+      rosterA: [],
+      rosterB: [],
+      events: [],
+    });
+    expect(bare.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  });
+
+  it("survives a signature whose payload is out of range", async () => {
+    // Clamping happens in fitStrokes, and the box also clips — a malformed
+    // payload must never be able to scrawl across the rest of the sheet.
+    const wild = await renderScoresheetPdf({
+      ...SIGNED,
+      approval: {
+        ...SIGNED.approval,
+        signatures: [
+          {
+            ...SIGNED.approval.signatures[0],
+            strokes: {
+              pad: { w: 1, h: 0.32 },
+              strokes: [[[-5, -5], [12, 40], [0.5, 0.5]]],
+            },
+          },
+        ],
+      },
+    });
+    expect(wild.subarray(0, 5).toString("latin1")).toBe("%PDF-");
   });
 });
