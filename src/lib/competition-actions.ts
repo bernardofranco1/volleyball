@@ -12,9 +12,11 @@ import { normalizeHex } from "@/lib/colors";
 import {
   PLAYERS_PER_SIDE,
   canTransition,
+  isCategory,
   isCompetitionStatus,
   isDiscipline,
   isGender,
+  type Category,
   type Gender,
 } from "@/lib/domain";
 import {
@@ -97,11 +99,19 @@ export async function updateCompetition(
   const color = colorRaw ? normalizeHex(colorRaw) : null;
   if (colorRaw && !color) return fail("Colour must be a hex value like #1a2b3c.");
 
+  // Official-scoresheet header fields (spec/21): blank = null = empty cell.
+  const categoryRaw = str(fd, "category");
+  if (categoryRaw && !isCategory(categoryRaw)) return fail("Invalid category.");
+
   await db
     .update(competitions)
     .set({
       name,
       venue: str(fd, "venue") || null,
+      city: str(fd, "city") || null,
+      country: str(fd, "country") || null,
+      hall: str(fd, "hall") || null,
+      category: categoryRaw ? (categoryRaw as Category) : null,
       startDate: dateOrNull(fd, "startDate"),
       endDate: dateOrNull(fd, "endDate"),
       color,

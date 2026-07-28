@@ -13,6 +13,10 @@ import {
   loadMatchReport,
 } from "@/lib/match-report";
 import { renderScoresheetPdf, drawSignatureInBox } from "@/lib/scoresheet-pdf";
+import { resolveMatchConfig } from "@/lib/match-engine";
+import { buildOfficialSheetData } from "@/lib/scoresheet/official-data";
+import { renderIndoorOfficialPdf } from "@/lib/scoresheet/indoor-official";
+import { renderBeachOfficialPdf } from "@/lib/scoresheet/beach-official";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,23 +42,45 @@ export async function GET(
     throw err;
   }
 
-  // ?type=sheet → the official scoresheet (the document the officials sign and
-  // hand in); ?type=log → the chronological event-log record (for protests);
-  // default → the internal match report.
+  // ?type=official → the FIVB-style official scoresheet replica (spec/21,
+  // indoor + beach; other disciplines fall back to the block-structure sheet);
+  // ?type=sheet → the block-structure scoresheet (spec/20); ?type=log → the
+  // chronological event-log record (for protests); default → internal report.
   const typeParam = req.nextUrl.searchParams.get("type");
-  const variant = typeParam === "log" ? "log" : typeParam === "sheet" ? "sheet" : "report";
-  const pdf =
-    variant === "log"
-      ? await renderLogPdf(data)
-      : variant === "sheet"
-        ? await renderScoresheetPdf(data)
-        : await renderPdf(data);
+  const variant =
+    typeParam === "log"
+      ? "log"
+      : typeParam === "official"
+        ? "official"
+        : typeParam === "sheet"
+          ? "sheet"
+          : "report";
+  let pdf: Buffer;
+  if (variant === "official") {
+    const config = await resolveMatchConfig(id);
+    const sheetData = buildOfficialSheetData(data);
+    pdf =
+      data.discipline === "BEACH"
+        ? await renderBeachOfficialPdf(data, sheetData, config)
+        : data.discipline === "INDOOR"
+          ? await renderIndoorOfficialPdf(data, sheetData, config)
+          : await renderScoresheetPdf(data);
+  } else {
+    pdf =
+      variant === "log"
+        ? await renderLogPdf(data)
+        : variant === "sheet"
+          ? await renderScoresheetPdf(data)
+          : await renderPdf(data);
+  }
   const filename =
     variant === "log"
       ? `match-${id}-log.pdf`
-      : variant === "sheet"
-        ? `scoresheet-${id}.pdf`
-        : `match-${id}.pdf`;
+      : variant === "official"
+        ? `official-scoresheet-${id}.pdf`
+        : variant === "sheet"
+          ? `scoresheet-${id}.pdf`
+          : `match-${id}.pdf`;
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",

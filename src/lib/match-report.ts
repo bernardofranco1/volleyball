@@ -36,6 +36,8 @@ export interface ReportSet {
 }
 
 export interface ReportEvent {
+  /** Event row id — survivingEvents() resolves UNDO targets against it. */
+  id: string;
   sequence: number;
   eventType: string;
   setNumber: number | null;
@@ -64,10 +66,17 @@ export interface MatchReportData {
   tenantName: string;
   teamAName: string;
   teamBName: string;
+  teamACountry: string | null;
+  teamBCountry: string | null;
   roundName: string | null;
   matchNumber: number | null;
   phaseName: string | null;
   venue: string | null;
+  /** Official scoresheet header (spec/21): venue split + age category. */
+  city: string | null;
+  country: string | null;
+  hall: string | null;
+  category: string | null;
   gender: string | null;
   courtNumber: number | null;
   scheduledAt: Date | null;
@@ -101,10 +110,16 @@ export async function loadMatchReport(
       teamBId: matches.teamBId,
       teamAName: teamA.displayName,
       teamBName: teamB.displayName,
+      teamACountry: teamA.countryCode,
+      teamBCountry: teamB.countryCode,
       roundName: matches.roundName,
       matchNumber: matches.matchNumber,
       phaseName: matches.phaseName,
       venue: competitions.venue,
+      city: competitions.city,
+      country: competitions.country,
+      hall: competitions.hall,
+      category: competitions.category,
       gender: competitions.gender,
       courtNumber: matches.courtNumber,
       scheduledAt: matches.scheduledAt,
@@ -129,6 +144,7 @@ export async function loadMatchReport(
 
   const evRows = await db
     .select({
+      id: events.id,
       sequence: events.sequence,
       eventType: events.eventType,
       setNumber: events.setNumber,
@@ -202,10 +218,16 @@ export async function loadMatchReport(
     tenantName: m.tenantName,
     teamAName: m.teamAName,
     teamBName: m.teamBName,
+    teamACountry: m.teamACountry,
+    teamBCountry: m.teamBCountry,
     roundName: m.roundName,
     matchNumber: m.matchNumber,
     phaseName: m.phaseName,
     venue: m.venue,
+    city: m.city,
+    country: m.country,
+    hall: m.hall,
+    category: m.category,
     gender: m.gender,
     courtNumber: m.courtNumber,
     scheduledAt: m.scheduledAt,
@@ -245,6 +267,7 @@ const INTERRUPTION_TYPES = new Set([
   "MISCONDUCT_DISQUALIFICATION",
   "VCS_CHALLENGE",
   "VCS_RESULT",
+  "IMPROPER_REQUEST",
 ]);
 
 export function isInterruption(eventType: string): boolean {

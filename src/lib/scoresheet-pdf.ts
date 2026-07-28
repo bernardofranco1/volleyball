@@ -212,8 +212,10 @@ function header(ctx: Ctx, data: MatchReportData) {
 }
 
 function genderLabel(g: string | null): string {
-  if (g === "MALE") return "M";
-  if (g === "FEMALE") return "F";
+  // Schema enum is MEN/WOMEN/MIXED (src/lib/domain.ts) — the old MALE/FEMALE
+  // checks printed "—" for every real match (spec/21 bug fix).
+  if (g === "MEN" || g === "MALE") return "M";
+  if (g === "WOMEN" || g === "FEMALE") return "F";
   if (g === "MIXED") return "Mixed";
   return "—";
 }

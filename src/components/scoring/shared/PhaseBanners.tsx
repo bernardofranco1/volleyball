@@ -50,13 +50,14 @@ export interface PhaseMatchState {
 export type PhaseDispatch = (
   payload:
     | { type: "MATCH_CREATED"; matchId: string }
-    | { type: "COIN_TOSS"; firstServer: TeamId; teamAStartSide: Side }
+    | { type: "COIN_TOSS"; firstServer: TeamId; teamAStartSide: Side; tossWinner?: TeamId }
     | { type: "MATCH_START" }
     | {
         type: "SET_START";
         setNumber: number;
         firstServer: TeamId;
         teamAStartSide: Side;
+        tossWinner?: TeamId;
       }
     | { type: "TIMEOUT_END"; team: TeamId }
     | { type: "MEDICAL_TIMEOUT_END" }
@@ -305,12 +306,13 @@ export function usePrePhaseBanner({
                 teamAName={teamAName}
                 teamBName={teamBName}
                 disabled={nextSetDisabled}
-                onStart={(firstServer, teamAStartSide) =>
+                onStart={(firstServer, teamAStartSide, tossWinner) =>
                   dispatch({
                     type: "SET_START",
                     setNumber: state.currentSetNumber + 1,
                     firstServer,
                     teamAStartSide,
+                    ...(tossWinner ? { tossWinner } : {}),
                   })
                 }
               />
@@ -399,9 +401,14 @@ export function usePrePhaseBanner({
       <CoinTossBanner
         teamAName={teamAName}
         teamBName={teamBName}
-        onToss={(firstServer, teamAStartSide) => {
+        onToss={(firstServer, teamAStartSide, tossWinner) => {
           setTossSide(teamAStartSide);
-          dispatch({ type: "COIN_TOSS", firstServer, teamAStartSide });
+          dispatch({
+            type: "COIN_TOSS",
+            firstServer,
+            teamAStartSide,
+            ...(tossWinner ? { tossWinner } : {}),
+          });
         }}
       />
     );
@@ -427,12 +434,13 @@ export function usePrePhaseBanner({
             teamAName={teamAName}
             teamBName={teamBName}
             disabled={nextSetDisabled}
-            onStart={(firstServer, teamAStartSide) =>
+            onStart={(firstServer, teamAStartSide, tossWinner) =>
               dispatch({
                 type: "SET_START",
                 setNumber: state.currentSetNumber,
                 firstServer,
                 teamAStartSide,
+                ...(tossWinner ? { tossWinner } : {}),
               })
             }
           />
@@ -482,9 +490,11 @@ function DecidingSetToss({
   teamAName: string;
   teamBName: string;
   disabled?: boolean;
-  onStart: (firstServer: TeamId, teamAStartSide: Side) => void;
+  onStart: (firstServer: TeamId, teamAStartSide: Side, tossWinner: TeamId | undefined) => void;
 }) {
   const t = useT();
+  const [tossWinner, setTossWinner] = useState<TeamId | undefined>(undefined);
+  const [winnerPicked, setWinnerPicked] = useState(false);
   const [firstServer, setFirstServer] = useState<TeamId | null>(null);
 
   return (
@@ -492,7 +502,22 @@ function DecidingSetToss({
       <span className="text-xs uppercase tracking-wide text-score-dim">
         {t("scoring.deciderToss")}
       </span>
-      {firstServer === null ? (
+      {!winnerPicked ? (
+        <>
+          <span className="text-sm text-score-dim">{t("scoring.coinTossWinner")}</span>
+          <div className="flex flex-wrap justify-center gap-2">
+            <PrimaryButton disabled={disabled} onClick={() => { setTossWinner("A"); setWinnerPicked(true); }}>
+              {teamAName}
+            </PrimaryButton>
+            <PrimaryButton disabled={disabled} onClick={() => { setTossWinner("B"); setWinnerPicked(true); }}>
+              {teamBName}
+            </PrimaryButton>
+            <SecondaryButton disabled={disabled} onClick={() => { setTossWinner(undefined); setWinnerPicked(true); }}>
+              {t("scoring.skip")}
+            </SecondaryButton>
+          </div>
+        </>
+      ) : firstServer === null ? (
         <>
           <span className="text-sm text-score-dim">{t("scoring.coinTossWhoServes")}</span>
           <div className="flex flex-wrap justify-center gap-2">
@@ -503,6 +528,9 @@ function DecidingSetToss({
               {t("scoring.teamServes", { team: teamBName })}
             </PrimaryButton>
           </div>
+          <SecondaryButton onClick={() => setWinnerPicked(false)}>
+            {t("scoring.back")}
+          </SecondaryButton>
         </>
       ) : (
         <>
@@ -513,10 +541,10 @@ function DecidingSetToss({
             })}
           </span>
           <div className="flex flex-wrap justify-center gap-2">
-            <PrimaryButton disabled={disabled} onClick={() => onStart(firstServer, "LEFT")}>
+            <PrimaryButton disabled={disabled} onClick={() => onStart(firstServer, "LEFT", tossWinner)}>
               {t("scoring.left")}
             </PrimaryButton>
-            <PrimaryButton disabled={disabled} onClick={() => onStart(firstServer, "RIGHT")}>
+            <PrimaryButton disabled={disabled} onClick={() => onStart(firstServer, "RIGHT", tossWinner)}>
               {t("scoring.right")}
             </PrimaryButton>
           </div>
@@ -543,15 +571,34 @@ function CoinTossBanner({
 }: {
   teamAName: string;
   teamBName: string;
-  onToss: (firstServer: TeamId, teamAStartSide: Side) => void;
+  onToss: (firstServer: TeamId, teamAStartSide: Side, tossWinner: TeamId | undefined) => void;
 }) {
   const t = useT();
+  // Three steps: toss winner (skippable — spec/21 scoresheet field), first
+  // server, then which side team A starts on.
+  const [tossWinner, setTossWinner] = useState<TeamId | undefined>(undefined);
+  const [winnerPicked, setWinnerPicked] = useState(false);
   const [firstServer, setFirstServer] = useState<TeamId | null>(null);
 
   return (
     <Banner>
       <div className="flex flex-col items-center gap-3">
-        {firstServer === null ? (
+        {!winnerPicked ? (
+          <>
+            <span className="text-sm text-score-dim">{t("scoring.coinTossWinner")}</span>
+            <div className="flex gap-3">
+              <PrimaryButton onClick={() => { setTossWinner("A"); setWinnerPicked(true); }}>
+                {teamAName}
+              </PrimaryButton>
+              <PrimaryButton onClick={() => { setTossWinner("B"); setWinnerPicked(true); }}>
+                {teamBName}
+              </PrimaryButton>
+              <SecondaryButton onClick={() => { setTossWinner(undefined); setWinnerPicked(true); }}>
+                {t("scoring.skip")}
+              </SecondaryButton>
+            </div>
+          </>
+        ) : firstServer === null ? (
           <>
             <span className="text-sm text-score-dim">{t("scoring.coinTossWhoServes")}</span>
             <div className="flex gap-3">
@@ -562,6 +609,9 @@ function CoinTossBanner({
                 {t("scoring.teamServes", { team: teamBName })}
               </PrimaryButton>
             </div>
+            <SecondaryButton onClick={() => setWinnerPicked(false)}>
+              {t("scoring.back")}
+            </SecondaryButton>
           </>
         ) : (
           <>
@@ -572,10 +622,10 @@ function CoinTossBanner({
               })}
             </span>
             <div className="flex gap-3">
-              <PrimaryButton onClick={() => onToss(firstServer, "LEFT")}>
+              <PrimaryButton onClick={() => onToss(firstServer, "LEFT", tossWinner)}>
                 {t("scoring.left")}
               </PrimaryButton>
-              <PrimaryButton onClick={() => onToss(firstServer, "RIGHT")}>
+              <PrimaryButton onClick={() => onToss(firstServer, "RIGHT", tossWinner)}>
                 {t("scoring.right")}
               </PrimaryButton>
             </div>

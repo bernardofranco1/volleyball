@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { matches } from "@/db/schema";
+import { matchOfficials, matches } from "@/db/schema";
 import { ADMIN_ROLES, authorizeMatch } from "@/lib/authz";
 import { recordAudit } from "@/lib/audit";
 import {
@@ -22,6 +22,7 @@ import {
 } from "@/lib/match-signatures";
 import { fail, ok, type FormState } from "@/lib/action-state";
 import { intOrNull, str } from "@/lib/form-data";
+import { newId } from "@/lib/id";
 
 /**
  * Rewind a match to just before a chosen event and let scoring resume manually
@@ -234,4 +235,86 @@ export async function reopenMatchResult(
       ? `Result reopened — ${invalidated} signature(s) invalidated. The scoresheet must be signed again.`
       : "Result reopened.",
   );
+}
+
+/**
+ * Assign the match officials printed in the scoresheet APPROVAL block
+ * (spec/21). One form submits every role: a non-empty name upserts the row
+ * (unique per match+role), a cleared name deletes it. Admin-only, like the
+ * other result-adjacent actions; the 1st-referee sign-off (spec/20) remains
+ * the other writer and wins by the same upsert.
+ */
+export async function saveMatchOfficials(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const matchId = str(fd, "matchId");
+  const authed = await authorizeMatch(matchId, ADMIN_ROLES);
+  if (!authed.ok) return fail("Only a competition admin can assign officials.");
+
+  const roles = matchOfficials.role.enumValues;
+  let saved = 0;
+  let removed = 0;
+  await db.transaction(async (tx) => {
+    for (const role of roles) {
+      const name = str(fd, `name_${role}`).slice(0, 120);
+      const country = str(fd, `country_${role}`).slice(0, 40);
+      const level = str(fd, `level_${role}`).slice(0, 40);
+      if (!name) {
+        const gone = await tx
+          .delete(matchOfficials)
+          .where(
+            and(
+              eq(matchOfficials.matchId, matchId),
+              eq(matchOfficials.role, role),
+            ),
+          )
+          .returning({ id: matchOfficials.id });
+        removed += gone.length;
+        continue;
+      }
+      await tx
+        .insert(matchOfficials)
+        .values({
+          id: newId("official"),
+          matchId,
+          tenantId: authed.auth.tenantId,
+          role,
+          name,
+          country: country || null,
+          level: level || null,
+          source: "MANUAL",
+          createdBy: authed.auth.user.id,
+        })
+        .onConflictDoUpdate({
+          target: [matchOfficials.matchId, matchOfficials.role],
+          set: {
+            name,
+            country: country || null,
+            level: level || null,
+            source: "MANUAL",
+            createdBy: authed.auth.user.id,
+          },
+        });
+      saved += 1;
+    }
+  });
+
+  await recordAudit({
+    tenantId: authed.auth.tenantId,
+    actor: { userId: authed.auth.user.id, email: authed.auth.user.email },
+    action: "match.officials",
+    entityType: "match",
+    entityId: matchId,
+    summary: `Assigned match officials (${saved} set, ${removed} cleared)`,
+  });
+
+  const tenantSlug = str(fd, "tenantSlug");
+  const competitionId = str(fd, "competitionId");
+  if (tenantSlug && competitionId) {
+    revalidatePath(
+      `/t/${tenantSlug}/competitions/${competitionId}/matches/${matchId}`,
+    );
+  }
+  return ok("Officials saved.");
 }

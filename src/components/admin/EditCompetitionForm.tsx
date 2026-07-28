@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { updateCompetition } from "@/lib/competition-actions";
-import { GENDERS } from "@/lib/domain";
+import { CATEGORIES, GENDERS } from "@/lib/domain";
 import { useT } from "@/lib/i18n/client";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { SubmitButton } from "@/components/admin/SubmitButton";
@@ -17,6 +17,10 @@ export function EditCompetitionForm({
     id: string;
     name: string;
     venue: string | null;
+    city: string | null;
+    country: string | null;
+    hall: string | null;
+    category: string | null;
     startDate: string | null;
     endDate: string | null;
     gender: string | null;
@@ -56,6 +60,59 @@ export function EditCompetitionForm({
             defaultValue={competition.venue ?? ""}
             className={ui.input}
           />
+        </div>
+        {/* Official-scoresheet header fields (spec/21). Indoor prints
+            City/Country/Hall; beach prints them as Site/Beach. */}
+        <div>
+          <label className={ui.label} htmlFor="e-city">
+            {t("common.city")}
+          </label>
+          <input
+            id="e-city"
+            name="city"
+            defaultValue={competition.city ?? ""}
+            className={ui.input}
+          />
+        </div>
+        <div>
+          <label className={ui.label} htmlFor="e-country">
+            {t("common.country")}
+          </label>
+          <input
+            id="e-country"
+            name="country"
+            defaultValue={competition.country ?? ""}
+            className={ui.input}
+          />
+        </div>
+        <div>
+          <label className={ui.label} htmlFor="e-hall">
+            {t("common.hall")}
+          </label>
+          <input
+            id="e-hall"
+            name="hall"
+            defaultValue={competition.hall ?? ""}
+            className={ui.input}
+          />
+        </div>
+        <div>
+          <label className={ui.label} htmlFor="e-category">
+            {t("common.category")}
+          </label>
+          <select
+            id="e-category"
+            name="category"
+            defaultValue={competition.category ?? ""}
+            className={ui.select}
+          >
+            <option value="">—</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c.charAt(0) + c.slice(1).toLowerCase()}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className={ui.label} htmlFor="e-start">

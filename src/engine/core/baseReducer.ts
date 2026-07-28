@@ -77,7 +77,9 @@ export interface CommonMatchState<Phase extends string = CommonRallyPhase> {
 
 export type CommonEventPayload =
   | { type: "MATCH_CREATED"; matchId: string }
-  | { type: "COIN_TOSS"; firstServer: TeamId; teamAStartSide: Side }
+  // `tossWinner` (spec/21): which team won the toss — printed on the official
+  // scoresheet ("Winner of Coin Toss"). Optional for replay compatibility.
+  | { type: "COIN_TOSS"; firstServer: TeamId; teamAStartSide: Side; tossWinner?: TeamId }
   | { type: "MATCH_START" }
   | { type: "REPLAY_POINT" }
   | { type: "TIMEOUT_REQUEST"; team: TeamId }
@@ -102,6 +104,10 @@ export type CommonEventPayload =
   | { type: "MISCONDUCT_EXPULSION"; team: TeamId; playerId: string }
   | { type: "MISCONDUCT_DISQUALIFICATION"; team: TeamId; playerId: string }
   | { type: "SERVE_CLOCK_EXPIRE" }
+  // Improper request (FIVB rule 16.1): rejected without sanction, recorded on
+  // the scoresheet only (max one per team per match — UI-enforced). No state
+  // effect; the official sheet reads it straight from the log (spec/21).
+  | { type: "IMPROPER_REQUEST"; team: TeamId }
   // `scope` is a request-time hint only (never persisted): "point" asks the
   // server to sweep set-start bookkeeping and undo the last real action in one
   // batch; absent/"single" keeps the one-event-at-a-time behaviour.
@@ -135,6 +141,7 @@ const COMMON_EVENT_TYPES: ReadonlySet<string> = new Set<
   "MISCONDUCT_EXPULSION",
   "MISCONDUCT_DISQUALIFICATION",
   "SERVE_CLOCK_EXPIRE",
+  "IMPROPER_REQUEST",
   "UNDO",
   "NOTE",
 ]);
@@ -290,6 +297,7 @@ export function reduceCommon<Phase extends string>(
     }
 
     case "SERVE_CLOCK_EXPIRE":
+    case "IMPROPER_REQUEST":
     case "UNDO":
     case "NOTE":
       return;

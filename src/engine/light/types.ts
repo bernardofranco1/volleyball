@@ -28,7 +28,7 @@ export type LightRallyPhase =
 
 export type LightEventPayload =
   | { type: "MATCH_CREATED"; matchId: string }
-  | { type: "COIN_TOSS"; firstServer: TeamId; teamAStartSide: Side }
+  | { type: "COIN_TOSS"; firstServer: TeamId; teamAStartSide: Side; tossWinner?: TeamId }
   | { type: "MATCH_START" }
   | {
       type: "LINEUP_CONFIRMED";
@@ -41,6 +41,8 @@ export type LightEventPayload =
       setNumber: SetNumber;
       firstServer: TeamId;
       teamAStartSide: Side;
+      /** Deciding-set re-toss winner (spec/21) — printed on the scoresheet. */
+      tossWinner?: TeamId;
     }
   | { type: "RALLY_WON_A" }
   | { type: "RALLY_WON_B" }
@@ -68,6 +70,7 @@ export type LightEventPayload =
   | { type: "MATCH_END"; winner: TeamId; setsA: number; setsB: number }
   | { type: "FORFEIT"; team: TeamId; reason: "FORFEIT" | "RETIREMENT" }
   | { type: "SERVE_CLOCK_EXPIRE" }
+  | { type: "IMPROPER_REQUEST"; team: TeamId }
   | { type: "DELAY_WARNING"; team: TeamId }
   | { type: "DELAY_PENALTY"; team: TeamId }
   | { type: "MEDICAL_TIMEOUT"; team: TeamId }

@@ -26,8 +26,21 @@ export const COMPETITION_STATUSES = ["DRAFT", "ACTIVE", "FINISHED"] as const sat
   readonly SchemaStatus[]
 >;
 
+type SchemaCategory = NonNullable<
+  (typeof competitions.category.enumValues)[number]
+>;
+export const CATEGORIES = ["SENIOR", "JUNIOR", "YOUTH", "KID"] as const satisfies Exhaustive<
+  SchemaCategory,
+  readonly SchemaCategory[]
+>;
+
 export type Gender = (typeof GENDERS)[number];
 export type CompetitionStatus = (typeof COMPETITION_STATUSES)[number];
+export type Category = (typeof CATEGORIES)[number];
+
+export function isCategory(v: string): v is Category {
+  return (CATEGORIES as readonly string[]).includes(v);
+}
 
 export function isDiscipline(v: string): v is Discipline {
   return (DISCIPLINES as readonly string[]).includes(v);

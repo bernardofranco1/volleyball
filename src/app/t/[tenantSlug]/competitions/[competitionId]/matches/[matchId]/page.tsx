@@ -25,7 +25,9 @@ import {
   confirmMatchResult,
   reopenMatchResult,
 } from "@/lib/match-admin-actions";
+import { MatchOfficialsForm } from "@/components/admin/MatchOfficialsForm";
 import {
+  loadOfficials,
   loadSignatures,
   SIGNATURE_ROLES,
   signatureRoleLabel,
@@ -81,7 +83,7 @@ export default async function MatchDetailPage({
   );
 
   // One round of concurrent fetches; access is gated (notFound) before render.
-  const [competition, match, seqRows, logRows, sessions, origin, pin, signatures] =
+  const [competition, match, seqRows, logRows, sessions, origin, pin, signatures, officials] =
     await Promise.all([
       getCompetition(ctx.tenant.id, competitionId),
       getMatch(ctx.tenant.id, matchId),
@@ -117,6 +119,7 @@ export default async function MatchDetailPage({
       resolveOrigin(),
       getScorerPin(matchId),
       loadSignatures(matchId),
+      loadOfficials(matchId),
     ]);
   if (!competition) notFound();
   if (!match || match.competitionId !== competitionId) notFound();
@@ -178,6 +181,15 @@ export default async function MatchDetailPage({
             className={ui.btnSecondary}
           >
             {t("match.viewScoreboard")}
+          </a>
+          {/* FIVB-style official scoresheet replica (spec/21). */}
+          <a
+            href={`/api/matches/${matchId}/export.pdf?type=official`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={ui.btnSecondary}
+          >
+            {t("match.exportOfficialSheet")}
           </a>
           {/* The official document the officials sign and hand in (spec/20). */}
           <a
@@ -365,6 +377,16 @@ export default async function MatchDetailPage({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Officials for the scoresheet APPROVAL block (spec/21). */}
+      <div className="mt-6 max-w-2xl">
+        <MatchOfficialsForm
+          tenantSlug={tenantSlug}
+          competitionId={competitionId}
+          matchId={matchId}
+          officials={officials}
+        />
       </div>
 
       {/* Result */}
