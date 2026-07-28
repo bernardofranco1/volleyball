@@ -39,6 +39,8 @@ export interface RotationMatchState {
   setsWonB: number;
   currentSetNumber: number;
   sets: RotationSet[];
+  /** Lineup declared before the next set exists (spec/21 flow fix). */
+  pendingLineup?: { teamAPlayerIds: string[]; teamBPlayerIds: string[] } | null;
 }
 
 export interface RotationCourtProps {
@@ -117,9 +119,26 @@ export function RotationScoreboard({
   // The court diagram marks the expected server (position 1) with a ring.
   const serving = set && !set.winner && state.status !== "FINISHED" ? set.currentServer : null;
 
+  // Lineups come BEFORE the set, as on paper (spec/21 flow fix): once the
+  // toss is done, the court zone collects them pre-match (READY) and during
+  // every set break, until the scorer submits (stashed as pendingLineup and
+  // applied by SET_START). LINEUP_PENDING remains the fallback for a set
+  // started without one.
+  const preSetLineup =
+    (config.lineupRequired ?? true) &&
+    (state.status === "READY" ||
+      (state.status === "LIVE" && (!set || !!set.winner))) &&
+    !state.pendingLineup;
+
   let main;
-  if (state.rallyPhase === "LINEUP_PENDING") {
+  if (state.rallyPhase === "LINEUP_PENDING" || preSetLineup) {
     main = lineupEntry;
+  } else if (state.pendingLineup && (!set || set.winner)) {
+    main = (
+      <p className="text-center text-sm text-score-dim">
+        {t("scoring.lineupSaved")}
+      </p>
+    );
   } else if (set && set.courtPositionsA.length > 0) {
     main = (
       <Court

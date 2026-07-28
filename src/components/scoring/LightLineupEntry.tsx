@@ -10,7 +10,13 @@ export function LightLineupEntry() {
     useLightMatch();
   return (
     <RotationLineupEntry
-      currentSetNumber={state.currentSetNumber}
+      // During a set break the lineup being collected is for the NEXT set
+      // (spec/21 flow fix); pre-match it is set 1 (= currentSetNumber).
+      currentSetNumber={
+        state.sets[state.currentSetNumber - 1]?.winner
+          ? state.currentSetNumber + 1
+          : state.currentSetNumber
+      }
       playersPerSide={config.playersPerSide}
       rosterA={rosterA}
       rosterB={rosterB}

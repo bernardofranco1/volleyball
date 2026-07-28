@@ -58,12 +58,23 @@ export function validateIndoorEvent(
     }
 
     case "LINEUP_CONFIRMED": {
-      if (state.rallyPhase !== "LINEUP_PENDING")
+      // Accepted while lineups are being collected (after SET_START, the old
+      // flow) AND before the set exists — pre-match (READY) or during the set
+      // break — matching the paper flow of lineups-first (spec/21 flow fix).
+      // A pre-declared lineup is re-submittable to correct a mistake.
+      const collecting = state.rallyPhase === "LINEUP_PENDING";
+      const preSet =
+        state.status !== "SETUP" &&
+        state.status !== "FINISHED" &&
+        (!set || !!set.winner);
+      if (!collecting && !preSet)
         return fail("Lineups are not being collected right now");
-      if (!set) return fail("No active set");
-      const already =
-        payload.team === "A" ? set.lineupConfirmedA : set.lineupConfirmedB;
-      if (already) return fail("Lineup already confirmed for this team");
+      if (collecting) {
+        if (!set) return fail("No active set");
+        const already =
+          payload.team === "A" ? set.lineupConfirmedA : set.lineupConfirmedB;
+        if (already) return fail("Lineup already confirmed for this team");
+      }
       if (payload.playerIds.length !== config.playersPerSide)
         return fail(`Lineup must list ${config.playersPerSide} players`);
       if (new Set(payload.playerIds).size !== payload.playerIds.length)

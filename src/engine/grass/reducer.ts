@@ -136,12 +136,32 @@ export function reduce(
       s.currentSetNumber = p.setNumber;
       if (p.setNumber === 1) s.set1FirstServer = p.firstServer;
       s.status = "LIVE";
-      s.rallyPhase = config.lineupRequired ? "LINEUP_PENDING" : "BETWEEN_RALLIES";
+      // A lineup declared during the break/pre-match (stashed below) applies
+      // to the set that just started — the paper flow: lineups first.
+      if (s.pendingLineup) {
+        newSet.lineupA = [...s.pendingLineup.teamAPlayerIds];
+        newSet.lineupB = [...s.pendingLineup.teamBPlayerIds];
+        newSet.courtPositionsA = [...s.pendingLineup.teamAPlayerIds];
+        newSet.courtPositionsB = [...s.pendingLineup.teamBPlayerIds];
+        newSet.lineupConfirmed = true;
+        s.pendingLineup = null;
+        s.rallyPhase = "BETWEEN_RALLIES";
+      } else {
+        s.rallyPhase = config.lineupRequired ? "LINEUP_PENDING" : "BETWEEN_RALLIES";
+      }
       return s;
     }
 
     case "LINEUP_CONFIRMED": {
-      if (!set) return s;
+      // No open set → the lineup is for the NEXT set: stash it (re-submittable
+      // to correct a mistake) without touching the phase; SET_START applies it.
+      if (!set || set.winner) {
+        s.pendingLineup = {
+          teamAPlayerIds: [...p.teamAPlayerIds],
+          teamBPlayerIds: [...p.teamBPlayerIds],
+        };
+        return s;
+      }
       set.lineupA = [...p.teamAPlayerIds];
       set.lineupB = [...p.teamBPlayerIds];
       set.courtPositionsA = [...p.teamAPlayerIds];

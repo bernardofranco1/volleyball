@@ -145,6 +145,12 @@ export interface GrassMatchState {
   setBreakStartedAt?: string | null;
   medicalTimeoutTeam: TeamId | null;
   matchStartedAt: string | null;
+  /** Lineup declared before the next set exists (spec/21 flow fix): stashed
+   *  here and applied by SET_START. Optional — old snapshots lack it. */
+  pendingLineup?: {
+    teamAPlayerIds: string[];
+    teamBPlayerIds: string[];
+  } | null;
   lastSequence: number;
   totalMatchSubsA: number;
   totalMatchSubsB: number;

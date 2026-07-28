@@ -339,3 +339,70 @@ describe("light reducer — rotation follows every point (8.6.2 + 10.2.2)", () =
     expect(serverOf(m)).toBe("b1");
   });
 });
+
+describe("light — lineups before the set (spec/21 flow fix)", () => {
+  it("accepts a lineup at READY and applies it when set 1 starts", () => {
+    const m = new TestMatch();
+    m.apply({ type: "MATCH_CREATED", matchId: "m1" });
+    m.apply({ type: "COIN_TOSS", firstServer: "A", teamAStartSide: "LEFT" });
+    // Pre-match (READY): the validator now accepts the lineup…
+    expect(
+      validateLightEvent(
+        { type: "LINEUP_CONFIRMED", setNumber: 1, teamAPlayerIds: A4, teamBPlayerIds: B4 },
+        m.state,
+        LIGHT,
+      ).ok,
+    ).toBe(true);
+    m.apply({ type: "LINEUP_CONFIRMED", setNumber: 1, teamAPlayerIds: A4, teamBPlayerIds: B4 });
+    // …stashes it without opening play…
+    expect(m.state.pendingLineup).toEqual({ teamAPlayerIds: A4, teamBPlayerIds: B4 });
+    expect(m.state.status).toBe("READY");
+    m.apply({ type: "MATCH_START" });
+    m.apply({ type: "SET_START", setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" });
+    // …and SET_START applies it: no LINEUP_PENDING gate, court populated.
+    expect(m.state.rallyPhase).toBe("BETWEEN_RALLIES");
+    expect(m.state.pendingLineup).toBeNull();
+    expect(m.set.lineupConfirmed).toBe(true);
+    expect(m.set.courtPositionsA).toEqual(A4);
+    expect(m.set.courtPositionsB).toEqual(B4);
+  });
+
+  it("accepts a lineup during the set break for the next set, re-submittable", () => {
+    const m = new TestMatch();
+    m.ready();
+    m.score("A", 21); // set 1 done → SET_BREAK
+    expect(m.state.rallyPhase).toBe("SET_BREAK");
+    const swapped = [...A4].reverse();
+    m.apply({ type: "LINEUP_CONFIRMED", setNumber: 2, teamAPlayerIds: A4, teamBPlayerIds: B4 });
+    // Correcting a mistake overwrites the stash.
+    m.apply({ type: "LINEUP_CONFIRMED", setNumber: 2, teamAPlayerIds: swapped, teamBPlayerIds: B4 });
+    m.apply({ type: "SET_START", setNumber: 2, firstServer: "B", teamAStartSide: "RIGHT" });
+    expect(m.state.rallyPhase).toBe("BETWEEN_RALLIES");
+    expect(m.set.courtPositionsA).toEqual(swapped);
+  });
+
+  it("still rejects lineups mid-set and pre-toss", () => {
+    const m = new TestMatch();
+    m.apply({ type: "MATCH_CREATED", matchId: "m1" });
+    // COIN_TOSS status (toss not done): allowed? — the toss banner comes first
+    // but a lineup handed in early is fine; SETUP is the hard gate.
+    const setup = new TestMatch();
+    expect(
+      validateLightEvent(
+        { type: "LINEUP_CONFIRMED", setNumber: 1, teamAPlayerIds: A4, teamBPlayerIds: B4 },
+        setup.state,
+        LIGHT,
+      ).ok,
+    ).toBe(false);
+    const live = new TestMatch();
+    live.ready();
+    live.score("A", 2);
+    expect(
+      validateLightEvent(
+        { type: "LINEUP_CONFIRMED", setNumber: 1, teamAPlayerIds: A4, teamBPlayerIds: B4 },
+        live.state,
+        LIGHT,
+      ).ok,
+    ).toBe(false);
+  });
+});

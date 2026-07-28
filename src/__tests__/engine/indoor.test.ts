@@ -488,3 +488,66 @@ describe("indoor append orchestrator", () => {
     expect(res.reason).toMatch(/disabled/i);
   });
 });
+
+describe("indoor — lineups before the set (spec/21 flow fix)", () => {
+  it("accepts per-team lineups at READY and applies both when set 1 starts", () => {
+    const m = new TestMatch();
+    m.apply({ type: "MATCH_CREATED", matchId: "m1" });
+    m.apply({ type: "COIN_TOSS", firstServer: "A", teamAStartSide: "LEFT" });
+    m.apply({
+      type: "LINEUP_CONFIRMED",
+      team: "A",
+      setNumber: 1,
+      playerIds: A6,
+      liberoId: "a7",
+      secondLiberoId: null,
+    });
+    expect(m.state.pendingLineups?.A?.playerIds).toEqual(A6);
+    expect(m.state.status).toBe("READY");
+    m.apply({
+      type: "LINEUP_CONFIRMED",
+      team: "B",
+      setNumber: 1,
+      playerIds: B6,
+      liberoId: "b7",
+      secondLiberoId: null,
+    });
+    m.apply({ type: "MATCH_START" });
+    m.apply({ type: "SET_START", setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" });
+    // Both pre-declared lineups apply — no LINEUP_PENDING gate.
+    expect(m.state.rallyPhase).toBe("BETWEEN_RALLIES");
+    expect(m.state.pendingLineups).toBeNull();
+    const set = m.state.sets[0];
+    expect(set.courtPositionsA).toEqual(A6);
+    expect(set.libero.liberoIdA).toBe("a7");
+    expect(set.lineupConfirmedB).toBe(true);
+  });
+
+  it("one pre-declared lineup + one at LINEUP_PENDING still works", () => {
+    const m = new TestMatch();
+    m.apply({ type: "MATCH_CREATED", matchId: "m1" });
+    m.apply({ type: "COIN_TOSS", firstServer: "A", teamAStartSide: "LEFT" });
+    m.apply({
+      type: "LINEUP_CONFIRMED",
+      team: "A",
+      setNumber: 1,
+      playerIds: A6,
+      liberoId: null,
+      secondLiberoId: null,
+    });
+    m.apply({ type: "MATCH_START" });
+    m.apply({ type: "SET_START", setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" });
+    // Team B still owes its lineup → the old gate holds.
+    expect(m.state.rallyPhase).toBe("LINEUP_PENDING");
+    expect(m.state.sets[0].lineupConfirmedA).toBe(true);
+    m.apply({
+      type: "LINEUP_CONFIRMED",
+      team: "B",
+      setNumber: 1,
+      playerIds: B6,
+      liberoId: null,
+      secondLiberoId: null,
+    });
+    expect(m.state.rallyPhase).toBe("BETWEEN_RALLIES");
+  });
+});

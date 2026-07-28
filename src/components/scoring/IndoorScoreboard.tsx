@@ -81,12 +81,21 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
     rosterB,
   });
 
+  // Lineups come BEFORE the set, as on paper (spec/21 flow fix): from READY
+  // and during every set break the court zone collects them (stashed as
+  // pendingLineups, applied by SET_START). LINEUP_PENDING remains the
+  // fallback for a set started without them.
+  const preSetLineup =
+    config.lineupRequired &&
+    (state.status === "READY" ||
+      (state.status === "LIVE" && (!set || !!set.winner)));
+
   let main;
   if (signOff.panel) {
     main = signOff.panel;
   } else if (prematch.panel) {
     main = prematch.panel;
-  } else if (state.rallyPhase === "LINEUP_PENDING") {
+  } else if (state.rallyPhase === "LINEUP_PENDING" || preSetLineup) {
     main = <IndoorLineupEntry />;
   } else if (set && set.courtPositionsA.length > 0) {
     main = (

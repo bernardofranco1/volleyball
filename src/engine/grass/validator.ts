@@ -50,7 +50,15 @@ export function validateGrassEvent(
     }
 
     case "LINEUP_CONFIRMED": {
-      if (state.rallyPhase !== "LINEUP_PENDING")
+      // Accepted while lineups are being collected (after SET_START, the old
+      // flow) AND before the set exists — pre-match (READY) or during the set
+      // break — matching the paper flow of lineups-first (spec/21 flow fix).
+      const collecting = state.rallyPhase === "LINEUP_PENDING";
+      const preSet =
+        state.status !== "SETUP" &&
+        state.status !== "FINISHED" &&
+        (!set || !!set.winner);
+      if (!collecting && !preSet)
         return fail("Lineups are not being collected right now");
       const n = config.playersPerSide;
       for (const ids of [payload.teamAPlayerIds, payload.teamBPlayerIds]) {

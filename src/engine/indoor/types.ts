@@ -171,6 +171,14 @@ export interface IndoorSetState {
   endedAt: string | null;
 }
 
+/** A lineup declared before its set exists (spec/21 flow fix): stashed on the
+ *  match and applied by SET_START. */
+export interface PendingIndoorLineup {
+  playerIds: string[];
+  liberoId: string | null;
+  secondLiberoId: string | null;
+}
+
 export interface IndoorMatchState {
   matchId: string;
   status: IndoorMatchStatus;
@@ -188,6 +196,12 @@ export interface IndoorMatchState {
   setBreakStartedAt?: string | null;
   medicalTimeoutTeam: TeamId | null;
   matchStartedAt: string | null;
+  /** Per-team lineups declared before the next set exists — optional, old
+   *  snapshots lack it (spec/21 flow fix). */
+  pendingLineups?: {
+    A?: PendingIndoorLineup | null;
+    B?: PendingIndoorLineup | null;
+  } | null;
   lastSequence: number;
   totalMatchSubsA: number;
   totalMatchSubsB: number;

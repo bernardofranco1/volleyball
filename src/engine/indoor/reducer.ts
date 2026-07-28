@@ -43,7 +43,30 @@ import {
   oppositeSide,
   rotateClockwise,
 } from "./types";
+import type { PendingIndoorLineup } from "./types";
 import { validateIndoorEvent } from "./validator";
+
+/** Confirm one team's starting six (+ liberos) on a set — shared by the live
+ *  LINEUP_CONFIRMED path and SET_START applying a pre-declared lineup. */
+function applyLineup(
+  set: IndoorSetState,
+  team: TeamId,
+  lineup: PendingIndoorLineup,
+): void {
+  if (team === "A") {
+    set.lineupA = [...lineup.playerIds];
+    set.courtPositionsA = [...lineup.playerIds];
+    set.lineupConfirmedA = true;
+    set.libero.liberoIdA = lineup.liberoId;
+    set.libero.secondLiberoIdA = lineup.secondLiberoId;
+  } else {
+    set.lineupB = [...lineup.playerIds];
+    set.courtPositionsB = [...lineup.playerIds];
+    set.lineupConfirmedB = true;
+    set.libero.liberoIdB = lineup.liberoId;
+    set.libero.secondLiberoIdB = lineup.secondLiberoId;
+  }
+}
 
 // ── pure rule predicates (config-driven; shared ones re-exported) ────────────
 
@@ -204,24 +227,38 @@ export function reduce(
       if (p.setNumber === 1) s.set1FirstServer = p.firstServer;
       s.status = "LIVE";
       s.rallyPhase = config.lineupRequired ? "LINEUP_PENDING" : "BETWEEN_RALLIES";
+      // Lineups declared during the break/pre-match (stashed below) apply to
+      // the set that just started — the paper flow: lineups first.
+      for (const team of ["A", "B"] as const) {
+        const pending = s.pendingLineups?.[team];
+        if (pending) applyLineup(newSet, team, pending);
+      }
+      s.pendingLineups = null;
+      if (newSet.lineupConfirmedA && newSet.lineupConfirmedB)
+        s.rallyPhase = "BETWEEN_RALLIES";
       return s;
     }
 
     case "LINEUP_CONFIRMED": {
-      if (!set) return s;
-      if (p.team === "A") {
-        set.lineupA = [...p.playerIds];
-        set.courtPositionsA = [...p.playerIds];
-        set.lineupConfirmedA = true;
-        set.libero.liberoIdA = p.liberoId;
-        set.libero.secondLiberoIdA = p.secondLiberoId;
-      } else {
-        set.lineupB = [...p.playerIds];
-        set.courtPositionsB = [...p.playerIds];
-        set.lineupConfirmedB = true;
-        set.libero.liberoIdB = p.liberoId;
-        set.libero.secondLiberoIdB = p.secondLiberoId;
+      // No open set → the lineup is for the NEXT set: stash it per team
+      // (re-submittable to correct a mistake) without touching the phase;
+      // SET_START applies it.
+      if (!set || set.winner) {
+        s.pendingLineups = {
+          ...(s.pendingLineups ?? {}),
+          [p.team]: {
+            playerIds: [...p.playerIds],
+            liberoId: p.liberoId,
+            secondLiberoId: p.secondLiberoId,
+          },
+        };
+        return s;
       }
+      applyLineup(set, p.team, {
+        playerIds: p.playerIds,
+        liberoId: p.liberoId,
+        secondLiberoId: p.secondLiberoId,
+      });
       if (set.lineupConfirmedA && set.lineupConfirmedB)
         s.rallyPhase = "BETWEEN_RALLIES";
       return s;
