@@ -255,6 +255,7 @@ export async function getMatch(
       teamBColor: string | null;
       confirmedVia: "SIGNATURES" | "ADMIN" | null;
       confirmedAt: Date | null;
+      visId: string | null;
     })
   | null
 > {
@@ -265,6 +266,7 @@ export async function getMatch(
       id: matches.id,
       competitionId: matches.competitionId,
       discipline: matches.discipline,
+      visId: matches.visId,
       status: matches.status,
       teamAId: matches.teamAId,
       teamBId: matches.teamBId,

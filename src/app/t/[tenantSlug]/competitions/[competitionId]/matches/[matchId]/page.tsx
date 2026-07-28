@@ -25,7 +25,7 @@ import {
   confirmMatchResult,
   reopenMatchResult,
 } from "@/lib/match-admin-actions";
-import { MatchOfficialsForm } from "@/components/admin/MatchOfficialsForm";
+import { MatchOfficialsForm, MatchVisIdForm } from "@/components/admin/MatchOfficialsForm";
 import {
   loadOfficials,
   loadSignatures,
@@ -216,6 +216,13 @@ export default async function MatchDetailPage({
           >
             {t("match.exportLogPdf")}
           </a>
+          {/* VolleyStation-style match log snapshot (spec/22). */}
+          <a
+            href={`/api/matches/${matchId}/export.vsr`}
+            className={ui.btnSecondary}
+          >
+            {t("match.exportVsr")}
+          </a>
         </div>
       </div>
 
@@ -380,12 +387,19 @@ export default async function MatchDetailPage({
       </div>
 
       {/* Officials for the scoresheet APPROVAL block (spec/21). */}
-      <div className="mt-6 max-w-2xl">
+      <div className="mt-6 flex max-w-2xl flex-col gap-4">
         <MatchOfficialsForm
           tenantSlug={tenantSlug}
           competitionId={competitionId}
           matchId={matchId}
           officials={officials}
+        />
+        {/* VIS join key for the VSR live feed (spec/22). */}
+        <MatchVisIdForm
+          tenantSlug={tenantSlug}
+          competitionId={competitionId}
+          matchId={matchId}
+          visId={match.visId}
         />
       </div>
 

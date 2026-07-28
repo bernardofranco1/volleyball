@@ -50,6 +50,7 @@ function baseReport(discipline: string, events: ReportEvent[]): MatchReportData 
     teamBCountry: "USA",
     roundName: "Final",
     matchNumber: 1,
+  visId: null,
     phaseName: "Main Draw",
     venue: "Centre Court",
     city: "Lausanne",

@@ -305,6 +305,9 @@ export const matches = pgTable(
     finishedAt: timestamp("finished_at"),
 
     roundName: text("round_name"),
+    // VIS match number — join key for the VSR live feed (spec/22). Nullable:
+    // dispatch is skipped when unset.
+    visId: text("vis_id"),
     matchNumber: integer("match_number"),
     // Group / phase metadata for schedule imports (brief §3.2).
     groupName: text("group_name"),

@@ -31,6 +31,7 @@ import type { GrassMatchState } from "@/engine/grass/types";
 import type { LightMatchState } from "@/engine/light/types";
 import type { Actor, Discipline } from "@/engine/types";
 import { newId } from "@/lib/id";
+import { scheduleVsrDispatch, vsrDispatchEnabled } from "@/lib/vsr/dispatch";
 import {
   type BroadcastMessage,
   broadcastMessages,
@@ -395,6 +396,22 @@ function scheduleBroadcast(msgs: BroadcastMessage[]): void {
 }
 
 /**
+ * VSR live feed (spec/22): every accepted action — points, time-outs, TTOs,
+ * set/match starts and ends, substitutions, liberos, challenges, UNDO/REWIND —
+ * regenerates the full .vsr snapshot and ships it, debounced per match.
+ * Post-response via `after()` so scoring latency is untouched.
+ */
+function scheduleVsrFeed(matchId: string): void {
+  if (!vsrDispatchEnabled()) return;
+  const send = () => scheduleVsrDispatch(matchId);
+  try {
+    after(send);
+  } catch {
+    void send();
+  }
+}
+
+/**
  * Validate and persist a new event (plus auto-emitted consequences) and the
  * fresh snapshot in one transaction, then broadcast a change signal.
  */
@@ -505,6 +522,7 @@ export async function appendMatchEvent(
   // tablets derive them from `activeTimeoutStartedAt` in the state they refetch
   // on the state-update signal — one source of truth for every surface.)
   scheduleBroadcast(msgs);
+  scheduleVsrFeed(matchId);
 
   return { newEvents: result.newEvents, state: finalState };
 }
@@ -654,6 +672,7 @@ async function undoLastEvent(
   }
 
   scheduleBroadcast([stateUpdateMessage(matchId, finalState.lastSequence)]);
+  scheduleVsrFeed(matchId);
   return {
     newEvents: undoEvents,
     state: finalState,
@@ -720,5 +739,6 @@ export async function rewindMatch(
   }
 
   scheduleBroadcast([stateUpdateMessage(matchId, finalState.lastSequence)]);
+  scheduleVsrFeed(matchId);
   return { newEvents: [rewind], state: finalState };
 }

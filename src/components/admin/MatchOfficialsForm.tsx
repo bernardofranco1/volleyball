@@ -5,7 +5,7 @@
 // what the indoor sheet prints, `country` what the beach sheet prints — both
 // are captured so either sheet renders complete.
 
-import { saveMatchOfficials } from "@/lib/match-admin-actions";
+import { saveMatchOfficials, setMatchVisId } from "@/lib/match-admin-actions";
 import { useT } from "@/lib/i18n/client";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { SubmitButton } from "@/components/admin/SubmitButton";
@@ -23,6 +23,42 @@ export const OFFICIAL_ROLE_LABELS: Record<string, string> = {
   LINE_JUDGE_3: "Line judge 3",
   LINE_JUDGE_4: "Line judge 4",
 };
+
+/** VIS match number — the join key of the VSR live feed (spec/22). */
+export function MatchVisIdForm({
+  tenantSlug,
+  competitionId,
+  matchId,
+  visId,
+}: {
+  tenantSlug: string;
+  competitionId: string;
+  matchId: string;
+  visId: string | null;
+}) {
+  const t = useT();
+  return (
+    <ActionForm action={setMatchVisId} className={ui.card}>
+      <h2 className="font-medium">{t("match.visIdTitle")}</h2>
+      <p className="mb-3 mt-1 text-xs text-score-dim">{t("match.visIdHint")}</p>
+      <input type="hidden" name="tenantSlug" value={tenantSlug} />
+      <input type="hidden" name="competitionId" value={competitionId} />
+      <input type="hidden" name="matchId" value={matchId} />
+      <div className="flex items-end gap-2">
+        <input
+          name="visId"
+          defaultValue={visId ?? ""}
+          inputMode="numeric"
+          placeholder="26665"
+          className={`${ui.input} max-w-40`}
+        />
+        <SubmitButton pendingLabel={t("common.saving")}>
+          {t("common.saveChanges")}
+        </SubmitButton>
+      </div>
+    </ActionForm>
+  );
+}
 
 export function MatchOfficialsForm({
   tenantSlug,

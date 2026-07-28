@@ -318,3 +318,42 @@ export async function saveMatchOfficials(
   }
   return ok("Officials saved.");
 }
+
+/**
+ * Set the VIS match number (spec/22) — the join key the VSR live feed uses.
+ * Clearing it disables dispatch for the match.
+ */
+export async function setMatchVisId(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const matchId = str(fd, "matchId");
+  const authed = await authorizeMatch(matchId, ADMIN_ROLES);
+  if (!authed.ok) return fail("Only a competition admin can set the VIS id.");
+
+  const visId = str(fd, "visId").slice(0, 40);
+  if (visId && !/^\d+$/.test(visId))
+    return fail("The VIS match number must be numeric.");
+
+  await db
+    .update(matches)
+    .set({ visId: visId || null })
+    .where(eq(matches.id, matchId));
+
+  await recordAudit({
+    tenantId: authed.auth.tenantId,
+    actor: { userId: authed.auth.user.id, email: authed.auth.user.email },
+    action: "match.visId",
+    entityType: "match",
+    entityId: matchId,
+    summary: visId ? `Set VIS match id ${visId}` : "Cleared the VIS match id",
+  });
+
+  const tenantSlug = str(fd, "tenantSlug");
+  const competitionId = str(fd, "competitionId");
+  if (tenantSlug && competitionId)
+    revalidatePath(
+      `/t/${tenantSlug}/competitions/${competitionId}/matches/${matchId}`,
+    );
+  return ok(visId ? "VIS match id saved." : "VIS match id cleared.");
+}

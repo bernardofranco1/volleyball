@@ -41,6 +41,7 @@ const DATA: MatchReportData = {
   teamBCountry: "BRA",
   roundName: "Final",
   matchNumber: 108,
+  visId: null,
   phaseName: "Main Draw",
   venue: "Centre Court",
   city: "Rome",

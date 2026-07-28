@@ -19,6 +19,10 @@ export interface ReportPlayer {
   jerseyNumber: number | null;
   isCaptain: boolean;
   isLibero: boolean;
+  /** Optional split-name/role detail (VSR export, spec/22). */
+  firstName?: string | null;
+  lastName?: string | null;
+  role?: string | null;
 }
 
 export interface ReportSet {
@@ -70,6 +74,8 @@ export interface MatchReportData {
   teamBCountry: string | null;
   roundName: string | null;
   matchNumber: number | null;
+  /** VIS match number (spec/22 VSR feed), when assigned. */
+  visId: string | null;
   phaseName: string | null;
   venue: string | null;
   /** Official scoresheet header (spec/21): venue split + age category. */
@@ -114,6 +120,7 @@ export async function loadMatchReport(
       teamBCountry: teamB.countryCode,
       roundName: matches.roundName,
       matchNumber: matches.matchNumber,
+      visId: matches.visId,
       phaseName: matches.phaseName,
       venue: competitions.venue,
       city: competitions.city,
@@ -165,6 +172,9 @@ export async function loadMatchReport(
       id: players.id,
       teamId: players.teamId,
       fullName: players.fullName,
+      firstName: players.firstName,
+      lastName: players.lastName,
+      role: players.role,
       jerseyNumber: players.jerseyNumber,
       isCaptain: players.isCaptain,
       isLibero: players.isLibero,
@@ -178,6 +188,9 @@ export async function loadMatchReport(
       .map((r) => ({
         id: r.id,
         fullName: r.fullName,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        role: r.role,
         jerseyNumber: r.jerseyNumber,
         isCaptain: r.isCaptain,
         isLibero: r.isLibero,
@@ -222,6 +235,7 @@ export async function loadMatchReport(
     teamBCountry: m.teamBCountry,
     roundName: m.roundName,
     matchNumber: m.matchNumber,
+    visId: m.visId,
     phaseName: m.phaseName,
     venue: m.venue,
     city: m.city,
