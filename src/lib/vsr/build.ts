@@ -74,7 +74,7 @@ const INDOOR_SETTINGS: Json = {
   setWinWithoutLead: false, pin: "", goldenSet: false, mediaTimeout: false,
   medicalAssistance: false, midRallyChallenge: false,
   noScoreChangeOnGreenCard: false, nonDisabledInLineup: 1,
-  nonDisabledOnRoster: 2, organiserName: "FIVB", paraVolley: false,
+  nonDisabledOnRoster: 2, organiserName: "", paraVolley: false,
   regularSetSideChanges: [2], remarksApprovals: [],
   resultApprovals: ["captain", "referee1", "referee2", "refereeChallenge", "scorer1", "scorer2"],
   rosterApprovals: ["captain", "coach"], serveTimer: 15,
@@ -110,9 +110,15 @@ const BEACH_SETTINGS: Json = {
   noTabletSubstitutions: false,
 };
 
-function buildSettings(discipline: string, config: TournamentConfig): Json {
+function buildSettings(
+  discipline: string,
+  config: TournamentConfig,
+  organiser: string,
+): Json {
   const beach = discipline === "BEACH";
   const s: Json = { ...(beach ? BEACH_SETTINGS : INDOOR_SETTINGS) };
+  // White-label: the organiser is the tenant, never a hardcoded brand.
+  s.organiserName = organiser;
   s.winningScore = Math.ceil(config.bestOf / 2);
   s.regularSetWin = config.setScore;
   s.decidingSetWin = config.setScoreTiebreak;
@@ -455,7 +461,7 @@ export function buildVsr(report: MatchReportData, config: TournamentConfig): Jso
 
   const vsr: Json = {
     scout: buildScout(report, beach),
-    settings: buildSettings(report.discipline, config),
+    settings: buildSettings(report.discipline, config, report.tenantName),
     signatures: {},
     approvals: buildApprovals(report),
     version: beach ? 6 : 7,

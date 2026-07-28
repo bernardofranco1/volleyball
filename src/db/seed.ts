@@ -14,7 +14,7 @@ import { newId } from "../lib/id";
 const TENANT = {
   id: "tenant_fivb_demo",
   slug: "fivb-demo",
-  name: "FIVB Demo",
+  name: "Volleyball Scoring",
   // FIVB brand colours (blue / gold) — see spec/13-SEED-DATA.md.
   primaryColor: "#0047AB",
   secondaryColor: "#FFD700",

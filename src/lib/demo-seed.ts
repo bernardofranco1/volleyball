@@ -32,7 +32,7 @@ import type { TournamentConfig } from "@/engine/config";
 import type { Discipline, TeamId, CourtSide } from "@/engine/types";
 import { newId } from "@/lib/id";
 
-const TENANT = { id: "tenant_fivb_demo", slug: "fivb-demo", name: "FIVB Demo" };
+const TENANT = { id: "tenant_fivb_demo", slug: "fivb-demo", name: "Volleyball Scoring" };
 
 type Payload = { type: string } & Record<string, unknown>;
 
