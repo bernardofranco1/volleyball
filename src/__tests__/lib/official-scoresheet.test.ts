@@ -133,10 +133,13 @@ function beachEvents(): ReportEvent[] {
   // Timeout by B at 3:1.
   evs.push(ev("TIMEOUT_REQUEST", { team: "B" }, [3, 1]));
   evs.push(ev("TIMEOUT_END", { team: "B" }, [3, 1]));
-  // A scores to 4:1, sum 5 → court switch (score-stamped), with a TTO first.
+  // A scores to 4:1, sum 5 → court switch (score-stamped). The engine
+  // auto-emits SIDE_SWITCH first, then TTO_START at the same score — the TTO
+  // flag must land on THAT switch, not the next one (regression: it used to
+  // shift one switch late).
   evs.push(ev("RALLY_WON_A", {}, [4, 1]));
-  evs.push(ev("TTO_START", {}, [4, 1]));
   evs.push(ev("SIDE_SWITCH", { newTeamASide: "RIGHT" }, [4, 1]));
+  evs.push(ev("TTO_START", {}, [4, 1]));
   // A misconduct warning against player a1 at 4:1.
   evs.push(ev("MISCONDUCT_WARNING", { team: "A", playerId: "a1" }, [4, 1]));
   // An improper request by B.
@@ -167,15 +170,18 @@ describe("official scoresheet data layer", () => {
     expect(s.scoreB).toBe(1);
     expect(s.winner).toBe("A");
 
-    // Side-outs: A lost serve once at 2 points (slot 0); at set end A's 21 is
-    // circled in slot 1 (its next server).
+    // Side-outs: A lost serve once at 2 points (slot 0). A won the set while
+    // its slot-1 player held serve → the final 21 is circled in THAT row
+    // (the player who served the last time the team scored — never the next
+    // server).
     expect(s.serviceA).toEqual([
       { col: 0, round: 0, score: 2, circled: false },
       { col: 1, round: 0, score: 21, circled: true },
     ]);
-    // B lost serve at 1 point; final 1 circled at its next slot.
-    expect(s.serviceB[0]).toEqual({ col: 0, round: 0, score: 1, circled: false });
-    expect(s.serviceB[1].circled).toBe(true);
+    // B's only service turn (slot 0) ended at its final score of 1 — the
+    // set-end circle MERGES onto that entry instead of duplicating it on the
+    // next server's row.
+    expect(s.serviceB).toEqual([{ col: 0, round: 0, score: 1, circled: true }]);
 
     // Service order maps player ids to jerseys: A declared a2 first.
     expect(s.serviceOrderA).toEqual([2, 1]);

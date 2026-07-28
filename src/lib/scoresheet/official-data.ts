@@ -155,6 +155,13 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
     B: new Map(),
   };
   let pendingTTO = false;
+  // The row/column position of each team's CURRENT server (in-progress or
+  // most recent service turn). The set-end circle belongs there — "the player
+  // that served the last time the team scored" — not on the next server.
+  let serverSlot: Record<TeamId, { col: number; round: number } | null> = {
+    A: null,
+    B: null,
+  };
   // Lineups confirmed before their SET_START (defensive: the indoor engine
   // confirms them after SET_START, but replay edges can reorder).
   const pendingLineups: Record<TeamId, (number | null)[]> = { A: [], B: [] };
@@ -174,8 +181,7 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
 
   const sideOut = (loser: TeamId) => {
     if (!cur) return;
-    const k = turns[loser];
-    const { col, round } = posOf(loser, k);
+    const { col, round } = serverSlot[loser] ?? posOf(loser, turns[loser]);
     const entry: ServiceEntry = {
       col,
       round,
@@ -186,6 +192,12 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
     turns[loser] += 1;
   };
 
+  /** `team` gains the right to serve — its upcoming turn's position becomes
+   *  the current server slot. */
+  const gainServe = (team: TeamId) => {
+    serverSlot[team] = posOf(team, turns[team]);
+  };
+
   const resetSetState = () => {
     server = null;
     turns = { A: 0, B: 0 };
@@ -194,6 +206,7 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
     lineupIds = { A: [], B: [] };
     openSubs = { A: new Map(), B: new Map() };
     pendingTTO = false;
+    serverSlot = { A: null, B: null };
   };
 
   for (const ev of events) {
@@ -238,6 +251,7 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
         };
         sets.push(cur);
         server = cur.firstServer;
+        if (server) gainServe(server);
         // Consume any lineup confirmed while no set was open.
         for (const t of ["A", "B"] as const) {
           if (pendingLineups[t].length) {
@@ -292,9 +306,13 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
           // the opponent's point, so post-rally denorms are safe to use.
           sideOut(server);
           server = winnerTeam;
+          gainServe(winnerTeam);
         } else {
           score = { a: evScore.a, b: evScore.b };
-          if (!server) server = winnerTeam;
+          if (!server) {
+            server = winnerTeam;
+            gainServe(winnerTeam);
+          }
         }
         cur.scoreA = score.a;
         cur.scoreB = score.b;
@@ -307,7 +325,16 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
       }
 
       case "TTO_START": {
-        pendingTTO = true;
+        // The TTO belongs to the court switch at the SAME score. The engine
+        // auto-emits SIDE_SWITCH before TTO_START at the trigger sum, so flag
+        // the switch already recorded; keep the pending path for the reverse
+        // order.
+        const last = cur?.switches[cur.switches.length - 1];
+        if (last && last.score.a === evScore.a && last.score.b === evScore.b) {
+          last.tto = true;
+        } else {
+          pendingTTO = true;
+        }
         break;
       }
 
@@ -356,17 +383,21 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
         cur.endedAt = ev.timestamp ?? null;
         cur.scoreA = num(p.scoreA) || cur.scoreA;
         cur.scoreB = num(p.scoreB) || cur.scoreB;
-        // Circle both teams' final scores in their next-server boxes (paper
-        // convention at set end).
+        // Paper convention at set end: each team's final score is CIRCLED in
+        // the row of its CURRENT server — the player who served the last time
+        // the team held serve — never the next server. If the final rally
+        // side-outed that team, the side-out already wrote the same score in
+        // that row: circle it instead of duplicating.
         for (const t of ["A", "B"] as const) {
-          const k = turns[t];
-          const { col, round } = posOf(t, k);
-          (t === "A" ? cur.serviceA : cur.serviceB).push({
-            col,
-            round,
-            score: t === "A" ? cur.scoreA : cur.scoreB,
-            circled: true,
-          });
+          const pos = serverSlot[t] ?? posOf(t, 0);
+          const final = t === "A" ? cur.scoreA : cur.scoreB;
+          const list = t === "A" ? cur.serviceA : cur.serviceB;
+          const last = list[list.length - 1];
+          if (last && last.col === pos.col && last.score === final && !last.circled) {
+            last.circled = true;
+          } else {
+            list.push({ col: pos.col, round: pos.round, score: final, circled: true });
+          }
         }
         cur = null;
         break;

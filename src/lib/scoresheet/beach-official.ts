@@ -207,24 +207,27 @@ function setPanel(
   const cw = w - leftW - railW - 16;
 
   // Title row.
-  g.rect(cx0 + cw / 2 - 30, y + 4, 60, 14);
-  g.ctext(`Set ${setNumber}`, cx0 + cw / 2, y + 11, { size: 7.5, bold: true });
+  g.rect(cx0 + cw / 2 - 30, y + 2, 60, 13);
+  g.ctext(`Set ${setNumber}`, cx0 + cw / 2, y + 8.5, { size: 7.5, bold: true });
   if (set?.startedAt)
-    g.text(`Start time: ${hhmmss(set.startedAt)}`, cx0 + cw - 110, y + 7, { size: 6.5, bold: true, color: INK });
+    g.text(`Start time: ${hhmmss(set.startedAt)}`, cx0 + cw - 110, y + 5, { size: 6.5, bold: true, color: INK });
 
   const topTeam: TeamId = set?.firstServer ?? "A";
   const botTeam: TeamId = topTeam === "A" ? "B" : "A";
   const top = set ? halfData(topTeam, true, set, report, sheet) : null;
   const bot = set ? halfData(botTeam, false, set, report, sheet) : null;
 
+  // The service-order rows (player numbers, sanctions cells) and the 1-21
+  // service boxes are the SAME physical row on the paper sheet — one line
+  // per player straight across. Shared y/h keeps them aligned.
   teamLeftBlock(g, x + 3, y + 4, leftW, top, false);
-  serviceRow(g, cx0, y + 24, cw, 19, top?.rows[0] ?? []);
-  serviceRow(g, cx0, y + 45, cw, 19, top?.rows[1] ?? []);
-  hLadder(g, cx0, y + 84, cw, 16, ladderMax, top?.points ?? 0);
-  hLadder(g, cx0, y + 128, cw, 16, ladderMax, bot?.points ?? 0);
-  serviceRow(g, cx0, y + 158, cw, 19, bot?.rows[0] ?? []);
-  serviceRow(g, cx0, y + 179, cw, 19, bot?.rows[1] ?? []);
-  teamLeftBlock(g, x + 3, y + 128, leftW, bot, true);
+  serviceRow(g, cx0, y + 18, cw, 14, top?.rows[0] ?? []);
+  serviceRow(g, cx0, y + 34, cw, 14, top?.rows[1] ?? []);
+  hLadder(g, cx0, y + 87, cw, 16, ladderMax, top?.points ?? 0);
+  hLadder(g, cx0, y + 123, cw, 16, ladderMax, bot?.points ?? 0);
+  serviceRow(g, cx0, y + 178, cw, 14, bot?.rows[0] ?? []);
+  serviceRow(g, cx0, y + 194, cw, 14, bot?.rows[1] ?? []);
+  teamLeftBlock(g, x + 3, y + 123, leftW, bot, true);
   if (set?.endedAt)
     g.text(`End time: ${hhmmss(set.endedAt)}`, cx0 + cw - 110, y + h - 14, { size: 6.5, bold: true, color: INK });
 
@@ -280,50 +283,52 @@ function teamLeftBlock(
     return byCol[colIdx]?.[0] ?? "";
   };
 
-  const headerRow = (yy: number) => {
+  const headerRow = (yy: number, labelBelow = false) => {
     const labels = ["Service order", "Player No.", "Formal warning", "Pen.", "Pen.", "Exp.", "Disq."];
     for (let i = 0; i < 7; i++) {
       g.rect(colX(i), yy, cwCols[i], 9, { fill: HEAD });
       g.ctext(labels[i], colX(i) + cwCols[i] / 2, yy + 4.5, { size: i < 3 ? 2.9 : 3.6 });
     }
-    g.text("Misconduct sanctions", x + 64, yy - 4.6, { size: 3.4 });
+    g.text("Misconduct sanctions", x + 64, labelBelow ? yy + 10.4 : yy - 4.6, { size: 3.4 });
   };
+  // h matches the center service-box rows exactly (same physical row).
+  const ORDER_ROW_H = 14;
   const orderRow = (yy: number, ord: string, no: number | null) => {
-    for (let i = 0; i < 7; i++) g.rect(colX(i), yy, cwCols[i], 12);
-    g.ctext(ord, x + 13, yy + 6, { size: 6, bold: true });
+    for (let i = 0; i < 7; i++) g.rect(colX(i), yy, cwCols[i], ORDER_ROW_H);
+    g.ctext(ord, x + 13, yy + ORDER_ROW_H / 2, { size: 6, bold: true });
     if (no != null) {
-      g.ctext(no, x + 33.5, yy + 6, { size: 7, bold: true, color: INK });
+      g.ctext(no, x + 33.5, yy + ORDER_ROW_H / 2, { size: 7, bold: true, color: INK });
       for (const ci of [2, 3, 4, 5, 6]) {
         const v = sanctionFor(no, ci);
-        if (v) g.ctext(v, colX(ci) + cwCols[ci] / 2, yy + 6, { size: 4, color: INK });
+        if (v) g.ctext(v, colX(ci) + cwCols[ci] / 2, yy + ORDER_ROW_H / 2, { size: 4, color: INK });
       }
     }
   };
   const coachRow = (yy: number) => {
-    for (let i = 0; i < 7; i++) g.rect(colX(i), yy, cwCols[i], 10);
-    g.ctext("C", x + 13, yy + 5, { size: 5.5, bold: true });
-    g.ctext("Coach", x + 33.5, yy + 5, { size: 3.6 });
+    for (let i = 0; i < 7; i++) g.rect(colX(i), yy, cwCols[i], 9);
+    g.ctext("C", x + 13, yy + 4.5, { size: 5, bold: true });
+    g.ctext("Coach", x + 33.5, yy + 4.5, { size: 3.4 });
   };
   const toDelayRow = (yy: number) => {
-    g.rect(x, yy, 41, 26);
-    g.ctext("Time", x + 20.5, yy + 5, { size: 4.6 });
-    g.ctext("Out", x + 20.5, yy + 10, { size: 4.6 });
+    g.rect(x, yy, 41, 24);
+    g.ctext("Time", x + 20.5, yy + 4.5, { size: 4.4 });
+    g.ctext("Out", x + 20.5, yy + 9.5, { size: 4.4 });
     if (t?.timeout)
-      g.ctext(`${t.timeout.own}:${t.timeout.opp}`, x + 20.5, yy + 19, { size: 6, bold: true, color: INK });
-    g.rect(x + 41, yy, w - 41, 8, { fill: HEAD });
-    g.ctext("Delay sanctions", x + 41 + (w - 41) / 2, yy + 4, { size: 3.8 });
+      g.ctext(`${t.timeout.own}:${t.timeout.opp}`, x + 20.5, yy + 17.5, { size: 6, bold: true, color: INK });
+    g.rect(x + 41, yy, w - 41, 7, { fill: HEAD });
+    g.ctext("Delay sanctions", x + 41 + (w - 41) / 2, yy + 3.5, { size: 3.6 });
     const dl = ["Warn.", "Pen.", "Pen.", "Pen."];
     const dw = (w - 41) / 4;
     const delays = t ? t.sanctions.filter((s) => s.kind.startsWith("DELAY")) : [];
     const warn = delays.filter((s) => s.kind === "DELAY_WARNING");
     const pens = delays.filter((s) => s.kind === "DELAY_PENALTY");
     for (let i = 0; i < 4; i++) {
-      g.rect(x + 41 + i * dw, yy + 8, dw, 8, { fill: HEAD });
-      g.ctext(dl[i], x + 41 + i * dw + dw / 2, yy + 12, { size: 3.6 });
-      g.rect(x + 41 + i * dw, yy + 16, dw, 10);
+      g.rect(x + 41 + i * dw, yy + 7, dw, 7, { fill: HEAD });
+      g.ctext(dl[i], x + 41 + i * dw + dw / 2, yy + 10.5, { size: 3.4 });
+      g.rect(x + 41 + i * dw, yy + 14, dw, 10);
       const s = i === 0 ? warn[0] : pens[i - 1];
       if (s)
-        g.ctext(`${s.score.a}:${s.score.b}`, x + 41 + i * dw + dw / 2, yy + 21, { size: 4, color: INK });
+        g.ctext(`${s.score.a}:${s.score.b}`, x + 41 + i * dw + dw / 2, yy + 19, { size: 4, color: INK });
     }
   };
   const teamPointsRow = (yy: number) => {
@@ -337,20 +342,24 @@ function teamLeftBlock(
     }
   };
 
+  // Offsets are chosen so the two order rows land on EXACTLY the same y/h as
+  // the center service-box rows (setPanel: top rows at panel+18/+34, bottom
+  // rows at panel+178/+194; this block is called with y = panel+4 for the top
+  // half and y = panel+123 for the bottom half).
   if (!mirror) {
-    headerRow(y + 5);
+    headerRow(y + 2);
     orderRow(y + 14, t?.orders[0][0] ?? "I", t?.orders[0][1] ?? null);
-    orderRow(y + 27, t?.orders[1][0] ?? "III", t?.orders[1][1] ?? null);
-    coachRow(y + 40);
-    toDelayRow(y + 53);
-    teamPointsRow(y + 82);
+    orderRow(y + 30, t?.orders[1][0] ?? "III", t?.orders[1][1] ?? null);
+    coachRow(y + 46);
+    toDelayRow(y + 57);
+    teamPointsRow(y + 83);
   } else {
     teamPointsRow(y);
-    toDelayRow(y + 19);
-    coachRow(y + 48);
-    orderRow(y + 59, t?.orders[0][0] ?? "II", t?.orders[0][1] ?? null);
-    orderRow(y + 72, t?.orders[1][0] ?? "IV", t?.orders[1][1] ?? null);
-    headerRow(y + 87);
+    toDelayRow(y + 18);
+    coachRow(y + 44);
+    orderRow(y + 55, t?.orders[0][0] ?? "II", t?.orders[0][1] ?? null);
+    orderRow(y + 71, t?.orders[1][0] ?? "IV", t?.orders[1][1] ?? null);
+    headerRow(y + 87, true);
   }
 }
 
