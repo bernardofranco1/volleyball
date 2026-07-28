@@ -567,3 +567,27 @@ describe("beach reducer — UNDO & replay", () => {
     expect(replayed).toEqual(m.state);
   });
 });
+
+describe("beach — rally gate (spec/22 timing)", () => {
+  it("cycles BETWEEN_RALLIES → RALLY_START → RALLY_LIVE → point → BETWEEN_RALLIES", () => {
+    const m = new TestMatch();
+    m.begin();
+    expect(m.state.rallyPhase).toBe("BETWEEN_RALLIES");
+    expect(
+      validateBeachEvent({ type: "RALLY_START" }, m.state, BEACH).ok,
+    ).toBe(true);
+    m.dispatch({ type: "RALLY_START" });
+    expect(m.state.rallyPhase).toBe("RALLY_LIVE");
+    // A second start while live is rejected (the button is gone anyway).
+    expect(
+      validateBeachEvent({ type: "RALLY_START" }, m.state, BEACH).ok,
+    ).toBe(false);
+    m.dispatch({ type: "RALLY_WON_A" });
+    expect(m.state.rallyPhase).toBe("BETWEEN_RALLIES");
+    expect(m.set.scoreA).toBe(1);
+    // Points remain accepted WITHOUT a rally start (engine stays tolerant for
+    // offline queues / API clients — the console flow is the gate).
+    m.dispatch({ type: "RALLY_WON_B" });
+    expect(m.set.scoreB).toBe(1);
+  });
+});

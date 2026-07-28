@@ -65,8 +65,14 @@ export function GrassActionBar() {
     const text = window.prompt(t("scoring.note"));
     if (text) dispatch({ type: "NOTE", text });
   };
-  useShortcut("pointLeft", live ? () => tap(leftTeam) : null);
-  useShortcut("pointRight", live ? () => tap(rightTeam) : null);
+  // Rally gate (spec/22): a point key pressed between rallies OPENS the rally
+  // (one action per press); it scores only while the rally is live.
+  const tapPoint = (team: TeamId) =>
+    state.rallyPhase === "RALLY_LIVE"
+      ? tap(team)
+      : dispatch({ type: "RALLY_START" });
+  useShortcut("pointLeft", live ? () => tapPoint(leftTeam) : null);
+  useShortcut("pointRight", live ? () => tapPoint(rightTeam) : null);
   useShortcut("replay", live ? tapReplay : null);
   useShortcut("undo", live ? tapUndo : null);
   useShortcut("timeoutLeft", live ? () => requestTimeout(leftTeam) : null);

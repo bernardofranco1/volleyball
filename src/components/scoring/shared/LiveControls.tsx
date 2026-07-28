@@ -38,9 +38,10 @@ export function LiveScoreGrid({
   /** Replay the rally (no score/serve change) — REPLAY_POINT, two-tap armed. */
   onReplay?: () => void;
   onNote: (text: string) => void;
-  /** Optional timing anchor (spec/22): tap at the service whistle so rally
-   * durations are exact in the VSR feed / timing exports. Fully optional —
-   * scoring works identically when the tap is skipped. */
+  /** Rally gate (spec/22): between rallies the two point buttons are REPLACED
+   * by one Start Rally button dispatching RALLY_START — every rally gets a
+   * precise start timestamp by construction. Points appear only once the
+   * rally is live. Omit to render the ungated two-button layout. */
   onRallyStart?: () => void;
   /** A RALLY_START was recorded and the rally is in progress. */
   rallyLive?: boolean;
@@ -70,38 +71,51 @@ export function LiveScoreGrid({
       </ScoreButton>
     );
   };
+  const controls = (
+    <div className="flex flex-col justify-center gap-1.5">
+      <SecondaryButton armed={armed === "UNDO"} onClick={onUndo} disabled={pending}>
+        {armed === "UNDO"
+          ? (confirmUndoLabel ?? t("scoring.confirmUndo"))
+          : t("scoring.undo")}
+      </SecondaryButton>
+      {onReplay ? (
+        <SecondaryButton
+          armed={armed === "REPLAY"}
+          onClick={onReplay}
+          disabled={pending}
+        >
+          {armed === "REPLAY" ? t("scoring.confirmReplay") : t("scoring.replayPoint")}
+        </SecondaryButton>
+      ) : null}
+      <SecondaryButton
+        onClick={() => {
+          const text = window.prompt(t("scoring.note"));
+          if (text) onNote(text);
+        }}
+      >
+        {t("scoring.note")}
+      </SecondaryButton>
+    </div>
+  );
+
+  // Rally gate (spec/22): between rallies ONE full-width Start Rally button
+  // stands where the two point buttons will be — scoring is impossible until
+  // the rally is opened, so every rally's start time is exact by construction.
+  if (onRallyStart && !rallyLive) {
+    return (
+      <div className="grid grid-cols-[1fr_auto] items-stretch gap-2">
+        <ScoreButton armed={false} color="#2b6cb0" onClick={() => onRallyStart()}>
+          {t("scoring.startRally")}
+        </ScoreButton>
+        {controls}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
       {scoreBtn(order[0])}
-      <div className="flex flex-col justify-center gap-1.5">
-        {onRallyStart ? (
-          <SecondaryButton onClick={onRallyStart} disabled={pending || rallyLive}>
-            {rallyLive ? t("scoring.rallyLive") : t("scoring.rallyStart")}
-          </SecondaryButton>
-        ) : null}
-        <SecondaryButton armed={armed === "UNDO"} onClick={onUndo} disabled={pending}>
-          {armed === "UNDO"
-            ? (confirmUndoLabel ?? t("scoring.confirmUndo"))
-            : t("scoring.undo")}
-        </SecondaryButton>
-        {onReplay ? (
-          <SecondaryButton
-            armed={armed === "REPLAY"}
-            onClick={onReplay}
-            disabled={pending}
-          >
-            {armed === "REPLAY" ? t("scoring.confirmReplay") : t("scoring.replayPoint")}
-          </SecondaryButton>
-        ) : null}
-        <SecondaryButton
-          onClick={() => {
-            const text = window.prompt(t("scoring.note"));
-            if (text) onNote(text);
-          }}
-        >
-          {t("scoring.note")}
-        </SecondaryButton>
-      </div>
+      {controls}
       {scoreBtn(order[1])}
     </div>
   );
