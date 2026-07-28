@@ -16,6 +16,16 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // The demo tenant was re-slugged fivb-demo → volleyball-scoring (branding,
+  // 2026-07-28). Permanent redirect keeps every printed QR code, scorer
+  // deep-link and bookmark alive — query strings (tablet tokens, PIN keys)
+  // are carried over untouched.
+  if (pathname === "/t/fivb-demo" || pathname.startsWith("/t/fivb-demo/")) {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname.replace("/t/fivb-demo", "/t/volleyball-scoring");
+    return NextResponse.redirect(url, 308);
+  }
+
   // Decide whether the path is user-gated BEFORE paying the Supabase Auth
   // round trip — public scoreboards/tablets/results were previously spending
   // 30-80ms on an auth check whose result was discarded.

@@ -32,7 +32,7 @@ import type { TournamentConfig } from "@/engine/config";
 import type { Discipline, TeamId, CourtSide } from "@/engine/types";
 import { newId } from "@/lib/id";
 
-const TENANT = { id: "tenant_fivb_demo", slug: "fivb-demo", name: "Volleyball Scoring" };
+const TENANT = { id: "tenant_fivb_demo", slug: "volleyball-scoring", name: "Volleyball Scoring" };
 
 type Payload = { type: string } & Record<string, unknown>;
 
@@ -70,7 +70,12 @@ async function ensureTenant() {
   await db
     .insert(tenants)
     .values({ id: TENANT.id, slug: TENANT.slug, name: TENANT.name })
-    .onConflictDoUpdate({ target: tenants.slug, set: { name: TENANT.name } });
+    // Conflict on the PK (not the slug) so a re-slugged tenant converges to
+    // the seed's values instead of tripping the id uniqueness.
+    .onConflictDoUpdate({
+      target: tenants.id,
+      set: { name: TENANT.name, slug: TENANT.slug },
+    });
   await db
     .insert(tenantBranding)
     .values({ tenantId: TENANT.id, primaryColor: "#0047AB", secondaryColor: "#FFD700" })
