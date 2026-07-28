@@ -490,10 +490,26 @@ describe("indoor append orchestrator", () => {
 });
 
 describe("indoor — lineups before the set (spec/21 flow fix)", () => {
-  it("accepts per-team lineups at READY and applies both when set 1 starts", () => {
+  it("accepts per-team lineups BEFORE the coin toss and applies both when set 1 starts", () => {
     const m = new TestMatch();
     m.apply({ type: "MATCH_CREATED", matchId: "m1" });
-    m.apply({ type: "COIN_TOSS", firstServer: "A", teamAStartSide: "LEFT" });
+    // Status COIN_TOSS (toss not yet done): the starting six is the FIRST
+    // step of the flow — before toss, Start match and Start set.
+    expect(m.state.status).toBe("COIN_TOSS");
+    expect(
+      validateIndoorEvent(
+        {
+          type: "LINEUP_CONFIRMED",
+          team: "A",
+          setNumber: 1,
+          playerIds: A6,
+          liberoId: "a7",
+          secondLiberoId: null,
+        },
+        m.state,
+        INDOOR,
+      ).ok,
+    ).toBe(true);
     m.apply({
       type: "LINEUP_CONFIRMED",
       team: "A",
@@ -503,7 +519,8 @@ describe("indoor — lineups before the set (spec/21 flow fix)", () => {
       secondLiberoId: null,
     });
     expect(m.state.pendingLineups?.A?.playerIds).toEqual(A6);
-    expect(m.state.status).toBe("READY");
+    expect(m.state.status).toBe("COIN_TOSS");
+    m.apply({ type: "COIN_TOSS", firstServer: "A", teamAStartSide: "LEFT" });
     m.apply({
       type: "LINEUP_CONFIRMED",
       team: "B",

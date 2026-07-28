@@ -81,13 +81,15 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
     rosterB,
   });
 
-  // Lineups come BEFORE the set, as on paper (spec/21 flow fix): from READY
-  // and during every set break the court zone collects them (stashed as
-  // pendingLineups, applied by SET_START). LINEUP_PENDING remains the
-  // fallback for a set started without them.
+  // The starting six is the FIRST step of the flow, as on paper: the court
+  // zone collects lineups from the moment the match is set up — before the
+  // coin toss, Start match and Start set — and again during every set break
+  // (stashed as pendingLineups, applied by SET_START). LINEUP_PENDING remains
+  // the fallback for a set started without them.
   const preSetLineup =
     config.lineupRequired &&
-    (state.status === "READY" ||
+    (state.status === "COIN_TOSS" ||
+      state.status === "READY" ||
       (state.status === "LIVE" && (!set || !!set.winner)));
 
   let main;

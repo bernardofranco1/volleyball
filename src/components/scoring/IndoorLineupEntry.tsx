@@ -20,7 +20,13 @@ export function IndoorLineupEntry() {
   // Pre-set: no open set — collecting for the upcoming one.
   const preSet = !set || !!set.winner;
   const upcomingSet = set?.winner ? state.currentSetNumber + 1 : state.currentSetNumber;
-  if (!set && state.status !== "READY" && state.status !== "LIVE") return null;
+  if (
+    !set &&
+    state.status !== "COIN_TOSS" &&
+    state.status !== "READY" &&
+    state.status !== "LIVE"
+  )
+    return null;
 
   const confirmedA = preSet ? !!state.pendingLineups?.A : !!set?.lineupConfirmedA;
   const confirmedB = preSet ? !!state.pendingLineups?.B : !!set?.lineupConfirmedB;

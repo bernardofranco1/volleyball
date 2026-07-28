@@ -126,7 +126,8 @@ export function RotationScoreboard({
   // started without one.
   const preSetLineup =
     (config.lineupRequired ?? true) &&
-    (state.status === "READY" ||
+    (state.status === "COIN_TOSS" ||
+      state.status === "READY" ||
       (state.status === "LIVE" && (!set || !!set.winner))) &&
     !state.pendingLineup;
 
