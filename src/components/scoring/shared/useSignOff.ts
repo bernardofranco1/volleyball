@@ -13,6 +13,8 @@ export interface SignOffStatus {
   policy: "REQUIRED" | "OPTIONAL" | "OFF";
   complete: boolean;
   missing: string[];
+  /** Every live signature role on record (trio + pre-match + bench). */
+  signedRoles: string[];
 }
 
 export function useSignOffStatus(matchId: string, enabled: boolean) {
@@ -24,11 +26,14 @@ export function useSignOffStatus(matchId: string, enabled: boolean) {
         cache: "no-store",
       });
       if (!res.ok) return;
-      const json = (await res.json()) as SignOffStatus;
+      const json = (await res.json()) as SignOffStatus & {
+        signatures?: { role: string }[];
+      };
       setStatus({
         policy: json.policy,
         complete: json.complete,
         missing: json.missing ?? [],
+        signedRoles: (json.signatures ?? []).map((s) => s.role),
       });
     } catch {
       // Offline or transient — the panel surfaces its own errors; the console

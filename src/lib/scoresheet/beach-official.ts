@@ -433,9 +433,15 @@ function teamsBlock(
     g.rect(tx + 14, yy, half - 14, 10);
     g.ctext("C", tx + 7, yy + 5, { size: 5, bold: true });
     yy += 10;
-    // Pre-match signatures: capture is spec/21 Phase D — blank boxes today.
+    // Pre-match captain signatures captured on the console (spec/21 Phase D);
+    // the coach box waits for staff entities and prints blank.
     g.rect(tx, yy, half, 14);
     g.text("Captain's pre-match signature:", tx + 2, yy + 2, { size: 3.6 });
+    const preSig = report.approval.signatures.find(
+      (s) => s.role === (side === "A" ? "TEAM_A_CAPTAIN_PREMATCH" : "TEAM_B_CAPTAIN_PREMATCH"),
+    );
+    if (preSig?.strokes)
+      drawSignatureInBox(g.d, preSig.strokes, { x: tx + 8, y: yy + 5, w: half - 16, h: 8.5 });
     yy += 14;
     g.rect(tx, yy, half, 14);
     g.text("Coach's pre-match signature:", tx + 2, yy + 2, { size: 3.6 });
@@ -580,8 +586,10 @@ function approvalBlock(
     if (o?.country || o?.level)
       g.ctext(o.country ?? o.level ?? "", colX[2] + cws[2] / 2, yy + 5, { size: 4.6, color: INK });
     g.rect(colX[3], yy, cws[3], 10);
-    if (role === "FIRST_REFEREE") {
-      const sig = sigByRole.get("FIRST_REFEREE");
+    // 1st referee, scorer and assistant scorer sign on the console (spec/20 +
+    // spec/21 Phase D); the 2nd referee prints a blank cell.
+    if (role === "FIRST_REFEREE" || role === "SCORER" || role === "ASSISTANT_SCORER") {
+      const sig = sigByRole.get(role);
       if (sig?.strokes)
         drawSignatureInBox(g.d, sig.strokes, { x: colX[3] + 2, y: yy + 0.5, w: cws[3] - 4, h: 9 });
     }

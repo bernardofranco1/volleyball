@@ -12,6 +12,8 @@ import {
 import { IndoorCourt } from "@/components/court/IndoorCourt";
 import { IndoorActionBar } from "@/components/scoring/IndoorActionBar";
 import { useResultSignOff } from "@/components/scoring/shared/ResultSignOff";
+import { usePrematchSignOff } from "@/components/scoring/shared/PrematchSignOff";
+import { SanctionsControl } from "@/components/scoring/shared/SanctionsControl";
 import { IndoorLineupEntry } from "@/components/scoring/IndoorLineupEntry";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
@@ -23,6 +25,7 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
     matchId,
     state,
     config,
+    dispatch,
     rosterA,
     rosterB,
     teamAName,
@@ -67,9 +70,22 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
     winner: state.winner,
   });
 
+  // Pre-match captain signatures (spec/21 Phase D).
+  const prematch = usePrematchSignOff({
+    matchId,
+    status: state.status,
+    policy: config.resultSignatures,
+    teamAName,
+    teamBName,
+    rosterA,
+    rosterB,
+  });
+
   let main;
   if (signOff.panel) {
     main = signOff.panel;
+  } else if (prematch.panel) {
+    main = prematch.panel;
   } else if (state.rallyPhase === "LINEUP_PENDING") {
     main = <IndoorLineupEntry />;
   } else if (set && set.courtPositionsA.length > 0) {
@@ -138,6 +154,18 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
             finishedExtra={signOff.finishedExtra}
             finishedUndoHidden={signOff.finishedUndoHidden}
           />
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {prematch.trigger}
+            <SanctionsControl
+              status={state.status}
+              teamAName={teamAName}
+              teamBName={teamBName}
+              rosterA={rosterA}
+              rosterB={rosterB}
+              dispatch={dispatch}
+              pending={pending}
+            />
+          </div>
         </div>
       }
       overlay={

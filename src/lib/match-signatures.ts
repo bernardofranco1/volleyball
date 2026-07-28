@@ -23,12 +23,50 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { matchSignatures, matchOfficials, matches } from "@/db/schema";
 
+/** The confirmation trio (spec/20): the third of these flips the match to
+ *  FINISHED. `signatureProgress` and the result lock key off exactly these. */
 export const SIGNATURE_ROLES = [
   "TEAM_A_CAPTAIN",
   "TEAM_B_CAPTAIN",
   "FIRST_REFEREE",
 ] as const;
 export type SignatureRole = (typeof SIGNATURE_ROLES)[number];
+
+/** Pre-match captain signatures (spec/21 Phase D) — attest to the roster and
+ *  lineup before play; they never gate result confirmation and never go stale
+ *  when the score moves. */
+export const PREMATCH_SIGNATURE_ROLES = [
+  "TEAM_A_CAPTAIN_PREMATCH",
+  "TEAM_B_CAPTAIN_PREMATCH",
+] as const;
+export type PrematchSignatureRole = (typeof PREMATCH_SIGNATURE_ROLES)[number];
+
+/** Scorer-bench signatures (spec/21 Phase D) — optional post-match additions
+ *  to the APPROVAL block; they may be added even after the result confirmed. */
+export const BENCH_SIGNATURE_ROLES = ["SCORER", "ASSISTANT_SCORER"] as const;
+export type BenchSignatureRole = (typeof BENCH_SIGNATURE_ROLES)[number];
+
+export const ALL_SIGNATURE_ROLES = [
+  ...SIGNATURE_ROLES,
+  ...PREMATCH_SIGNATURE_ROLES,
+  ...BENCH_SIGNATURE_ROLES,
+] as const;
+export type AnySignatureRole = (typeof ALL_SIGNATURE_ROLES)[number];
+
+export function isConfirmationRole(v: unknown): v is SignatureRole {
+  return typeof v === "string" && (SIGNATURE_ROLES as readonly string[]).includes(v);
+}
+export function isPrematchRole(v: unknown): v is PrematchSignatureRole {
+  return (
+    typeof v === "string" &&
+    (PREMATCH_SIGNATURE_ROLES as readonly string[]).includes(v)
+  );
+}
+export function isBenchRole(v: unknown): v is BenchSignatureRole {
+  return (
+    typeof v === "string" && (BENCH_SIGNATURE_ROLES as readonly string[]).includes(v)
+  );
+}
 
 export const SIGNATURE_INTENTS = ["ACCEPT", "PROTEST", "REFUSED"] as const;
 export type SignatureIntent = (typeof SIGNATURE_INTENTS)[number];
@@ -46,8 +84,11 @@ export const STROKE_LIMITS = {
   maxTotalPoints: 4000,
 } as const;
 
-export function isSignatureRole(v: unknown): v is SignatureRole {
-  return typeof v === "string" && (SIGNATURE_ROLES as readonly string[]).includes(v);
+/** Any role the signatures API accepts (trio + pre-match + bench). */
+export function isSignatureRole(v: unknown): v is AnySignatureRole {
+  return (
+    typeof v === "string" && (ALL_SIGNATURE_ROLES as readonly string[]).includes(v)
+  );
 }
 
 export function isSignatureIntent(v: unknown): v is SignatureIntent {
@@ -179,7 +220,7 @@ export function resultDigest(state: SignableState): string {
 
 export interface SignatureRecord {
   id: string;
-  role: SignatureRole;
+  role: AnySignatureRole;
   signerName: string;
   signerPlayerId: string | null;
   strokes: SignatureStrokes | null;
@@ -266,7 +307,7 @@ export function signatureProgress(
 }
 
 /** Human label for a signature role (English; the UI uses i18n keys). */
-export function signatureRoleLabel(role: SignatureRole): string {
+export function signatureRoleLabel(role: AnySignatureRole): string {
   switch (role) {
     case "TEAM_A_CAPTAIN":
       return "Team A captain";
@@ -274,6 +315,14 @@ export function signatureRoleLabel(role: SignatureRole): string {
       return "Team B captain";
     case "FIRST_REFEREE":
       return "First referee";
+    case "TEAM_A_CAPTAIN_PREMATCH":
+      return "Team A captain (pre-match)";
+    case "TEAM_B_CAPTAIN_PREMATCH":
+      return "Team B captain (pre-match)";
+    case "SCORER":
+      return "Scorer";
+    case "ASSISTANT_SCORER":
+      return "Assistant scorer";
   }
 }
 

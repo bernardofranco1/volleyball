@@ -17,6 +17,8 @@ import { pairDisplayName } from "@/lib/player-name";
 import { BeachCourt, type BeachCourtPlayer } from "@/components/court/BeachCourt";
 import { BeachActionBar } from "@/components/scoring/BeachActionBar";
 import { useResultSignOff } from "@/components/scoring/shared/ResultSignOff";
+import { usePrematchSignOff } from "@/components/scoring/shared/PrematchSignOff";
+import { SanctionsControl } from "@/components/scoring/shared/SanctionsControl";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
@@ -141,6 +143,18 @@ export function LiveScoreboard({
     winner: state.winner,
   });
 
+  // Pre-match captain signatures (spec/21 Phase D): low-key trigger under the
+  // bar from the coin toss until the match is over.
+  const prematch = usePrematchSignOff({
+    matchId,
+    status: state.status,
+    policy: config.resultSignatures,
+    teamAName,
+    teamBName,
+    rosterA,
+    rosterB,
+  });
+
   // One-tap service-order declaration (rules: each team declares its order
   // before the set). Prompt for the serving team first, then the receiver —
   // but ONLY until the set's first rally: once play is underway the serving
@@ -198,7 +212,7 @@ export function LiveScoreboard({
         />
       }
       main={
-        signOff.panel ?? (
+        signOff.panel ?? prematch.panel ?? (
           <BeachCourt
             teamASide={set?.teamASide ?? "LEFT"}
             currentServer={servingTeam}
@@ -244,6 +258,18 @@ export function LiveScoreboard({
             finishedExtra={signOff.finishedExtra}
             finishedUndoHidden={signOff.finishedUndoHidden}
           />
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {prematch.trigger}
+            <SanctionsControl
+              status={state.status}
+              teamAName={teamAName}
+              teamBName={teamBName}
+              rosterA={rosterA}
+              rosterB={rosterB}
+              dispatch={dispatch}
+              pending={pending}
+            />
+          </div>
         </div>
       }
       overlay={

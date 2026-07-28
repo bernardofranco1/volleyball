@@ -67,7 +67,41 @@ function baseReport(discipline: string, events: ReportEvent[]): MatchReportData 
     winner: "A",
     sets: [],
     events,
-    approval: { confirmedVia: null, confirmedAt: null, officials: [], signatures: [] },
+    approval: {
+      confirmedVia: null,
+      confirmedAt: null,
+      officials: [],
+      // A pre-match captain and a scorer signature exercise the Phase D
+      // drawing paths (TEAMS pre-match box + APPROVAL bench row).
+      signatures: [
+        {
+          id: "sig1",
+          role: "TEAM_A_CAPTAIN_PREMATCH",
+          signerName: "Duda Lisboa",
+          signerPlayerId: "a1",
+          strokes: { pad: { w: 1, h: 0.32 }, strokes: [[[0.1, 0.5], [0.9, 0.5]]] },
+          intent: "ACCEPT",
+          remarks: null,
+          signedAt: T0,
+          signedSequence: 3,
+          resultDigest: "d1",
+          capturedBy: null,
+        },
+        {
+          id: "sig2",
+          role: "SCORER",
+          signerName: "Dundas W.",
+          signerPlayerId: null,
+          strokes: { pad: { w: 1, h: 0.32 }, strokes: [[[0.2, 0.3], [0.8, 0.7]]] },
+          intent: "ACCEPT",
+          remarks: null,
+          signedAt: T0,
+          signedSequence: 30,
+          resultDigest: "d2",
+          capturedBy: null,
+        },
+      ],
+    },
     rosterA: [
       { id: "a1", fullName: "Duda Lisboa", jerseyNumber: 1, isCaptain: true, isLibero: false },
       { id: "a2", fullName: "Ana Patricia", jerseyNumber: 2, isCaptain: false, isLibero: false },

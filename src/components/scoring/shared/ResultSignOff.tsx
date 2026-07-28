@@ -1,10 +1,12 @@
 "use client";
 
 /**
- * Post-match scoresheet sign-off (spec/20), rendered in the middle of the
- * scorer console in place of the court: both team captains and the 1st referee
- * sign on this one device, in any order. The third signature confirms the
- * result and locks the match.
+ * Post-match scoresheet sign-off (spec/20 + spec/21 Phase D), rendered in the
+ * middle of the scorer console in place of the court: both team captains and
+ * the 1st referee sign on this one device, in any order — the third signature
+ * confirms the result and locks the match. The scorer bench (scorer +
+ * assistant scorer) signs the APPROVAL block too, optionally, and may still do
+ * so after the result is confirmed.
  *
  * Everything here is deliberately explicit about WHAT is being signed: the
  * result recap stays on screen, and every signature is posted with the digest
@@ -16,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/client";
 import type { PlayerLite } from "@/lib/match-provider";
 import type {
+  BenchSignatureRole,
   SignatureIntent,
   SignatureRole,
   SignatureStrokes,
@@ -25,8 +28,10 @@ import { PrimaryButton, SecondaryButton } from "@/components/scoring/shared/butt
 import { useSignOffStatus } from "@/components/scoring/shared/useSignOff";
 import type { ResultSignaturePolicy } from "@/engine/config";
 
+type PanelRole = SignatureRole | BenchSignatureRole;
+
 interface SignatureView {
-  role: SignatureRole;
+  role: string;
   signerName: string;
   signerPlayerId: string | null;
   intent: SignatureIntent;
@@ -51,6 +56,11 @@ const ROLES: SignatureRole[] = [
   "TEAM_B_CAPTAIN",
   "FIRST_REFEREE",
 ];
+const BENCH: BenchSignatureRole[] = ["SCORER", "ASSISTANT_SCORER"];
+
+const isBench = (role: PanelRole): role is BenchSignatureRole =>
+  role === "SCORER" || role === "ASSISTANT_SCORER";
+const typesName = (role: PanelRole) => role === "FIRST_REFEREE" || isBench(role);
 
 export function ResultSignOff({
   matchId,
@@ -80,7 +90,7 @@ export function ResultSignOff({
   const t = useT();
   const [data, setData] = useState<ProgressView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [openRole, setOpenRole] = useState<SignatureRole | null>(null);
+  const [openRole, setOpenRole] = useState<PanelRole | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -115,25 +125,25 @@ export function ResultSignOff({
     return () => clearTimeout(first);
   }, [load]);
 
-  const rosterFor = (role: SignatureRole) =>
-    role === "TEAM_A_CAPTAIN" ? rosterA : rosterB;
+  const rosterFor = (role: PanelRole) =>
+    role === "TEAM_A_CAPTAIN" ? rosterA : role === "TEAM_B_CAPTAIN" ? rosterB : [];
 
-  const openFor = (role: SignatureRole) => {
+  const openFor = (role: PanelRole) => {
     const existing = data?.signatures.find((s) => s.role === role);
-    const roster = rosterFor(role);
     setOpenRole(role);
     setError(null);
     setStrokes(null);
     setIntent("ACCEPT");
     setRemarks("");
-    if (role === "FIRST_REFEREE") {
+    if (typesName(role)) {
       // Pre-filled when the name already came with the match data (officials
-      // import) or from an earlier signature; otherwise the pad stays disabled
-      // until a name is typed.
-      const official = data?.officials.find((o) => o.role === "FIRST_REFEREE");
+      // assignment/import) or from an earlier signature; otherwise the pad
+      // stays disabled until a name is typed.
+      const official = data?.officials.find((o) => o.role === role);
       setRefName(existing?.signerName ?? official?.name ?? "");
       setSignerId(null);
     } else {
+      const roster = rosterFor(role);
       const captain = roster.find((p) => p.isCaptain) ?? roster[0];
       setSignerId(existing?.signerPlayerId ?? captain?.id ?? null);
       setRefName("");
@@ -141,9 +151,9 @@ export function ResultSignOff({
   };
 
   const signerName = (): string => {
-    if (openRole === "FIRST_REFEREE") return refName.trim();
-    const roster = openRole ? rosterFor(openRole) : [];
-    return roster.find((p) => p.id === signerId)?.fullName ?? "";
+    if (!openRole) return "";
+    if (typesName(openRole)) return refName.trim();
+    return rosterFor(openRole).find((p) => p.id === signerId)?.fullName ?? "";
   };
 
   const canSubmit = (): boolean => {
@@ -166,7 +176,7 @@ export function ResultSignOff({
         body: JSON.stringify({
           role: openRole,
           signerName: signerName(),
-          signerPlayerId: openRole === "FIRST_REFEREE" ? null : signerId,
+          signerPlayerId: typesName(openRole) ? null : signerId,
           strokes: intent === "REFUSED" ? null : strokes,
           intent,
           remarks: remarks.trim() || null,
@@ -194,7 +204,7 @@ export function ResultSignOff({
     }
   };
 
-  const clearSignature = async (role: SignatureRole) => {
+  const clearSignature = async (role: PanelRole) => {
     setBusy(true);
     setError(null);
     try {
@@ -215,56 +225,208 @@ export function ResultSignOff({
     }
   };
 
-  const roleLabel = (role: SignatureRole) =>
+  const roleLabel = (role: PanelRole | string) =>
     role === "FIRST_REFEREE"
       ? t("signoff.firstReferee")
-      : t("signoff.captainOf", {
-          team: role === "TEAM_A_CAPTAIN" ? teamAName : teamBName,
-        });
+      : role === "SCORER"
+        ? t("signoff.scorer")
+        : role === "ASSISTANT_SCORER"
+          ? t("signoff.assistantScorer")
+          : t("signoff.captainOf", {
+              team: role === "TEAM_A_CAPTAIN" ? teamAName : teamBName,
+            });
 
   const winnerName = winner === "A" ? teamAName : winner === "B" ? teamBName : "—";
+  const complete = data?.complete ?? false;
 
-  if (data?.complete) {
-    const signed = data.signatures;
+  /** One signature row: status + inline signing form. `locked` = signed and no
+   *  redo offered (the trio once the result is confirmed). */
+  const renderRow = (role: PanelRole, locked: boolean) => {
+    const sig = data?.signatures.find((s) => s.role === role);
+    const isStale = data?.stale.includes(role as SignatureRole) ?? false;
+    const done = !!sig && !isStale;
+    const isOpen = openRole === role;
     return (
-      <section className="flex h-full flex-col gap-3 overflow-y-auto p-3">
-        <div className="rounded-xl border border-green-600/40 bg-green-500/10 p-4 text-center">
-          <h2 className="text-lg font-semibold">{t("signoff.confirmedTitle")}</h2>
-          <p className="mt-1 text-sm text-score-dim">{t("signoff.confirmedBody")}</p>
-        </div>
-        <ul className="flex flex-col gap-2 text-sm">
-          {signed.map((s) => (
-            <li
-              key={s.role}
-              className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"
-            >
-              <span>
-                <span className="text-score-dim">{roleLabel(s.role)}:</span>{" "}
-                <span className="font-medium">{s.signerName}</span>
-                {s.intent !== "ACCEPT" ? (
-                  <span className="ml-2 rounded border border-amber-500/50 px-1.5 py-0.5 text-[11px] text-amber-400">
-                    {s.intent === "PROTEST"
+      <li key={role} className="rounded-xl border border-border">
+        <div className="flex items-center justify-between gap-2 px-3 py-2">
+          <span className="text-sm">
+            <span className="font-medium">{roleLabel(role)}</span>
+            {done ? (
+              <span className="ml-2 text-xs text-score-dim">{sig!.signerName}</span>
+            ) : null}
+          </span>
+          <span className="flex flex-none items-center gap-2">
+            {done ? (
+              <>
+                <span className="rounded-full border border-green-600/50 px-2 py-0.5 text-[11px] text-green-400">
+                  {sig!.intent === "REFUSED"
+                    ? t("signoff.refusedNote")
+                    : sig!.intent === "PROTEST"
                       ? t("signoff.protestNote")
-                      : t("signoff.refusedNote")}
+                      : t("signoff.signed")}
+                </span>
+                {!locked ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      // A bench redo on a confirmed match re-signs via POST
+                      // (supersede); DELETE is blocked once FINISHED.
+                      complete && isBench(role)
+                        ? openFor(role)
+                        : void clearSignature(role)
+                    }
+                    className="rounded-lg border border-border px-2 py-1 text-[11px] text-score-dim disabled:opacity-40"
+                  >
+                    {t("signoff.redo")}
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {isStale ? (
+                  <span className="rounded-full border border-amber-500/50 px-2 py-0.5 text-[11px] text-amber-400">
+                    {t("signoff.stale")}
                   </span>
                 ) : null}
-              </span>
-              <span aria-hidden>✓</span>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-auto flex justify-center pb-2">
-          <PrimaryButton onClick={onClose}>{t("signoff.close")}</PrimaryButton>
+                <SecondaryButton disabled={busy} onClick={() => openFor(role)}>
+                  {isOpen ? t("signoff.signing") : t("signoff.sign")}
+                </SecondaryButton>
+              </>
+            )}
+          </span>
         </div>
-      </section>
+
+        {isOpen ? (
+          <div className="flex flex-col gap-3 border-t border-border p-3">
+            {typesName(role) ? (
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-score-dim">
+                  {role === "FIRST_REFEREE"
+                    ? t("signoff.refName")
+                    : t("signoff.officialName")}
+                </span>
+                <input
+                  value={refName}
+                  onChange={(e) => setRefName(e.target.value)}
+                  autoComplete="off"
+                  maxLength={120}
+                  className="rounded-lg border border-border bg-surface px-3 py-2"
+                  placeholder={t("signoff.refNamePlaceholder")}
+                />
+              </label>
+            ) : (
+              <div className="flex flex-col gap-1 text-sm">
+                <span className="text-score-dim">{t("signoff.signingAs")}</span>
+                <div className="flex flex-wrap gap-2">
+                  {rosterFor(role).map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSignerId(p.id)}
+                      className={`rounded-lg border px-3 py-1.5 text-sm ${
+                        signerId === p.id
+                          ? "border-primary bg-primary/15 font-medium"
+                          : "border-border text-score-dim"
+                      }`}
+                    >
+                      {p.jerseyNumber != null ? `${p.jerseyNumber} ` : ""}
+                      {p.fullName}
+                      {p.isCaptain ? " (C)" : ""}
+                    </button>
+                  ))}
+                  {rosterFor(role).length === 0 ? (
+                    <span className="text-xs text-red-300">
+                      {t("signoff.noRoster")}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            )}
+
+            <SignaturePad
+              value={strokes}
+              onChange={setStrokes}
+              disabled={
+                intent === "REFUSED" ||
+                (typesName(role) && refName.trim().length < 2)
+              }
+              disabledHint={
+                intent === "REFUSED"
+                  ? t("signoff.refusedPad")
+                  : t("signoff.refNameHint")
+              }
+              ariaLabel={t("signoff.padLabel", { role: roleLabel(role) })}
+            />
+
+            {/* Protest / refusal are statements of record: they must say why.
+                The scorer bench signs plainly — no protest path. */}
+            {!isBench(role) ? (
+              <div className="flex flex-wrap gap-2">
+                {(["ACCEPT", "PROTEST", "REFUSED"] as SignatureIntent[]).map((it) => (
+                  <button
+                    key={it}
+                    type="button"
+                    onClick={() => setIntent(it)}
+                    className={`rounded-lg border px-3 py-1.5 text-xs ${
+                      intent === it
+                        ? "border-primary bg-primary/15 font-medium"
+                        : "border-border text-score-dim"
+                    }`}
+                  >
+                    {it === "ACCEPT"
+                      ? t("signoff.intentAccept")
+                      : it === "PROTEST"
+                        ? t("signoff.intentProtest")
+                        : t("signoff.intentRefused")}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {intent !== "ACCEPT" ? (
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-score-dim">{t("signoff.remarks")}</span>
+                <textarea
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  rows={2}
+                  maxLength={500}
+                  className="rounded-lg border border-border bg-surface px-3 py-2"
+                />
+              </label>
+            ) : null}
+
+            {error ? (
+              <p role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                {error}
+              </p>
+            ) : null}
+
+            <div className="flex items-center justify-between gap-2">
+              <SecondaryButton disabled={busy} onClick={() => setOpenRole(null)}>
+                {t("signoff.cancel")}
+              </SecondaryButton>
+              <PrimaryButton disabled={!canSubmit()} onClick={() => void submit()}>
+                {intent === "REFUSED"
+                  ? t("signoff.recordRefusal")
+                  : t("signoff.confirmSignature")}
+              </PrimaryButton>
+            </div>
+          </div>
+        ) : null}
+      </li>
     );
-  }
+  };
 
   return (
     <section className="flex h-full flex-col gap-3 overflow-y-auto p-3">
       <header className="text-center">
-        <h2 className="text-lg font-semibold">{t("signoff.title")}</h2>
-        <p className="text-xs text-score-dim">{t("signoff.subtitle")}</p>
+        <h2 className="text-lg font-semibold">
+          {complete ? t("signoff.confirmedTitle") : t("signoff.title")}
+        </h2>
+        <p className="text-xs text-score-dim">
+          {complete ? t("signoff.confirmedBody") : t("signoff.subtitle")}
+        </p>
       </header>
 
       {/* What is being signed — always on screen. */}
@@ -287,177 +449,27 @@ export function ResultSignOff({
         </p>
       ) : null}
 
-      <ul className="flex flex-col gap-2">
-        {ROLES.map((role) => {
-          const sig = data?.signatures.find((s) => s.role === role);
-          const isStale = data?.stale.includes(role) ?? false;
-          const done = !!sig && !isStale;
-          const isOpen = openRole === role;
-          return (
-            <li key={role} className="rounded-xl border border-border">
-              <div className="flex items-center justify-between gap-2 px-3 py-2">
-                <span className="text-sm">
-                  <span className="font-medium">{roleLabel(role)}</span>
-                  {done ? (
-                    <span className="ml-2 text-xs text-score-dim">{sig!.signerName}</span>
-                  ) : null}
-                </span>
-                <span className="flex flex-none items-center gap-2">
-                  {done ? (
-                    <>
-                      <span className="rounded-full border border-green-600/50 px-2 py-0.5 text-[11px] text-green-400">
-                        {sig!.intent === "REFUSED"
-                          ? t("signoff.refusedNote")
-                          : sig!.intent === "PROTEST"
-                            ? t("signoff.protestNote")
-                            : t("signoff.signed")}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void clearSignature(role)}
-                        className="rounded-lg border border-border px-2 py-1 text-[11px] text-score-dim disabled:opacity-40"
-                      >
-                        {t("signoff.redo")}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      {isStale ? (
-                        <span className="rounded-full border border-amber-500/50 px-2 py-0.5 text-[11px] text-amber-400">
-                          {t("signoff.stale")}
-                        </span>
-                      ) : null}
-                      <SecondaryButton disabled={busy} onClick={() => openFor(role)}>
-                        {isOpen ? t("signoff.signing") : t("signoff.sign")}
-                      </SecondaryButton>
-                    </>
-                  )}
-                </span>
-              </div>
+      <ul className="flex flex-col gap-2">{ROLES.map((r) => renderRow(r, complete))}</ul>
 
-              {isOpen ? (
-                <div className="flex flex-col gap-3 border-t border-border p-3">
-                  {role === "FIRST_REFEREE" ? (
-                    <label className="flex flex-col gap-1 text-sm">
-                      <span className="text-score-dim">{t("signoff.refName")}</span>
-                      <input
-                        value={refName}
-                        onChange={(e) => setRefName(e.target.value)}
-                        autoComplete="off"
-                        maxLength={120}
-                        className="rounded-lg border border-border bg-surface px-3 py-2"
-                        placeholder={t("signoff.refNamePlaceholder")}
-                      />
-                    </label>
-                  ) : (
-                    <div className="flex flex-col gap-1 text-sm">
-                      <span className="text-score-dim">{t("signoff.signingAs")}</span>
-                      <div className="flex flex-wrap gap-2">
-                        {rosterFor(role).map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => setSignerId(p.id)}
-                            className={`rounded-lg border px-3 py-1.5 text-sm ${
-                              signerId === p.id
-                                ? "border-primary bg-primary/15 font-medium"
-                                : "border-border text-score-dim"
-                            }`}
-                          >
-                            {p.jerseyNumber != null ? `${p.jerseyNumber} ` : ""}
-                            {p.fullName}
-                            {p.isCaptain ? " (C)" : ""}
-                          </button>
-                        ))}
-                        {rosterFor(role).length === 0 ? (
-                          <span className="text-xs text-red-300">
-                            {t("signoff.noRoster")}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  )}
-
-                  <SignaturePad
-                    value={strokes}
-                    onChange={setStrokes}
-                    disabled={
-                      intent === "REFUSED" ||
-                      (role === "FIRST_REFEREE" && refName.trim().length < 2)
-                    }
-                    disabledHint={
-                      intent === "REFUSED"
-                        ? t("signoff.refusedPad")
-                        : t("signoff.refNameHint")
-                    }
-                    ariaLabel={t("signoff.padLabel", { role: roleLabel(role) })}
-                  />
-
-                  {/* Protest / refusal are statements of record: they must say why. */}
-                  <div className="flex flex-wrap gap-2">
-                    {(["ACCEPT", "PROTEST", "REFUSED"] as SignatureIntent[]).map((it) => (
-                      <button
-                        key={it}
-                        type="button"
-                        onClick={() => setIntent(it)}
-                        className={`rounded-lg border px-3 py-1.5 text-xs ${
-                          intent === it
-                            ? "border-primary bg-primary/15 font-medium"
-                            : "border-border text-score-dim"
-                        }`}
-                      >
-                        {it === "ACCEPT"
-                          ? t("signoff.intentAccept")
-                          : it === "PROTEST"
-                            ? t("signoff.intentProtest")
-                            : t("signoff.intentRefused")}
-                      </button>
-                    ))}
-                  </div>
-                  {intent !== "ACCEPT" ? (
-                    <label className="flex flex-col gap-1 text-sm">
-                      <span className="text-score-dim">{t("signoff.remarks")}</span>
-                      <textarea
-                        value={remarks}
-                        onChange={(e) => setRemarks(e.target.value)}
-                        rows={2}
-                        maxLength={500}
-                        className="rounded-lg border border-border bg-surface px-3 py-2"
-                      />
-                    </label>
-                  ) : null}
-
-                  {error ? (
-                    <p role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">
-                      {error}
-                    </p>
-                  ) : null}
-
-                  <div className="flex items-center justify-between gap-2">
-                    <SecondaryButton disabled={busy} onClick={() => setOpenRole(null)}>
-                      {t("signoff.cancel")}
-                    </SecondaryButton>
-                    <PrimaryButton disabled={!canSubmit()} onClick={() => void submit()}>
-                      {intent === "REFUSED"
-                        ? t("signoff.recordRefusal")
-                        : t("signoff.confirmSignature")}
-                    </PrimaryButton>
-                  </div>
-                </div>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-
-      <p className="text-center text-xs text-score-dim">
-        {data?.policy === "REQUIRED"
-          ? t("signoff.requiredHint")
-          : t("signoff.optionalHint")}
+      {/* Scorer bench — optional, never gates confirmation (spec/21 Phase D). */}
+      <p className="mt-1 text-xs uppercase tracking-wide text-score-dim">
+        {t("signoff.benchTitle")}
       </p>
+      <ul className="flex flex-col gap-2">{BENCH.map((r) => renderRow(r, false))}</ul>
+
+      {!complete ? (
+        <p className="text-center text-xs text-score-dim">
+          {data?.policy === "REQUIRED"
+            ? t("signoff.requiredHint")
+            : t("signoff.optionalHint")}
+        </p>
+      ) : null}
       <div className="mt-auto flex justify-center pb-2">
-        <SecondaryButton onClick={onClose}>{t("signoff.later")}</SecondaryButton>
+        {complete ? (
+          <PrimaryButton onClick={onClose}>{t("signoff.close")}</PrimaryButton>
+        ) : (
+          <SecondaryButton onClick={onClose}>{t("signoff.later")}</SecondaryButton>
+        )}
       </div>
     </section>
   );
@@ -492,6 +504,8 @@ export function useResultSignOff(opts: {
   const available = opts.finished && opts.policy !== "OFF";
   const { status, refresh } = useSignOffStatus(opts.matchId, available);
   const complete = status?.complete ?? false;
+  // The bench may still be missing after confirmation — keep an entry point.
+  const benchMissing = BENCH.some((r) => !(status?.signedRoles ?? []).includes(r));
 
   const panel =
     available && open ? (
@@ -511,10 +525,16 @@ export function useResultSignOff(opts: {
     ) : null;
 
   const finishedExtra =
-    available && !complete && !open ? (
-      <PrimaryButton onClick={() => setOpen(true)}>
-        {t("scoring.signResult")}
-      </PrimaryButton>
+    available && !open && (!complete || benchMissing) ? (
+      complete ? (
+        <SecondaryButton onClick={() => setOpen(true)}>
+          {t("signoff.benchButton")}
+        </SecondaryButton>
+      ) : (
+        <PrimaryButton onClick={() => setOpen(true)}>
+          {t("scoring.signResult")}
+        </PrimaryButton>
+      )
     ) : null;
 
   return { panel, finishedExtra, finishedUndoHidden: complete };

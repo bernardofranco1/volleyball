@@ -9,11 +9,26 @@ spec/20 block-structure sheet. Shipped: venue/category columns (migration
 `tossWinner` on COIN_TOSS/SET_START (3-step toss wizards),
 `src/lib/scoresheet/{official-data,primitives,indoor-official,beach-official}.ts`
 with embedded Liberation Sans (fonts/), UNDO/REWIND-aware survivor pass,
-genderLabel bug fix, 5 new tests (250 total green). **Remaining**: Phase D
-pre-match captain/coach + scorer/assistant signature capture (cells render
-blank until then); G4 staff/coach sanctions + bench function codes; G9 VCS
-duration; per-match court label; reference-match golden fixtures (Phase E
-full slice). Times print as UTC pending a venue-timezone field.
+genderLabel bug fix, 5 new tests (250 total green).
+
+**Phase D shipped (2026-07-28, same day)**: signature roles extended with
+`TEAM_A/B_CAPTAIN_PREMATCH` (captured on the console between coin toss and
+final rally, ACCEPT-only, never gate confirmation, never go stale) and
+`SCORER`/`ASSISTANT_SCORER` (post-match, typed name + pad, addable even after
+the result confirmed; name upserts `match_officials`). The confirmation trio
+and result-lock semantics are unchanged. UI: `PrematchSignOff` (low-key
+trigger under the bar, panel replaces the court), `ResultSignOff` gained an
+optional "Officials' signatures" section usable pre- and post-confirmation.
+Plus the **sanctions panel** (`SanctionsControl`, beach + indoor consoles):
+delay warning/penalty, improper request, and the four misconduct cards with a
+roster player picker — the first UI writer for these events; the sanction
+records the fact only, any awarded point is tapped separately (paper
+procedure). Renderers draw all new signatures in their cells.
+
+**Remaining**: G4 staff/coach sanctions + bench function codes (coach
+pre-match box prints blank); G9 VCS duration; per-match court label;
+reference-match golden fixtures (Phase E full slice); sanctions panel on
+grass/light consoles. Times print as UTC pending a venue-timezone field.
 
 Reference documents (checked into `spec/reference/`):
 

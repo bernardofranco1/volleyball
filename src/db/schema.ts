@@ -499,7 +499,17 @@ export const matchSignatures = pgTable(
       .notNull()
       .references(() => tenants.id),
     role: text("role", {
-      enum: ["TEAM_A_CAPTAIN", "TEAM_B_CAPTAIN", "FIRST_REFEREE"],
+      // The confirmation trio (spec/20) + pre-match captains and the scorer
+      // bench (spec/21 Phase D). Text enum = TS-only; no DB migration needed.
+      enum: [
+        "TEAM_A_CAPTAIN",
+        "TEAM_B_CAPTAIN",
+        "FIRST_REFEREE",
+        "TEAM_A_CAPTAIN_PREMATCH",
+        "TEAM_B_CAPTAIN_PREMATCH",
+        "SCORER",
+        "ASSISTANT_SCORER",
+      ],
     }).notNull(),
     signerName: text("signer_name").notNull(),
     signerPlayerId: text("signer_player_id").references(() => players.id),

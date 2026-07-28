@@ -30,6 +30,9 @@ import { rateLimit } from "@/lib/ratelimit";
 import { scorerPinSatisfied } from "@/lib/scorer-pin";
 import { loadMatchState, MatchNotFoundError } from "@/lib/match-engine";
 import {
+  isBenchRole,
+  isConfirmationRole,
+  isPrematchRole,
   isSignatureIntent,
   isSignatureRole,
   loadOfficials,
@@ -202,35 +205,60 @@ export async function POST(
       { error: "This competition does not use scoresheet signatures." },
       { status: 409 },
     );
-  if (p.state.status !== "FINISHED" || p.digest == null)
-    return Response.json(
-      { error: "The match is not over yet." },
-      { status: 409 },
-    );
-  if (row.status === "FINISHED" && p.complete)
-    return Response.json(
-      { error: "This result is already signed and confirmed." },
-      { status: 409 },
-    );
 
-  // The signature attests to ONE state of the log. If the score moved since the
-  // client loaded the session, refuse — the console restarts the signing round.
-  const expected = String(body.expectedDigest ?? "");
-  if (expected && expected !== p.digest)
-    return Response.json(
-      {
-        error: "The result changed since you opened the signature panel.",
-        digest: p.digest,
-      },
-      { status: 409 },
-    );
+  const prematch = isPrematchRole(role);
+  const bench = isBenchRole(role);
+  if (prematch) {
+    // Pre-match signatures (spec/21 Phase D) attest to the roster/lineup
+    // before play — once the result is in they can no longer be added.
+    if (p.state.status === "FINISHED" || row.status === "FINISHED")
+      return Response.json(
+        { error: "The match is over — pre-match signatures are closed." },
+        { status: 409 },
+      );
+    if (intent !== "ACCEPT")
+      return Response.json(
+        { error: "A pre-match signature cannot protest or refuse." },
+        { status: 422 },
+      );
+  } else {
+    if (p.state.status !== "FINISHED" || p.digest == null)
+      return Response.json(
+        { error: "The match is not over yet." },
+        { status: 409 },
+      );
+    // Bench signatures (scorer / assistant scorer) may still be added after
+    // the trio confirmed the result — they complete the APPROVAL block, they
+    // don't change what was confirmed.
+    if (!bench && row.status === "FINISHED" && p.complete)
+      return Response.json(
+        { error: "This result is already signed and confirmed." },
+        { status: 409 },
+      );
 
-  // Captains sign as a named player of their own team; the referee types a name.
+    // The signature attests to ONE state of the log. If the score moved since
+    // the client loaded the session, refuse — the console restarts the round.
+    const expected = String(body.expectedDigest ?? "");
+    if (expected && expected !== p.digest)
+      return Response.json(
+        {
+          error: "The result changed since you opened the signature panel.",
+          digest: p.digest,
+        },
+        { status: 409 },
+      );
+  }
+  // Pre-match signatures store a digest of the state they were taken at; it is
+  // never compared for staleness (scoring afterwards is the whole point).
+  const digestToStore = prematch ? resultDigest(p.state) : p.digest!;
+
+  // Captains sign as a named player of their own team; the referee and the
+  // scorer bench type a name.
   let signerPlayerId: string | null = null;
-  if (role !== "FIRST_REFEREE") {
+  if (role !== "FIRST_REFEREE" && !bench) {
     const wanted = body.signerPlayerId;
     if (typeof wanted === "string" && wanted) {
-      const teamId = role === "TEAM_A_CAPTAIN" ? row.teamAId : row.teamBId;
+      const teamId = role.startsWith("TEAM_A") ? row.teamAId : row.teamBId;
       const player = (
         await db
           .select({ id: players.id })
@@ -249,9 +277,10 @@ export async function POST(
 
   const now = new Date();
   const capturedBy = authed.auth.user.id;
-  // Does this signature complete the set? (The one being written counts.)
+  // Does this signature complete the confirmation trio? Pre-match and bench
+  // signatures never confirm the result. (The one being written counts.)
   const remaining = p.missing.filter((r) => r !== role);
-  const completesResult = remaining.length === 0;
+  const completesResult = isConfirmationRole(role) && remaining.length === 0;
 
   try {
     await db.transaction(async (tx) => {
@@ -261,7 +290,7 @@ export async function POST(
       .set({
         invalidatedAt: now,
         invalidatedReason:
-          p.stale.includes(role as SignatureRole)
+          isConfirmationRole(role) && p.stale.includes(role as SignatureRole)
             ? "Result changed after signing"
             : "Replaced by a new signature",
       })
@@ -285,22 +314,23 @@ export async function POST(
       remarks: remarksRaw || null,
       signedAt: now,
       signedSequence: p.state.lastSequence,
-      resultDigest: p.digest!,
+      resultDigest: digestToStore,
       capturedBy,
       deviceInfo: req.headers.get("user-agent")?.slice(0, 200) ?? null,
     });
 
-    // The referee's name is scoresheet data in its own right: keep it on the
+    // An official's name is scoresheet data in its own right: keep it on the
     // officials row so the report prints it and the (later) match-data import
-    // has the same place to write.
-    if (role === "FIRST_REFEREE") {
+    // has the same place to write. Applies to the 1st referee and the scorer
+    // bench (their signature-role names match the officials-role enum).
+    if (role === "FIRST_REFEREE" || bench) {
       await tx
         .insert(matchOfficials)
         .values({
           id: newId("off"),
           matchId: id,
           tenantId: row.tenantId,
-          role: "FIRST_REFEREE",
+          role: role as "FIRST_REFEREE" | "SCORER" | "ASSISTANT_SCORER",
           name: signerName,
           source: "MANUAL",
           createdBy: capturedBy,

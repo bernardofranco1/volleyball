@@ -563,18 +563,31 @@ function teamsBlock(
     yy += 8;
   }
 
-  // Captains sign here pre-match on the paper sheet — capture is spec/21
-  // Phase D; until then the boxes render blank, exactly like unsigned paper.
+  // Pre-match signatures (spec/21 Phase D): captains sign on the console
+  // before play; coach capture waits for staff entities and prints blank.
   g.rect(x, yy, w, 8, { fill: HEAD });
   g.ctext("SIGNATURES (pre-match)", x + w / 2, yy + 4, { size: 4.4, bold: true });
   yy += 8;
   const sh = y + h - yy;
+  const sigByRole = new Map(report.approval.signatures.map((s) => [s.role, s]));
   for (const [i, label] of (["Team captain", "Coach"] as const).entries()) {
     for (const side of [0, 1] as const) {
       const rx = x + side * half;
       const cy = yy + i * (sh / 2);
       g.rect(rx, cy, half, sh / 2);
       g.text(label, rx + 2, cy + 1.6, { size: 3.6 });
+      if (i === 0) {
+        const sig = sigByRole.get(
+          side === 0 ? "TEAM_A_CAPTAIN_PREMATCH" : "TEAM_B_CAPTAIN_PREMATCH",
+        );
+        if (sig?.strokes)
+          drawSignatureInBox(g.d, sig.strokes, {
+            x: rx + 4,
+            y: cy + 5,
+            w: half - 8,
+            h: sh / 2 - 7,
+          });
+      }
     }
   }
 }
@@ -695,8 +708,10 @@ function remarksAndApproval(g: Sheet, report: MatchReportData, sheet: OfficialSh
     if (o?.level || o?.country)
       g.ctext(o.level ?? o.country ?? "", colX[2] + cw[2] / 2, yy + rh / 2, { size: 4.2, color: INK });
     g.rect(colX[3], yy, cw[3], rh);
-    if (role === "FIRST_REFEREE") {
-      const sig = sigByRole.get("FIRST_REFEREE");
+    // 1st referee, scorer and assistant scorer sign on the console (spec/20 +
+    // spec/21 Phase D); the other referee roles print blank cells.
+    if (role === "FIRST_REFEREE" || role === "SCORER" || role === "ASSISTANT_SCORER") {
+      const sig = sigByRole.get(role);
       if (sig?.strokes)
         drawSignatureInBox(g.d, sig.strokes, { x: colX[3] + 2, y: yy + 0.5, w: cw[3] - 4, h: rh - 1 });
     }
