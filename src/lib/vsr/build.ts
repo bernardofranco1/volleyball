@@ -4,7 +4,7 @@
 // from two real reference logs (indoor 26665 / beach 505567).
 
 import type { TournamentConfig } from "@/engine/config";
-import type { MatchReportData, ReportEvent, ReportPlayer } from "@/lib/match-report";
+import type { MatchReportData, ReportPlayer } from "@/lib/match-report";
 import type { SignatureStrokes } from "@/lib/match-signatures";
 import { survivingEvents } from "@/lib/scoresheet/official-data";
 
