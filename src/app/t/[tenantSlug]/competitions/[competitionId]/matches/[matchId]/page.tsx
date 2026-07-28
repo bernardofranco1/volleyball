@@ -223,6 +223,13 @@ export default async function MatchDetailPage({
           >
             {t("match.exportVsr")}
           </a>
+          {/* Per-rally / per-set / per-break timing breakdown (spec/22). */}
+          <a
+            href={`/api/matches/${matchId}/export.timings`}
+            className={ui.btnSecondary}
+          >
+            {t("match.exportTimings")}
+          </a>
         </div>
       </div>
 

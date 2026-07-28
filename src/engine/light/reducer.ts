@@ -182,6 +182,10 @@ export function reduce(
       return s;
     }
 
+    case "RALLY_START":
+      s.rallyPhase = "RALLY_LIVE";
+      return s;
+
     case "RALLY_WON_A":
     case "RALLY_WON_B": {
       const winner: TeamId = p.type === "RALLY_WON_A" ? "A" : "B";

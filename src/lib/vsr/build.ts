@@ -254,6 +254,9 @@ function buildScout(report: MatchReportData, beach: boolean): Json {
   const sets: VsrSet[] = [];
   let cur: VsrSet | null = null;
   let prevTs: string | null = null;
+  // The rally's REAL start (RALLY_START = service whistle, spec/22). When the
+  // scorer skips the tap, the previous event's timestamp approximates it.
+  let rallyStartTs: string | null = null;
   let coinToss: Json | null = null;
   let openChallenge: { team: TeamKey; atScore: Json; startTime: string | null } | null = null;
   // Latest lineup per team (indoor jersey rotation / beach service order),
@@ -319,6 +322,7 @@ function buildScout(report: MatchReportData, beach: boolean): Json {
           };
         sets.push(cur);
         prevTs = ts;
+        rallyStartTs = null;
         break;
       }
       case "LINEUP_CONFIRMED": {
@@ -345,18 +349,23 @@ function buildScout(report: MatchReportData, beach: boolean): Json {
         }
         break;
       }
+      case "RALLY_START": {
+        rallyStartTs = ts;
+        break;
+      }
       case "RALLY_WON_A":
       case "RALLY_WON_B": {
         if (!cur) break;
         cur.events.push({
           rally: {
-            startTime: prevTs ?? cur.startTime,
+            startTime: rallyStartTs ?? prevTs ?? cur.startTime,
             endTime: ts,
             point: type === "RALLY_WON_A" ? "home" : "away",
           },
         });
         cur.score = scoreNow;
         prevTs = ts;
+        rallyStartTs = null;
         break;
       }
       case "TIMEOUT_REQUEST": {

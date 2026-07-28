@@ -93,6 +93,19 @@ files and overrides everything derivable from `TournamentConfig`.
 - `undoLog` stays `[]`: every snapshot is rebuilt AFTER the undo, so the
   dispatched file always reflects the corrected state — exactly the point of
   full-snapshot semantics.
+- **Rally timing (added same day)**: a new `RALLY_START` event (all four
+  disciplines, client-submittable, valid only BETWEEN_RALLIES while LIVE)
+  anchors the rally's REAL start — the consoles expose an optional "Serve ●"
+  tap in the shared live controls. When present, VSR `rally.startTime` and
+  the timing export use it; when skipped, the previous event's timestamp
+  approximates it (flagged `precise: false` in the timing export). Scoring is
+  unaffected either way.
+- **Timing export**: `GET /api/matches/[id]/export.timings` — the full
+  breakdown per rally / set / break (timeouts, TTOs, medical, video
+  challenges, set breaks) computed by `src/lib/timings.ts` from the surviving
+  log; final once the match ends. The beach official sheet now prints the
+  "Total match duration adjustment for Video challenge" remark from the same
+  computation (closes spec/21 G9).
 - Sanctions, forfeits, medical: not present in either reference file —
   schema unknown, currently omitted (Open questions).
 

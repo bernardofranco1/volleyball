@@ -106,6 +106,7 @@ describe("VSR builder", () => {
       ev("MATCH_START", {}, null, 2),
       ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT", tossWinner: "B" }, [0, 0], 10),
       ev("SERVICE_ORDER", { team: "A", firstServerPlayerId: "a2" }, [0, 0], 11),
+      ev("RALLY_START", {}, [0, 0], 25),
       ev("RALLY_WON_A", {}, [1, 0], 30),
       ev("RALLY_WON_B", {}, [1, 1], 55),
       ev("TIMEOUT_REQUEST", { team: "B" }, [1, 1], 60),
@@ -150,7 +151,8 @@ describe("VSR builder", () => {
     const rally = set.events[0]!.rally!;
     expect(rally.point).toBe("home");
     expect(rally.endTime).toBe(at(30).toISOString());
-    expect(rally.startTime).toBe(at(11).toISOString());
+    // RALLY_START (the service whistle) anchors the real start time.
+    expect(rally.startTime).toBe(at(25).toISOString());
     const vc = set.events[4]!.videoChallenge!;
     expect(vc).toMatchObject({ team: "away", method: "video", response: "correct" });
     expect(vsr.scout.ended).toBe(at(3600).toISOString());

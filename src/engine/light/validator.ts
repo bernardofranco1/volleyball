@@ -148,6 +148,13 @@ export function validateLightEvent(
         return fail("Match is already finished");
       return OK;
 
+    case "RALLY_START":
+      // Timing anchor (spec/22): only meaningful while play can start.
+      if (state.status !== "LIVE") return fail("Match is not live");
+      if (state.rallyPhase !== "BETWEEN_RALLIES")
+        return fail("A rally is not about to start");
+      return OK;
+
     default:
       return OK;
   }

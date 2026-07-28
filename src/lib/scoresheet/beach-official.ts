@@ -7,6 +7,7 @@ import PDFDocument from "pdfkit";
 import type { TournamentConfig } from "@/engine/config";
 import type { MatchReportData } from "@/lib/match-report";
 import { drawSignatureInBox } from "@/lib/scoresheet-pdf";
+import { computeMatchTimings } from "@/lib/timings";
 import type { OfficialSheetData, SheetSetData, SheetSanction } from "./official-data";
 import {
   DIM,
@@ -653,7 +654,18 @@ function remarksAndToss(
         `${sheet.forfeit.reason === "RETIREMENT" ? "Retirement" : "Forfeit"}: team ${sheet.forfeit.team}`,
       ]
     : [];
-  const all = [...sheet.remarks, ...forfeitNote, ...sigRemarks];
+  // Video-challenge time adjustment (spec/21 G9 / reference sheet remark):
+  // summed from the VCS_CHALLENGE→VCS_RESULT pairs in the log.
+  const vcsMs = computeMatchTimings(report).videoChallengeMs;
+  const vcsNote =
+    vcsMs > 0
+      ? [
+          `Total match duration adjustment for Video challenge: ${new Date(vcsMs)
+            .toISOString()
+            .slice(11, 19)}.`,
+        ]
+      : [];
+  const all = [...sheet.remarks, ...forfeitNote, ...vcsNote, ...sigRemarks];
   g.text("Additional information attached", x + w - 105, y + 5, { size: 4 });
   g.rect(x + w - 16, y + 2, 11, 11);
   if (all.length > 4) g.xmark(x + w - 16, y + 2, 11, 11);

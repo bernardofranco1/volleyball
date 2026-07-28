@@ -111,6 +111,8 @@ export function LightActionBar() {
   return (
     <div className="flex flex-col gap-3">
       <LiveScoreGrid
+        onRallyStart={() => dispatch({ type: "RALLY_START" })}
+        rallyLive={state.rallyPhase === "RALLY_LIVE"}
         teamASide={set.teamASide}
         armed={armed}
         onPoint={tap}

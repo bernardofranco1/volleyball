@@ -49,6 +49,10 @@ export type IndoorEventPayload =
       /** Deciding-set re-toss winner (spec/21) — printed on the scoresheet. */
       tossWinner?: TeamId;
     }
+  // Marks the first referee's whistle / service — anchors the rally's real
+  // start time for the VSR feed and timing exports (spec/22). Optional: a
+  // rally scored without it falls back to approximated timing.
+  | { type: "RALLY_START" }
   | { type: "RALLY_WON_A" }
   | { type: "RALLY_WON_B" }
   | { type: "REPLAY_POINT" }

@@ -21,6 +21,8 @@ export function LiveScoreGrid({
   onUndo,
   onReplay,
   onNote,
+  onRallyStart,
+  rallyLive,
   pending,
   teamAName,
   teamBName,
@@ -36,6 +38,12 @@ export function LiveScoreGrid({
   /** Replay the rally (no score/serve change) — REPLAY_POINT, two-tap armed. */
   onReplay?: () => void;
   onNote: (text: string) => void;
+  /** Optional timing anchor (spec/22): tap at the service whistle so rally
+   * durations are exact in the VSR feed / timing exports. Fully optional —
+   * scoring works identically when the tap is skipped. */
+  onRallyStart?: () => void;
+  /** A RALLY_START was recorded and the rally is in progress. */
+  rallyLive?: boolean;
   pending: boolean;
   teamAName: string;
   teamBName: string;
@@ -66,6 +74,11 @@ export function LiveScoreGrid({
     <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
       {scoreBtn(order[0])}
       <div className="flex flex-col justify-center gap-1.5">
+        {onRallyStart ? (
+          <SecondaryButton onClick={onRallyStart} disabled={pending || rallyLive}>
+            {rallyLive ? t("scoring.rallyLive") : t("scoring.rallyStart")}
+          </SecondaryButton>
+        ) : null}
         <SecondaryButton armed={armed === "UNDO"} onClick={onUndo} disabled={pending}>
           {armed === "UNDO"
             ? (confirmUndoLabel ?? t("scoring.confirmUndo"))
