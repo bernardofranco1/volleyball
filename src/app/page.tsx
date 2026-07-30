@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { RecoveryHashForwarder } from "@/components/RecoveryHashForwarder";
+import { maybeSessionDestination } from "@/lib/login-destination";
 
 const DISCIPLINES = [
   "Beach",
@@ -8,7 +10,13 @@ const DISCIPLINES = [
   "Light Volleyball",
 ] as const;
 
-export default function Home() {
+export default async function Home() {
+  // A signed-in visitor belongs in the app, not on the marketing page —
+  // route them exactly where a fresh login would. Anonymous visitors (no
+  // auth cookie) skip the check entirely and get the static page.
+  const destination = await maybeSessionDestination();
+  if (destination) redirect(destination);
+
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-24 text-center">
       {/* Email-link safety net: forwards #access_token recovery fragments. */}

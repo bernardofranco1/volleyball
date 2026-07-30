@@ -1,11 +1,9 @@
 "use server";
 
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase";
-import { getUserTenants } from "@/lib/tenant";
-import { isGlobalAdmin } from "@/lib/authz";
-import { LAST_TENANT_COOKIE, tenantUrl } from "@/lib/subdomain";
+import { postLoginDestination } from "@/lib/login-destination";
 import { rateLimitAuth } from "@/lib/ratelimit";
 
 import { safeRedirect } from "@/lib/http";
@@ -48,29 +46,12 @@ export async function login(
     return { error: error.message };
   }
 
-  // Destination (spec/23 §4): explicit redirectTo wins; global admins land on
-  // the platform console; single-tenant members go straight in; multi-tenant
-  // members return to their last tenant (cookie, written by the Proxy) or the
-  // picker when there is no valid last one.
-  let destination = safeRedirect(redirectTo);
-  if (!destination) {
-    if (await isGlobalAdmin(data.user.id)) {
-      destination = "/admin";
-    } else {
-      const memberships = await getUserTenants(data.user.id);
-      if (memberships.length === 0) {
-        destination = "/";
-      } else if (memberships.length === 1) {
-        destination = tenantUrl(memberships[0], "/dashboard");
-      } else {
-        const last = (await cookies()).get(LAST_TENANT_COOKIE)?.value;
-        const match = memberships.find((m) => m.slug === last);
-        destination = match
-          ? tenantUrl(match, "/dashboard")
-          : "/select-tenant";
-      }
-    }
-  }
+  // Destination (spec/23 §4): explicit redirectTo wins, then the shared
+  // signed-in routing (console / dashboard / last-tenant / picker).
+  const destination =
+    safeRedirect(redirectTo) ||
+    (await postLoginDestination(data.user.id)) ||
+    "/";
 
   // redirect() throws NEXT_REDIRECT — must be outside any try/catch.
   redirect(destination);

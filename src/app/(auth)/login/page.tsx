@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { safeRedirect } from "@/lib/http";
+import { maybeSessionDestination } from "@/lib/login-destination";
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage({
@@ -7,6 +10,11 @@ export default async function LoginPage({
   searchParams: Promise<{ redirectTo?: string }>;
 }) {
   const { redirectTo } = await searchParams;
+
+  // Already signed in → skip the form: honour redirectTo when present,
+  // otherwise the same routing a fresh login would use.
+  const destination = await maybeSessionDestination();
+  if (destination) redirect(safeRedirect(redirectTo ?? "") || destination);
 
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-16">
