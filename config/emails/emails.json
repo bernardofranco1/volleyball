@@ -1,0 +1,28 @@
+{
+  "_readme": [
+    "Email configuration for the Volleyball Scoring Platform.",
+    "The APP renders and sends these emails itself (src/lib/email.ts) when SMTP",
+    "is configured (SMTP_HOST/PORT/USER/PASS/FROM env vars — see .env.example);",
+    "without SMTP it falls back to Supabase's default mailer and its fixed",
+    "wording. Edit these files + the .html templates, commit and push — the",
+    "auto-deploy picks them up. No code changes needed.",
+    "",
+    "Available tokens inside the .html files and subjects:",
+    "  [FIRST_NAME]         the person's first name (falls back to 'there')",
+    "  [ACCESS_DETAILS]     what they were granted (global / tenant + role)",
+    "  [SET_PASSWORD_LINK]  the one-time password-setup link",
+    "  [PLATFORM_LINK]      the platform URL below",
+    "  [LINK_EXPIRY_HOURS]  the number below (24h is also set on the real links)",
+    "  [EMAIL]              the recipient's email address"
+  ],
+  "platformUrl": "https://volleyball-eight.vercel.app",
+  "linkExpiryHours": 24,
+  "invite": {
+    "subject": "Welcome to the Volleyball Scoring Platform",
+    "template": "invite.html"
+  },
+  "recovery": {
+    "subject": "Set your Volleyball Scoring Platform password",
+    "template": "recovery.html"
+  }
+}

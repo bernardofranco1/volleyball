@@ -55,6 +55,17 @@ export function AddPlatformUserForm({
             className={ui.input}
           />
         </div>
+        <div>
+          <label className={ui.label} htmlFor="pu-name">
+            Name (greets them in the welcome email)
+          </label>
+          <input
+            id="pu-name"
+            name="name"
+            placeholder="e.g. Shyamang Goswami"
+            className={ui.input}
+          />
+        </div>
 
         <div>
           <span className={ui.label}>Access</span>

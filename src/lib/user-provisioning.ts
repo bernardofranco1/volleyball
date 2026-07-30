@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { users, userTenantRoles } from "@/db/schema";
 import type { Role } from "@/lib/authz";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { emailConfigured, sendTemplatedEmail } from "@/lib/email";
 import { newId } from "@/lib/id";
 
 /** The public origin for links in outgoing emails (env first, headers fallback). */
@@ -33,21 +34,26 @@ export type ProvisionResult =
   | { userId: string; tempPassword: string | null; note: string }
   | { error: string };
 
+/** "bernardo.franco@x" → "Bernardo" — the welcome email's fallback greeting. */
+export function firstNameFrom(name: string | null, email: string): string {
+  const source = name?.trim() || email.split("@")[0].split(/[._-]/)[0];
+  const word = source.split(/\s+/)[0];
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
 /**
- * Try to send a set-your-password email (the invitation flow, spec/23
- * addendum) and report honestly whether it will actually reach a usable page.
- *
- * Two failure modes are detected up front:
- *  1. The Supabase project's redirect allowlist doesn't include our origin —
- *     GoTrue then silently rewrites the link to the project's Site URL, which
- *     may be a dead end. Probed via generateLink (creates no email) by
- *     comparing the `redirect_to` GoTrue actually kept against what we asked.
- *  2. The mailer refuses (e.g. the default dev SMTP's hourly rate limit).
- * Either way the caller falls back to a one-time temp password.
+ * Send a set-your-password email to an EXISTING account (resends, lost
+ * invites). With SMTP configured, the app renders the configurable recovery
+ * template (config/emails/) around a link minted via generateLink. Without
+ * SMTP it falls back to Supabase's default mailer, first probing that our
+ * redirect survives the project's allowlist (GoTrue silently rewrites
+ * disallowed redirects to the Site URL, which may be a dead end). Either way
+ * the caller shows a temp password instead when nothing could be sent.
  */
 export async function sendPasswordSetupEmail(
   email: string,
   origin: string,
+  values?: { name?: string | null; accessSummary?: string | null },
 ): Promise<{ sent: true } | { sent: false; reason: string }> {
   const target = `${origin}/auth/set-password`;
   const admin = createSupabaseAdminClient();
@@ -58,9 +64,8 @@ export async function sendPasswordSetupEmail(
     options: { redirectTo: target },
   });
   if (probe.error) return { sent: false, reason: probe.error.message };
-  const kept = new URL(probe.data.properties.action_link).searchParams.get(
-    "redirect_to",
-  );
+  const actionLink = probe.data.properties.action_link;
+  const kept = new URL(actionLink).searchParams.get("redirect_to");
   if (!kept || !kept.startsWith(origin)) {
     return {
       sent: false,
@@ -69,8 +74,21 @@ export async function sendPasswordSetupEmail(
     };
   }
 
-  // Send the real email with the anon key — resetPasswordForEmail is the one
-  // service that emails EXISTING users a set-password link.
+  // App-side send (configurable template) when SMTP is available — the link
+  // minted above is a real one-time recovery link.
+  if (emailConfigured()) {
+    return sendTemplatedEmail("recovery", email, {
+      firstName: firstNameFrom(values?.name ?? null, email),
+      accessDetails: values?.accessSummary ?? null,
+      setPasswordLink: actionLink,
+      email,
+    });
+  }
+
+  // Fallback: Supabase's own mailer (fixed template, tight rate limits).
+  // resetPasswordForEmail is the one service that emails EXISTING users a
+  // set-password link. It mints a NEW token; the probe link above is simply
+  // superseded.
   const anon = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -85,13 +103,21 @@ export async function sendPasswordSetupEmail(
 
 /**
  * Ensure an account + app user row exist for an email. New accounts get the
- * invitation flow when possible: a set-your-password email (opts.origin set
- * and the project allows the redirect), falling back to a one-time temporary
- * password otherwise. Existing accounts are returned untouched.
+ * invitation flow when possible: a WELCOME email (the configurable invite
+ * template — see config/emails/) with the person's name and what they were
+ * granted, falling back to a one-time temporary password when the email
+ * can't be sent. Existing accounts are returned untouched.
  */
 export async function provisionUserByEmail(
   email: string,
-  opts?: { passwordEmail?: boolean; origin?: string },
+  opts?: {
+    passwordEmail?: boolean;
+    origin?: string;
+    /** Person's name — stored on the account and greeting the welcome email. */
+    name?: string | null;
+    /** What they're being granted — rendered as [ACCESS_DETAILS] in the email. */
+    accessSummary?: string | null;
+  },
 ): Promise<ProvisionResult> {
   const existing = (
     await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
@@ -101,6 +127,85 @@ export async function provisionUserByEmail(
   }
 
   const admin = createSupabaseAdminClient();
+
+  // Invitation flow first (spec/23 addendum), best transport available:
+  //  a. SMTP configured → create the account, mint a one-time link, and send
+  //     the configurable WELCOME template (config/emails/invite.html) with
+  //     the person's name and what they were granted.
+  //  b. No SMTP → Supabase's default mailer via inviteUserByEmail (fixed
+  //     wording, tight rate limits) — still a working link.
+  // Any failure falls through to the one-time temp password: never leave the
+  // person credential-less.
+  if (opts?.passwordEmail && opts.origin) {
+    const meta = {
+      first_name: firstNameFrom(opts.name ?? null, email),
+      access_details: opts.accessSummary ?? null,
+      full_name: opts.name || null,
+    };
+    if (emailConfigured()) {
+      const password = genPassword(); // random, never shown — the link replaces it
+      const created = await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: meta,
+      });
+      if (!created.error && created.data?.user) {
+        await db
+          .insert(users)
+          .values({ id: created.data.user.id, email, name: opts.name || null })
+          .onConflictDoUpdate({ target: users.id, set: { email } });
+        const link = await admin.auth.admin.generateLink({
+          type: "recovery",
+          email,
+          options: { redirectTo: `${opts.origin}/auth/set-password` },
+        });
+        const sent = link.error
+          ? { sent: false as const, reason: link.error.message }
+          : await sendTemplatedEmail("invite", email, {
+              firstName: meta.first_name,
+              accessDetails: meta.access_details,
+              setPasswordLink: link.data.properties.action_link,
+              email,
+            });
+        if (sent.sent) {
+          return {
+            userId: created.data.user.id,
+            tempPassword: null,
+            note:
+              "Account created and a welcome email sent — they'll choose their own password via the link (worth checking spam the first time).",
+          };
+        }
+        console.warn(`welcome email to ${email} not sent: ${sent.reason}`);
+        return {
+          userId: created.data.user.id,
+          tempPassword: password,
+          note:
+            "Account created. The welcome email could not be sent, so share the temporary password below instead — they should change it after signing in.",
+        };
+      }
+      // Creation failed (account may already exist in auth) → shared fallback.
+    } else {
+      const invited = await admin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: `${opts.origin}/auth/set-password`,
+        data: meta,
+      });
+      if (!invited.error && invited.data?.user) {
+        await db
+          .insert(users)
+          .values({ id: invited.data.user.id, email, name: opts.name || null })
+          .onConflictDoUpdate({ target: users.id, set: { email } });
+        return {
+          userId: invited.data.user.id,
+          tempPassword: null,
+          note:
+            "Account created and a welcome email sent — they'll choose their own password via the link (worth checking spam the first time).",
+        };
+      }
+      console.warn(`invite email to ${email} not sent: ${invited.error?.message}`);
+    }
+  }
+
   const password = genPassword();
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -113,28 +218,10 @@ export async function provisionUserByEmail(
   let note: string;
   if (!error && data?.user) {
     userId = data.user.id;
-    // Invitation flow first (spec/23 addendum): email a set-your-password
-    // link; the account keeps its random unseen password until the person
-    // chooses their own. Falls back to showing the temp password once.
-    let emailed = false;
-    if (opts?.passwordEmail && opts.origin) {
-      const sent = await sendPasswordSetupEmail(email, opts.origin);
-      if (sent.sent) {
-        emailed = true;
-      } else {
-        console.warn(`password email to ${email} not sent: ${sent.reason}`);
-      }
-    }
-    if (emailed) {
-      tempPassword = null;
-      note =
-        "Account created and an invitation email sent — they'll choose their own password via the link (worth checking spam the first time).";
-    } else {
-      tempPassword = password;
-      note = opts?.passwordEmail
-        ? "Account created. The invitation email could not be sent, so share the temporary password below instead — they should change it after signing in."
-        : "Account created. Share the temporary password below — they should change it after signing in.";
-    }
+    tempPassword = password;
+    note = opts?.passwordEmail
+      ? "Account created. The welcome email could not be sent, so share the temporary password below instead — they should change it after signing in."
+      : "Account created. Share the temporary password below — they should change it after signing in.";
   } else {
     // The auth account may exist without an app link — find and reuse it.
     // listUsers is paginated: scan pages rather than only the first, otherwise
@@ -158,7 +245,7 @@ export async function provisionUserByEmail(
 
   await db
     .insert(users)
-    .values({ id: userId, email })
+    .values({ id: userId, email, name: opts?.name || null })
     .onConflictDoUpdate({ target: users.id, set: { email } });
 
   return { userId, tempPassword, note };

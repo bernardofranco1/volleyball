@@ -26,7 +26,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { recordAudit } from "@/lib/audit";
 import { fail, ok, type FormState } from "@/lib/action-state";
 import { str } from "@/lib/form-data";
-import type { AddMemberState } from "@/lib/roles";
+import { ROLE_LABEL, type AddMemberState } from "@/lib/roles";
 
 const ASSIGNABLE: Role[] = [
   "TENANT_ADMIN",
@@ -48,18 +48,27 @@ export async function addPlatformUser(
   const email = str(fd, "email").toLowerCase();
   if (!email || !email.includes("@"))
     return { error: "Enter a valid email address." };
+  const name = str(fd, "name") || null;
 
   const access = str(fd, "access"); // "global" | "tenant"
   const tenantId = str(fd, "tenantId");
   const role = str(fd, "role") as Role;
+  let accessSummary =
+    "Global administrator — full access to every tenant and the platform console";
+  let grantTenant: Awaited<ReturnType<typeof getTenantById>> = null;
   if (access !== "global") {
     if (!tenantId) return { error: "Pick a tenant." };
     if (!ASSIGNABLE.includes(role)) return { error: "Choose a role." };
+    grantTenant = await getTenantById(tenantId);
+    if (!grantTenant) return { error: "Unknown tenant." };
+    accessSummary = `${grantTenant.name} — ${ROLE_LABEL[role]}`;
   }
 
   const provisioned = await provisionUserByEmail(email, {
     passwordEmail: true,
     origin: await appOrigin(),
+    name,
+    accessSummary,
   });
   if ("error" in provisioned) return { error: provisioned.error };
 
@@ -68,12 +77,10 @@ export async function addPlatformUser(
       .update(users)
       .set({ isGlobalAdmin: true })
       .where(eq(users.id, provisioned.userId));
-  } else {
-    const tenant = await getTenantById(tenantId);
-    if (!tenant) return { error: "Unknown tenant." };
-    await setSingleRole(tenant.id, provisioned.userId, role);
+  } else if (grantTenant) {
+    await setSingleRole(grantTenant.id, provisioned.userId, role);
     await recordAudit({
-      tenantId: tenant.id,
+      tenantId: grantTenant.id,
       actor: { userId: actor.id, email: actor.email },
       action: "access.grant",
       entityType: "user",
@@ -246,14 +253,16 @@ export async function sendPasswordEmail(
   const userId = str(fd, "userId");
   const row = (
     await db
-      .select({ email: users.email })
+      .select({ email: users.email, name: users.name })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1)
   )[0];
   if (!row) return fail("Unknown user.");
 
-  const sent = await sendPasswordSetupEmail(row.email, await appOrigin());
+  const sent = await sendPasswordSetupEmail(row.email, await appOrigin(), {
+    name: row.name,
+  });
   if (!sent.sent) return fail(`Email not sent: ${sent.reason}.`);
   return ok(`Password email sent to ${row.email}.`);
 }

@@ -37,7 +37,12 @@ const nextConfig: NextConfig = {
   // PDFKit reads its AFM font metrics from disk at runtime via __dirname. Keep it
   // as a runtime require (not bundled) so those paths resolve under node_modules
   // in the nodejs route runtime (see src/app/api/matches/[id]/export.pdf).
-  serverExternalPackages: ["pdfkit"],
+  serverExternalPackages: ["pdfkit", "nodemailer"],
+  // The email templates are runtime-read config files (config/emails/) — make
+  // sure output file tracing ships them with every serverless function.
+  outputFileTracingIncludes: {
+    "**": ["./config/emails/**"],
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

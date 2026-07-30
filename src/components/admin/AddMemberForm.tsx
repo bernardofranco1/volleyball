@@ -53,6 +53,17 @@ export function AddMemberForm({ tenantSlug }: { tenantSlug: string }) {
           />
         </div>
         <div>
+          <label className={ui.label} htmlFor="member-name">
+            Name (greets them in the welcome email)
+          </label>
+          <input
+            id="member-name"
+            name="name"
+            placeholder="e.g. Ana Ribeiro"
+            className={ui.input}
+          />
+        </div>
+        <div>
           <label className={ui.label} htmlFor="member-role">
             Role
           </label>

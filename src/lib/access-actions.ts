@@ -14,7 +14,7 @@ import {
 import { recordAudit } from "@/lib/audit";
 import { fail, ok, type FormState } from "@/lib/action-state";
 import { str } from "@/lib/form-data";
-import type { AddMemberState } from "@/lib/roles";
+import { ROLE_LABEL, type AddMemberState } from "@/lib/roles";
 
 // Access management is TENANT_ADMIN only.
 const MANAGE_ACCESS: Role[] = ["TENANT_ADMIN"];
@@ -51,6 +51,8 @@ export async function addMember(
   const provisioned = await provisionUserByEmail(email, {
     passwordEmail: true,
     origin: await appOrigin(),
+    name: str(fd, "name") || null,
+    accessSummary: `${ctx.tenant.name} — ${ROLE_LABEL[role]}`,
   });
   if ("error" in provisioned) return { error: provisioned.error };
   const { userId, tempPassword } = provisioned;
