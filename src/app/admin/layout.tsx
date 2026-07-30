@@ -38,6 +38,12 @@ export default async function AdminLayout({
               Tenants
             </Link>
             <Link
+              href="/admin/access"
+              className="rounded-lg px-3 py-1.5 text-sm text-score-dim transition-colors hover:bg-surface-raised hover:text-foreground"
+            >
+              People
+            </Link>
+            <Link
               href="/admin/backups"
               className="rounded-lg px-3 py-1.5 text-sm text-score-dim transition-colors hover:bg-surface-raised hover:text-foreground"
             >

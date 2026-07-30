@@ -113,6 +113,34 @@ export async function listAllTenants(): Promise<AdminTenantRow[]> {
   }));
 }
 
+/**
+ * Lightweight tenant list for the global admin's header switcher: ONE query
+ * (no stats). The switcher renders on every tenant page navigation — the full
+ * listAllTenants (5 grouped queries) belongs on the console page only.
+ */
+export async function listTenantsForSwitcher(): Promise<
+  {
+    slug: string;
+    name: string;
+    subdomain: string | null;
+    title: string | null;
+    logoUrl: string | null;
+  }[]
+> {
+  return db
+    .select({
+      slug: tenants.slug,
+      name: tenants.name,
+      subdomain: tenants.subdomain,
+      title: tenantBranding.title,
+      logoUrl: tenantBranding.logoUrl,
+    })
+    .from(tenants)
+    .leftJoin(tenantBranding, eq(tenantBranding.tenantId, tenants.id))
+    .where(isNull(tenants.deletedAt))
+    .orderBy(tenants.name);
+}
+
 export interface AdminTenantDetail {
   id: string;
   slug: string;

@@ -7,7 +7,7 @@ import { logout } from "@/lib/auth-actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getCurrentUser, isGlobalAdmin, type Role } from "@/lib/authz";
 import { getTenantBySlug, getUserTenants, tenantTitle } from "@/lib/tenant";
-import { listAllTenants } from "@/lib/tenant-admin";
+import { listTenantsForSwitcher } from "@/lib/tenant-admin";
 import { tenantUrl } from "@/lib/subdomain";
 import { ROLE_LABEL } from "@/lib/roles";
 import { getT } from "@/lib/i18n/server";
@@ -64,7 +64,7 @@ async function getSwitcher(currentSlug: string): Promise<{
 
   const globalAdmin = await isGlobalAdmin(user.id);
   if (globalAdmin) {
-    const all = (await listAllTenants()).filter((t) => !t.deletedAt);
+    const all = await listTenantsForSwitcher();
     return {
       showManage: true,
       tenants: all.map((t) => ({
