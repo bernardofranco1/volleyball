@@ -5,15 +5,22 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import * as schema from "@/db/schema";
+// Pure policy module — importing @/lib/backup would drag in the db/storage graph.
 import {
   EXPORTED_TABLES,
   FULL_BACKUPS_KEPT,
   MIGRATION_JOURNAL_IDX,
   selectExpiredBackups,
-} from "@/lib/backup";
+} from "@/lib/backup-policy";
 import {
   RESERVED_SUBDOMAINS,
+  SESSION_COOKIE_MAX_AGE_S,
+  authCookieOptions,
+  isProtectedTenantPath,
   isValidSubdomain,
+  legacyDemoPath,
+  rootDomain,
+  routeSubdomainPath,
   subdomainFromHost,
   tenantUrl,
 } from "@/lib/subdomain";
@@ -46,8 +53,36 @@ describe("subdomain validation (spec/23 §6)", () => {
   });
 });
 
+describe("authCookieOptions (spec/23 §6.3)", () => {
+  it("SESSION_COOKIE_MAX_AGE_S is the 8-day product decision (2026-07-30)", () => {
+    expect(SESSION_COOKIE_MAX_AGE_S).toBe(8 * 24 * 60 * 60);
+  });
+
+  it("path-only mode: maxAge only, no domain key at all", () => {
+    vi.stubEnv("NEXT_PUBLIC_ROOT_DOMAIN", "");
+    // A present-but-undefined domain would still serialise into Set-Cookie.
+    expect(authCookieOptions()).toEqual({ maxAge: SESSION_COOKIE_MAX_AGE_S });
+    expect("domain" in authCookieOptions()).toBe(false);
+  });
+
+  it("subdomain mode: apex-wide dot-prefixed domain", () => {
+    vi.stubEnv("NEXT_PUBLIC_ROOT_DOMAIN", "example.com");
+    expect(authCookieOptions()).toEqual({
+      maxAge: SESSION_COOKIE_MAX_AGE_S,
+      domain: ".example.com",
+    });
+  });
+});
+
 describe("subdomainFromHost (spec/23 §6.2)", () => {
+  it("rootDomain treats an empty env value as unconfigured", () => {
+    vi.stubEnv("NEXT_PUBLIC_ROOT_DOMAIN", "");
+    expect(rootDomain()).toBe(null);
+  });
+
   it("is inert without a configured root domain", () => {
+    // Explicit stub so an ambient developer NEXT_PUBLIC_ROOT_DOMAIN can't redden this.
+    vi.stubEnv("NEXT_PUBLIC_ROOT_DOMAIN", "");
     expect(subdomainFromHost("lisbon.example.com")).toBe(null);
   });
 
@@ -87,6 +122,71 @@ describe("tenantUrl (spec/23 §6.3)", () => {
     expect(tenantUrl({ slug: "x", subdomain: null }, "/dashboard")).toBe(
       "/t/x/dashboard",
     );
+  });
+});
+
+describe("isProtectedTenantPath (spec/17 perf)", () => {
+  it.each([
+    // The three public tenant surfaces skip the auth round-trip.
+    ["/t/x/scoreboard/m1", false],
+    ["/t/x/matches/m1/team/A", false],
+    ["/t/x/results/c1", false],
+    // Everything else under /t/ needs a session…
+    ["/t/x/dashboard", true],
+    ["/t/x/matches", true], // match centre (list) IS protected
+    ["/t/x/results", true], // regex requires a trailing segment — bare list is protected
+    // …and non-/t/ paths are out of scope for this check.
+    ["/admin", false],
+    ["/", false],
+  ])("%s → %s", (path, expected) => {
+    expect(isProtectedTenantPath(path)).toBe(expected);
+  });
+});
+
+describe("legacyDemoPath (fivb-demo re-slug, 2026-07-28)", () => {
+  it("maps the bare legacy prefix and subpaths", () => {
+    expect(legacyDemoPath("/t/fivb-demo")).toBe("/t/volleyball-scoring");
+    expect(legacyDemoPath("/t/fivb-demo/scoreboard/m")).toBe(
+      "/t/volleyball-scoring/scoreboard/m",
+    );
+  });
+
+  it("must not overmatch sibling slugs sharing the prefix", () => {
+    expect(legacyDemoPath("/t/fivb-demo-x")).toBe(null);
+  });
+
+  it("leaves unaffected paths alone", () => {
+    expect(legacyDemoPath("/t/volleyball-scoring/dashboard")).toBe(null);
+    expect(legacyDemoPath("/dashboard")).toBe(null);
+  });
+});
+
+describe("routeSubdomainPath (spec/23 §6.2)", () => {
+  it("strips the own-slug prefix to the canonical bare form", () => {
+    expect(routeSubdomainPath("/t/lisbon", "lisbon")).toEqual({
+      kind: "strip",
+      path: "/dashboard", // bare tenant root → dashboard default
+    });
+    expect(routeSubdomainPath("/t/lisbon/settings", "lisbon")).toEqual({
+      kind: "strip",
+      path: "/settings",
+    });
+  });
+
+  it("bounces foreign-tenant and /admin paths to the apex", () => {
+    expect(routeSubdomainPath("/t/other/x", "lisbon")).toEqual({ kind: "apex" });
+    expect(routeSubdomainPath("/admin", "lisbon")).toEqual({ kind: "apex" });
+  });
+
+  it("rewrites bare paths into the tenant's /t/ namespace", () => {
+    expect(routeSubdomainPath("/", "lisbon")).toEqual({
+      kind: "rewrite",
+      path: "/t/lisbon/dashboard",
+    });
+    expect(routeSubdomainPath("/matches", "lisbon")).toEqual({
+      kind: "rewrite",
+      path: "/t/lisbon/matches",
+    });
   });
 });
 
@@ -152,6 +252,27 @@ describe("backup retention (spec/23 §7.2)", () => {
     expect(r.expiredFulls).toEqual([]);
     // Oldest kept full is day(1) → the day(0) incremental predates it.
     expect(r.expiredIncrementals).toEqual([`${day(0)}T09-00-00-000Z-c.json.gz`]);
+  });
+
+  it("expires nothing at exactly the retention count", () => {
+    const fulls = Array.from({ length: FULL_BACKUPS_KEPT }, (_, i) =>
+      `${day(FULL_BACKUPS_KEPT - 1 - i)}.json.gz`,
+    );
+    const r = selectExpiredBackups(fulls, []);
+    expect(r.expiredFulls).toEqual([]);
+  });
+
+  it("keeps an incremental dated the same day as the oldest kept full (strict <)", () => {
+    const fulls = Array.from({ length: FULL_BACKUPS_KEPT + 1 }, (_, i) =>
+      `${day(FULL_BACKUPS_KEPT - i)}.json.gz`,
+    );
+    // Oldest KEPT full is day(1); day(0) fell off the window.
+    const r = selectExpiredBackups(fulls, [
+      `${day(1)}T00-00-00-000Z-c.json.gz`, // same day as oldest kept → kept
+      `${day(0)}T23-59-59-999Z-c.json.gz`, // strictly before → expired
+    ]);
+    expect(r.expiredFulls).toEqual([`${day(0)}.json.gz`]);
+    expect(r.expiredIncrementals).toEqual([`${day(0)}T23-59-59-999Z-c.json.gz`]);
   });
 
   it("keeps all incrementals when no fulls exist yet", () => {

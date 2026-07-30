@@ -128,7 +128,7 @@ describe("grass reducer — scoring & sets", () => {
 });
 
 describe("grass reducer — rotation", () => {
-  it("3-player: side-out gains serve at rotation 0, then advances", () => {
+  it("3-player: side-out gains serve at rotation 0, then advances and wraps 2 → 0", () => {
     const m = new TestMatch();
     m.ready("A", "LEFT");
     expect(m.set.lastRotA).toBe(0);
@@ -139,18 +139,12 @@ describe("grass reducer — rotation", () => {
     expect(m.set.lastRotB).toBe(0);
     expect(m.set.courtPositionsB[0]).toBe("b1");
 
-    m.score("A", 1); // side-out A → A advances 0→1
-    expect(m.set.lastRotA).toBe(1);
-    expect(m.set.courtPositionsA[1]).toBe("a2");
-  });
-
-  it("3-player: rotation wraps 2 → 0", () => {
-    const m = new TestMatch();
-    m.ready("A", "LEFT"); // lastRotA 0
+    // Each regained serve advances the rotation: 0→1→2, then wraps 2→0.
     for (const r of [1, 2, 0]) {
-      m.score("B", 1); // give serve away
-      m.score("A", 1); // regain → advance
+      m.score("A", 1); // side-out A → advance
       expect(m.set.lastRotA).toBe(r);
+      expect(m.set.courtPositionsA[r]).toBe(`a${r + 1}`);
+      m.score("B", 1); // give serve away again
     }
   });
 
@@ -230,20 +224,7 @@ describe("grass lineup & substitutions", () => {
   });
 });
 
-describe("grass — UNDO & replay", () => {
-  it("UNDO removes the targeted event and recomputes", () => {
-    const m = new TestMatch();
-    m.ready();
-    m.score("A", 3);
-    m.score("B", 2);
-    const lastB = m.events.filter((e) => e.payload.type === "RALLY_WON_B").pop()!;
-    m.apply({ type: "UNDO", targetEventId: lastB.id });
-    const state = replayEvents("m1", m.events, GRASS);
-    const set = activeSet(state)!;
-    expect(set.scoreA).toBe(3);
-    expect(set.scoreB).toBe(1);
-  });
-
+describe("grass — replay", () => {
   it("replayEvents reproduces the incrementally reduced state", () => {
     const m = new TestMatch();
     m.ready();

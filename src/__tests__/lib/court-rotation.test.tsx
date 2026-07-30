@@ -44,14 +44,17 @@ interface Placed {
   y: number;
 }
 
+/** The court SVG's vertical midline: markers beyond it belong to team B. */
+const COURT_MIDLINE_X = 160;
+
 /** Markers of the left-hand half, in document order, with their drawn point. */
 function placed(html: string): Placed[] {
   const out: Placed[] = [];
   const re =
-    /<g class="court-rotate" style="transform:translate\((-?[\d.]+)px, ?(-?[\d.]+)px\)"><g>(.*?)<\/g><\/g>/g;
+    /<g class="court-rotate" style="transform:translate\((-?[\d.]+)px, ?(-?[\d.]+)px\)[^"]*"><g>(.*?)<\/g><\/g>/g;
   for (const m of html.matchAll(re)) {
     const [, x, y, inner] = m;
-    if (Number(x) > 160) continue; // right half is the mirrored opponent
+    if (Number(x) > COURT_MIDLINE_X) continue; // right half is the mirrored opponent
     const jersey = /dominant-baseline="central"[^>]*>(\d+)</.exec(inner)?.[1];
     if (jersey) out.push({ jersey, x: Number(x), y: Number(y) });
   }
@@ -156,11 +159,9 @@ describe("rotation animation — scorer court", () => {
         rosterById={roster(4) as never}
       />,
     );
-    // Eight markers (both halves), each wrapped in exactly one .court-rotate.
-    expect(html.match(/class="court-rotate"/g)).toHaveLength(8);
-    // And no marker keeps a per-axis class from the earlier implementation.
-    expect(html).not.toContain("court-rot-x");
-    expect(html).not.toContain("court-rot-y");
+    // One .court-rotate wrapper per on-court player, both halves.
+    const playersOnCourt = 4 + 4;
+    expect(html.match(/class="court-rotate"/g)).toHaveLength(playersOnCourt);
   });
 
   it("the serve marker is always present, opacity-crossfaded", () => {
@@ -179,8 +180,9 @@ describe("rotation animation — scorer court", () => {
         rosterById={roster(4) as never}
       />,
     );
-    // Two per marker (ring + ball badge) × 8 markers.
-    expect(html.match(/class="court-serve"/g)).toHaveLength(16);
+    // Two serve elements per marker (ring + ball badge).
+    const playersOnCourt = 4 + 4;
+    expect(html.match(/class="court-serve"/g)).toHaveLength(playersOnCourt * 2);
     expect(html).toMatch(/class="court-serve"[^>]*opacity="1"/);
     expect(html).toMatch(/class="court-serve"[^>]*opacity="0"/);
   });

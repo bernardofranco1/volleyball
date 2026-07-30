@@ -79,6 +79,59 @@ export function subdomainFromHost(host: string | null): string | null {
   return isValidSubdomain(label) ? label : null;
 }
 
+// ── Proxy routing decisions (pure — extracted from src/proxy.ts for tests) ──
+
+/**
+ * True when a /t/… path requires a session. The three public tenant surfaces
+ * (TV scoreboard, token-gated team tablet, public results) skip the auth
+ * round-trip entirely (spec/17 perf).
+ */
+export function isProtectedTenantPath(pathname: string): boolean {
+  if (!pathname.startsWith("/t/")) return false;
+  return !(
+    /^\/t\/[^/]+\/scoreboard\//.test(pathname) ||
+    /^\/t\/[^/]+\/matches\/[^/]+\/team\//.test(pathname) ||
+    /^\/t\/[^/]+\/results\//.test(pathname)
+  );
+}
+
+/**
+ * The demo tenant was re-slugged fivb-demo → volleyball-scoring (2026-07-28).
+ * Returns the replacement path for legacy URLs (printed QR codes, bookmarks),
+ * or null when the path isn't affected. Query strings are the caller's — they
+ * carry tablet tokens/PIN keys and must be preserved untouched.
+ */
+export function legacyDemoPath(pathname: string): string | null {
+  return pathname === "/t/fivb-demo" || pathname.startsWith("/t/fivb-demo/")
+    ? pathname.replace("/t/fivb-demo", "/t/volleyball-scoring")
+    : null;
+}
+
+export type SubdomainRouting =
+  | { kind: "strip"; path: string } // own /t/{slug} path on the subdomain → canonical bare form (308)
+  | { kind: "apex" } // another tenant's path or /admin on a subdomain → apex (308)
+  | { kind: "rewrite"; path: string }; // bare path → internal /t/{slug} rewrite
+
+/** Where a request on a tenant subdomain host should go (spec/23 §6.2). */
+export function routeSubdomainPath(
+  pathname: string,
+  slug: string,
+): SubdomainRouting {
+  if (pathname === `/t/${slug}` || pathname.startsWith(`/t/${slug}/`)) {
+    return {
+      kind: "strip",
+      path: pathname.slice(`/t/${slug}`.length) || "/dashboard",
+    };
+  }
+  if (pathname.startsWith("/t/") || pathname.startsWith("/admin")) {
+    return { kind: "apex" };
+  }
+  return {
+    kind: "rewrite",
+    path: `/t/${slug}${pathname === "/" ? "/dashboard" : pathname}`,
+  };
+}
+
 /**
  * Canonical URL (or path) for a tenant page. With a root domain configured and
  * a subdomain chosen, links go to `https://{subdomain}.{root}{path}` — the

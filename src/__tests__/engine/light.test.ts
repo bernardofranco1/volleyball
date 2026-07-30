@@ -144,16 +144,6 @@ describe("light reducer — rotation", () => {
     expect(m.set.courtPositionsA.length).toBe(5);
   });
 
-  it("serving team rotates after a won rally (Air/Light §7 / F1)", () => {
-    const m = new TestMatch();
-    m.ready("A", "LEFT"); // A serving from rotation index 0
-    expect(m.set.lastRotA).toBe(0);
-    m.score("A", 1); // A wins WHILE serving → rotates but keeps the serve
-    expect(m.set.currentServer).toBe("A");
-    expect(m.set.lastRotA).toBe(1);
-    m.score("A", 1); // wins again → rotates again
-    expect(m.set.lastRotA).toBe(2);
-  });
 });
 
 describe("light reducer — side switches", () => {
@@ -247,18 +237,7 @@ describe("light validator — limits & lineup", () => {
   });
 });
 
-describe("light — UNDO & replay", () => {
-  it("UNDO removes the targeted event and recomputes", () => {
-    const m = new TestMatch();
-    m.ready();
-    m.score("A", 3);
-    m.score("B", 2);
-    const lastB = m.events.filter((e) => e.payload.type === "RALLY_WON_B").pop()!;
-    m.apply({ type: "UNDO", targetEventId: lastB.id });
-    const state = replayEvents("m1", m.events, LIGHT);
-    expect(activeSet(state)!.scoreB).toBe(1);
-  });
-
+describe("light — replay", () => {
   it("replayEvents reproduces the incrementally reduced state", () => {
     const m = new TestMatch();
     m.ready();
@@ -308,12 +287,15 @@ describe("light reducer — rotation follows every point (8.6.2 + 10.2.2)", () =
     const m = new TestMatch();
     m.ready("A", "LEFT");
     const seen = [serverOf(m)];
+    const rots = [m.set.lastRotA];
     for (let i = 0; i < 4; i++) {
-      m.score("A", 1); // A wins WHILE serving → must rotate every time
+      m.score("A", 1); // A wins WHILE serving → must rotate, keeps the serve
       seen.push(serverOf(m));
+      rots.push(m.set.lastRotA);
     }
     // Four players, so the fifth service returns to the first player.
     expect(seen).toEqual(["a1", "a2", "a3", "a4", "a1"]);
+    expect(rots).toEqual([0, 1, 2, 3, 0]);
     expect(m.set.currentServer).toBe("A");
   });
 
@@ -382,10 +364,7 @@ describe("light — lineups before the set (spec/21 flow fix)", () => {
   });
 
   it("still rejects lineups mid-set and pre-toss", () => {
-    const m = new TestMatch();
-    m.apply({ type: "MATCH_CREATED", matchId: "m1" });
-    // COIN_TOSS status (toss not done): allowed? — the toss banner comes first
-    // but a lineup handed in early is fine; SETUP is the hard gate.
+    // SETUP (match not yet created) is the hard gate: no lineup accepted.
     const setup = new TestMatch();
     expect(
       validateLightEvent(

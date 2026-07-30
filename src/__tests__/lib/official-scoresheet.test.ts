@@ -14,9 +14,11 @@ import { resolveConfig } from "@/engine/config";
 // survivor semantics; both renderers must emit a real PDF from the result.
 
 const T0 = new Date("2026-07-28T10:00:00.000Z");
-let seq = 0;
 
-function ev(
+/** Event factory with its own sequence counter — no shared mutable state. */
+function eventFactory() {
+  let seq = 0;
+  return function ev(
   eventType: string,
   payload: Record<string, unknown>,
   score: [number, number] | null,
@@ -35,6 +37,7 @@ function ev(
     actor: "SCORER",
     notes: null,
     payload: { type: eventType, ...payload },
+  };
   };
 }
 
@@ -115,7 +118,7 @@ function baseReport(discipline: string, events: ReportEvent[]): MatchReportData 
 }
 
 function beachEvents(): ReportEvent[] {
-  seq = 0;
+  const ev = eventFactory();
   const evs: ReportEvent[] = [
     ev("MATCH_CREATED", { matchId: "m1" }, null, null),
     ev("COIN_TOSS", { firstServer: "A", teamAStartSide: "LEFT", tossWinner: "B" }, null, null),
@@ -204,7 +207,7 @@ describe("official scoresheet data layer", () => {
   });
 
   it("drops UNDO targets and REWIND tails from the survivor list", () => {
-    seq = 0;
+    const ev = eventFactory();
     const a = ev("RALLY_WON_A", {}, [1, 0]);
     const b = ev("RALLY_WON_B", {}, [1, 1]);
     const undo = ev("UNDO", { targetEventId: b.id }, null);
@@ -216,7 +219,7 @@ describe("official scoresheet data layer", () => {
   });
 
   it("shifts the receiving team's indoor service rounds by one column", () => {
-    seq = 0;
+    const ev = eventFactory();
     const evs = [
       ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
       ev("LINEUP_CONFIRMED", { team: "A", setNumber: 1, playerIds: ["a1", "a2"] }, [0, 0]),

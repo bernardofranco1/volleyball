@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { DISCIPLINE_DEFAULTS } from "@/engine/config";
-import { replayEvents as beachReplay } from "@/engine/beach/reducer";
+import {
+  reduce as beachReduce,
+  replayEvents as beachReplay,
+} from "@/engine/beach/reducer";
 import { validateBeachEvent } from "@/engine/beach/validator";
 import {
   type BeachEvent,
@@ -72,6 +75,27 @@ describe("replay: UNDO advances lastSequence to the log head", () => {
     const set = state.sets[state.currentSetNumber - 1];
     expect(set.timeoutsUsedA).toBe(0); // timeout erased
     expect(state.lastSequence).toBe(8); // head, not 5
+  });
+});
+
+// ── Regression: snapshot + tail replay === full replay (spec/14 §C1) ──────────
+
+describe("snapshot equivalence (pure)", () => {
+  it("reducing from a mid-log snapshot + tail equals a full replay", () => {
+    const { events } = buildLog();
+    const log: BeachEvent[] = [
+      ...events,
+      { id: "e8", sequence: 8, timestamp: TS, payload: { type: "RALLY_WON_B" } },
+      { id: "e9", sequence: 9, timestamp: TS, payload: { type: "RALLY_WON_A" } },
+    ];
+    const full = beachReplay("m1", log, BEACH);
+    // Snapshot at an arbitrary mid-point (inside the time-out), then replay
+    // only the tail onto it.
+    const k = 6;
+    const snapshot = beachReplay("m1", log.slice(0, k), BEACH);
+    let tailState = snapshot;
+    for (const e of log.slice(k)) tailState = beachReduce(tailState, e, BEACH);
+    expect(tailState).toEqual(full);
   });
 });
 

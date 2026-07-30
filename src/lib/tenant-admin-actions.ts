@@ -171,6 +171,12 @@ export async function softDeleteTenant(
   if (!backup.ok)
     return fail(`Final backup failed (${backup.error}) — tenant NOT deleted.`);
 
+  // Re-check after the backup: it can take a while, and a match going LIVE in
+  // the meantime must still block the deletion (the earlier check is only a
+  // fast pre-flight).
+  if (await hasLiveMatch(tenantId))
+    return fail("A match is LIVE in this tenant — finish or abandon it first.");
+
   await db
     .update(tenants)
     .set({ deletedAt: new Date() })

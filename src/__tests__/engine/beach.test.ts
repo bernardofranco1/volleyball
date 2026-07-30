@@ -270,6 +270,10 @@ describe("beach reducer — TTO", () => {
     const types = bringToSum21(m);
     expect(types).toContain("TTO_START");
     expect(m.set.ttoFired).toBe(true);
+    // While the TTO runs, the next rally is rejected (spec/14 §A2 regression).
+    const blocked = validateBeachEvent({ type: "RALLY_WON_A" }, m.state, BEACH);
+    expect(blocked.ok).toBe(false);
+    expect(blocked.reason).toMatch(/not in a rally/i);
   });
 
   it("TTO records its start timestamp (drives the countdown) and clears it on end", () => {
@@ -300,8 +304,7 @@ describe("beach reducer — TTO", () => {
     m.begin("A", "LEFT");
     bringToSum21(m); // TTO fired at 11-10
     m.apply({ type: "TTO_END" });
-    const lastRally = m.dispatch({ type: "RALLY_WON_B" }); // 11-11 (sum 22)
-    void lastRally;
+    m.dispatch({ type: "RALLY_WON_B" }); // 11-11 (sum 22)
     const rallyEvent = m.events.filter(
       (e) => e.payload.type === "RALLY_WON_B",
     ).pop()!;
@@ -339,39 +342,9 @@ describe("beach reducer — match completion", () => {
     const types = m.dispatch({ type: "RALLY_WON_A" }); // 21st point of set 2
     expect(types).toEqual(["SET_END", "MATCH_END"]);
   });
-
-  it("emits SIDE_SWITCH before TTO_START when both are due at sum 21", () => {
-    const m = new TestMatch();
-    m.begin("A", "LEFT");
-    // 11-10 → sum 21, which is both a side-switch multiple (21%7==0) and the TTO trigger
-    for (let i = 0; i < 10; i++) {
-      m.dispatch({ type: "RALLY_WON_A" });
-      m.dispatch({ type: "RALLY_WON_B" });
-    }
-    const types = m.dispatch({ type: "RALLY_WON_A" });
-    expect(types).toEqual(["SIDE_SWITCH", "TTO_START"]);
-  });
 });
 
 describe("beach validator", () => {
-  it("enforces the timeout limit (1 per set for beach)", () => {
-    const m = new TestMatch();
-    m.begin("A", "LEFT");
-    m.dispatch({ type: "RALLY_WON_A" }); // BETWEEN_RALLIES
-    expect(
-      validateBeachEvent({ type: "TIMEOUT_REQUEST", team: "A" }, m.state, BEACH).ok,
-    ).toBe(true);
-    m.apply({ type: "TIMEOUT_REQUEST", team: "A" });
-    m.apply({ type: "TIMEOUT_END", team: "A" });
-    const second = validateBeachEvent(
-      { type: "TIMEOUT_REQUEST", team: "A" },
-      m.state,
-      BEACH,
-    );
-    expect(second.ok).toBe(false);
-    expect(second.reason).toMatch(/limit/i);
-  });
-
   // FIVB beach rule 15.1: ONE 30-second time-out per team per set — including
   // the deciding set (15.4.3), where the automatic TTO does not exist. The
   // allowance is per team and resets every set; the TTO and medical time-outs

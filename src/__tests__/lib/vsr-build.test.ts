@@ -8,10 +8,12 @@ import { buildVsr, strokesToSvg, vsrFilename } from "@/lib/vsr/build";
 // settings templates — rebuilt purely from the event log.
 
 const T0 = new Date("2026-07-28T10:00:00.000Z");
-let seq = 0;
 const at = (sec: number) => new Date(T0.getTime() + sec * 1000);
 
-function ev(
+/** Event factory with its own sequence counter — no shared mutable state. */
+function eventFactory() {
+  let seq = 0;
+  return function ev(
   eventType: string,
   payload: Record<string, unknown>,
   score: [number, number] | null,
@@ -29,6 +31,7 @@ function ev(
     actor: "SCORER",
     notes: null,
     payload: { type: eventType, ...payload },
+  };
   };
 }
 
@@ -99,7 +102,7 @@ function report(discipline: string, events: ReportEvent[]): MatchReportData {
 
 describe("VSR builder", () => {
   it("builds a beach snapshot with per-set coin toss, rallies and TTO", () => {
-    seq = 0;
+    const ev = eventFactory();
     const evs = [
       ev("MATCH_CREATED", { matchId: "m1" }, null, 0),
       ev("COIN_TOSS", { firstServer: "A", teamAStartSide: "LEFT", tossWinner: "B" }, null, 1),
@@ -159,7 +162,7 @@ describe("VSR builder", () => {
   });
 
   it("builds an indoor snapshot with match coin toss, lineups, subs and libero", () => {
-    seq = 0;
+    const ev = eventFactory();
     const evs = [
       ev("COIN_TOSS", { firstServer: "B", teamAStartSide: "RIGHT" }, null, 1),
       ev("LINEUP_CONFIRMED", { team: "A", setNumber: 1, playerIds: ["a1", "a2"], liberoId: "a7", secondLiberoId: null }, [0, 0], 5),

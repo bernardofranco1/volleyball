@@ -8,6 +8,11 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["src/**/*.test.{ts,tsx}"],
+    // Mock hygiene: nothing stubbed/mocked in one file may leak into another.
+    restoreMocks: true,
+    clearMocks: true,
+    unstubEnvs: true,
+    unstubGlobals: true,
   },
   resolve: {
     alias: {

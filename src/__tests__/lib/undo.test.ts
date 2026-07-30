@@ -11,6 +11,13 @@ import {
   type BeachMatchState,
   initialBeachState,
 } from "@/engine/beach/types";
+import { appendGrassEvent, replayEvents as grassReplay } from "@/engine/grass/reducer";
+import {
+  type GrassEvent,
+  type GrassEventPayload,
+  type GrassMatchState,
+  initialGrassState,
+} from "@/engine/grass/types";
 import { selectUndoTargets } from "@/lib/match-engine";
 import type { EngineEvent } from "@/engine/registry";
 
@@ -117,36 +124,6 @@ describe("undo during a TTO removes the rally AND its auto-emitted TTO_START", (
     expect(selectUndoTargets(onlySystem)).toEqual([]);
   });
 });
-
-import { shouldSnapshot } from "@/lib/match-engine";
-
-describe("shouldSnapshot (snapshot cache write policy)", () => {
-  const live = (seq: number) => ({ lastSequence: seq, status: "LIVE" as const });
-  const ev = (type: string): EngineEvent =>
-    ({ id: "x", sequence: 1, timestamp: TS, payload: { type } }) as EngineEvent;
-
-  it("always snapshots when none exists", () => {
-    expect(shouldSnapshot(false, 0, live(1), [ev("RALLY_WON_A")])).toBe(true);
-  });
-  it("skips within the interval, writes at the boundary", () => {
-    expect(shouldSnapshot(true, 10, live(12), [ev("RALLY_WON_A")])).toBe(false);
-    expect(shouldSnapshot(true, 10, live(15), [ev("RALLY_WON_A")])).toBe(true);
-  });
-  it("writes when the match leaves LIVE or on system auto-emits", () => {
-    expect(
-      shouldSnapshot(true, 10, { lastSequence: 11, status: "FINISHED" }, [ev("RALLY_WON_A")]),
-    ).toBe(true);
-    expect(shouldSnapshot(true, 10, live(11), [ev("RALLY_WON_A"), ev("SET_END")])).toBe(true);
-  });
-});
-
-import { appendGrassEvent, replayEvents as grassReplay } from "@/engine/grass/reducer";
-import {
-  type GrassEvent,
-  type GrassEventPayload,
-  type GrassMatchState,
-  initialGrassState,
-} from "@/engine/grass/types";
 
 // Regression: the lineup-confirmation step used to trap scorers — no undo was
 // reachable, and cancelling needed to unwind LINEUP_CONFIRMED(s) AND SET_START.

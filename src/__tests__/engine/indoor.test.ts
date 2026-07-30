@@ -388,6 +388,28 @@ describe("indoor libero", () => {
     expect(m.set.subsUsedA).toBe(0);
     expect(m.state.totalMatchSubsA).toBe(0);
   });
+
+  // The libero may not rotate into the front row (spec/14 §E3): the reducer
+  // auto-removes it and returns the replaced player.
+  it("is auto-removed when rotation would put it in the front row", () => {
+    const m = new TestMatch();
+    m.ready("A", "LEFT");
+    // Libero in for a6 (back-row, index 5).
+    m.apply({ type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a7", direction: "IN", outPlayerId: "a6" });
+    expect(m.set.libero.liberoOnCourtA).toBe(true);
+    expect(m.set.courtPositionsA[5]).toBe("a7");
+
+    // Two A side-outs rotate the libero 5 → 4 → 3 (front row).
+    m.score("B", 1); // A serving → side-out to B (A doesn't rotate)
+    m.score("A", 1); // side-out to A (rotate: libero 5 → 4, legal)
+    expect(m.set.libero.liberoOnCourtA).toBe(true);
+    m.score("B", 1); // side-out to B
+    m.score("A", 1); // side-out to A (rotate: libero 4 → 3, front row)
+
+    expect(m.set.libero.liberoOnCourtA).toBe(false);
+    expect(m.set.courtPositionsA.includes("a7")).toBe(false);
+    expect(m.set.courtPositionsA.includes("a6")).toBe(true);
+  });
 });
 
 describe("indoor VCS", () => {
@@ -426,20 +448,7 @@ describe("indoor VCS", () => {
   });
 });
 
-describe("indoor — UNDO & replay", () => {
-  it("UNDO removes the targeted event and recomputes", () => {
-    const m = new TestMatch();
-    m.ready();
-    m.score("A", 3);
-    m.score("B", 2); // 3-2
-    const lastB = m.events.filter((e) => e.payload.type === "RALLY_WON_B").pop()!;
-    m.apply({ type: "UNDO", targetEventId: lastB.id });
-    const state = replayEvents("m1", m.events, INDOOR);
-    const set = activeSet(state)!;
-    expect(set.scoreA).toBe(3);
-    expect(set.scoreB).toBe(1);
-  });
-
+describe("indoor — replay", () => {
   it("replayEvents reproduces the incrementally reduced state", () => {
     const m = new TestMatch();
     m.ready();

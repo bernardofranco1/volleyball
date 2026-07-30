@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderLogPdf, renderPdf } from "@/app/api/matches/[id]/export.pdf/route";
+import { renderLogPdf, renderPdf } from "@/lib/match-report-pdf";
 import { renderScoresheetPdf } from "@/lib/scoresheet-pdf";
 import type { MatchReportData, ReportEvent } from "@/lib/match-report";
 
@@ -185,12 +185,6 @@ describe("match report approval block", () => {
     expect(pdf.length).toBeGreaterThan(unsigned.length);
   });
 
-  it("renders an unsigned, unconfirmed match without crashing", async () => {
-    const pdf = await renderPdf(DATA);
-    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
-    expect(pdf.length).toBeGreaterThan(1500);
-  });
-
   it("handles a manager-confirmed result with no signatures", async () => {
     const pdf = await renderPdf({
       ...DATA,
@@ -212,23 +206,8 @@ describe("official scoresheet export", () => {
     expect(pdf.length).toBeGreaterThan(3000);
   });
 
-  it("draws more ink when signatures are present", async () => {
-    const signed = await renderScoresheetPdf(SIGNED);
-    const unsigned = await renderScoresheetPdf(DATA);
-    expect(signed.length).toBeGreaterThan(unsigned.length);
-  });
-
-  it("renders with no roster, no sets and no signatures", async () => {
-    const bare = await renderScoresheetPdf({
-      ...DATA,
-      sets: [],
-      rosterA: [],
-      rosterB: [],
-      events: [],
-    });
-    expect(bare.subarray(0, 5).toString("latin1")).toBe("%PDF-");
-  });
-
+  // (Plain renderer crash-smokes live in official-scoresheet.test.ts — this
+  // file keeps only the two structural contracts: page geometry + clamping.)
   it("survives a signature whose payload is out of range", async () => {
     // Clamping happens in fitStrokes, and the box also clips — a malformed
     // payload must never be able to scrawl across the rest of the sheet.

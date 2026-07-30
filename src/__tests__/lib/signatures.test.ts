@@ -11,8 +11,6 @@ import {
   type SignableState,
   type SignatureRecord,
 } from "@/lib/match-signatures";
-import { DISCIPLINE_DEFAULTS, resolveConfig } from "@/engine/config";
-import { DISCIPLINES } from "@/engine/types";
 
 const STATE: SignableState = {
   matchId: "m1",
@@ -166,29 +164,6 @@ describe("stroke payload validation", () => {
     });
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.value.strokes[0]).toHaveLength(2);
-  });
-});
-
-describe("signature obligation per discipline", () => {
-  it("beach and indoor require a signed scoresheet; grass and air do not", () => {
-    expect(DISCIPLINE_DEFAULTS.BEACH.resultSignatures).toBe("REQUIRED");
-    expect(DISCIPLINE_DEFAULTS.INDOOR.resultSignatures).toBe("REQUIRED");
-    expect(DISCIPLINE_DEFAULTS.GRASS.resultSignatures).toBe("OFF");
-    expect(DISCIPLINE_DEFAULTS.LIGHT.resultSignatures).toBe("OFF");
-  });
-
-  it("is overridable per competition", () => {
-    expect(
-      resolveConfig("BEACH", { resultSignatures: "OPTIONAL" }).resultSignatures,
-    ).toBe("OPTIONAL");
-    expect(resolveConfig("BEACH", { resultSignatures: null as never }).resultSignatures).toBe(
-      "REQUIRED",
-    );
-    // Every discipline resolves to one of the three policies.
-    for (const d of DISCIPLINES)
-      expect(["REQUIRED", "OPTIONAL", "OFF"]).toContain(
-        resolveConfig(d).resultSignatures,
-      );
   });
 });
 

@@ -7,27 +7,30 @@ import { computeMatchTimings } from "@/lib/timings";
 // challenges, set breaks — all derivable from the surviving event log.
 
 const T0 = new Date("2026-07-28T10:00:00.000Z");
-let seq = 0;
 const at = (sec: number) => new Date(T0.getTime() + sec * 1000);
 
-function ev(
-  eventType: string,
-  payload: Record<string, unknown>,
-  score: [number, number] | null,
-  sec: number,
-): ReportEvent {
-  seq += 1;
-  return {
-    id: `evt_${seq}`,
-    sequence: seq,
-    eventType,
-    setNumber: 1,
-    scoreAfterA: score?.[0] ?? null,
-    scoreAfterB: score?.[1] ?? null,
-    timestamp: at(sec),
-    actor: "SCORER",
-    notes: null,
-    payload: { type: eventType, ...payload },
+/** Event factory with its own sequence counter — no shared mutable state. */
+function eventFactory() {
+  let seq = 0;
+  return function ev(
+    eventType: string,
+    payload: Record<string, unknown>,
+    score: [number, number] | null,
+    sec: number,
+  ): ReportEvent {
+    seq += 1;
+    return {
+      id: `evt_${seq}`,
+      sequence: seq,
+      eventType,
+      setNumber: 1,
+      scoreAfterA: score?.[0] ?? null,
+      scoreAfterB: score?.[1] ?? null,
+      timestamp: at(sec),
+      actor: "SCORER",
+      notes: null,
+      payload: { type: eventType, ...payload },
+    };
   };
 }
 
@@ -67,10 +70,11 @@ function report(events: ReportEvent[]): MatchReportData {
   };
 }
 
-describe("computeMatchTimings", () => {
-  it("times rallies (precise + approximated), breaks and sets", () => {
-    seq = 0;
-    const evs = [
+/** The shared two-set fixture: precise + approximated rallies, every break kind. */
+function fixture() {
+  const ev = eventFactory();
+  return computeMatchTimings(
+    report([
       ev("SET_START", { setNumber: 1, firstServer: "A" }, [0, 0], 0),
       // Precise rally: RALLY_START at 10s, point at 22s → 12s duration.
       ev("RALLY_START", {}, null, 10),
@@ -94,10 +98,13 @@ describe("computeMatchTimings", () => {
       ev("SET_START", { setNumber: 2, firstServer: "B" }, [0, 0], 960),
       ev("RALLY_WON_A", {}, [1, 0], 980),
       ev("SET_END", { setNumber: 2, winner: "A", scoreA: 21, scoreB: 5 }, [21, 5], 1900),
-    ];
-    const t = computeMatchTimings(report(evs));
+    ]),
+  );
+}
 
-    // Rallies.
+describe("computeMatchTimings", () => {
+  it("times rallies — precise via RALLY_START, approximated from the previous event", () => {
+    const t = fixture();
     expect(t.rallies).toHaveLength(3);
     expect(t.rallies[0]).toMatchObject({
       setNumber: 1,
@@ -110,8 +117,10 @@ describe("computeMatchTimings", () => {
       durationMs: 18_000,
       precise: false,
     });
+  });
 
-    // Sets.
+  it("times sets and counts their (precise) rallies", () => {
+    const t = fixture();
     expect(t.sets[0]).toMatchObject({
       setNumber: 1,
       durationMs: 900_000,
@@ -119,16 +128,21 @@ describe("computeMatchTimings", () => {
       preciseRallies: 1,
     });
     expect(t.sets[1]).toMatchObject({ setNumber: 2, durationMs: 940_000 });
+  });
 
-    // Breaks: TO 30s, TTO 60s, medical 150s, challenge 25s, set break 60s.
+  it("classifies every break kind with its duration and team", () => {
+    const t = fixture();
+    // TO 30s, TTO 60s, medical 150s, challenge 25s, set break 60s.
     const byKind = Object.fromEntries(t.breaks.map((b) => [b.kind, b]));
     expect(byKind.TIMEOUT).toMatchObject({ team: "B", durationMs: 30_000 });
     expect(byKind.TECHNICAL_TIMEOUT).toMatchObject({ durationMs: 60_000 });
     expect(byKind.MEDICAL_TIMEOUT).toMatchObject({ team: "A", durationMs: 150_000 });
     expect(byKind.VIDEO_CHALLENGE).toMatchObject({ team: "B", durationMs: 25_000 });
     expect(byKind.SET_BREAK).toMatchObject({ durationMs: 60_000 });
+  });
 
-    // Totals.
+  it("totals the match and the challenge time", () => {
+    const t = fixture();
     expect(t.videoChallengeMs).toBe(25_000);
     expect(t.totalMs).toBe(2_000_000);
   });

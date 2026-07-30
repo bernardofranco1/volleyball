@@ -96,6 +96,30 @@ describe("resolveConfig", () => {
   });
 });
 
+describe("signature obligation per discipline", () => {
+  it("beach and indoor require a signed scoresheet; grass and air do not", () => {
+    expect(DISCIPLINE_DEFAULTS.BEACH.resultSignatures).toBe("REQUIRED");
+    expect(DISCIPLINE_DEFAULTS.INDOOR.resultSignatures).toBe("REQUIRED");
+    expect(DISCIPLINE_DEFAULTS.GRASS.resultSignatures).toBe("OFF");
+    expect(DISCIPLINE_DEFAULTS.LIGHT.resultSignatures).toBe("OFF");
+  });
+
+  it("is overridable per competition", () => {
+    expect(
+      resolveConfig("BEACH", { resultSignatures: "OPTIONAL" }).resultSignatures,
+    ).toBe("OPTIONAL");
+    // null means 'use default'
+    expect(
+      resolveConfig("BEACH", { resultSignatures: null as never }).resultSignatures,
+    ).toBe("REQUIRED");
+    // Every discipline resolves to one of the three policies.
+    for (const d of DISCIPLINES)
+      expect(["REQUIRED", "OPTIONAL", "OFF"]).toContain(
+        resolveConfig(d).resultSignatures,
+      );
+  });
+});
+
 describe("timeoutCapForSet", () => {
   it("uses the normal cap for non-deciding sets and the tie-break cap for the decider", () => {
     const c = resolveConfig("INDOOR", {

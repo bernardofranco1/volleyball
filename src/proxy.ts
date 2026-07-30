@@ -13,8 +13,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import {
   authCookieOptions,
+  isProtectedTenantPath,
   LAST_TENANT_COOKIE,
+  legacyDemoPath,
   rootDomain,
+  routeSubdomainPath,
   subdomainFromHost,
 } from "@/lib/subdomain";
 
@@ -68,13 +71,14 @@ export async function proxy(request: NextRequest) {
       url.pathname = "/tenant-not-found";
       return NextResponse.rewrite(url, { status: 404 });
     }
-    if (pathname === `/t/${slug}` || pathname.startsWith(`/t/${slug}/`)) {
+    const routed = routeSubdomainPath(pathname, slug);
+    if (routed.kind === "strip") {
       // Path-form URL opened on the subdomain host → canonical bare form.
       const url = request.nextUrl.clone();
-      url.pathname = pathname.slice(`/t/${slug}`.length) || "/dashboard";
+      url.pathname = routed.path;
       return NextResponse.redirect(url, 308);
     }
-    if (pathname.startsWith("/t/") || pathname.startsWith("/admin")) {
+    if (routed.kind === "apex") {
       // Another tenant's path (or the console) on a subdomain host → apex.
       const url = request.nextUrl.clone();
       url.hostname = rootDomain()!;
@@ -82,36 +86,22 @@ export async function proxy(request: NextRequest) {
     }
     // Internal rewrite: the browser URL stays https://{label}.{root}/…
     rewriteUrl = request.nextUrl.clone();
-    rewriteUrl.pathname = `/t/${slug}${pathname === "/" ? "/dashboard" : pathname}`;
+    rewriteUrl.pathname = routed.path;
     pathname = rewriteUrl.pathname;
   }
 
-  // The demo tenant was re-slugged fivb-demo → volleyball-scoring (branding,
-  // 2026-07-28). Permanent redirect keeps every printed QR code, scorer
-  // deep-link and bookmark alive — query strings (tablet tokens, PIN keys)
-  // are carried over untouched.
-  if (pathname === "/t/fivb-demo" || pathname.startsWith("/t/fivb-demo/")) {
+  // Legacy demo slug 308 (printed QR codes, bookmarks) — query string intact.
+  const legacy = legacyDemoPath(pathname);
+  if (legacy) {
     const url = request.nextUrl.clone();
-    url.pathname = pathname.replace("/t/fivb-demo", "/t/volleyball-scoring");
+    url.pathname = legacy;
     return NextResponse.redirect(url, 308);
   }
 
   // Decide whether the path is user-gated BEFORE paying the Supabase Auth
   // round trip — public scoreboards/tablets/results were previously spending
   // 30-80ms on an auth check whose result was discarded.
-  //   - the scoreboard display (`/t/{slug}/scoreboard/{matchId}`) — public TV view
-  //   - the team tablet (`/t/{slug}/matches/{id}/team/{A|B}`) — session-token gated
-  //   - public results (`/t/{slug}/results/…`)
-  const isPublicScoreboard = /^\/t\/[^/]+\/scoreboard\//.test(pathname);
-  const isTeamTablet = /^\/t\/[^/]+\/matches\/[^/]+\/team\//.test(pathname);
-  const isPublicResults = /^\/t\/[^/]+\/results\//.test(pathname);
-  const isProtected =
-    pathname.startsWith("/t/") &&
-    !isPublicScoreboard &&
-    !isTeamTablet &&
-    !isPublicResults;
-
-  if (!isProtected) return pass();
+  if (!isProtectedTenantPath(pathname)) return pass();
 
   let response = pass();
 
