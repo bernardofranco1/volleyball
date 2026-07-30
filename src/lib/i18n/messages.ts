@@ -44,6 +44,19 @@ const en: Dict = {
   "settings.primaryColor": "Primary colour",
   "settings.secondaryColor": "Secondary colour",
   "settings.logoUrl": "Logo URL",
+  "settings.brandTitle": "Display title",
+  "settings.brandTitleHint": "Shown instead of “Volleyball Scoring”",
+  "settings.logoUpload": "Upload logo",
+  "settings.logoUploadHint":
+    "PNG, JPEG or WebP, up to 1 MB. Uploading replaces the URL below.",
+  "settings.contrastWarning": "Low contrast — check readability",
+  "tenantSwitcher.switch": "Switch organisation",
+  "tenantSwitcher.manage": "Manage tenants",
+  "selectTenant.title": "Choose an organisation",
+  "selectTenant.subtitle":
+    "Your account belongs to several organisations. Pick one to continue.",
+  "selectTenant.none":
+    "Your account has no organisation access yet — ask an administrator to invite you.",
   "settings.fontFamily": "Font family",
   "settings.courtColors": "Court colours",
   "settings.save": "Save",
@@ -556,6 +569,19 @@ const fr: Dict = {
   "settings.primaryColor": "Couleur principale",
   "settings.secondaryColor": "Couleur secondaire",
   "settings.logoUrl": "URL du logo",
+  "settings.brandTitle": "Titre affiché",
+  "settings.brandTitleHint": "Affiché à la place de « Volleyball Scoring »",
+  "settings.logoUpload": "Téléverser un logo",
+  "settings.logoUploadHint":
+    "PNG, JPEG ou WebP, 1 Mo max. Le téléversement remplace l'URL ci-dessous.",
+  "settings.contrastWarning": "Contraste faible — vérifiez la lisibilité",
+  "tenantSwitcher.switch": "Changer d'organisation",
+  "tenantSwitcher.manage": "Gérer les organisations",
+  "selectTenant.title": "Choisissez une organisation",
+  "selectTenant.subtitle":
+    "Votre compte appartient à plusieurs organisations. Choisissez-en une pour continuer.",
+  "selectTenant.none":
+    "Votre compte n'a encore accès à aucune organisation — demandez une invitation à un administrateur.",
   "settings.fontFamily": "Police",
   "settings.courtColors": "Couleurs du terrain",
   "settings.save": "Enregistrer",
@@ -1052,6 +1078,19 @@ const de: Dict = {
   "settings.primaryColor": "Primärfarbe",
   "settings.secondaryColor": "Sekundärfarbe",
   "settings.logoUrl": "Logo-URL",
+  "settings.brandTitle": "Anzeigetitel",
+  "settings.brandTitleHint": "Wird statt „Volleyball Scoring“ angezeigt",
+  "settings.logoUpload": "Logo hochladen",
+  "settings.logoUploadHint":
+    "PNG, JPEG oder WebP, max. 1 MB. Der Upload ersetzt die URL unten.",
+  "settings.contrastWarning": "Geringer Kontrast — Lesbarkeit prüfen",
+  "tenantSwitcher.switch": "Organisation wechseln",
+  "tenantSwitcher.manage": "Organisationen verwalten",
+  "selectTenant.title": "Organisation wählen",
+  "selectTenant.subtitle":
+    "Ihr Konto gehört zu mehreren Organisationen. Wählen Sie eine aus, um fortzufahren.",
+  "selectTenant.none":
+    "Ihr Konto hat noch keinen Organisationszugang — bitten Sie einen Administrator um eine Einladung.",
   "settings.fontFamily": "Schriftart",
   "settings.courtColors": "Spielfeldfarben",
   "settings.save": "Speichern",
@@ -1549,6 +1588,19 @@ const es: Dict = {
   "settings.primaryColor": "Color principal",
   "settings.secondaryColor": "Color secundario",
   "settings.logoUrl": "URL del logotipo",
+  "settings.brandTitle": "Título mostrado",
+  "settings.brandTitleHint": "Se muestra en lugar de «Volleyball Scoring»",
+  "settings.logoUpload": "Subir logotipo",
+  "settings.logoUploadHint":
+    "PNG, JPEG o WebP, máx. 1 MB. Subir un archivo reemplaza la URL de abajo.",
+  "settings.contrastWarning": "Contraste bajo — compruebe la legibilidad",
+  "tenantSwitcher.switch": "Cambiar de organización",
+  "tenantSwitcher.manage": "Gestionar organizaciones",
+  "selectTenant.title": "Elija una organización",
+  "selectTenant.subtitle":
+    "Su cuenta pertenece a varias organizaciones. Elija una para continuar.",
+  "selectTenant.none":
+    "Su cuenta aún no tiene acceso a ninguna organización — pida una invitación a un administrador.",
   "settings.fontFamily": "Tipografía",
   "settings.courtColors": "Colores de la pista",
   "settings.save": "Guardar",
@@ -2046,6 +2098,19 @@ const pt: Dict = {
   "settings.primaryColor": "Cor principal",
   "settings.secondaryColor": "Cor secundária",
   "settings.logoUrl": "URL do logótipo",
+  "settings.brandTitle": "Título apresentado",
+  "settings.brandTitleHint": "Mostrado em vez de «Volleyball Scoring»",
+  "settings.logoUpload": "Carregar logótipo",
+  "settings.logoUploadHint":
+    "PNG, JPEG ou WebP, máx. 1 MB. O carregamento substitui o URL abaixo.",
+  "settings.contrastWarning": "Contraste baixo — verifique a legibilidade",
+  "tenantSwitcher.switch": "Mudar de organização",
+  "tenantSwitcher.manage": "Gerir organizações",
+  "selectTenant.title": "Escolha uma organização",
+  "selectTenant.subtitle":
+    "A sua conta pertence a várias organizações. Escolha uma para continuar.",
+  "selectTenant.none":
+    "A sua conta ainda não tem acesso a nenhuma organização — peça um convite a um administrador.",
   "settings.fontFamily": "Fonte",
   "settings.courtColors": "Cores do campo",
   "settings.save": "Guardar",

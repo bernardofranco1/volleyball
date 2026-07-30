@@ -1,12 +1,19 @@
 import type { CSSProperties } from "react";
+import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { logout } from "@/lib/auth-actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { getTenantBySlug } from "@/lib/tenant";
+import { getCurrentUser, isGlobalAdmin, type Role } from "@/lib/authz";
+import { getTenantBySlug, getUserTenants, tenantTitle } from "@/lib/tenant";
+import { listAllTenants } from "@/lib/tenant-admin";
+import { tenantUrl } from "@/lib/subdomain";
+import { ROLE_LABEL } from "@/lib/roles";
 import { getT } from "@/lib/i18n/server";
 import { LocaleProvider } from "@/lib/i18n/client";
 import { MobileNav } from "@/components/MobileNav";
+import { TenantSwitcher, type SwitcherTenant } from "@/components/TenantSwitcher";
 
 // Tenant pages are user- and DB-specific, so never prerender at build time.
 export const dynamic = "force-dynamic";
@@ -20,6 +27,78 @@ const NAV_LINKS = [
   ["nav.settings", "settings"],
 ] as const;
 
+/** Browser-tab title = the tenant's product name (spec/23 §5.1). */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ tenantSlug: string }>;
+}): Promise<Metadata> {
+  const { tenantSlug } = await params;
+  const tenant = await getTenantBySlug(tenantSlug);
+  if (!tenant) return {};
+  const title = tenantTitle(tenant);
+  return { title: { default: title, template: `%s | ${title}` } };
+}
+
+const ROLE_RANK: Record<Role, number> = {
+  TENANT_ADMIN: 4,
+  COMPETITION_ADMIN: 3,
+  SCORER: 2,
+  VIEWER: 1,
+};
+
+/**
+ * Switcher data for the signed-in user, or null when the plain wordmark link
+ * should render (no session, or a single-tenant member). Public surfaces
+ * (scoreboard, tablets, results) carry no Supabase cookie, so the cheap
+ * cookie-presence test keeps them off the auth path entirely (spec/17 perf).
+ */
+async function getSwitcher(currentSlug: string): Promise<{
+  tenants: SwitcherTenant[];
+  showManage: boolean;
+} | null> {
+  const cookieStore = await cookies();
+  if (!cookieStore.getAll().some((c) => c.name.startsWith("sb-"))) return null;
+  const user = await getCurrentUser();
+  if (!user) return null;
+
+  const globalAdmin = await isGlobalAdmin(user.id);
+  if (globalAdmin) {
+    const all = (await listAllTenants()).filter((t) => !t.deletedAt);
+    return {
+      showManage: true,
+      tenants: all.map((t) => ({
+        slug: t.slug,
+        label: t.title ?? t.name,
+        logoUrl: t.logoUrl,
+        roleLabel: null,
+        url: tenantUrl(t, "/dashboard"),
+        current: t.slug === currentSlug,
+      })),
+    };
+  }
+
+  const mine = await getUserTenants(user.id);
+  if (mine.length <= 1) return null;
+  return {
+    showManage: false,
+    tenants: mine.map((t) => {
+      const top = (t.roles as Role[]).reduce(
+        (a, b) => (ROLE_RANK[b] > ROLE_RANK[a] ? b : a),
+        "VIEWER" as Role,
+      );
+      return {
+        slug: t.slug,
+        label: t.title ?? t.name,
+        logoUrl: t.logoUrl,
+        roleLabel: ROLE_LABEL[top],
+        url: tenantUrl(t, "/dashboard"),
+        current: t.slug === currentSlug,
+      };
+    }),
+  };
+}
+
 export default async function TenantLayout({
   children,
   params,
@@ -32,7 +111,11 @@ export default async function TenantLayout({
   if (!tenant) {
     notFound();
   }
-  const { locale, t, messages } = await getT();
+  const [{ locale, t, messages }, switcher] = await Promise.all([
+    getT(),
+    getSwitcher(tenantSlug),
+  ]);
+  const title = tenantTitle(tenant);
 
   // Inject brand tokens: colours, optional font, and any court-colour overrides.
   // These cascade over the base tokens in globals.css, so `*-primary` and
@@ -66,27 +149,39 @@ export default async function TenantLayout({
                 label: t(key),
               }))}
             />
-            <Link
-              href={`/t/${tenantSlug}/dashboard`}
-              className="flex items-center gap-3"
-            >
-              {tenant.branding.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={tenant.branding.logoUrl}
-                  alt={`${tenant.name} logo`}
-                  className="h-7 w-auto"
-                />
-              ) : (
-                <span
-                  className="grid h-7 w-7 place-items-center rounded-md bg-primary text-xs font-bold text-primary-fg"
-                  aria-hidden
-                >
-                  {tenant.name.charAt(0)}
-                </span>
-              )}
-              <span className="font-semibold">{tenant.name}</span>
-            </Link>
+            {switcher ? (
+              <TenantSwitcher
+                current={{
+                  label: title,
+                  logoUrl: tenant.branding.logoUrl,
+                  dashboardHref: `/t/${tenantSlug}/dashboard`,
+                }}
+                tenants={switcher.tenants}
+                showManage={switcher.showManage}
+              />
+            ) : (
+              <Link
+                href={`/t/${tenantSlug}/dashboard`}
+                className="flex items-center gap-3"
+              >
+                {tenant.branding.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={tenant.branding.logoUrl}
+                    alt={`${tenant.name} logo`}
+                    className="h-7 w-auto"
+                  />
+                ) : (
+                  <span
+                    className="grid h-7 w-7 place-items-center rounded-md bg-primary text-xs font-bold text-primary-fg"
+                    aria-hidden
+                  >
+                    {title.charAt(0)}
+                  </span>
+                )}
+                <span className="font-semibold">{title}</span>
+              </Link>
+            )}
             {/* Top navigation menu (brief §1.2). */}
             <nav className="hidden items-center gap-1 md:flex">
               {NAV_LINKS.map(([key, path]) => (

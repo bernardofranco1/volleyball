@@ -2,11 +2,13 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { competitions, competitionBranding, tournamentConfig } from "@/db/schema";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { gateCompetition } from "@/lib/action-gate";
+import { scheduleIncrementalBackup } from "@/lib/backup";
 import { BOARD_FONTS } from "@/lib/board-theme";
 import { normalizeHex } from "@/lib/colors";
 import {
@@ -72,6 +74,9 @@ export async function createCompetition(
     entityId: id,
     summary: `Created ${discipline} competition “${name}”`,
   });
+
+  // Creation event → incremental backup (spec/23 §7.4), post-response.
+  after(() => scheduleIncrementalBackup(ctx.tenant.id, id));
 
   revalidatePath(`/t/${tenantSlug}/competitions`);
   redirect(`/t/${tenantSlug}/competitions/${id}`);

@@ -31,6 +31,7 @@ import type { GrassMatchState } from "@/engine/grass/types";
 import type { LightMatchState } from "@/engine/light/types";
 import type { Actor, Discipline } from "@/engine/types";
 import { newId } from "@/lib/id";
+import { scheduleIncrementalBackup } from "@/lib/backup";
 import { scheduleVsrDispatch, vsrDispatchEnabled } from "@/lib/vsr/dispatch";
 import {
   type BroadcastMessage,
@@ -52,9 +53,12 @@ const SNAPSHOT_EVERY = 5;
 interface MatchMeta {
   matchId: string;
   tenantId: string;
+  competitionId: string;
   discipline: Discipline;
   config: TournamentConfig;
   engine: NonNullable<ReturnType<typeof getEngine>>;
+  /** Row status BEFORE this operation — lets writes detect real transitions. */
+  status: string;
   /** Snapshot columns, fetched with the meta so loads are one round trip. */
   snap: unknown | null;
   snapshotSeq: number;
@@ -65,6 +69,8 @@ async function loadMatchMeta(matchId: string): Promise<MatchMeta> {
   const rows = await db
     .select({
       tenantId: matches.tenantId,
+      competitionId: matches.competitionId,
+      status: matches.status,
       discipline: matches.discipline,
       snap: matches.stateSnapshot,
       snapshotSeq: matches.snapshotSequence,
@@ -95,9 +101,11 @@ async function loadMatchMeta(matchId: string): Promise<MatchMeta> {
   return {
     matchId,
     tenantId: row.tenantId,
+    competitionId: row.competitionId,
     discipline,
     config,
     engine,
+    status: row.status,
     snap: row.snap,
     snapshotSeq: row.snapshotSeq ?? 0,
   };
@@ -412,6 +420,22 @@ function scheduleVsrFeed(matchId: string): void {
 }
 
 /**
+ * Incremental backup trigger (spec/23 §7.4): fires ONLY when the row status
+ * actually changed — never per rally. Post-response + internally debounced
+ * (5 min per competition), so a set-end burst costs one export.
+ */
+function scheduleBackupOnStatusChange(meta: MatchMeta, newStatus: string): void {
+  if (newStatus === meta.status) return;
+  const send = () =>
+    scheduleIncrementalBackup(meta.tenantId, meta.competitionId);
+  try {
+    after(send);
+  } catch {
+    void send();
+  }
+}
+
+/**
  * Validate and persist a new event (plus auto-emitted consequences) and the
  * fresh snapshot in one transaction, then broadcast a change signal.
  */
@@ -523,6 +547,7 @@ export async function appendMatchEvent(
   // on the state-update signal — one source of truth for every surface.)
   scheduleBroadcast(msgs);
   scheduleVsrFeed(matchId);
+  scheduleBackupOnStatusChange(meta, status);
 
   return { newEvents: result.newEvents, state: finalState };
 }
@@ -673,6 +698,13 @@ async function undoLastEvent(
 
   scheduleBroadcast([stateUpdateMessage(matchId, finalState.lastSequence)]);
   scheduleVsrFeed(matchId);
+  {
+    const engineStatus = meta.engine.matchStatusOf(finalState);
+    scheduleBackupOnStatusChange(
+      meta,
+      engineStatus === "FINISHED" ? "PENDING_CONFIRMATION" : engineStatus,
+    );
+  }
   return {
     newEvents: undoEvents,
     state: finalState,
@@ -740,5 +772,12 @@ export async function rewindMatch(
 
   scheduleBroadcast([stateUpdateMessage(matchId, finalState.lastSequence)]);
   scheduleVsrFeed(matchId);
+  {
+    const engineStatus = meta.engine.matchStatusOf(finalState);
+    scheduleBackupOnStatusChange(
+      meta,
+      engineStatus === "FINISHED" ? "PENDING_CONFIRMATION" : engineStatus,
+    );
+  }
   return { newEvents: [rewind], state: finalState };
 }

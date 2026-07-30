@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { events, matchSessions, matches, pools, teams } from "@/db/schema";
 import { gateCompetition } from "@/lib/action-gate";
 import { recordAudit } from "@/lib/audit";
+import { scheduleIncrementalBackup } from "@/lib/backup";
 import { newId } from "@/lib/id";
 import { nextMatchNumber } from "@/lib/match-number";
 import { fail, ok, type FormState } from "@/lib/action-state";
@@ -55,6 +57,8 @@ export async function createMatch(
   });
 
   revalidatePath(schedulePath(g.tenantSlug, g.competitionId));
+  // Creation event → incremental backup (spec/23 §7.4), post-response.
+  after(() => scheduleIncrementalBackup(g.tenantId, g.competitionId));
   return ok("Match created.");
 }
 
@@ -197,7 +201,11 @@ export async function generateRoundRobin(
       }
     }
   }
-  if (rows.length > 0) await db.insert(matches).values(rows);
+  if (rows.length > 0) {
+    await db.insert(matches).values(rows);
+    // Creation event → incremental backup (spec/23 §7.4), post-response.
+    after(() => scheduleIncrementalBackup(g.tenantId, g.competitionId));
+  }
 
   await recordAudit({
     tenantId: g.tenantId,

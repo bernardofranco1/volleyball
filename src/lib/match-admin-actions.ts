@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { matchOfficials, matches } from "@/db/schema";
 import { ADMIN_ROLES, authorizeMatch } from "@/lib/authz";
 import { recordAudit } from "@/lib/audit";
+import { scheduleIncrementalBackup } from "@/lib/backup";
 import {
   MatchNotFoundError,
   RewindRejectedError,
@@ -135,6 +137,11 @@ export async function confirmMatchResult(
     })
     .where(eq(matches.id, matchId));
 
+  // Status transition → competition-scoped incremental backup (spec/23 §7.4).
+  after(() =>
+    scheduleIncrementalBackup(authed.auth.tenantId, row.competitionId),
+  );
+
   await recordAudit({
     tenantId: authed.auth.tenantId,
     actor: { userId: authed.auth.user.id, email: authed.auth.user.email },
@@ -186,7 +193,11 @@ export async function reopenMatchResult(
 
   const row = (
     await db
-      .select({ status: matches.status, via: matches.confirmedVia })
+      .select({
+        status: matches.status,
+        via: matches.confirmedVia,
+        competitionId: matches.competitionId,
+      })
       .from(matches)
       .where(eq(matches.id, matchId))
       .limit(1)
@@ -209,6 +220,11 @@ export async function reopenMatchResult(
       confirmedVia: null,
     })
     .where(eq(matches.id, matchId));
+
+  // Status transition → competition-scoped incremental backup (spec/23 §7.4).
+  after(() =>
+    scheduleIncrementalBackup(authed.auth.tenantId, row.competitionId),
+  );
 
   await recordAudit({
     tenantId: authed.auth.tenantId,

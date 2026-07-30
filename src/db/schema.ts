@@ -28,6 +28,13 @@ export const tenants = pgTable("tenants", {
   id: text("id").primaryKey(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
+  // Optional hostname label for subdomain routing (spec/23 §6): lowercase
+  // DNS label, validated app-side against RESERVED_SUBDOMAINS. Null = tenant
+  // reachable only via /t/{slug}.
+  subdomain: text("subdomain").unique(),
+  // Soft delete (spec/23 §3.4): non-null hides the tenant everywhere; hard
+  // purge happens after a 7-day grace via the daily backup cron.
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }).enableRLS();
 
@@ -35,6 +42,9 @@ export const tenantBranding = pgTable("tenant_branding", {
   tenantId: text("tenant_id")
     .primaryKey()
     .references(() => tenants.id),
+  // Display title shown instead of the "Volleyball Scoring" product name
+  // (header wordmark + browser tab). Null → fall back to the tenant name.
+  title: text("title"),
   logoUrl: text("logo_url"),
   primaryColor: text("primary_color").default("#0066cc"),
   secondaryColor: text("secondary_color").default("#ffffff"),
@@ -63,6 +73,10 @@ export const users = pgTable("users", {
   id: text("id").primaryKey(), // Supabase Auth user id (uuid)
   email: text("email").notNull(),
   name: text("name"),
+  // Platform-level superadmin (spec/23 §3): implicit TENANT_ADMIN in every
+  // tenant + access to /admin. Deliberately no UI to set it — flipping the
+  // flag is a DB-only operation.
+  isGlobalAdmin: boolean("is_global_admin").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }).enableRLS();
 
@@ -618,6 +632,36 @@ export const auditLog = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("audit_log_tenant_idx").on(t.tenantId, t.createdAt)],
+).enableRLS();
+
+// ── Backup runs (spec/23 §7) ─────────────────────────────────────────────────
+// One row per backup attempt (including failures — a FAILED row is how a missed
+// backup becomes visible in the admin console instead of silently absent).
+// Objects live in the private Supabase Storage bucket `backups`.
+
+export const backupRuns = pgTable(
+  "backup_runs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    kind: text("kind", { enum: ["FULL", "INCREMENTAL"] }).notNull(),
+    trigger: text("trigger", { enum: ["CRON", "EVENT", "MANUAL"] }).notNull(),
+    // e.g. { competitionId } for competition-scoped incrementals.
+    scope: jsonb("scope").$type<{ competitionId?: string } | null>(),
+    status: text("status", { enum: ["RUNNING", "OK", "FAILED"] })
+      .default("RUNNING")
+      .notNull(),
+    objectPath: text("object_path"),
+    sizeBytes: integer("size_bytes"),
+    rowCounts: jsonb("row_counts").$type<Record<string, number> | null>(),
+    error: text("error"),
+    startedAt: timestamp("started_at").defaultNow().notNull(),
+    finishedAt: timestamp("finished_at"),
+  },
+  // Console history + the incremental debounce query by tenant, newest first.
+  (t) => [index("backup_runs_tenant_started_idx").on(t.tenantId, t.startedAt)],
 ).enableRLS();
 
 // ── Tenant billing (Phase 11 scaffold — Stripe, "future") ────────────────────

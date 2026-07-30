@@ -3,6 +3,10 @@
   "regions": ["dub1"],
   "crons": [
     {
+      "path": "/api/cron/backup",
+      "schedule": "0 3 * * *"
+    },
+    {
       "path": "/api/cron/reseed",
       "schedule": "0 5 * * *"
     }

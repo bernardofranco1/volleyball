@@ -57,6 +57,13 @@
       "when": 1785244687538,
       "tag": "0007_careful_riptide",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785401854782,
+      "tag": "0008_even_monster_badoon",
+      "breakpoints": true
     }
   ]
 }

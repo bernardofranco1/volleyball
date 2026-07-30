@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { matches, pools, teams } from "@/db/schema";
 import { gateCompetition } from "@/lib/action-gate";
 import { computeStandings } from "@/lib/standings";
 import { recordAudit } from "@/lib/audit";
+import { scheduleIncrementalBackup } from "@/lib/backup";
 import {
   bracketSize,
   isKnockoutRound,
@@ -303,6 +305,8 @@ export async function generateBracket(
     summary: "Generated single-elimination bracket",
   });
   revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
+  // Creation event → incremental backup (spec/23 §7.4), post-response.
+  after(() => scheduleIncrementalBackup(g.tenantId, g.competitionId));
   return outcome;
 }
 
@@ -418,6 +422,8 @@ export async function advanceBracket(
     summary: "Advanced bracket winners",
   });
   revalidatePath(standingsPath(g.tenantSlug, g.competitionId));
+  // Creation event → incremental backup (spec/23 §7.4), post-response.
+  after(() => scheduleIncrementalBackup(g.tenantId, g.competitionId));
   return ok(`Created ${createdTotal} next-round match(es).`);
 }
 

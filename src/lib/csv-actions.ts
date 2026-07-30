@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { csvImports, matches, players, teams } from "@/db/schema";
 import { gateCompetition } from "@/lib/action-gate";
 import { csvBool, parseCsvRecords, recordGetter } from "@/lib/csv";
 import { recordAudit } from "@/lib/audit";
+import { scheduleIncrementalBackup } from "@/lib/backup";
 import { newId } from "@/lib/id";
 import type { ImportState } from "@/lib/action-state";
 
@@ -154,6 +156,8 @@ export async function importSchedule(
 
   await logImport(g.tenantId, "SCHEDULE", fileName(fd), g.actor.userId, ok, errs);
   revalidatePath(`/t/${g.tenantSlug}/competitions/${g.competitionId}/schedule`);
+  // Creation event → incremental backup (spec/23 §7.4), post-response.
+  if (ok > 0) after(() => scheduleIncrementalBackup(g.tenantId, g.competitionId));
   return { error: null, summary: { ok, errors: errs.length, messages: errs } };
 }
 

@@ -13,6 +13,8 @@
 // with confirmedVia = SIGNATURES, in one transaction with the insert.
 
 import type { NextRequest } from "next/server";
+// Aliased: this file has a local `after` variable (signature progress).
+import { after as afterResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
@@ -25,6 +27,7 @@ import {
   tenants,
 } from "@/db/schema";
 import { ADMIN_ROLES, authorizeMatch, hasRole, SCORING_ROLES } from "@/lib/authz";
+import { scheduleIncrementalBackup } from "@/lib/backup";
 import { sameOriginOk } from "@/lib/http";
 import { rateLimit } from "@/lib/ratelimit";
 import { scorerPinSatisfied } from "@/lib/scorer-pin";
@@ -386,6 +389,10 @@ export async function POST(
     revalidatePath(`${base}/standings`);
     revalidatePath(`/t/${row.tenantSlug}/matches`);
     revalidatePath(`/t/${row.tenantSlug}/scoreboard/${id}`);
+    // Status transition → competition-scoped incremental backup (spec/23 §7.4).
+    afterResponse(() =>
+      scheduleIncrementalBackup(row.tenantId, row.competitionId),
+    );
   }
 
   const after = await progressFor(id);

@@ -10,7 +10,7 @@ import { cache } from "react";
 import { and, eq } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/db";
-import { matches, userTenantRoles } from "@/db/schema";
+import { matches, users, userTenantRoles } from "@/db/schema";
 import { createSupabaseServerClient } from "@/lib/supabase";
 import { getTenantBySlug, type TenantWithBranding } from "@/lib/tenant";
 
@@ -40,7 +40,28 @@ export function hasRole(roles: Role[], allowed: Role[]): boolean {
   return roles.some((r) => allowed.includes(r));
 }
 
+/**
+ * Platform superadmin flag (spec/23 §3). Memoised per request — every gate on
+ * a page funnels through rolesFor, so without the cache a single render would
+ * repeat the lookup. Not a membership: global admins never appear in
+ * user_tenant_roles (the last-admin guard keeps counting real members only).
+ */
+export const isGlobalAdmin = cache(async (userId: string): Promise<boolean> => {
+  const row = (
+    await db
+      .select({ isGlobalAdmin: users.isGlobalAdmin })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+  )[0];
+  return row?.isGlobalAdmin ?? false;
+});
+
 async function rolesFor(userId: string, tenantId: string): Promise<Role[]> {
+  // A global admin is implicitly TENANT_ADMIN everywhere. Synthesising it here
+  // means every existing gate (requireRole, authorizeMatch, gateCompetition)
+  // honours the flag with no further changes.
+  if (await isGlobalAdmin(userId)) return ["TENANT_ADMIN"];
   const rows = await db
     .select({ role: userTenantRoles.role })
     .from(userTenantRoles)
@@ -51,6 +72,26 @@ async function rolesFor(userId: string, tenantId: string): Promise<Role[]> {
       ),
     );
   return rows.map((r) => r.role as Role);
+}
+
+/**
+ * Gate for the /admin console (spec/23 §3.2): requires a session AND the
+ * global-admin flag. Not-global-admin gets notFound() — same "don't reveal the
+ * surface exists" convention as requireRole.
+ */
+export async function requireGlobalAdmin(redirectTo?: string): Promise<{
+  user: { id: string; email: string | null };
+}> {
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect(
+      redirectTo
+        ? `/login?redirectTo=${encodeURIComponent(redirectTo)}`
+        : "/login",
+    );
+  }
+  if (!(await isGlobalAdmin(user.id))) notFound();
+  return { user: { id: user.id, email: user.email ?? null } };
 }
 
 /**

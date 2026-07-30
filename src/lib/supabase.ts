@@ -6,14 +6,18 @@
 // Client Component (use `@/lib/supabase-browser` there instead).
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { rootDomain } from "@/lib/subdomain";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
+  const root = rootDomain();
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
+    // One session across the apex and every tenant subdomain (spec/23 §6.3).
+    ...(root ? { cookieOptions: { domain: `.${root}` } } : {}),
     cookies: {
       getAll() {
         return cookieStore.getAll();
