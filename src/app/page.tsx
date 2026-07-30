@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RecoveryHashForwarder } from "@/components/RecoveryHashForwarder";
 
 const DISCIPLINES = [
   "Beach",
@@ -10,6 +11,8 @@ const DISCIPLINES = [
 export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-24 text-center">
+      {/* Email-link safety net: forwards #access_token recovery fragments. */}
+      <RecoveryHashForwarder />
       <div className="flex flex-col items-center gap-8 max-w-2xl">
         <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight">
           Volleyball Scoring Platform

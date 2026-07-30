@@ -16,10 +16,13 @@ import { requireGlobalAdmin, type Role } from "@/lib/authz";
 import { adminCount } from "@/lib/access";
 import { getTenantById } from "@/lib/tenant-admin";
 import {
+  appOrigin,
   provisionUserByEmail,
   resetUserPassword,
+  sendPasswordSetupEmail,
   setSingleRole,
 } from "@/lib/user-provisioning";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { recordAudit } from "@/lib/audit";
 import { fail, ok, type FormState } from "@/lib/action-state";
 import { str } from "@/lib/form-data";
@@ -54,7 +57,10 @@ export async function addPlatformUser(
     if (!ASSIGNABLE.includes(role)) return { error: "Choose a role." };
   }
 
-  const provisioned = await provisionUserByEmail(email);
+  const provisioned = await provisionUserByEmail(email, {
+    passwordEmail: true,
+    origin: await appOrigin(),
+  });
   if ("error" in provisioned) return { error: provisioned.error };
 
   if (access === "global") {
@@ -186,6 +192,70 @@ export async function revokeTenantRole(
   });
   revalidatePath("/admin/access");
   return ok("Access revoked.");
+}
+
+/**
+ * Delete a person from the platform entirely: every tenant membership, the
+ * app user row, and the Supabase Auth account. Historic records that mention
+ * the id (audit log, match confirmations, signatures) are kept — they document
+ * what happened, not who may sign in. You cannot delete yourself.
+ */
+export async function deleteUserAccount(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const { user: actor } = await requireGlobalAdmin();
+  const userId = str(fd, "userId");
+  if (!userId) return fail("Missing user.");
+  if (userId === actor.id)
+    return fail("You can't delete your own account from here.");
+
+  const row = (
+    await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+  )[0];
+  if (!row) return fail("Unknown user.");
+
+  await db.delete(userTenantRoles).where(eq(userTenantRoles.userId, userId));
+  await db.delete(users).where(eq(users.id, userId));
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error && !/not found/i.test(error.message)) {
+    // The app rows are gone but the auth account lingers — surface it rather
+    // than pretending; a retry (auth-only path) is safe.
+    return fail(`App access removed, but the sign-in account could not be deleted: ${error.message}`);
+  }
+
+  revalidatePath("/admin/access");
+  return ok(`${row.email} deleted.`);
+}
+
+/**
+ * (Re)send the set-your-password email — for fresh invites that never arrived
+ * or expired links. Falls back with the reason when the project's email/
+ * redirect configuration blocks it.
+ */
+export async function sendPasswordEmail(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  await requireGlobalAdmin();
+  const userId = str(fd, "userId");
+  const row = (
+    await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+  )[0];
+  if (!row) return fail("Unknown user.");
+
+  const sent = await sendPasswordSetupEmail(row.email, await appOrigin());
+  if (!sent.sent) return fail(`Email not sent: ${sent.reason}.`);
+  return ok(`Password email sent to ${row.email}.`);
 }
 
 /** New one-time temporary password for an account (lost invite, etc.). */

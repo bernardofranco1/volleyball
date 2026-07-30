@@ -12,6 +12,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  authCookieOptions,
   LAST_TENANT_COOKIE,
   rootDomain,
   subdomainFromHost,
@@ -19,13 +20,6 @@ import {
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-// With a root domain configured, auth cookies span the apex (/admin) and every
-// tenant subdomain — one session everywhere (spec/23 §6.3).
-function cookieDomain(): { domain: string } | undefined {
-  const root = rootDomain();
-  return root ? { domain: `.${root}` } : undefined;
-}
 
 // Per-instance memo for subdomain → slug (the resolve route is CDN-cached too;
 // this removes even the fetch on steady state). null = known-unknown.
@@ -122,7 +116,8 @@ export async function proxy(request: NextRequest) {
   let response = pass();
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookieOptions: cookieDomain(),
+    // 8-day rolling persistence + apex-wide domain when subdomains are on.
+    cookieOptions: authCookieOptions(),
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -163,11 +158,12 @@ export async function proxy(request: NextRequest) {
   // authenticated tenant pages, only when it changed.
   const slugMatch = /^\/t\/([^/]+)/.exec(pathname);
   if (slugMatch && request.cookies.get(LAST_TENANT_COOKIE)?.value !== slugMatch[1]) {
+    const { domain } = authCookieOptions();
     response.cookies.set(LAST_TENANT_COOKIE, slugMatch[1], {
       path: "/",
       maxAge: 60 * 60 * 24 * 365,
       sameSite: "lax",
-      ...cookieDomain(),
+      ...(domain ? { domain } : {}),
     });
   }
 

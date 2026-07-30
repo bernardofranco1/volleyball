@@ -6,7 +6,11 @@ import { db } from "@/db";
 import { userTenantRoles } from "@/db/schema";
 import { requireRole, type Role } from "@/lib/authz";
 import { adminCount } from "@/lib/access";
-import { provisionUserByEmail, setSingleRole } from "@/lib/user-provisioning";
+import {
+  appOrigin,
+  provisionUserByEmail,
+  setSingleRole,
+} from "@/lib/user-provisioning";
 import { recordAudit } from "@/lib/audit";
 import { fail, ok, type FormState } from "@/lib/action-state";
 import { str } from "@/lib/form-data";
@@ -44,7 +48,10 @@ export async function addMember(
   if (!email || !email.includes("@")) return { error: "Enter a valid email address." };
   if (!ASSIGNABLE.includes(role)) return { error: "Choose a role." };
 
-  const provisioned = await provisionUserByEmail(email);
+  const provisioned = await provisionUserByEmail(email, {
+    passwordEmail: true,
+    origin: await appOrigin(),
+  });
   if ("error" in provisioned) return { error: provisioned.error };
   const { userId, tempPassword } = provisioned;
   const note =

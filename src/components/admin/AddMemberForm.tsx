@@ -32,8 +32,9 @@ export function AddMemberForm({ tenantSlug }: { tenantSlug: string }) {
     <form action={action} className={ui.card}>
       <h2 className="mb-1 font-medium">Add a person</h2>
       <p className="mb-3 text-xs text-score-dim">
-        Grants access by email. If they have no account yet, one is created and a
-        temporary password is shown once.
+        Grants access by email. New accounts receive an invitation email to
+        choose their own password; if it can&apos;t be sent, a temporary
+        password is shown here once instead.
       </p>
       <input type="hidden" name="tenantSlug" value={tenantSlug} />
 

@@ -36,8 +36,9 @@ export function AddPlatformUserForm({
     <form action={action} className={ui.card}>
       <h2 className="mb-1 font-medium">Add a person</h2>
       <p className="mb-3 text-xs text-score-dim">
-        Creates the account if needed (temporary password shown once), then
-        grants platform-wide or tenant access.
+        New accounts receive an invitation email to choose their own password
+        (a one-time temporary password is shown here instead if the email
+        can&apos;t be sent). Then platform-wide or tenant access is granted.
       </p>
 
       <div className="space-y-3">

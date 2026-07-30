@@ -10,6 +10,28 @@
 export const LAST_TENANT_COOKIE = "lastTenant";
 
 /**
+ * How long a signed-in session persists in the browser without re-entering a
+ * password: 8 days (product decision, 2026-07-30). Auth cookies are rewritten
+ * on every token refresh, so this is a ROLLING window — active users are never
+ * logged out; only 8 full days of inactivity requires a fresh sign-in.
+ */
+export const SESSION_COOKIE_MAX_AGE_S = 60 * 60 * 24 * 8;
+
+/**
+ * Shared cookie options for every Supabase client (server, browser, proxy):
+ * the 8-day rolling persistence plus, when subdomain routing is configured,
+ * the apex-wide domain so one session spans /admin and every tenant subdomain
+ * (spec/23 §6.3).
+ */
+export function authCookieOptions(): { maxAge: number; domain?: string } {
+  const root = rootDomain();
+  return {
+    maxAge: SESSION_COOKIE_MAX_AGE_S,
+    ...(root ? { domain: `.${root}` } : {}),
+  };
+}
+
+/**
  * Labels that can never be tenant subdomains: they collide with (current or
  * plausible) platform infrastructure on the root domain.
  */

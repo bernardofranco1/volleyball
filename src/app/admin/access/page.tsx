@@ -1,17 +1,8 @@
 import { requireGlobalAdmin } from "@/lib/authz";
 import { listAllUsers } from "@/lib/user-admin";
 import { listAllTenants } from "@/lib/tenant-admin";
-import {
-  grantTenantRole,
-  revokeTenantRole,
-  setGlobalAdminFlag,
-} from "@/lib/user-admin-actions";
-import { ASSIGNABLE_ROLES, ROLE_LABEL } from "@/lib/roles";
-import { ActionForm } from "@/components/admin/ActionForm";
 import { AddPlatformUserForm } from "@/components/admin/AddPlatformUserForm";
-import { ResetPasswordButton } from "@/components/admin/ResetPasswordButton";
-import { SubmitButton } from "@/components/admin/SubmitButton";
-import { ui } from "@/components/admin/styles";
+import { PeopleList } from "@/components/admin/PeopleList";
 
 export const dynamic = "force-dynamic";
 
@@ -37,120 +28,21 @@ export default async function AdminAccessPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_20rem]">
-        <div className="space-y-3">
-          {usersList.map((u) => (
-            <div key={u.id} className={ui.card}>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate font-medium">{u.email}</span>
-                    {u.id === me.id && (
-                      <span className="text-xs text-score-dim">(you)</span>
-                    )}
-                    {u.isGlobalAdmin && (
-                      <span className="rounded-full border border-primary/50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-                        global admin
-                      </span>
-                    )}
-                  </div>
-                  {u.name && (
-                    <div className="truncate text-xs text-score-dim">{u.name}</div>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <ActionForm
-                    action={setGlobalAdminFlag}
-                    confirm={
-                      u.isGlobalAdmin
-                        ? `Revoke GLOBAL access for ${u.email}? They keep any per-tenant roles.`
-                        : `Grant ${u.email} GLOBAL admin access to every tenant and this console?`
-                    }
-                  >
-                    <input type="hidden" name="userId" value={u.id} />
-                    <input
-                      type="hidden"
-                      name="enable"
-                      value={u.isGlobalAdmin ? "false" : "true"}
-                    />
-                    <SubmitButton
-                      variant={u.isGlobalAdmin ? "danger" : "secondary"}
-                      pendingLabel="…"
-                    >
-                      {u.isGlobalAdmin ? "Revoke global" : "Make global admin"}
-                    </SubmitButton>
-                  </ActionForm>
-                  <ResetPasswordButton userId={u.id} email={u.email} />
-                </div>
-              </div>
-
-              {/* Tenant memberships */}
-              <div className="mt-3 space-y-2">
-                {u.memberships.map((m) => (
-                  <div
-                    key={m.tenantId}
-                    className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {m.tenantName}
-                      <span className="text-score-dim"> · {ROLE_LABEL[m.role]}</span>
-                    </span>
-                    <ActionForm
-                      action={revokeTenantRole}
-                      confirm={`Remove ${u.email} from ${m.tenantName}?`}
-                    >
-                      <input type="hidden" name="userId" value={u.id} />
-                      <input type="hidden" name="tenantId" value={m.tenantId} />
-                      <button
-                        type="submit"
-                        className="text-xs text-score-dim hover:text-red-400"
-                      >
-                        Remove
-                      </button>
-                    </ActionForm>
-                  </div>
-                ))}
-                {u.memberships.length === 0 && !u.isGlobalAdmin && (
-                  <p className="text-xs text-score-dim">No tenant access.</p>
-                )}
-
-                {/* Grant access to (another) tenant */}
-                <ActionForm
-                  action={grantTenantRole}
-                  className="flex flex-wrap items-center gap-2"
-                >
-                  <input type="hidden" name="userId" value={u.id} />
-                  <select
-                    name="tenantId"
-                    className="rounded-lg border border-border bg-surface px-2 py-1 text-sm"
-                    aria-label={`Tenant to grant ${u.email} access to`}
-                  >
-                    {liveTenants.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    name="role"
-                    defaultValue="VIEWER"
-                    className="rounded-lg border border-border bg-surface px-2 py-1 text-sm"
-                    aria-label="Role"
-                  >
-                    {ASSIGNABLE_ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABEL[r]}
-                      </option>
-                    ))}
-                  </select>
-                  <SubmitButton variant="secondary" pendingLabel="…">
-                    Grant
-                  </SubmitButton>
-                </ActionForm>
-              </div>
-            </div>
-          ))}
-        </div>
-
+        <PeopleList
+          people={usersList.map((u) => ({
+            id: u.id,
+            email: u.email,
+            name: u.name,
+            isGlobalAdmin: u.isGlobalAdmin,
+            memberships: u.memberships.map((m) => ({
+              tenantId: m.tenantId,
+              tenantName: m.tenantName,
+              role: m.role,
+            })),
+          }))}
+          tenants={liveTenants}
+          meId={me.id}
+        />
         <AddPlatformUserForm tenants={liveTenants} />
       </div>
     </main>
