@@ -1,10 +1,15 @@
 "use client";
 
-// Adopts the session tokens delivered by a Supabase email link (URL fragment
-// `#access_token=…&refresh_token=…`, or `?code=` for same-browser PKCE), then
-// lets the person set their password. Deterministic manual handling — no
-// reliance on detectSessionInUrl, which varies by flow type.
-import { useEffect, useState } from "react";
+// Lets an invited person choose their password. Three entry modes:
+//   1. ?token_hash=…&type=… — OUR email links (scanner-safe): the one-time
+//      token is verified ONLY when the person presses submit, so corporate
+//      mail scanners that pre-fetch (or render) the link can't consume it
+//      (Microsoft Safe Links burned a fresh invite on 2026-07-30).
+//   2. #access_token=…&refresh_token=… — links sent by Supabase's own mailer
+//      (the no-SMTP fallback), which verify at GoTrue before landing here.
+//   3. ?code=… — same-browser PKCE.
+// Deterministic manual handling — no reliance on detectSessionInUrl.
+import { useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { ui } from "@/components/admin/styles";
 
@@ -15,15 +20,25 @@ export function SetPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  // Set in mode 1 — consumed (verifyOtp) on submit, never on load.
+  const pendingToken = useRef<{ tokenHash: string; type: "recovery" | "invite" } | null>(null);
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
     const run = async () => {
+      const query = new URLSearchParams(window.location.search);
       const hash = new URLSearchParams(window.location.hash.slice(1));
+
+      const tokenHash = query.get("token_hash");
+      const type = query.get("type");
+      if (tokenHash && (type === "recovery" || type === "invite")) {
+        // Do NOT verify yet — that would make the link scanner-consumable.
+        pendingToken.current = { tokenHash, type };
+        return setPhase("ready");
+      }
+
       const accessToken = hash.get("access_token");
       const refreshToken = hash.get("refresh_token");
-      const code = new URLSearchParams(window.location.search).get("code");
-
       if (accessToken && refreshToken) {
         const { error: e } = await supabase.auth.setSession({
           access_token: accessToken,
@@ -34,6 +49,7 @@ export function SetPasswordForm() {
         window.history.replaceState(null, "", window.location.pathname);
         return setPhase("ready");
       }
+      const code = query.get("code");
       if (code) {
         const { error: e } = await supabase.auth.exchangeCodeForSession(code);
         if (e) return setPhase("invalid");
@@ -55,6 +71,21 @@ export function SetPasswordForm() {
     if (password !== confirm) return setError("Passwords don't match.");
     setPhase("saving");
     const supabase = createSupabaseBrowserClient();
+
+    // Mode 1: consume the one-time token now — a human pressed the button.
+    if (pendingToken.current) {
+      const { error: ve } = await supabase.auth.verifyOtp({
+        type: pendingToken.current.type,
+        token_hash: pendingToken.current.tokenHash,
+      });
+      if (ve) {
+        setPhase("invalid");
+        return;
+      }
+      pendingToken.current = null;
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+
     const { error: e2 } = await supabase.auth.updateUser({ password });
     if (e2) {
       setPhase("ready");

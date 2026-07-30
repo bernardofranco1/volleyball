@@ -34,6 +34,19 @@ export type ProvisionResult =
   | { userId: string; tempPassword: string | null; note: string }
   | { error: string };
 
+/**
+ * Email-safe set-password URL: our own page carrying the token_hash. The
+ * token is only consumed when the person presses the page's submit button —
+ * mail scanners that pre-fetch (or even render) the link can't burn it.
+ */
+function scannerSafeLink(
+  origin: string,
+  tokenHash: string,
+  type: "recovery" | "invite",
+): string {
+  return `${origin}/auth/set-password?token_hash=${encodeURIComponent(tokenHash)}&type=${type}`;
+}
+
 /** "bernardo.franco@x" → "Bernardo" — the welcome email's fallback greeting. */
 export function firstNameFrom(name: string | null, email: string): string {
   const source = name?.trim() || email.split("@")[0].split(/[._-]/)[0];
@@ -74,13 +87,20 @@ export async function sendPasswordSetupEmail(
     };
   }
 
-  // App-side send (configurable template) when SMTP is available — the link
-  // minted above is a real one-time recovery link.
+  // App-side send (configurable template) when SMTP is available. The email
+  // links to OUR set-password page with the token_hash — NOT the one-time
+  // GoTrue /verify URL: corporate mail scanners (Microsoft Safe Links etc.)
+  // pre-fetch links and would consume the token before the human clicks
+  // (2026-07-30 incident). Verification happens only on the page's submit.
   if (emailConfigured()) {
     return sendTemplatedEmail("recovery", email, {
       firstName: firstNameFrom(values?.name ?? null, email),
       accessDetails: values?.accessSummary ?? null,
-      setPasswordLink: actionLink,
+      setPasswordLink: scannerSafeLink(
+        origin,
+        probe.data.properties.hashed_token,
+        "recovery",
+      ),
       email,
     });
   }
@@ -165,7 +185,13 @@ export async function provisionUserByEmail(
           : await sendTemplatedEmail("invite", email, {
               firstName: meta.first_name,
               accessDetails: meta.access_details,
-              setPasswordLink: link.data.properties.action_link,
+              // Scanner-safe: our page + token_hash, verified on submit only
+              // (see sendPasswordSetupEmail for the incident note).
+              setPasswordLink: scannerSafeLink(
+                opts.origin,
+                link.data.properties.hashed_token,
+                "recovery",
+              ),
               email,
             });
         if (sent.sent) {
