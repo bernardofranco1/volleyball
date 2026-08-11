@@ -1,31 +1,13 @@
 # 24 — Reports tab, tenant configuration (reports & disciplines), and people management
 
-**Status: phases A + B + C + F IMPLEMENTED 2026-08-11. Phase D deliberately NOT
-run — see below. Phase E blocked on FIVB IT (§7.4).** Product-owner decisions
-confirmed 2026-08-11 (§1). VIS field verification done against the vis-connector
-repo 2026-08-11 (§7).
+**Status: phases A + B + C + D + F IMPLEMENTED 2026-08-11. Phase E blocked on
+FIVB IT (§7.4).** Product-owner decisions confirmed 2026-08-11 (§1). VIS field
+verification done against the vis-connector repo 2026-08-11 (§7).
 
 Migrations applied: `0009` (tenant_config), `0010` (people, person_roles,
-team_staff, nullable person links). Backfill run: 62 roster rows and 4 officials
-rows linked to 64 people, and `scripts/backfill-people.ts` is idempotent (a
-second run reports 0 to do). Test suite 361 → 418.
-
-**Phase D (dropping `players.first_name/last_name/full_name` and making the
-person links NOT NULL) has not been run, and must not be run casually.** It is
-irreversible on a live database, and the read paths currently
-`coalesce(people.…, players.…)` precisely so both linked and un-linked rows work
-— those COALESCEs reference the columns D drops, so D is not just a migration:
-
-1. Remove the COALESCE fallbacks in `listPlayersByTeam`, `loadMatchRosters`
-   (`src/lib/competitions.ts`) and `loadMatchReport` (`src/lib/match-report.ts`).
-2. Stop writing the name columns in `createPlayer` (`src/lib/team-actions.ts`)
-   and `importRoster` (`src/lib/csv-actions.ts`).
-3. Re-run the backfill, confirm `select count(*) from players where person_id is
-   null` is 0, then `SET NOT NULL` on `players.person_id` and
-   `match_officials.person_id`.
-4. Only then drop the three name columns, and bump `MIGRATION_JOURNAL_IDX`.
-
-Until then the expand phase is fully functional and strictly additive.
+team_staff, person links), `0012` (contract — see the Phase D section at the end),
+`0013`/`0014` (jersey name, spec/26). Identity keys are spec/25 (`0011`). Backfill
+linked 62 roster rows and 4 officials rows to 64 people. Test suite 361 → 434.
 
 Scope: four features, one spec —
 
