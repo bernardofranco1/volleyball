@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { matches, players } from "@/db/schema";
+import { matches, people, players } from "@/db/schema";
 import { getTenantBySlug } from "@/lib/tenant";
 import { validateTabletToken } from "@/lib/match-session";
 import {
@@ -83,11 +83,16 @@ export default async function TeamTabletPage({
         await db
           .select({
             id: players.id,
-            fullName: players.fullName,
+            // Through the linked person, like every other roster read (spec/24
+            // §6.2). Without the join this tablet kept showing the name captured
+            // on the roster row, so correcting someone in the registry left the
+            // bench looking at the old spelling.
+            fullName: sql<string>`coalesce(${people.displayName}, ${players.fullName})`,
             jerseyNumber: players.jerseyNumber,
             isLibero: players.isLibero,
           })
           .from(players)
+          .leftJoin(people, eq(people.id, players.personId))
           .where(eq(players.teamId, teamId))
       ).map((r) => ({
         id: r.id,
