@@ -49,6 +49,7 @@ import {
 } from "@/lib/match-signatures";
 import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
+import { resolvePickedPerson } from "@/lib/people-actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -285,6 +286,21 @@ export async function POST(
   const remaining = p.missing.filter((r) => r !== role);
   const completesResult = isConfirmationRole(role) && remaining.length === 0;
 
+  // Resolve the signer to a registry person BEFORE the transaction: the officials
+  // slot requires one (migration 0012), and resolvePickedPerson may insert, which
+  // must not be entangled with the signature write. Signing at the table is the
+  // one path where an official can appear without an admin entering them first,
+  // so a typed name becomes a person instead of failing the signature.
+  let signerPersonId: string | null = null;
+  if (role === "FIRST_REFEREE" || bench) {
+    const resolved = await resolvePickedPerson(
+      row.tenantId,
+      { personName: signerName },
+      bench ? "SCORER" : "REFEREE",
+    );
+    if (!("error" in resolved)) signerPersonId = resolved.id;
+  }
+
   try {
     await dbTx.transaction(async (tx) => {
     // Supersede any live signature for this role (kept for the record).
@@ -326,7 +342,12 @@ export async function POST(
     // officials row so the report prints it and the (later) match-data import
     // has the same place to write. Applies to the 1st referee and the scorer
     // bench (their signature-role names match the officials-role enum).
-    if (role === "FIRST_REFEREE" || bench) {
+    //
+    // The slot needs a registry person as of migration 0012, resolved above the
+    // transaction — signing at the table is the one place an official can appear
+    // without an admin having entered them first, so the typed name becomes a
+    // person rather than being refused mid-signature.
+    if ((role === "FIRST_REFEREE" || bench) && signerPersonId) {
       await tx
         .insert(matchOfficials)
         .values({
@@ -334,13 +355,14 @@ export async function POST(
           matchId: id,
           tenantId: row.tenantId,
           role: role as "FIRST_REFEREE" | "SCORER" | "ASSISTANT_SCORER",
+          personId: signerPersonId,
           name: signerName,
           source: "MANUAL",
           createdBy: capturedBy,
         })
         .onConflictDoUpdate({
           target: [matchOfficials.matchId, matchOfficials.role],
-          set: { name: signerName },
+          set: { personId: signerPersonId, name: signerName },
         });
     }
 

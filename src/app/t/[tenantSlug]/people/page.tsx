@@ -148,7 +148,7 @@ export default async function PeoplePage({
                         {p.roles.length > 0
                           ? p.roles.map((r) => ROLE_LABEL[r].replace(/s$/, "")).join(" · ")
                           : "No role"}
-                        {p.displayName !== personName(p) && ` · “${p.displayName}”`}
+                        {p.jerseyName !== personName(p) && ` · shirt “${p.jerseyName}”`}
                       </span>
                     </span>
                     <span className="flex flex-none items-center gap-2 text-xs text-score-dim">

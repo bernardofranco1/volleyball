@@ -210,7 +210,7 @@ export function ScoreboardDisplay({
       if (player)
         servingPlayer = pairDisplayName(
           team === "A" ? teamAName : teamBName,
-          player.fullName,
+          player.jerseyName,
         );
     }
   }
@@ -246,7 +246,7 @@ export function ScoreboardDisplay({
       return {
         pos: i + 1,
         jersey: p?.jerseyNumber ?? null,
-        name: p ? surname(p.fullName) : "—",
+        name: p?.jerseyName ?? "—",
         serving: iset?.currentServer === team && i === 0,
         libero: p?.isLibero ?? false,
         key: id,
@@ -257,7 +257,7 @@ export function ScoreboardDisplay({
   const rosterList = (players: PlayerLite[] | undefined): IndoorRosterEntry[] =>
     (players ?? []).map((p) => ({
       jersey: p.jerseyNumber,
-      name: surname(p.fullName),
+      name: p.jerseyName,
       libero: p.isLibero,
     }));
 

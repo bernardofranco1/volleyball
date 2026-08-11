@@ -27,7 +27,28 @@ import { DISCIPLINES, isCompetitionStatus, isDiscipline } from "@/lib/domain";
 export type Competition = typeof competitions.$inferSelect;
 export type TournamentConfigRow = typeof tournamentConfig.$inferSelect;
 export type Team = typeof teams.$inferSelect;
-export type Player = typeof players.$inferSelect;
+export type PlayerRowRaw = typeof players.$inferSelect;
+
+/**
+ * A roster row joined to its person (spec/24 §2.3, spec/26).
+ *
+ * `jerseyName` is the ONLY name that belongs on a match output — console,
+ * scoreboard, substitutions, e-scoresheets, exports. `firstName`/`lastName` are
+ * registration data, for admin surfaces only.
+ */
+export interface Player {
+  id: string;
+  teamId: string;
+  tenantId: string;
+  personId: string;
+  firstName: string | null;
+  lastName: string | null;
+  jerseyName: string;
+  jerseyNumber: number | null;
+  isCaptain: boolean;
+  isLibero: boolean;
+  role: "PLAYER" | "BENCH" | "STAFF";
+}
 export type Pool = typeof pools.$inferSelect;
 
 /**
@@ -126,31 +147,26 @@ export async function listPlayersByTeam(
 ): Promise<Map<string, Player[]>> {
   const byTeam = new Map<string, Player[]>();
   if (teamIds.length === 0) return byTeam;
-  // Names come from the linked person when there is one (spec/24 §6.2), falling
-  // back to the row's own columns for anything the backfill hasn't linked yet.
-  // COALESCE rather than two code paths, so the contract migration that drops
-  // players.full_name changes nothing here.
+  // A roster row IS a person now (spec/24 §2.3 contract migration): the name
+  // columns are gone from players, so this is an inner join, not a fallback.
   const rows = await db
     .select({
       id: players.id,
       teamId: players.teamId,
       tenantId: players.tenantId,
       personId: players.personId,
-      firstName: sql<string | null>`coalesce(${people.firstName}, ${players.firstName})`,
-      lastName: sql<string | null>`coalesce(${people.lastName}, ${players.lastName})`,
-      fullName: sql<string>`coalesce(${people.displayName}, ${players.fullName})`,
+      firstName: people.firstName,
+      lastName: people.lastName,
+      jerseyName: people.jerseyName,
       jerseyNumber: players.jerseyNumber,
       isCaptain: players.isCaptain,
       isLibero: players.isLibero,
       role: players.role,
     })
     .from(players)
-    .leftJoin(people, eq(people.id, players.personId))
+    .innerJoin(people, eq(people.id, players.personId))
     .where(inArray(players.teamId, teamIds))
-    .orderBy(
-      asc(players.jerseyNumber),
-      asc(sql`coalesce(${people.displayName}, ${players.fullName})`),
-    );
+    .orderBy(asc(players.jerseyNumber), asc(people.jerseyName));
   for (const p of rows) {
     const list = byTeam.get(p.teamId) ?? [];
     list.push(p);
@@ -342,7 +358,7 @@ export async function getMatch(
 
 interface PlayerLiteRow {
   id: string;
-  fullName: string;
+  jerseyName: string;
   jerseyNumber: number | null;
   isLibero: boolean;
   isCaptain: boolean;
@@ -368,21 +384,20 @@ export async function loadMatchRosters(matchId: string): Promise<{
     .select({
       id: players.id,
       teamId: players.teamId,
-      // Linked person wins; fall back to the row for un-backfilled data.
-      fullName: sql<string>`coalesce(${people.displayName}, ${players.fullName})`,
+      jerseyName: people.jerseyName,
       jerseyNumber: players.jerseyNumber,
       isLibero: players.isLibero,
       isCaptain: players.isCaptain,
     })
     .from(players)
-    .leftJoin(people, eq(people.id, players.personId))
+    .innerJoin(people, eq(people.id, players.personId))
     .where(inArray(players.teamId, [m.teamAId, m.teamBId]));
   const lite = (teamId: string) =>
     rows
       .filter((r) => r.teamId === teamId)
       .map((r) => ({
         id: r.id,
-        fullName: r.fullName,
+        jerseyName: r.jerseyName,
         jerseyNumber: r.jerseyNumber,
         isLibero: r.isLibero,
         isCaptain: r.isCaptain,

@@ -690,3 +690,36 @@ Commits reference this spec: `feat(reports): … (spec/24)`.
   roster-name snapshot at confirm time instead.
 - Whether `people.deleted_at` should cascade-hide from pickers only, or also from
   where-used panels.
+
+---
+
+## Phase D — IMPLEMENTED 2026-08-11 (migration 0012)
+
+`players.first_name`, `last_name` and `full_name` are gone; `players.person_id`
+and `match_officials.person_id` are NOT NULL. A roster row is now purely a
+membership: person + jersey + captain/libero.
+
+Prerequisites done in the same pass, because the drop breaks without them:
+
+- Read paths (`listPlayersByTeam`, `loadMatchRosters`, `loadMatchReport`, the team
+  tablet) went from `coalesce(person, row)` to an inner join.
+- `createPlayer`, `updatePlayer` and `importRoster` stopped writing names.
+  `updatePlayer` now owns only the jersey and the C/L flags; the roster row links
+  to the person editor for the name, because editing it on the roster would have
+  changed one competition's copy.
+- The roster page's inline first/last inputs were removed for the same reason.
+- `POST /signatures` resolves the signer to a person before its transaction —
+  signing at the table is the one path where an official can appear without an
+  admin entering them first, so a typed name becomes a person rather than
+  failing the signature.
+- `demo-seed` creates people (with placeholder emails) and links rosters to them.
+- `scripts/backfill-people.ts` lost the one-time backfill: with the columns gone
+  and the links NOT NULL an unlinked row is unrepresentable, so the code could
+  not run. It survives in git history for the pre-0012 restore case.
+
+A dump of the dropped columns was taken before applying (62 player rows, 4
+officials rows) — the drop is irreversible and the data is not in the backup
+retention window yet.
+
+Verified: 434 tests, clean build, and the roster/board/scoresheet paths exercised
+against the live database.

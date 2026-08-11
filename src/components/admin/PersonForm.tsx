@@ -274,16 +274,18 @@ function NameFields({ person }: { person?: PersonDetail }) {
         />
       </div>
       <div className="sm:col-span-2">
-        <label className={ui.label}>Shirt / display name</label>
+        <label className={ui.label}>Jersey name</label>
         <input
-          name="displayName"
-          defaultValue={person?.displayName ?? ""}
-          placeholder="Defaults to the first + last name"
+          name="jerseyName"
+          defaultValue={person?.jerseyName ?? ""}
+          placeholder="Defaults to the surname"
           className={ui.input}
         />
         <p className="mt-1 text-xs text-score-dim">
-          What appears on boards and scoresheets (e.g. “Sørum, C.”). Some people
-          have only this and no surname.
+          The only name that appears on the scoring console, scoreboard,
+          substitutions, e-scoresheets and every export. Defaults to the surname.
+          First and last name above are registration data and never printed on a
+          match output.
         </p>
       </div>
     </div>
@@ -372,7 +374,7 @@ export function MergePeopleForm({
   targetId: string;
   targetName: string;
   candidates: {
-    person: { id: string; firstName: string | null; lastName: string | null; displayName: string };
+    person: { id: string; firstName: string | null; lastName: string | null; jerseyName: string };
     reason: "EMAIL" | "VIS_NUMBER" | "NAME_AND_BIRTHDATE" | "NAME";
     usageCount: number;
   }[];
@@ -423,7 +425,7 @@ export function MergePeopleForm({
               <span className="font-medium">
                 {c.person.lastName && c.person.firstName
                   ? `${c.person.lastName}, ${c.person.firstName}`
-                  : (c.person.lastName ?? c.person.firstName ?? c.person.displayName)}
+                  : (c.person.lastName ?? c.person.firstName ?? c.person.jerseyName)}
               </span>
               <span className="mt-0.5 block text-xs text-score-dim">
                 {REASON[c.reason]} · {c.usageCount} reference(s)

@@ -30,7 +30,7 @@ function splitName(name: string): { firstName: string; lastName: string } {
 function playerName(p: ReportPlayer): { firstName: string; lastName: string } {
   if (p.firstName || p.lastName)
     return { firstName: p.firstName ?? "", lastName: p.lastName ?? "" };
-  return splitName(p.fullName);
+  return splitName(p.jerseyName);
 }
 
 /** Signature strokes → the SVG string format the reference approvals carry
@@ -157,7 +157,7 @@ function buildTeam(report: MatchReportData, side: "A" | "B"): Json {
   const toPlayer = (p: ReportPlayer, i: number): Json => ({
     ...playerName(p),
     shirtNumber: p.jerseyNumber,
-    shirtName: playerName(p).lastName || p.fullName,
+    shirtName: playerName(p).lastName || p.jerseyName,
     code: p.id,
     position: i,
   });

@@ -11,7 +11,10 @@
 // while presenting fresh, dated demo content.
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
+import { placeholderEmail } from "@/lib/people-domain";
 import {
+  people,
+  personRoles,
   competitionBranding,
   competitions,
   events,
@@ -137,13 +140,37 @@ async function createTeam(compId: string, spec: TeamSpec): Promise<CreatedTeam> 
     seed: spec.seed,
     clubName: spec.clubName ?? null,
   });
-  const rows = spec.players.map((p) => ({
+  // A roster row is a membership; the human lives in the people registry
+  // (spec/24 §6, spec/26). Seeded people get a placeholder email so the identity
+  // field is exercised — `.invalid` can never receive mail (spec/25 §2).
+  const personRows = spec.players.map((p) => {
+    const personId = newId("per");
+    return {
+      id: personId,
+      tenantId: TENANT.id,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      // Federations put the surname on the shirt; this is what every match
+      // output prints.
+      jerseyName: p.lastName,
+      email: placeholderEmail(personId),
+    };
+  });
+  await db.insert(people).values(personRows);
+  await db.insert(personRoles).values(
+    personRows.map((pr) => ({
+      id: newId("prole"),
+      personId: pr.id,
+      tenantId: TENANT.id,
+      role: "PLAYER" as const,
+    })),
+  );
+
+  const rows = spec.players.map((p, i) => ({
     id: newId("plyr"),
     teamId: id,
     tenantId: TENANT.id,
-    firstName: p.firstName,
-    lastName: p.lastName,
-    fullName: `${p.firstName} ${p.lastName}`,
+    personId: personRows[i].id,
     jerseyNumber: p.jerseyNumber,
     isCaptain: p.isCaptain ?? false,
     isLibero: p.isLibero ?? false,

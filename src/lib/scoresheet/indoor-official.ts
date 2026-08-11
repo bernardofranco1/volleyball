@@ -536,7 +536,7 @@ function teamsBlock(
         if (p.jerseyNumber != null)
           g.ctext(p.jerseyNumber, rx + 6.5, yy + rh / 2, { size: 5, bold: true, color: INK });
         if (p.isCaptain) g.ellipse(rx + 6.5, yy + rh / 2, 5, Math.min(3.6, rh * 0.44), { lw: 0.6 });
-        g.text(p.fullName.slice(0, 30), rx + 15, yy + rh / 2 - 2.2, { size: 4.4, color: INK });
+        g.text(p.jerseyName.slice(0, 30), rx + 15, yy + rh / 2 - 2.2, { size: 4.4, color: INK });
       }
     }
     yy += rh;
@@ -557,7 +557,7 @@ function teamsBlock(
       if (p) {
         if (p.jerseyNumber != null)
           g.ctext(p.jerseyNumber, rx + 6.5, yy + 4, { size: 5, bold: true, color: INK });
-        g.text(p.fullName.slice(0, 30), rx + 15, yy + 1.8, { size: 4.4, color: INK });
+        g.text(p.jerseyName.slice(0, 30), rx + 15, yy + 1.8, { size: 4.4, color: INK });
       }
     }
     yy += 8;

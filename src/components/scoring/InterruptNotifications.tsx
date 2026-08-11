@@ -14,7 +14,7 @@ interface Pending {
 
 export interface RosterEntry {
   jerseyNumber: number | null;
-  fullName: string;
+  jerseyName: string;
 }
 
 // Surfaces team-tablet interrupt requests to the scorer with approve/deny.
@@ -122,7 +122,7 @@ export function InterruptNotifications({
   const player = (id?: string) => {
     if (!id) return "?";
     const p = rosterById?.get(id);
-    return p ? `${p.jerseyNumber ?? "–"} ${p.fullName}` : id;
+    return p ? `${p.jerseyNumber ?? "–"} ${p.jerseyName}` : id;
   };
 
   return (

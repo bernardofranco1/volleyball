@@ -318,7 +318,7 @@ export async function saveMatchOfficials(
           matchId,
           tenantId: authed.auth.tenantId,
           role,
-          personId: personIds.get(role) ?? null,
+          personId: personIds.get(role)!,
           name,
           country: country || null,
           level: level || null,
@@ -328,7 +328,7 @@ export async function saveMatchOfficials(
         .onConflictDoUpdate({
           target: [matchOfficials.matchId, matchOfficials.role],
           set: {
-            personId: personIds.get(role) ?? null,
+            personId: personIds.get(role)!,
             name,
             country: country || null,
             level: level || null,

@@ -153,7 +153,7 @@ export function ResultSignOff({
   const signerName = (): string => {
     if (!openRole) return "";
     if (typesName(openRole)) return refName.trim();
-    return rosterFor(openRole).find((p) => p.id === signerId)?.fullName ?? "";
+    return rosterFor(openRole).find((p) => p.id === signerId)?.jerseyName ?? "";
   };
 
   const canSubmit = (): boolean => {
@@ -331,7 +331,7 @@ export function ResultSignOff({
                       }`}
                     >
                       {p.jerseyNumber != null ? `${p.jerseyNumber} ` : ""}
-                      {p.fullName}
+                      {p.jerseyName}
                       {p.isCaptain ? " (C)" : ""}
                     </button>
                   ))}

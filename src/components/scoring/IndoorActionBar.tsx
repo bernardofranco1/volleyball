@@ -254,7 +254,7 @@ function LiberoPanel({ team, onClose }: { team: TeamId; onClose: () => void }) {
   const [outId, setOutId] = useState(backRow[0] ?? "");
   const label = (id: string) => {
     const p = roster.find((r) => r.id === id);
-    return p ? `${p.jerseyNumber ?? "–"} ${p.fullName}` : id;
+    return p ? `${p.jerseyNumber ?? "–"} ${p.jerseyName}` : id;
   };
 
   if (!liberoId)

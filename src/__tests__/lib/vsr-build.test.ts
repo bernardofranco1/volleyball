@@ -91,13 +91,13 @@ function report(discipline: string, events: ReportEvent[]): MatchReportData {
     coachA: null,
     coachB: null,
     rosterA: [
-      { id: "a1", fullName: "Ada Alpha", firstName: "Ada", lastName: "Alpha", role: "PLAYER", jerseyNumber: 1, isCaptain: true, isLibero: false },
-      { id: "a2", fullName: "Amy Alpha", firstName: "Amy", lastName: "Alpha", role: "PLAYER", jerseyNumber: 2, isCaptain: false, isLibero: false },
-      { id: "a7", fullName: "Lia Libero", firstName: "Lia", lastName: "Libero", role: "PLAYER", jerseyNumber: 7, isCaptain: false, isLibero: true },
+      { id: "a1", jerseyName: "Ada Alpha", firstName: "Ada", lastName: "Alpha", role: "PLAYER", jerseyNumber: 1, isCaptain: true, isLibero: false },
+      { id: "a2", jerseyName: "Amy Alpha", firstName: "Amy", lastName: "Alpha", role: "PLAYER", jerseyNumber: 2, isCaptain: false, isLibero: false },
+      { id: "a7", jerseyName: "Lia Libero", firstName: "Lia", lastName: "Libero", role: "PLAYER", jerseyNumber: 7, isCaptain: false, isLibero: true },
     ],
     rosterB: [
-      { id: "b1", fullName: "Bea Beta", firstName: "Bea", lastName: "Beta", role: "PLAYER", jerseyNumber: 1, isCaptain: true, isLibero: false },
-      { id: "b2", fullName: "Bo Beta", firstName: "Bo", lastName: "Beta", role: "PLAYER", jerseyNumber: 2, isCaptain: false, isLibero: false },
+      { id: "b1", jerseyName: "Bea Beta", firstName: "Bea", lastName: "Beta", role: "PLAYER", jerseyNumber: 1, isCaptain: true, isLibero: false },
+      { id: "b2", jerseyName: "Bo Beta", firstName: "Bo", lastName: "Beta", role: "PLAYER", jerseyNumber: 2, isCaptain: false, isLibero: false },
     ],
   };
 }

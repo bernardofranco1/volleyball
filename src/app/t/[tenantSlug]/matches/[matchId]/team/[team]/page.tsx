@@ -84,19 +84,17 @@ export default async function TeamTabletPage({
           .select({
             id: players.id,
             // Through the linked person, like every other roster read (spec/24
-            // §6.2). Without the join this tablet kept showing the name captured
-            // on the roster row, so correcting someone in the registry left the
-            // bench looking at the old spelling.
-            fullName: sql<string>`coalesce(${people.displayName}, ${players.fullName})`,
+            // §6.2) — the roster row no longer carries a name of its own.
+            jerseyName: people.jerseyName,
             jerseyNumber: players.jerseyNumber,
             isLibero: players.isLibero,
           })
           .from(players)
-          .leftJoin(people, eq(people.id, players.personId))
+          .innerJoin(people, eq(people.id, players.personId))
           .where(eq(players.teamId, teamId))
       ).map((r) => ({
         id: r.id,
-        fullName: r.fullName,
+        jerseyName: r.jerseyName,
         jerseyNumber: r.jerseyNumber,
         isLibero: r.isLibero,
       }))

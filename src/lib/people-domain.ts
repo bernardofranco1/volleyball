@@ -59,7 +59,7 @@ export interface PersonRow {
   id: string;
   firstName: string | null;
   lastName: string | null;
-  displayName: string;
+  jerseyName: string;
   federationCode: string | null;
   visPersonNo: number | null;
   roles: PersonRole[];
@@ -116,16 +116,17 @@ export interface PersonDetail extends PersonRow {
 }
 
 /**
- * A readable name: "Last, First" when both are known, otherwise whatever exists.
- * The display/shirt label is a LAST resort and is never appended to a real name —
- * doing that is what produced names like "Thatdao N.Thatdao" in production
- * (spec/24 §7.5).
+ * A REGISTRATION name: "Last, First" when both are known, otherwise whatever
+ * exists. Used on admin/registration surfaces only — match outputs use the
+ * jersey name (spec/26). The jersey label is a LAST resort here and is never
+ * appended to a real name; doing that produced names like "Thatdao N.Thatdao"
+ * in production (spec/24 §7.5).
  */
 export function personName(p: {
   firstName: string | null;
   lastName: string | null;
-  displayName: string;
+  jerseyName: string;
 }): string {
   if (p.lastName && p.firstName) return `${p.lastName}, ${p.firstName}`;
-  return p.lastName ?? p.firstName ?? p.displayName;
+  return p.lastName ?? p.firstName ?? p.jerseyName;
 }

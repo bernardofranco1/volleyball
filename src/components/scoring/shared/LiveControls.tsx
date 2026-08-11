@@ -168,7 +168,7 @@ export function SubPanel({
   const [inId, setInId] = useState(bench[0]?.id ?? "");
   const label = (id: string) => {
     const p = roster.find((r) => r.id === id);
-    return p ? `${p.jerseyNumber ?? "–"} ${p.fullName}` : id;
+    return p ? `${p.jerseyNumber ?? "–"} ${p.jerseyName}` : id;
   };
 
   return (

@@ -3,7 +3,6 @@ import type { Side, TeamId } from "@/engine/light/types";
 import { resolveTeamColor } from "@/lib/colors";
 import {
   PositionalCourt,
-  surnameOf,
   type CourtSlot,
   type CourtTeam,
 } from "@/components/court/PositionalCourt";
@@ -72,7 +71,7 @@ export function LightCourt({
       const player = pid ? rosterById.get(pid) : undefined;
       return {
         jersey: player?.jerseyNumber ?? null,
-        name: player ? surnameOf(player.fullName) : "",
+        name: player?.jerseyName ?? "",
         posLabel: posNum,
         isServer: posNum === 1 && serving,
         isLibero: false,

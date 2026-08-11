@@ -18,26 +18,26 @@ import {
 describe("personName", () => {
   it('renders "Last, First" when both are known', () => {
     expect(
-      personName({ firstName: "Anders", lastName: "Mol", displayName: "Mol, A." }),
+      personName({ firstName: "Anders", lastName: "Mol", jerseyName: "Mol, A." }),
     ).toBe("Mol, Anders");
   });
 
   it("uses the surname alone when there is no first name", () => {
     expect(
-      personName({ firstName: null, lastName: "Egonu", displayName: "EGONU" }),
+      personName({ firstName: null, lastName: "Egonu", jerseyName: "EGONU" }),
     ).toBe("Egonu");
   });
 
   it("uses the first name alone when there is no surname", () => {
     expect(
-      personName({ firstName: "Thatdao", lastName: null, displayName: "N.THATDAO" }),
+      personName({ firstName: "Thatdao", lastName: null, jerseyName: "N.THATDAO" }),
     ).toBe("Thatdao");
   });
 
   it("falls back to the shirt label only when there is no name at all", () => {
     // Real VIS players exist with only this. It is a last resort, not a surname.
     expect(
-      personName({ firstName: null, lastName: null, displayName: "N.THATDAO" }),
+      personName({ firstName: null, lastName: null, jerseyName: "N.THATDAO" }),
     ).toBe("N.THATDAO");
   });
 
@@ -46,7 +46,7 @@ describe("personName", () => {
     const out = personName({
       firstName: "Thatdao",
       lastName: null,
-      displayName: "N.THATDAO",
+      jerseyName: "N.THATDAO",
     });
     expect(out).not.toContain("N.THATDAO");
   });
@@ -58,7 +58,7 @@ describe("personName", () => {
       personName({
         firstName: "Marketa",
         lastName: "Brancuska",
-        displayName: "BRANCUSKA",
+        jerseyName: "BRANCUSKA",
       }),
     ).toBe("Brancuska, Marketa");
   });

@@ -20,7 +20,7 @@ import { IndoorCourt } from "@/components/court/IndoorCourt";
 
 type Lite = {
   id: string;
-  fullName: string;
+  jerseyName: string;
   jerseyNumber: number | null;
   isLibero: boolean;
 };
@@ -31,7 +31,7 @@ const roster = (n: number): Map<string, Lite> =>
       `a${i + 1}`,
       {
         id: `a${i + 1}`,
-        fullName: `Player ${i + 1}`,
+        jerseyName: `Player ${i + 1}`,
         jerseyNumber: i + 1,
         isLibero: false,
       },

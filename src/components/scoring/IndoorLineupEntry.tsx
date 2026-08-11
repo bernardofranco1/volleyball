@@ -130,7 +130,7 @@ function TeamLineupForm({
 
   const label = (id: string) => {
     const p = roster.find((r) => r.id === id);
-    return p ? `${p.jerseyNumber ?? "–"} ${p.fullName}` : id;
+    return p ? `${p.jerseyNumber ?? "–"} ${p.jerseyName}` : id;
   };
   const distinct = new Set(lineup.filter(Boolean)).size === size;
   const liberoClash = liberoId !== "" && lineup.includes(liberoId);

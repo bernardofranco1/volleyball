@@ -88,7 +88,7 @@ export function PrematchSignOff({
 
   const submit = async () => {
     if (!openRole || !signerId || !strokes || busy) return;
-    const name = rosterFor(openRole).find((p) => p.id === signerId)?.fullName ?? "";
+    const name = rosterFor(openRole).find((p) => p.id === signerId)?.jerseyName ?? "";
     if (name.length < 2) return;
     setBusy(true);
     setError(null);
@@ -174,7 +174,7 @@ export function PrematchSignOff({
                           }`}
                         >
                           {p.jerseyNumber != null ? `${p.jerseyNumber} ` : ""}
-                          {p.fullName}
+                          {p.jerseyName}
                           {p.isCaptain ? " (C)" : ""}
                         </button>
                       ))}

@@ -191,7 +191,7 @@ export function SanctionsControl({
                       onClick={() => setPlayerId(p.id)}
                     >
                       {p.jerseyNumber != null ? `${p.jerseyNumber} ` : ""}
-                      {p.fullName}
+                      {p.jerseyName}
                     </button>
                   ))}
                   {team && roster.length === 0 ? (

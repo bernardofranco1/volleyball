@@ -14,7 +14,7 @@ export const BACKUP_FORMAT_VERSION = 1;
  * database. A unit test asserts this matches src/db/migrations/meta/_journal.json
  * so it can't silently drift.
  */
-export const MIGRATION_JOURNAL_IDX = 11;
+export const MIGRATION_JOURNAL_IDX = 14;
 
 /**
  * DB table names covered by a FULL export, in FK-safe restore order.

@@ -445,7 +445,7 @@ function teamsBlock(
         // The asterisk marks the set-1 first server (confirmed convention).
         if (p.jerseyNumber != null && p.jerseyNumber === firstServerJersey)
           g.text("*", tx + 11.4, yy + 2.4, { size: 6.5, bold: true, color: INK });
-        g.text(p.fullName.slice(0, 34), tx + 17, yy + 3, { size: 5, bold: true, color: INK });
+        g.text(p.jerseyName.slice(0, 34), tx + 17, yy + 3, { size: 5, bold: true, color: INK });
       }
       yy += 11;
     }

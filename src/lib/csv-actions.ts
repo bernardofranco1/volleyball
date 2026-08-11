@@ -255,7 +255,7 @@ export async function importRoster(
       id: people.id,
       firstName: people.firstName,
       lastName: people.lastName,
-      displayName: people.displayName,
+      jerseyName: people.jerseyName,
       email: people.email,
       birthdate: people.birthdate,
     })
@@ -271,7 +271,7 @@ export async function importRoster(
   const personIdByEmail = new Map<string, string>();
   const personIdByNameDob = new Map<string, string>();
   for (const p of existingPeople) {
-    personIdByKey.set(personKey(p.firstName, p.lastName, p.displayName), p.id);
+    personIdByKey.set(personKey(p.firstName, p.lastName, p.jerseyName), p.id);
     if (p.firstName || p.lastName)
       personIdByKey.set(personKey(p.firstName, p.lastName, ""), p.id);
     const em = normalizeEmail(p.email);
@@ -361,7 +361,9 @@ export async function importRoster(
         tenantId: g.tenantId,
         firstName: firstName || null,
         lastName: lastName || null,
-        displayName: fullName,
+        // Shirt label defaults to the surname (spec/26); the registration name
+        // is kept in first/last.
+        jerseyName: lastName || fullName,
         email: rowEmail,
         birthdate:
           rowDob && /^\d{4}-\d{2}-\d{2}$/.test(rowDob) ? rowDob : null,
@@ -391,9 +393,6 @@ export async function importRoster(
       teamId,
       tenantId: g.tenantId,
       personId,
-      firstName: firstName || null,
-      lastName: lastName || null,
-      fullName,
       jerseyNumber,
       isCaptain: csvBool(get("Captain", "isCaptain")),
       isLibero: csvBool(get("Libero", "isLibero")),

@@ -24,7 +24,12 @@ import type { TournamentConfig } from "@/engine/config";
 
 export interface PlayerLite {
   id: string;
-  fullName: string;
+  /**
+   * The jersey/shirt name — the ONLY name a match surface prints (spec/26).
+   * Registration names never reach here, which is why the field is not called
+   * `jerseyName` any more.
+   */
+  jerseyName: string;
   jerseyNumber: number | null;
   isLibero: boolean;
   /** Team captain per the roster — pre-selects the signer on the sign-off panel. */

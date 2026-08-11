@@ -264,7 +264,7 @@ function teamsBlock(ctx: Ctx, data: MatchReportData) {
       doc.text(p.jerseyNumber != null ? String(p.jerseyNumber) : "—", cx, ry, {
         width: 24,
       });
-      doc.text(p.fullName, cx + 28, ry, {
+      doc.text(p.jerseyName, cx + 28, ry, {
         width: nameW,
         ellipsis: true,
         lineBreak: false,
@@ -719,7 +719,7 @@ function approvalBlock(ctx: Ctx, data: MatchReportData) {
 }
 
 function captainOf(roster: ReportPlayer[]): string {
-  return roster.find((p) => p.isCaptain)?.fullName ?? "";
+  return roster.find((p) => p.isCaptain)?.jerseyName ?? "";
 }
 
 // ── footer ──────────────────────────────────────────────────────────────────

@@ -266,9 +266,6 @@ export async function createPlayer(
     teamId,
     tenantId: g.tenantId,
     personId: picked.id,
-    // fullName is still written for now; the contract migration drops it once
-    // every read path goes through the person join.
-    fullName,
     jerseyNumber,
     isCaptain: fd.get("isCaptain") != null,
     isLibero: fd.get("isLibero") != null,
@@ -297,11 +294,10 @@ export async function updatePlayer(
   )[0];
   if (!current) return fail("Player not found.");
 
-  const firstName = str(fd, "firstName");
-  const lastName = str(fd, "lastName");
-  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
-  if (!fullName) return fail("Player name is required.");
-
+  // A roster row owns the jersey number and the captain/libero flags. The NAME
+  // belongs to the person (spec/24 §2.3) — editing it here would have changed
+  // only this competition's copy, which is the duplication the registry removes.
+  // The roster row links to the person editor instead.
   const jerseyNumber = intOrNull(fd, "jerseyNumber");
   if (jerseyNumber != null) {
     const dup = await db
@@ -321,9 +317,6 @@ export async function updatePlayer(
   await db
     .update(players)
     .set({
-      firstName: firstName || null,
-      lastName: lastName || null,
-      fullName,
       jerseyNumber,
       isCaptain: fd.get("isCaptain") != null,
       isLibero: fd.get("isLibero") != null,

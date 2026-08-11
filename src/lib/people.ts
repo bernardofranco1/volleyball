@@ -47,7 +47,7 @@ export async function listPeople(
       or(
         ilike(people.firstName, like),
         ilike(people.lastName, like),
-        ilike(people.displayName, like),
+        ilike(people.jerseyName, like),
       )!,
     );
   }
@@ -64,13 +64,13 @@ export async function listPeople(
       id: people.id,
       firstName: people.firstName,
       lastName: people.lastName,
-      displayName: people.displayName,
+      jerseyName: people.jerseyName,
       federationCode: people.federationCode,
       visPersonNo: people.visPersonNo,
     })
     .from(people)
     .where(and(...conds))
-    .orderBy(asc(people.lastName), asc(people.firstName), asc(people.displayName))
+    .orderBy(asc(people.lastName), asc(people.firstName), asc(people.jerseyName))
     .limit(PEOPLE_PAGE_SIZE + 1)
     .offset(page * PEOPLE_PAGE_SIZE);
 
@@ -136,7 +136,7 @@ export async function getPerson(
     id: r.id,
     firstName: r.firstName,
     lastName: r.lastName,
-    displayName: r.displayName,
+    jerseyName: r.jerseyName,
     federationCode: r.federationCode,
     visPersonNo: r.visPersonNo,
     gender: r.gender as "M" | "W" | null,
@@ -172,7 +172,7 @@ export async function searchPeople(
       or(
         ilike(people.firstName, like),
         ilike(people.lastName, like),
-        ilike(people.displayName, like),
+        ilike(people.jerseyName, like),
       )!,
     );
   }
@@ -186,7 +186,7 @@ export async function searchPeople(
       id: people.id,
       firstName: people.firstName,
       lastName: people.lastName,
-      displayName: people.displayName,
+      jerseyName: people.jerseyName,
       federationCode: people.federationCode,
       visPersonNo: people.visPersonNo,
     })
@@ -293,7 +293,7 @@ export async function findDuplicateCandidates(
       .select({
         firstName: people.firstName,
         lastName: people.lastName,
-        displayName: people.displayName,
+        jerseyName: people.jerseyName,
         email: people.email,
         birthdate: people.birthdate,
         visPersonNo: people.visPersonNo,
@@ -309,7 +309,7 @@ export async function findDuplicateCandidates(
       id: people.id,
       firstName: people.firstName,
       lastName: people.lastName,
-      displayName: people.displayName,
+      jerseyName: people.jerseyName,
       federationCode: people.federationCode,
       visPersonNo: people.visPersonNo,
       email: people.email,
@@ -326,7 +326,7 @@ export async function findDuplicateCandidates(
 
   const norm = (v: string | null) => (v ?? "").trim().toLowerCase();
   const myName = norm(me.lastName) + "|" + norm(me.firstName);
-  const myLabel = norm(me.displayName);
+  const myLabel = norm(me.jerseyName);
 
   const scored: DuplicateCandidate[] = [];
   for (const o of others) {
@@ -341,7 +341,7 @@ export async function findDuplicateCandidates(
     else {
       const sameName =
         (myName !== "|" && myName === norm(o.lastName) + "|" + norm(o.firstName)) ||
-        (myLabel !== "" && myLabel === norm(o.displayName));
+        (myLabel !== "" && myLabel === norm(o.jerseyName));
       if (sameName)
         reason =
           me.birthdate && o.birthdate && me.birthdate === o.birthdate
@@ -355,7 +355,7 @@ export async function findDuplicateCandidates(
         id: o.id,
         firstName: o.firstName,
         lastName: o.lastName,
-        displayName: o.displayName,
+        jerseyName: o.jerseyName,
         federationCode: o.federationCode,
         visPersonNo: o.visPersonNo,
         roles: [],
@@ -389,7 +389,7 @@ export async function listTeamStaff(
       personId: teamStaff.personId,
       firstName: people.firstName,
       lastName: people.lastName,
-      displayName: people.displayName,
+      jerseyName: people.jerseyName,
     })
     .from(teamStaff)
     .innerJoin(people, eq(people.id, teamStaff.personId))
@@ -409,7 +409,7 @@ export async function headCoachName(teamId: string): Promise<string | null> {
       .select({
         firstName: people.firstName,
         lastName: people.lastName,
-        displayName: people.displayName,
+        jerseyName: people.jerseyName,
       })
       .from(teamStaff)
       .innerJoin(people, eq(people.id, teamStaff.personId))

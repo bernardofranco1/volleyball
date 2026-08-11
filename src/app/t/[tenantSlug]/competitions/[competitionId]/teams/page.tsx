@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import {
@@ -17,7 +18,7 @@ import { getT } from "@/lib/i18n/server";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { AddTeamForm } from "@/components/admin/AddTeamForm";
 import { AddPlayerForm } from "@/components/admin/AddPlayerForm";
-import { listTeamStaff, searchPeople } from "@/lib/people";
+import { listTeamStaff, personName, searchPeople } from "@/lib/people";
 import { TeamStaffPanel } from "@/components/admin/TeamStaffPanel";
 import { CompetitionHeader } from "@/components/admin/CompetitionHeader";
 import { CsvImport } from "@/components/admin/CsvImport";
@@ -178,26 +179,29 @@ export default async function TeamsPage({
                               placeholder="#"
                               className={`${ui.input} w-14 px-2 py-1 text-sm`}
                             />
-                            <input
-                              name="firstName"
-                              defaultValue={p.firstName ?? ""}
-                              aria-label={t("common.firstName")}
-                              placeholder={t("common.firstName")}
-                              className={`${ui.input} w-28 flex-1 px-2 py-1 text-sm sm:flex-none`}
-                            />
-                            <input
-                              name="lastName"
-                              defaultValue={p.lastName ?? ""}
-                              aria-label={t("common.lastName")}
-                              placeholder={t("common.lastName")}
-                              className={`${ui.input} w-28 flex-1 px-2 py-1 text-sm sm:flex-none`}
-                            />
+                            {/* The name belongs to the person, not to this
+                                roster spot (spec/24 §2.3) — editing it here
+                                would only change one competition's copy. This
+                                row owns the jersey and the C/L flags; the name
+                                is a link to the registry record. */}
+                            <Link
+                              href={`/t/${tenantSlug}/people/${p.personId}`}
+                              className="w-36 flex-1 truncate px-1 text-sm hover:text-primary hover:underline sm:flex-none"
+                              title={`Edit ${personName(p)} in People — shirt name “${p.jerseyName}”`}
+                            >
+                              {personName(p)}
+                              {p.jerseyName !== personName(p) && (
+                                <span className="ml-1 text-xs text-score-dim">
+                                  · {p.jerseyName}
+                                </span>
+                              )}
+                            </Link>
                             <label className="flex items-center gap-1 text-xs text-score-dim">
                               <input
                                 type="checkbox"
                                 name="isCaptain"
                                 defaultChecked={p.isCaptain}
-                                aria-label={t("teams.isCaptain", { name: p.fullName })}
+                                aria-label={t("teams.isCaptain", { name: p.jerseyName })}
                               />
                               C
                             </label>
@@ -206,21 +210,21 @@ export default async function TeamsPage({
                                 type="checkbox"
                                 name="isLibero"
                                 defaultChecked={p.isLibero}
-                                aria-label={t("teams.isLibero", { name: p.fullName })}
+                                aria-label={t("teams.isLibero", { name: p.jerseyName })}
                               />
                               L
                             </label>
                             <button
                               type="submit"
                               className="text-xs text-score-dim hover:text-foreground"
-                              aria-label={t("teams.savePlayer", { name: p.fullName })}
+                              aria-label={t("teams.savePlayer", { name: p.jerseyName })}
                             >
                               {t("common.save")}
                             </button>
                           </ActionForm>
                           <ActionForm
                             action={deletePlayer}
-                            confirm={t("teams.removeConfirm", { player: p.fullName, team: team.displayName })}
+                            confirm={t("teams.removeConfirm", { player: p.jerseyName, team: team.displayName })}
                             className="mt-0.5"
                           >
                             <input
@@ -237,7 +241,7 @@ export default async function TeamsPage({
                             <button
                               type="submit"
                               className="text-xs text-score-dim hover:text-red-400"
-                              aria-label={t("teams.removePlayer", { name: p.fullName })}
+                              aria-label={t("teams.removePlayer", { name: p.jerseyName })}
                             >
                               {t("common.remove")}
                             </button>

@@ -24,7 +24,7 @@ import {
 
 export interface ReportPlayer {
   id: string;
-  fullName: string;
+  jerseyName: string;
   jerseyNumber: number | null;
   isCaptain: boolean;
   isLibero: boolean;
@@ -187,19 +187,17 @@ export async function loadMatchReport(
     .select({
       id: players.id,
       teamId: players.teamId,
-      // Names resolve through the linked person when there is one (spec/24 §6.2).
-      // COALESCE so un-backfilled rows still print, and so the later contract
-      // migration that drops players.full_name needs no change here.
-      fullName: sql<string>`coalesce(${people.displayName}, ${players.fullName})`,
-      firstName: sql<string | null>`coalesce(${people.firstName}, ${players.firstName})`,
-      lastName: sql<string | null>`coalesce(${people.lastName}, ${players.lastName})`,
+      // Names live on the person only (spec/24 §2.3 contract migration).
+      jerseyName: people.jerseyName,
+      firstName: people.firstName,
+      lastName: people.lastName,
       role: players.role,
       jerseyNumber: players.jerseyNumber,
       isCaptain: players.isCaptain,
       isLibero: players.isLibero,
     })
     .from(players)
-    .leftJoin(people, eq(people.id, players.personId))
+    .innerJoin(people, eq(people.id, players.personId))
     .where(inArray(players.teamId, [m.teamAId, m.teamBId]))
     .orderBy(asc(players.jerseyNumber));
   const rosterOf = (teamId: string): ReportPlayer[] =>
@@ -207,7 +205,7 @@ export async function loadMatchReport(
       .filter((r) => r.teamId === teamId)
       .map((r) => ({
         id: r.id,
-        fullName: r.fullName,
+        jerseyName: r.jerseyName,
         firstName: r.firstName,
         lastName: r.lastName,
         role: r.role,

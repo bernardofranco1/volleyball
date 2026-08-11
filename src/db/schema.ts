@@ -287,8 +287,18 @@ export const people = pgTable(
       .references(() => tenants.id),
     firstName: text("first_name"),
     lastName: text("last_name"),
-    /** Shirt / scoreboard label. Never a surname fallback. */
-    displayName: text("display_name").notNull(),
+    /**
+     * The name that appears on the shirt and therefore on EVERY match-facing
+     * output: scoring console, scoreboard, substitution and lineup pickers,
+     * e-scoresheets, PDFs and the VSR feed (spec/26).
+     *
+     * First/last name are registration data and deliberately do NOT reach those
+     * surfaces. Before this field existed the boards derived a label by guessing
+     * a surname out of the full name, which mangles the conventions federations
+     * actually use ("Sørum, C.", "EGONU", "N.THATDAO"). VIS models it the same
+     * way — its `TeamName` is a shirt label, not a surname.
+     */
+    jerseyName: text("jersey_name").notNull(),
     gender: text("gender", { enum: ["M", "W"] }),
     // ── Identity (spec/25) ────────────────────────────────────────────────
     // The goal is one row per human per tenant. These are what make that
@@ -389,16 +399,15 @@ export const players = pgTable("players", {
   tenantId: text("tenant_id")
     .notNull()
     .references(() => tenants.id),
-  // Link to the tenant-level person (spec/24 §2.3). Nullable during the expand
-  // phase so existing rows stay valid; the backfill fills it and the contract
-  // migration makes it NOT NULL and drops the name columns below. Jersey,
-  // captain and libero stay here — they are facts about this roster spot, not
-  // about the person, which is also how VIS models it (shirt number lives on
-  // the tournament registration).
-  personId: text("person_id").references(() => people.id),
-  firstName: text("first_name"),
-  lastName: text("last_name"),
-  fullName: text("full_name").notNull(),
+  // A roster row is a MEMBERSHIP, not a person (spec/24 §2.3). The name columns
+  // that used to live here are gone as of migration 0012: they were a per-team,
+  // per-competition copy of a human, which is exactly the duplication the
+  // registry removes. Jersey number, captain and libero stay — they are facts
+  // about this roster spot, not about the person, which is how VIS models it too
+  // (shirt number lives on the tournament registration, not the player record).
+  personId: text("person_id")
+    .notNull()
+    .references(() => people.id),
   jerseyNumber: integer("jersey_number"),
   isCaptain: boolean("is_captain").default(false).notNull(),
   isLibero: boolean("is_libero").default(false).notNull(),
@@ -411,11 +420,9 @@ export const players = pgTable("players", {
   uniqueIndex("players_team_jersey_uq").on(t.teamId, t.jerseyNumber),
   // One roster spot per person per team (spec/25 §4). Without this, the same
   // person could be added to a team twice — trivially, by giving them a second
-  // jersey or no jersey at all — which is exactly the duplication the registry
-  // exists to remove. Partial so rows not yet linked to a person are unaffected.
-  uniqueIndex("players_team_person_uq")
-    .on(t.teamId, t.personId)
-    .where(sql`${t.personId} is not null`),
+  // jersey or no jersey at all — which is the duplication the registry exists to
+  // remove. No longer partial: person_id is NOT NULL as of migration 0012.
+  uniqueIndex("players_team_person_uq").on(t.teamId, t.personId),
 ]).enableRLS();
 
 // ── Matches ──────────────────────────────────────────────────────────────────
@@ -632,9 +639,11 @@ export const matchOfficials = pgTable(
         "LINE_JUDGE_4",
       ],
     }).notNull(),
-    // Link to the tenant-level person (spec/24 §2.4). Nullable in the expand
-    // phase; the backfill fills it from the existing names.
-    personId: text("person_id").references(() => people.id),
+    // The registry person this slot was filled by (spec/24 §2.4). Required as of
+    // migration 0012 — every officials slot resolves to a real person.
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
     // name/country/level are KEPT after the migration, as a snapshot of what was
     // printed on the sheet at match time. A scoresheet is a historical record:
     // correcting a person's spelling next season must not silently rewrite an

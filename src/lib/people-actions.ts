@@ -73,7 +73,7 @@ function dateOrNull(fd: FormData, field: string): string | null {
 interface PersonFields {
   firstName: string | null;
   lastName: string | null;
-  displayName: string;
+  jerseyName: string;
   gender: "M" | "W" | null;
   email: string | null;
   birthdate: string | null;
@@ -95,10 +95,15 @@ function readFields(fd: FormData): PersonFields | { error: string } {
   const lastName = str(fd, "lastName") || null;
   // The display/shirt label defaults to the spoken name, but is stored
   // separately — VIS's equivalent is a shirt label, not a surname (spec/24 §7.5).
-  const displayName =
-    str(fd, "displayName") ||
-    [firstName, lastName].filter(Boolean).join(" ").trim();
-  if (!displayName) return { error: "A name is required." };
+  // The jersey/shirt name is what every match output prints (spec/26). It
+  // defaults to the SURNAME, not "First Last": that is the federation
+  // convention, and it is what the boards were already displaying.
+  const jerseyName =
+    str(fd, "jerseyName") ||
+    lastName ||
+    firstName ||
+    "";
+  if (!jerseyName) return { error: "A name is required." };
 
   const federationCode = (str(fd, "federationCode") || "").toUpperCase() || null;
   if (federationCode && !/^[A-Z]{3}$/.test(federationCode))
@@ -115,7 +120,7 @@ function readFields(fd: FormData): PersonFields | { error: string } {
   return {
     firstName,
     lastName,
-    displayName,
+    jerseyName,
     gender: enumOrNull(fd, "gender", ["M", "W"] as const),
     email,
     birthdate: dateOrNull(fd, "birthdate"),
@@ -172,7 +177,7 @@ export async function resolvePickedPerson(
   if (picked.personId) {
     const row = (
       await db
-        .select({ id: people.id, name: people.displayName })
+        .select({ id: people.id, name: people.jerseyName })
         .from(people)
         .where(and(eq(people.id, picked.personId), eq(people.tenantId, tenantId)))
         .limit(1)
@@ -196,7 +201,9 @@ export async function resolvePickedPerson(
     tenantId,
     firstName: parts.length > 1 ? parts.slice(0, -1).join(" ") : parts[0],
     lastName: parts.length > 1 ? parts[parts.length - 1] : null,
-    displayName: raw,
+    // Quick-add from a picker: the surname is the jersey label, matching the
+    // default the person form uses (spec/26).
+    jerseyName: parts.length > 1 ? parts[parts.length - 1] : raw,
   });
   await db
     .insert(personRoles)
@@ -233,11 +240,11 @@ export async function createPerson(
     action: "person.create",
     entityType: "person",
     entityId: id,
-    summary: `Created ${parsed.displayName}`,
+    summary: `Created ${parsed.jerseyName}`,
     metadata: { roles },
   });
   revalidatePath(`/t/${tenantSlug}/people`);
-  return ok(`${parsed.displayName} added.`);
+  return ok(`${parsed.jerseyName} added.`);
 }
 
 /** Update a person. ADMIN_ROLES. */
@@ -275,7 +282,7 @@ export async function updatePerson(
     action: "person.update",
     entityType: "person",
     entityId: personId,
-    summary: `Updated ${parsed.displayName}`,
+    summary: `Updated ${parsed.jerseyName}`,
     metadata: { roles },
   });
   revalidatePath(`/t/${tenantSlug}/people`);
@@ -313,7 +320,7 @@ export async function deletePerson(
     .update(people)
     .set({ deletedAt: new Date() })
     .where(and(eq(people.id, personId), eq(people.tenantId, ctx.tenant.id)))
-    .returning({ name: people.displayName });
+    .returning({ name: people.jerseyName });
   if (deleted.length === 0) return fail("Unknown person.");
 
   await recordAudit({
@@ -366,7 +373,7 @@ export async function mergePeople(
 
   // Both must belong to the acting tenant — never trust posted ids.
   const rows = await db
-    .select({ id: people.id, name: people.displayName })
+    .select({ id: people.id, name: people.jerseyName })
     .from(people)
     .where(
       and(
@@ -512,7 +519,7 @@ export async function setTeamStaff(
   // The person must belong to this tenant — never trust the posted id.
   const person = (
     await db
-      .select({ name: people.displayName })
+      .select({ name: people.jerseyName })
       .from(people)
       .where(and(eq(people.id, personId), eq(people.tenantId, ctx.tenant.id)))
       .limit(1)

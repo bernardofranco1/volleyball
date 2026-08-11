@@ -108,7 +108,7 @@ export function LiveScoreboard({
   // Players are labelled by the name they're known by — the segment of the
   // pair team name ("Duda / Ana Patrícia" → "Duda", not the surname Lisboa).
   const nameOf = (team: TeamId, p: PlayerLite) =>
-    pairDisplayName(team === "A" ? teamAName : teamBName, p.fullName);
+    pairDisplayName(team === "A" ? teamAName : teamBName, p.jerseyName);
 
   // Court markers: jersey number + known name per player, ring/dot on the one
   // whose turn it is to serve.

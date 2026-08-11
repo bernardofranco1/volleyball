@@ -18,7 +18,7 @@ export interface PickerPerson {
   id: string;
   firstName: string | null;
   lastName: string | null;
-  displayName: string;
+  jerseyName: string;
   federationCode: string | null;
 }
 
@@ -27,7 +27,7 @@ function labelFor(p: PickerPerson): string {
   const spoken =
     p.lastName && p.firstName
       ? `${p.lastName}, ${p.firstName}`
-      : (p.lastName ?? p.firstName ?? p.displayName);
+      : (p.lastName ?? p.firstName ?? p.jerseyName);
   return p.federationCode ? `${spoken} (${p.federationCode})` : spoken;
 }
 
@@ -64,7 +64,7 @@ export function PersonPicker({
     for (const p of people) {
       let label = labelFor(p);
       // Two people can share a label; disambiguate so a pick is never ambiguous.
-      if (m.has(label)) label = `${label} · ${p.displayName}`;
+      if (m.has(label)) label = `${label} · ${p.jerseyName}`;
       let n = 2;
       while (m.has(label)) label = `${labelFor(p)} · ${n++}`;
       m.set(label, p);

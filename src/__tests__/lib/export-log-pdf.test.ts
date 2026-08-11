@@ -62,12 +62,12 @@ const DATA: MatchReportData = {
   coachA: null,
   coachB: null,
   rosterA: [
-    { id: "p1", fullName: "Marco Rossi", jerseyNumber: 1, isCaptain: true, isLibero: false },
-    { id: "p2", fullName: "Luca Bianchi", jerseyNumber: 2, isCaptain: false, isLibero: false },
+    { id: "p1", jerseyName: "Marco Rossi", jerseyNumber: 1, isCaptain: true, isLibero: false },
+    { id: "p2", jerseyName: "Luca Bianchi", jerseyNumber: 2, isCaptain: false, isLibero: false },
   ],
   rosterB: [
-    { id: "p3", fullName: "João Silva", jerseyNumber: 1, isCaptain: true, isLibero: false },
-    { id: "p4", fullName: "Pedro Costa", jerseyNumber: 2, isCaptain: false, isLibero: false },
+    { id: "p3", jerseyName: "João Silva", jerseyNumber: 1, isCaptain: true, isLibero: false },
+    { id: "p4", jerseyName: "Pedro Costa", jerseyNumber: 2, isCaptain: false, isLibero: false },
   ],
   events: [
     ev(1, "MATCH_CREATED", { matchId: "m1" }, null, null),

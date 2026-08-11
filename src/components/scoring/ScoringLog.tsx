@@ -51,7 +51,7 @@ export function ScoringLog({
   matchId: string;
   teamAName: string;
   teamBName: string;
-  rosterById?: Map<string, { jerseyNumber: number | null; fullName: string }>;
+  rosterById?: Map<string, { jerseyNumber: number | null; jerseyName: string }>;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -90,7 +90,7 @@ export function ScoringLog({
   const playerName = (id: unknown) => {
     if (typeof id !== "string") return "—";
     const p = rosterById?.get(id);
-    return p ? `${p.jerseyNumber ?? "–"} ${p.fullName}` : id;
+    return p ? `${p.jerseyNumber ?? "–"} ${p.jerseyName}` : id;
   };
   const tn = (t: unknown) =>
     t === "A" ? teamAName : t === "B" ? teamBName : "";
