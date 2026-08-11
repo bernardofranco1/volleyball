@@ -234,10 +234,13 @@ export interface SignatureRecord {
 
 export interface OfficialRecord {
   role: string;
+  /** Snapshot of what is printed on the sheet, kept even after the person link. */
   name: string;
   country: string | null;
   level: string | null;
   source: string;
+  /** Registry person, when this slot has been linked (spec/24 §2.4). */
+  personId: string | null;
 }
 
 /** Live (non-invalidated) signatures for a match, in signing order. */
@@ -276,6 +279,7 @@ export async function loadOfficials(matchId: string): Promise<OfficialRecord[]> 
       country: matchOfficials.country,
       level: matchOfficials.level,
       source: matchOfficials.source,
+      personId: matchOfficials.personId,
     })
     .from(matchOfficials)
     .where(eq(matchOfficials.matchId, matchId))) as OfficialRecord[];

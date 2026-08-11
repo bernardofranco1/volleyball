@@ -14,7 +14,7 @@ export const BACKUP_FORMAT_VERSION = 1;
  * database. A unit test asserts this matches src/db/migrations/meta/_journal.json
  * so it can't silently drift.
  */
-export const MIGRATION_JOURNAL_IDX = 8;
+export const MIGRATION_JOURNAL_IDX = 11;
 
 /**
  * DB table names covered by a FULL export, in FK-safe restore order.
@@ -26,13 +26,19 @@ export const EXPORTED_TABLES = [
   "tenants",
   "tenant_branding",
   "tenant_billing",
+  "tenant_config",
   "users",
   "user_tenant_roles",
+  // people precede everything that references them (players, match_officials,
+  // team_staff); person_roles follows people.
+  "people",
+  "person_roles",
   "competitions",
   "tournament_config",
   "competition_branding",
   "pools",
   "teams", // teams.pool_id → pools, pools precede teams
+  "team_staff", // → teams + people, both above
   "pool_teams",
   "players",
   "matches",

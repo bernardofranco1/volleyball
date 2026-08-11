@@ -10,6 +10,7 @@ import { useT } from "@/lib/i18n/client";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { ui } from "@/components/admin/styles";
+import { PersonPicker, type PickerPerson } from "@/components/admin/PersonPicker";
 
 export const OFFICIAL_ROLE_LABELS: Record<string, string> = {
   FIRST_REFEREE: "First referee",
@@ -60,11 +61,16 @@ export function MatchVisIdForm({
   );
 }
 
+/** Which registry role each officials slot should suggest from (spec/24 A3). */
+const SCORER_SLOTS = new Set(["SCORER", "ASSISTANT_SCORER"]);
+
 export function MatchOfficialsForm({
   tenantSlug,
   competitionId,
   matchId,
   officials,
+  referees,
+  scorers,
 }: {
   tenantSlug: string;
   competitionId: string;
@@ -74,7 +80,11 @@ export function MatchOfficialsForm({
     name: string;
     country: string | null;
     level: string | null;
+    personId?: string | null;
   }[];
+  /** Registry referees and scorers to autocomplete against (spec/24 §6.3). */
+  referees: PickerPerson[];
+  scorers: PickerPerson[];
 }) {
   const t = useT();
   const byRole = new Map(officials.map((o) => [o.role, o]));
@@ -102,11 +112,14 @@ export function MatchOfficialsForm({
               className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[10rem_1fr_6rem_6rem]"
             >
               <span className="text-sm text-score-dim">{label}</span>
-              <input
-                name={`name_${role}`}
-                defaultValue={o?.name ?? ""}
+              <PersonPicker
+                people={SCORER_SLOTS.has(role) ? scorers : referees}
+                idField={`personId_${role}`}
+                nameField={`name_${role}`}
+                listId={`officials-${role}`}
+                defaultPersonId={o?.personId ?? null}
+                defaultText={o?.name ?? null}
                 placeholder={t("common.name")}
-                className={ui.input}
               />
               <input
                 name={`country_${role}`}

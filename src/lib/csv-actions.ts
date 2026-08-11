@@ -2,14 +2,22 @@
 
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { eq, inArray } from "drizzle-orm";
-import { db } from "@/db";
-import { csvImports, matches, players, teams } from "@/db/schema";
+import { and, eq, inArray, isNull } from "drizzle-orm";
+import { db, dbTx } from "@/db";
+import {
+  csvImports,
+  matches,
+  people,
+  personRoles,
+  players,
+  teams,
+} from "@/db/schema";
 import { gateCompetition } from "@/lib/action-gate";
 import { csvBool, parseCsvRecords, recordGetter } from "@/lib/csv";
 import { recordAudit } from "@/lib/audit";
 import { scheduleIncrementalBackup } from "@/lib/backup";
 import { newId } from "@/lib/id";
+import { normalizeEmail } from "@/lib/people-domain";
 import type { ImportState } from "@/lib/action-state";
 
 function intFrom(v: string): number | null {
@@ -219,10 +227,68 @@ export async function importRoster(
       : [],
   );
   const seenJerseys = new Set<string>();
+  // A person may not appear twice in one competition — not on the same team
+  // (the DB now refuses that) and not on two teams either, which is a real
+  // eligibility rule rather than untidiness (spec/25 §4).
+  const existingCompPeople = new Set(
+    existingTeams.length
+      ? (
+          await db
+            .select({ personId: players.personId })
+            .from(players)
+            .where(inArray(players.teamId, [...teamIdByName.values()]))
+        )
+          .filter((r) => r.personId != null)
+          .map((r) => r.personId as string)
+      : [],
+  );
+  const seenCompPeople = new Set<string>();
+
+  // Every imported roster row must resolve to a person in the tenant registry
+  // (spec/24 §6.2), otherwise an import would quietly create roster rows with no
+  // person and the contract migration could never make the link required.
+  // Matching is exact on (first, last), case-insensitive — the same rule the
+  // backfill used. Nothing fuzzy: silently merging two different humans is worse
+  // than creating a duplicate an admin can merge deliberately.
+  const existingPeople = await db
+    .select({
+      id: people.id,
+      firstName: people.firstName,
+      lastName: people.lastName,
+      displayName: people.displayName,
+      email: people.email,
+      birthdate: people.birthdate,
+    })
+    .from(people)
+    .where(and(eq(people.tenantId, g.tenantId), isNull(people.deletedAt)));
+
+  const personKey = (first: string | null, last: string | null, display: string) =>
+    `${(first ?? "").trim().toLowerCase()}|${(last ?? "").trim().toLowerCase()}|${display.trim().toLowerCase()}`;
+  const personIdByKey = new Map<string, string>();
+  // Identity keys are checked BEFORE names (spec/25 §2): an email or a
+  // name+birthdate match is evidence, a bare name match is a coincidence waiting
+  // to happen. Keyed maps rather than per-row queries — an import is one pass.
+  const personIdByEmail = new Map<string, string>();
+  const personIdByNameDob = new Map<string, string>();
+  for (const p of existingPeople) {
+    personIdByKey.set(personKey(p.firstName, p.lastName, p.displayName), p.id);
+    if (p.firstName || p.lastName)
+      personIdByKey.set(personKey(p.firstName, p.lastName, ""), p.id);
+    const em = normalizeEmail(p.email);
+    if (em) personIdByEmail.set(em, p.id);
+    if (p.birthdate && (p.firstName || p.lastName))
+      personIdByNameDob.set(
+        `${personKey(p.firstName, p.lastName, "")}|${p.birthdate}`,
+        p.id,
+      );
+  }
 
   const newTeams: (typeof teams.$inferInsert)[] = [];
+  const newPeople: (typeof people.$inferInsert)[] = [];
+  const newRoles: (typeof personRoles.$inferInsert)[] = [];
   const newPlayers: (typeof players.$inferInsert)[] = [];
   const errs: string[] = [];
+  let matchedPeople = 0;
   let exampleRows = 0;
 
   for (let i = 0; i < records.length; i++) {
@@ -272,10 +338,59 @@ export async function importRoster(
       }
       seenJerseys.add(key);
     }
+    // Resolve to a person, strongest identity signal first (spec/25 §2):
+    // email → name+date of birth → name. Anything weaker creates a new record
+    // that an admin can merge, rather than guessing at a human.
+    const rowEmail = normalizeEmail(get("Email", "email", "E-mail"));
+    const rowDob = (get("Birthdate", "Date of birth", "birthdate", "dob") || "").trim();
+    const key = personKey(firstName || null, lastName || null, fullName);
+    const nameOnlyKey = personKey(firstName || null, lastName || null, "");
+    let personId =
+      (rowEmail ? personIdByEmail.get(rowEmail) : undefined) ??
+      (rowDob && /^\d{4}-\d{2}-\d{2}$/.test(rowDob)
+        ? personIdByNameDob.get(`${nameOnlyKey}|${rowDob}`)
+        : undefined) ??
+      personIdByKey.get(key) ??
+      (firstName || lastName ? personIdByKey.get(nameOnlyKey) : undefined);
+    if (personId) {
+      matchedPeople++;
+    } else {
+      personId = newId("per");
+      newPeople.push({
+        id: personId,
+        tenantId: g.tenantId,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        displayName: fullName,
+        email: rowEmail,
+        birthdate:
+          rowDob && /^\d{4}-\d{2}-\d{2}$/.test(rowDob) ? rowDob : null,
+        federationCode: (get("Country", "countryCode") || "").toUpperCase() || null,
+      });
+      if (rowEmail) personIdByEmail.set(rowEmail, personId);
+      newRoles.push({
+        id: newId("prole"),
+        personId,
+        tenantId: g.tenantId,
+        role: "PLAYER",
+      });
+      personIdByKey.set(key, personId);
+      if (firstName || lastName) personIdByKey.set(nameOnlyKey, personId);
+    }
+
+    if (existingCompPeople.has(personId) || seenCompPeople.has(personId)) {
+      errs.push(
+        `Row ${rowNo}: ${fullName} is already on a roster in this competition — one person can only play for one team`,
+      );
+      continue;
+    }
+    seenCompPeople.add(personId);
+
     newPlayers.push({
       id: newId("plyr"),
       teamId,
       tenantId: g.tenantId,
+      personId,
       firstName: firstName || null,
       lastName: lastName || null,
       fullName,
@@ -290,8 +405,11 @@ export async function importRoster(
   let ok = 0;
   if (newTeams.length || newPlayers.length) {
     try {
-      await db.transaction(async (tx) => {
+      await dbTx.transaction(async (tx) => {
         if (newTeams.length) await tx.insert(teams).values(newTeams);
+        // People before players — players.person_id references them.
+        if (newPeople.length) await tx.insert(people).values(newPeople);
+        if (newRoles.length) await tx.insert(personRoles).values(newRoles);
         if (newPlayers.length) await tx.insert(players).values(newPlayers);
       });
       ok = newPlayers.length;
@@ -310,6 +428,11 @@ export async function importRoster(
       messages: [
         ...(ok > 0 && newTeams.length
           ? [`${newTeams.length} new team(s) created`]
+          : []),
+        ...(ok > 0
+          ? [
+              `${matchedPeople} matched to existing people, ${newPeople.length} new person record(s) created`,
+            ]
           : []),
         ...(exampleRows > 0 ? [`${exampleRows} example row(s) ignored`] : []),
         ...errs,

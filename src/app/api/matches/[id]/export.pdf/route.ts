@@ -3,7 +3,8 @@
 // serverExternalPackage (see next.config.ts). Authorized to the match's tenant.
 
 import type { NextRequest } from "next/server";
-import { authorizeMatch, SCORING_ROLES } from "@/lib/authz";
+import { authorizeReport } from "@/lib/report-access";
+import { reportTypeForPdf } from "@/lib/reports";
 import {
   type MatchReportData,
   MatchReportNotFound,
@@ -26,10 +27,17 @@ export async function GET(
   const { id } = await ctx.params;
 
   // The report exposes rosters/results — restrict to the match's tenant members
-  // (spec/14 §A1), not any authenticated user.
-  const authed = await authorizeMatch(id, SCORING_ROLES);
+  // (spec/14 §A1), not any authenticated user. Which roles suffice now depends on
+  // the document: match documents are open to any tenant role, the event log
+  // stays with managers/scorers, and a report type the tenant disabled is 404
+  // regardless of role (spec/24 §3.3).
+  const requested = reportTypeForPdf(req.nextUrl.searchParams.get("type"));
+  const authed = await authorizeReport(id, requested);
   if (!authed.ok)
-    return Response.json({ error: "Forbidden" }, { status: authed.status });
+    return Response.json(
+      { error: authed.status === 404 ? "Not found" : "Forbidden" },
+      { status: authed.status },
+    );
 
   let data: MatchReportData;
   try {
@@ -44,13 +52,12 @@ export async function GET(
   // indoor + beach; other disciplines fall back to the block-structure sheet);
   // ?type=sheet → the block-structure scoresheet (spec/20); ?type=log → the
   // chronological event-log record (for protests); default → internal report.
-  const typeParam = req.nextUrl.searchParams.get("type");
   const variant =
-    typeParam === "log"
+    requested === "EVENT_LOG"
       ? "log"
-      : typeParam === "official"
+      : requested === "OFFICIAL_SCORESHEET"
         ? "official"
-        : typeParam === "sheet"
+        : requested === "SCORESHEET"
           ? "sheet"
           : "report";
   let pdf: Buffer;

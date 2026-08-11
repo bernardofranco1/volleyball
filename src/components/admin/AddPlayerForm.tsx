@@ -5,16 +5,20 @@ import { createPlayer } from "@/lib/team-actions";
 import { OK } from "@/lib/action-state";
 import { useT } from "@/lib/i18n/client";
 import { SubmitButton } from "@/components/admin/SubmitButton";
+import { PersonPicker, type PickerPerson } from "@/components/admin/PersonPicker";
 import { ui } from "@/components/admin/styles";
 
 export function AddPlayerForm({
   tenantSlug,
   competitionId,
   teamId,
+  people,
 }: {
   tenantSlug: string;
   competitionId: string;
   teamId: string;
+  /** Registry players to autocomplete against (spec/24 §6.2). */
+  people: PickerPerson[];
 }) {
   const t = useT();
   const [state, action] = useActionState(createPlayer, OK);
@@ -31,17 +35,12 @@ export function AddPlayerForm({
       <input type="hidden" name="competitionId" value={competitionId} />
       <input type="hidden" name="teamId" value={teamId} />
 
-      <input
-        name="firstName"
-        placeholder={t("teams.firstShort")}
-        className={`${ui.input} w-28`}
-        aria-label={t("common.firstName")}
-      />
-      <input
-        name="lastName"
-        placeholder={t("teams.lastShort")}
-        className={`${ui.input} w-28`}
-        aria-label={t("common.lastName")}
+      <PersonPicker
+        people={people}
+        listId={`people-${teamId}`}
+        placeholder={t("teams.addPlayer")}
+        className={`${ui.input} w-60`}
+        required
       />
       <input
         name="jerseyNumber"

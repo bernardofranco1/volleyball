@@ -95,36 +95,53 @@ export function ScoreboardDisplay({
 
   // Authoritative state from /state (the realtime channel only signals changes —
   // spec/14 §B1 — so a forged broadcast can't push fake state to a TV).
-  const fetchState = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/matches/${matchId}/state`, {
-        cache: "no-store",
-      });
-      if (!res.ok) return;
-      const data = (await res.json()) as {
-        state: BeachMatchState;
-        config?: TournamentConfig;
-        serverNow?: number;
-      };
-      if (typeof data.serverNow === "number") {
-        const off = data.serverNow - Date.now();
-        setClockOffset((prev) => (Math.abs(off - prev) > 1000 ? off : prev));
+  //
+  // `since` turns the "has anything changed?" probe into one indexed MAX() and a
+  // 204 instead of a snapshot load + tail replay + full-state serialization
+  // (spec/24 §9.5 F1). Pass it from the polling backstop only: the mount fetch
+  // needs the full payload (it carries `config`), and a broadcast-triggered
+  // refetch must never be answered from the CDN micro-cache, so it goes without
+  // `since` and stays uncached (spec/24 §9.5 F2).
+  const fetchState = useCallback(
+    async (since?: number) => {
+      try {
+        const url =
+          since != null
+            ? `/api/matches/${matchId}/state?since=${since}`
+            : `/api/matches/${matchId}/state`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (res.status === 204) return; // already current
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          state: BeachMatchState;
+          config?: TournamentConfig;
+          serverNow?: number;
+        };
+        if (typeof data.serverNow === "number") {
+          const off = data.serverNow - Date.now();
+          setClockOffset((prev) => (Math.abs(off - prev) > 1000 ? off : prev));
+        }
+        if (data.config) setConfig(data.config);
+        if (data.state.lastSequence >= stateRef.current.lastSequence)
+          setState(data.state);
+      } catch {
+        /* keep last good state */
       }
-      if (data.config) setConfig(data.config);
-      if (data.state.lastSequence >= stateRef.current.lastSequence)
-        setState(data.state);
-    } catch {
-      /* keep last good state */
-    }
-  }, [matchId]);
+    },
+    [matchId],
+  );
 
   // Live updates: HTTP polling fallback for unreliable WebSocket environments
   // (TVs/projectors), otherwise the public Supabase Realtime signal channel.
   useEffect(() => {
     if (poll) {
       // Defer the first poll (not a synchronous setState in the effect body).
-      const first = setTimeout(fetchState, 0);
-      const id = setInterval(fetchState, 3000);
+      // First fetch is full (delivers `config`); subsequent probes pass `since`.
+      const first = setTimeout(() => void fetchState(), 0);
+      const id = setInterval(
+        () => void fetchState(stateRef.current.lastSequence),
+        3000,
+      );
       return () => {
         clearTimeout(first);
         clearInterval(id);
@@ -147,8 +164,11 @@ export function ScoreboardDisplay({
     // Realtime is the instant path, but broadcasts are fire-and-forget — fetch
     // once on mount and run a slow backstop so a missed signal never leaves the
     // board stale (brief §4.2).
-    const first = setTimeout(fetchState, 0);
-    const backstop = setInterval(fetchState, 10000);
+    const first = setTimeout(() => void fetchState(), 0);
+    const backstop = setInterval(
+      () => void fetchState(stateRef.current.lastSequence),
+      10000,
+    );
     return () => {
       clearTimeout(first);
       clearInterval(backstop);

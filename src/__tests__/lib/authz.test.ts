@@ -29,9 +29,18 @@ vi.mock("@/db", async () => {
   return { db: { select: () => chain([]) } };
 });
 
+// getClaims(), not getUser(): authz verifies the JWT locally off the JWKS rather
+// than paying an Auth round trip per request (spec/24 §9.5 F5). Claims are the
+// token's shape — `sub` for the id — so the mock mirrors that, not a User row.
 vi.mock("@/lib/supabase", () => ({
   createSupabaseServerClient: async () => ({
-    auth: { getUser: async () => ({ data: { user: state.user } }) },
+    auth: {
+      getClaims: async () => ({
+        data: state.user
+          ? { claims: { sub: state.user.id, email: state.user.email } }
+          : null,
+      }),
+    },
   }),
 }));
 

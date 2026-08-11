@@ -69,8 +69,8 @@ function report(discipline: string, events: ReportEvent[]): MatchReportData {
       confirmedVia: null,
       confirmedAt: null,
       officials: [
-        { role: "FIRST_REFEREE", name: "Anna Meier", country: "GER", level: "Int.", source: "MANUAL" },
-        { role: "SCORER", name: "Kit Ian Yu", country: "MAC", level: null, source: "MANUAL" },
+        { role: "FIRST_REFEREE", name: "Anna Meier", country: "GER", level: "Int.", source: "MANUAL", personId: null },
+        { role: "SCORER", name: "Kit Ian Yu", country: "MAC", level: null, source: "MANUAL", personId: null },
       ],
       signatures: [
         {
@@ -88,6 +88,8 @@ function report(discipline: string, events: ReportEvent[]): MatchReportData {
         },
       ],
     },
+    coachA: null,
+    coachB: null,
     rosterA: [
       { id: "a1", fullName: "Ada Alpha", firstName: "Ada", lastName: "Alpha", role: "PLAYER", jerseyNumber: 1, isCaptain: true, isLibero: false },
       { id: "a2", fullName: "Amy Alpha", firstName: "Amy", lastName: "Alpha", role: "PLAYER", jerseyNumber: 2, isCaptain: false, isLibero: false },

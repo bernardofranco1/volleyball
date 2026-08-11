@@ -2,7 +2,20 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { tenants, tenantBranding, userTenantRoles } from "@/db/schema";
+import {
+  tenants,
+  tenantBranding,
+  tenantConfig,
+  userTenantRoles,
+} from "@/db/schema";
+import {
+  DISCIPLINES,
+  REPORT_TYPES,
+  isDiscipline,
+  isReportType,
+  type ReportType,
+} from "@/lib/domain";
+import type { Discipline } from "@/engine/types";
 
 // Tenant resolution helpers. These query the database directly and therefore
 // run only in Node-runtime contexts (Server Components, Route Handlers, Server
@@ -18,12 +31,22 @@ export interface TenantBranding {
   courtColorOverrides: Record<string, string> | null;
 }
 
+/**
+ * Per-tenant capability config (spec/24 §2.1). Always a fully-resolved value —
+ * callers never deal with "unset", they get the defaults.
+ */
+export interface TenantConfig {
+  enabledDisciplines: Discipline[];
+  enabledReportTypes: ReportType[];
+}
+
 export interface TenantWithBranding {
   id: string;
   slug: string;
   name: string;
   subdomain: string | null;
   branding: TenantBranding;
+  config: TenantConfig;
 }
 
 export const DEFAULT_BRANDING: TenantBranding = {
@@ -34,6 +57,49 @@ export const DEFAULT_BRANDING: TenantBranding = {
   fontFamily: null,
   courtColorOverrides: null,
 };
+
+/** No row (or an unreadable one) ⇒ everything enabled, i.e. today's behaviour. */
+export const DEFAULT_TENANT_CONFIG: TenantConfig = {
+  enabledDisciplines: [...DISCIPLINES],
+  enabledReportTypes: [...REPORT_TYPES],
+};
+
+/**
+ * Coerce a stored jsonb array into a known-good list. Anything unrecognised is
+ * dropped, and an empty or absent result falls back to "all" — a tenant must
+ * never end up locked out of every discipline (or with an empty Reports tab)
+ * because a row was hand-edited or an enum member was renamed.
+ */
+function resolveList<T extends string>(
+  stored: unknown,
+  allowed: readonly T[],
+  guard: (v: string) => v is T,
+): T[] {
+  if (!Array.isArray(stored)) return [...allowed];
+  const picked = stored.filter(
+    (v): v is T => typeof v === "string" && guard(v),
+  );
+  return picked.length > 0 ? picked : [...allowed];
+}
+
+export function resolveTenantConfig(row: {
+  enabledDisciplines?: unknown;
+  enabledReportTypes?: unknown;
+} | null): TenantConfig {
+  if (!row) return DEFAULT_TENANT_CONFIG;
+  return {
+    enabledDisciplines: resolveList(
+      row.enabledDisciplines,
+      DISCIPLINES,
+      isDiscipline,
+    ),
+    enabledReportTypes: resolveList(
+      row.enabledReportTypes,
+      REPORT_TYPES,
+      isReportType,
+    ),
+  };
+}
 
 /** The tenant's user-facing product name (spec/23 §5.1). */
 export function tenantTitle(tenant: {
@@ -70,9 +136,15 @@ export const getTenantBySlug = cache(async function getTenantBySlug(
           logoUrl: tenantBranding.logoUrl,
           fontFamily: tenantBranding.fontFamily,
           courtColorOverrides: tenantBranding.courtColorOverrides,
+          // Joined into the same cached read rather than fetched separately:
+          // the config gates nav entries and the Reports tab, so it is needed on
+          // effectively every tenant page render (spec/24 §2.1).
+          enabledDisciplines: tenantConfig.enabledDisciplines,
+          enabledReportTypes: tenantConfig.enabledReportTypes,
         })
         .from(tenants)
         .leftJoin(tenantBranding, eq(tenantBranding.tenantId, tenants.id))
+        .leftJoin(tenantConfig, eq(tenantConfig.tenantId, tenants.id))
         .where(and(eq(tenants.slug, slug), isNull(tenants.deletedAt)))
         .limit(1);
       return rows[0] ?? null;
@@ -97,7 +169,27 @@ export const getTenantBySlug = cache(async function getTenantBySlug(
       courtColorOverrides:
         (r.courtColorOverrides as Record<string, string> | null) ?? null,
     },
+    config: resolveTenantConfig(r),
   };
+});
+
+/**
+ * Capability config by tenant id, for paths that resolved a tenant from a match
+ * rather than from a URL slug (the export routes). Cached per request; the row
+ * is tiny and the export routes hit it once per download.
+ */
+export const getTenantConfigById = cache(async function getTenantConfigById(
+  tenantId: string,
+): Promise<TenantConfig> {
+  const rows = await db
+    .select({
+      enabledDisciplines: tenantConfig.enabledDisciplines,
+      enabledReportTypes: tenantConfig.enabledReportTypes,
+    })
+    .from(tenantConfig)
+    .where(eq(tenantConfig.tenantId, tenantId))
+    .limit(1);
+  return resolveTenantConfig(rows[0] ?? null);
 });
 
 /** A tenant a user can switch into, with what the switcher renders. */

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { db } from "@/db";
+import { db, dbTx } from "@/db";
 import { events, matchSessions, matches, pools, teams } from "@/db/schema";
 import { gateCompetition } from "@/lib/action-gate";
 import { recordAudit } from "@/lib/audit";
@@ -105,7 +105,7 @@ export async function deleteMatch(
   if (ev.length > 0)
     return fail("This match has been scored — it's a record and can't be deleted.");
 
-  await db.transaction(async (tx) => {
+  await dbTx.transaction(async (tx) => {
     await tx.delete(matchSessions).where(eq(matchSessions.matchId, matchId));
     await tx
       .delete(matches)

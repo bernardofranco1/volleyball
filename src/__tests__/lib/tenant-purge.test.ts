@@ -68,7 +68,9 @@ vi.mock("@/db", async () => {
       });
     },
   };
-  return { db };
+  // Transactions run on the dedicated single-connection pool (src/db/index.ts),
+  // so the mock must expose it too — `db` alone cannot begin a transaction.
+  return { db, dbTx: db };
 });
 
 import {

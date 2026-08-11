@@ -59,6 +59,8 @@ const DATA: MatchReportData = {
   winner: "A",
   sets: [],
   approval: { confirmedVia: null, confirmedAt: null, officials: [], signatures: [] },
+  coachA: null,
+  coachB: null,
   rosterA: [
     { id: "p1", fullName: "Marco Rossi", jerseyNumber: 1, isCaptain: true, isLibero: false },
     { id: "p2", fullName: "Luca Bianchi", jerseyNumber: 2, isCaptain: false, isLibero: false },
@@ -130,7 +132,7 @@ const SIGNED: MatchReportData = {
     confirmedVia: "SIGNATURES",
     confirmedAt: TS,
     officials: [
-      { role: "FIRST_REFEREE", name: "Amantino G.", country: null, level: null, source: "MANUAL" },
+      { role: "FIRST_REFEREE", name: "Amantino G.", country: null, level: null, source: "MANUAL", personId: null },
     ],
     signatures: [
       {

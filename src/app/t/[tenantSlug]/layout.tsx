@@ -5,7 +5,15 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { logout } from "@/lib/auth-actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { getCurrentUser, isGlobalAdmin, type Role } from "@/lib/authz";
+import {
+  ADMIN_ROLES,
+  getAuthContext,
+  getCurrentUser,
+  hasRole,
+  isGlobalAdmin,
+  VIEW_ROLES,
+  type Role,
+} from "@/lib/authz";
 import { getTenantBySlug, getUserTenants, tenantTitle } from "@/lib/tenant";
 import { listTenantsForSwitcher } from "@/lib/tenant-admin";
 import { tenantUrl } from "@/lib/subdomain";
@@ -13,6 +21,7 @@ import { ROLE_LABEL } from "@/lib/roles";
 import { getT } from "@/lib/i18n/server";
 import { LocaleProvider } from "@/lib/i18n/client";
 import { MobileNav } from "@/components/MobileNav";
+import { TenantNav } from "@/components/TenantNav";
 import { TenantSwitcher, type SwitcherTenant } from "@/components/TenantSwitcher";
 
 // Tenant pages are user- and DB-specific, so never prerender at build time.
@@ -20,12 +29,22 @@ export const dynamic = "force-dynamic";
 
 // Top-nav destinations (brief §1.2). Shared by the desktop bar and the mobile
 // nav row so phones aren't stranded on the dashboard.
-const NAV_LINKS = [
-  ["nav.dashboard", "dashboard"],
-  ["nav.competitions", "competitions"],
-  ["nav.matches", "matches"],
-  ["nav.settings", "settings"],
-] as const;
+//
+// `roles` gates each entry (spec/24 §8). Previously every entry rendered for
+// everyone, so a VIEWER was shown Competitions and Settings and got a 404 on
+// click — each page gates itself with notFound(), which is correct but made the
+// menu a list of dead ends. null = no role requirement.
+const NAV_LINKS: {
+  key: string;
+  path: string;
+  roles: Role[] | null;
+}[] = [
+  { key: "nav.dashboard", path: "dashboard", roles: null },
+  { key: "nav.competitions", path: "competitions", roles: ADMIN_ROLES },
+  { key: "nav.matches", path: "matches", roles: VIEW_ROLES },
+  { key: "nav.people", path: "people", roles: ADMIN_ROLES },
+  { key: "nav.settings", path: "settings", roles: ["TENANT_ADMIN"] },
+];
 
 /** Browser-tab title = the tenant's product name (spec/23 §5.1). */
 export async function generateMetadata({
@@ -99,6 +118,20 @@ async function getSwitcher(currentSlug: string): Promise<{
   };
 }
 
+/**
+ * The signed-in user's roles in this tenant, or null when there is no session.
+ * Same cheap cookie pre-check as getSwitcher: the public surfaces under this
+ * layout (scoreboard, results, team tablets) carry no Supabase cookie and must
+ * not touch the auth path (spec/17 perf discipline). No session ⇒ no nav entries,
+ * which is right for a TV board.
+ */
+async function getNavRoles(tenantSlug: string): Promise<Role[] | null> {
+  const cookieStore = await cookies();
+  if (!cookieStore.getAll().some((c) => c.name.startsWith("sb-"))) return null;
+  const ctx = await getAuthContext(tenantSlug);
+  return ctx?.roles ?? null;
+}
+
 export default async function TenantLayout({
   children,
   params,
@@ -111,11 +144,17 @@ export default async function TenantLayout({
   if (!tenant) {
     notFound();
   }
-  const [{ locale, t, messages }, switcher] = await Promise.all([
+  const [{ locale, t, messages }, switcher, navRoles] = await Promise.all([
     getT(),
     getSwitcher(tenantSlug),
+    getNavRoles(tenantSlug),
   ]);
   const title = tenantTitle(tenant);
+
+  // Only offer what this user can actually open (spec/24 §8).
+  const navLinks = NAV_LINKS.filter(
+    (l) => l.roles === null || (navRoles !== null && hasRole(navRoles, l.roles)),
+  ).map((l) => ({ href: `/t/${tenantSlug}/${l.path}`, label: t(l.key) }));
 
   // Inject brand tokens: colours, optional font, and any court-colour overrides.
   // These cascade over the base tokens in globals.css, so `*-primary` and
@@ -142,13 +181,7 @@ export default async function TenantLayout({
         <header className="relative flex items-center justify-between border-b border-border px-4 py-2 md:px-6 md:py-4">
           <div className="flex items-center gap-3 md:gap-6">
             {/* Mobile: ☰ collapses the nav (saves a UI row). Desktop: hidden. */}
-            <MobileNav
-              menuLabel={t("nav.menu")}
-              links={NAV_LINKS.map(([key, path]) => ({
-                href: `/t/${tenantSlug}/${path}`,
-                label: t(key),
-              }))}
-            />
+            <MobileNav menuLabel={t("nav.menu")} links={navLinks} />
             {switcher ? (
               <TenantSwitcher
                 current={{
@@ -182,18 +215,8 @@ export default async function TenantLayout({
                 <span className="font-semibold">{title}</span>
               </Link>
             )}
-            {/* Top navigation menu (brief §1.2). */}
-            <nav className="hidden items-center gap-1 md:flex">
-              {NAV_LINKS.map(([key, path]) => (
-                <Link
-                  key={path}
-                  href={`/t/${tenantSlug}/${path}`}
-                  className="rounded-lg px-3 py-1.5 text-sm text-score-dim transition-colors hover:bg-surface-raised hover:text-foreground"
-                >
-                  {t(key)}
-                </Link>
-              ))}
-            </nav>
+            {/* Top navigation menu (brief §1.2), role-filtered above. */}
+            <TenantNav links={navLinks} />
           </div>
 
           <div className="flex items-center gap-2">

@@ -563,8 +563,9 @@ function teamsBlock(
     yy += 8;
   }
 
-  // Pre-match signatures (spec/21 Phase D): captains sign on the console
-  // before play; coach capture waits for staff entities and prints blank.
+  // Pre-match signatures (spec/21 Phase D): captains sign on the console before
+  // play. The coach box now prints the assigned head coach's name (spec/24 §2.5
+  // gave coaches an entity); the coach's *signature* is still not captured.
   g.rect(x, yy, w, 8, { fill: HEAD });
   g.ctext("SIGNATURES (pre-match)", x + w / 2, yy + 4, { size: 4.4, bold: true });
   yy += 8;
@@ -576,6 +577,14 @@ function teamsBlock(
       const cy = yy + i * (sh / 2);
       g.rect(rx, cy, half, sh / 2);
       g.text(label, rx + 2, cy + 1.6, { size: 3.6 });
+      if (i === 1) {
+        const coach = side === 0 ? report.coachA : report.coachB;
+        if (coach)
+          g.text(coach.slice(0, 30), rx + 2, cy + sh / 2 - 5, {
+            size: 4,
+            color: INK,
+          });
+      }
       if (i === 0) {
         const sig = sigByRole.get(
           side === 0 ? "TEAM_A_CAPTAIN_PREMATCH" : "TEAM_B_CAPTAIN_PREMATCH",

@@ -4,13 +4,25 @@ import { useActionState } from "react";
 import { createCompetition } from "@/lib/competition-actions";
 import { OK } from "@/lib/action-state";
 import { DISCIPLINES, GENDERS } from "@/lib/domain";
+import type { Discipline } from "@/engine/types";
 import { useT } from "@/lib/i18n/client";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { ui } from "@/components/admin/styles";
 
-export function NewCompetitionForm({ tenantSlug }: { tenantSlug: string }) {
+export function NewCompetitionForm({
+  tenantSlug,
+  // Disciplines this tenant may create in (spec/24 §5.2). Defaults to all so
+  // existing callers/tests keep working; createCompetition re-checks server-side.
+  enabledDisciplines = [...DISCIPLINES],
+}: {
+  tenantSlug: string;
+  enabledDisciplines?: Discipline[];
+}) {
   const t = useT();
   const [state, action] = useActionState(createCompetition, OK);
+  // Preserve the canonical order regardless of how the config array is stored.
+  const options = DISCIPLINES.filter((d) => enabledDisciplines.includes(d));
+  const only = options.length === 1 ? options[0] : null;
 
   return (
     <form action={action} className={ui.card}>
@@ -35,18 +47,29 @@ export function NewCompetitionForm({ tenantSlug }: { tenantSlug: string }) {
           <label className={ui.label} htmlFor="discipline">
             {t("common.discipline")}
           </label>
-          <select
-            id="discipline"
-            name="discipline"
-            defaultValue="BEACH"
-            className={ui.select}
-          >
-            {DISCIPLINES.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
+          {only ? (
+            // Single enabled discipline: show it, don't make them pick from a
+            // list of one. Still submitted, so the action sees a value.
+            <>
+              <input type="hidden" name="discipline" value={only} />
+              <p className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-score-dim">
+                {only}
+              </p>
+            </>
+          ) : (
+            <select
+              id="discipline"
+              name="discipline"
+              defaultValue={options.includes("BEACH") ? "BEACH" : options[0]}
+              className={ui.select}
+            >
+              {options.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div>

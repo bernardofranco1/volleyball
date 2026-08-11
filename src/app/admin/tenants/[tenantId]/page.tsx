@@ -6,6 +6,7 @@ import { listTenantBackupRuns, TEST_TENANT_SLUG } from "@/lib/backup";
 import { listMembers } from "@/lib/access";
 import { BrandingForm } from "@/components/admin/BrandingForm";
 import { TenantConfigForm } from "@/components/admin/TenantConfigForm";
+import { AdminTenantCapabilityForm } from "@/components/admin/AdminTenantCapabilityForm";
 import { TenantDangerZone } from "@/components/admin/TenantDangerZone";
 import { BackupNowButton } from "@/components/admin/BackupNowButton";
 import { ui } from "@/components/admin/styles";
@@ -60,6 +61,11 @@ export default async function AdminTenantPage({
 
       <div className="space-y-10">
         <TenantConfigForm tenant={tenant} />
+
+        <AdminTenantCapabilityForm
+          tenantId={tenant.id}
+          config={tenant.config}
+        />
 
         <section aria-labelledby="admin-branding">
           <h2

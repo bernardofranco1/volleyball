@@ -15,21 +15,22 @@ vi.mock("@/db", async () => {
   const { getTableConfig } = await import("drizzle-orm/pg-core");
   const nameOf = (t: unknown) =>
     getTableConfig(t as Parameters<typeof getTableConfig>[0]).name;
-  return {
-    db: {
-      transaction: async (fn: (tx: unknown) => Promise<void>) => {
-        dbState.transactions += 1;
-        if (dbState.transactionError) throw dbState.transactionError;
-        await fn({ insert: () => ({ values: async () => {} }) });
-      },
-      update: (t: unknown) => ({
-        set: (set: Record<string, unknown>) => {
-          dbState.updates.push({ table: nameOf(t), set });
-          return { where: () => Promise.resolve([]) };
-        },
-      }),
+  const db = {
+    transaction: async (fn: (tx: unknown) => Promise<void>) => {
+      dbState.transactions += 1;
+      if (dbState.transactionError) throw dbState.transactionError;
+      await fn({ insert: () => ({ values: async () => {} }) });
     },
+    update: (t: unknown) => ({
+      set: (set: Record<string, unknown>) => {
+        dbState.updates.push({ table: nameOf(t), set });
+        return { where: () => Promise.resolve([]) };
+      },
+    }),
   };
+  // Transactions run on the dedicated single-connection pool (src/db/index.ts),
+  // so the mock must expose it too — `db` alone cannot begin a transaction.
+  return { db, dbTx: db };
 });
 
 // next/cache & next/navigation throw outside a request — always mock in tests.

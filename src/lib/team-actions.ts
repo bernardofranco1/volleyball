@@ -2,13 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { and, eq, or } from "drizzle-orm";
-import { db } from "@/db";
+import { db, dbTx } from "@/db";
 import { matches, players, teams } from "@/db/schema";
 import { SCORING_ROLES, authorizeMatch } from "@/lib/authz";
 import { gateCompetition } from "@/lib/action-gate";
 import { normalizeHex } from "@/lib/colors";
 import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
+import { resolvePickedPerson } from "@/lib/people-actions";
 import { fail, ok, type FormState } from "@/lib/action-state";
 import { intOrNull, str } from "@/lib/form-data";
 
@@ -178,7 +179,7 @@ export async function deleteTeam(
       "This team appears in a match. Delete its matches first, then remove the team.",
     );
 
-  await db.transaction(async (tx) => {
+  await dbTx.transaction(async (tx) => {
     await tx.delete(players).where(eq(players.teamId, teamId));
     await tx
       .delete(teams)
@@ -217,10 +218,35 @@ export async function createPlayer(
     .limit(1);
   if (team.length === 0) return fail("Team not found.");
 
-  const firstName = str(fd, "firstName");
-  const lastName = str(fd, "lastName");
-  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
-  if (!fullName) return fail("Player name is required.");
+  // Rosters reference the tenant people registry (spec/24 §6.2). The picker
+  // sends an id when the typed name matched someone, or just the name — in which
+  // case a person is created, so a roster row is never left unlinked.
+  const picked = await resolvePickedPerson(
+    g.tenantId,
+    { personId: str(fd, "personId"), personName: str(fd, "personName") },
+    "PLAYER",
+  );
+  if ("error" in picked) return fail(picked.error);
+  const fullName = picked.name;
+
+  // One person, one roster spot per competition (spec/25 §4). The DB refuses a
+  // repeat on the same team; two teams in the same competition needs a query,
+  // because players link to a competition only through their team.
+  const already = await db
+    .select({ teamId: players.teamId })
+    .from(players)
+    .innerJoin(teams, eq(teams.id, players.teamId))
+    .where(
+      and(
+        eq(players.personId, picked.id),
+        eq(teams.competitionId, g.competitionId),
+      ),
+    )
+    .limit(1);
+  if (already.length > 0)
+    return fail(
+      `${fullName} is already on a roster in this competition. One person can only play for one team — remove the other entry first.`,
+    );
 
   const jerseyNumber = intOrNull(fd, "jerseyNumber");
   if (jerseyNumber != null) {
@@ -239,8 +265,9 @@ export async function createPlayer(
     id: newId("plyr"),
     teamId,
     tenantId: g.tenantId,
-    firstName: firstName || null,
-    lastName: lastName || null,
+    personId: picked.id,
+    // fullName is still written for now; the contract migration drops it once
+    // every read path goes through the person join.
     fullName,
     jerseyNumber,
     isCaptain: fd.get("isCaptain") != null,

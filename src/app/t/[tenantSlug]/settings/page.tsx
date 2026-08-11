@@ -3,6 +3,10 @@ import { requireRole } from "@/lib/authz";
 import { getLocale } from "@/lib/i18n/server";
 import { translate } from "@/lib/i18n/messages";
 import { BrandingForm } from "@/components/admin/BrandingForm";
+import {
+  DisciplinesForm,
+  ReportTypesForm,
+} from "@/components/admin/TenantCapabilityForm";
 import { LanguageSwitcher } from "@/components/admin/LanguageSwitcher";
 import { ui } from "@/components/admin/styles";
 
@@ -59,6 +63,34 @@ export default async function SettingsPage({
             Branding
           </h2>
           <BrandingForm tenantSlug={tenantSlug} branding={ctx.tenant.branding} />
+        </section>
+
+        {/* ── Disciplines (spec/24 §5) ── */}
+        <section aria-labelledby="settings-disciplines">
+          <h2
+            id="settings-disciplines"
+            className="mb-3 text-xs font-medium uppercase tracking-wide text-score-dim"
+          >
+            Disciplines
+          </h2>
+          <DisciplinesForm
+            tenantSlug={tenantSlug}
+            enabled={ctx.tenant.config.enabledDisciplines}
+          />
+        </section>
+
+        {/* ── Reports (spec/24 §4) ── */}
+        <section aria-labelledby="settings-reports">
+          <h2
+            id="settings-reports"
+            className="mb-3 text-xs font-medium uppercase tracking-wide text-score-dim"
+          >
+            Reports
+          </h2>
+          <ReportTypesForm
+            tenantSlug={tenantSlug}
+            enabled={ctx.tenant.config.enabledReportTypes}
+          />
         </section>
 
         {/* ── People & security ── */}

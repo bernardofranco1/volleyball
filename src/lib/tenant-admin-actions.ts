@@ -4,7 +4,7 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, dbTx } from "@/db";
 import { tenantBranding, tenants } from "@/db/schema";
 import { requireGlobalAdmin } from "@/lib/authz";
 import { runBackup, TEST_TENANT_SLUG } from "@/lib/backup";
@@ -69,7 +69,7 @@ export async function createTenant(
 
   const tenantId = newId("tnt");
   try {
-    await db.transaction(async (tx) => {
+    await dbTx.transaction(async (tx) => {
       await tx.insert(tenants).values({
         id: tenantId,
         slug,

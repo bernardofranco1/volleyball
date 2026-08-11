@@ -64,6 +64,27 @@
       "when": 1785401854782,
       "tag": "0008_even_monster_badoon",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786447851422,
+      "tag": "0009_purple_mariko_yashida",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786448992469,
+      "tag": "0010_abandoned_sway",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786452373753,
+      "tag": "0011_sleepy_post",
+      "breakpoints": true
     }
   ]
 }

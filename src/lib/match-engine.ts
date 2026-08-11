@@ -16,7 +16,7 @@
 
 import { after } from "next/server";
 import { aliasedTable, and, asc, eq, gt, max } from "drizzle-orm";
-import { db } from "@/db";
+import { db, dbTx } from "@/db";
 import { competitions, events, matches, teams, tournamentConfig } from "@/db/schema";
 import { type TournamentConfig, resolveConfig } from "@/engine/config";
 import {
@@ -514,7 +514,7 @@ export async function appendMatchEvent(
   const status: MatchRowStatus =
     engineStatus === "FINISHED" ? "PENDING_CONFIRMATION" : engineStatus;
   try {
-    await db.transaction(async (tx) => {
+    await dbTx.transaction(async (tx) => {
       await tx.insert(events).values(rows);
       await tx
         .update(matches)
@@ -669,7 +669,7 @@ async function undoLastEvent(
   );
 
   try {
-    await db.transaction(async (tx) => {
+    await dbTx.transaction(async (tx) => {
       const d = meta.engine.denormalize(finalState);
       await tx.insert(events).values(
         undoEvents.map((ev) => ({
@@ -747,7 +747,7 @@ export async function rewindMatch(
   const finalState = meta.engine.replay(matchId, [...log, rewind], meta.config);
 
   try {
-    await db.transaction(async (tx) => {
+    await dbTx.transaction(async (tx) => {
       await tx.insert(events).values({
         id: rewind.id,
         matchId,

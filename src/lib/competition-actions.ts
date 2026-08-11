@@ -4,7 +4,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, dbTx } from "@/db";
 import { competitions, competitionBranding, tournamentConfig } from "@/db/schema";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { gateCompetition } from "@/lib/action-gate";
@@ -45,12 +45,19 @@ export async function createCompetition(
   if (!name) return fail("Name is required.");
   if (!isDiscipline(discipline)) return fail("Pick a discipline.");
   if (!isGender(gender)) return fail("Invalid gender.");
+  // Server-side gate on the tenant's enabled disciplines (spec/24 §5.2). The
+  // form only narrows the dropdown; this is what actually enforces it, since the
+  // discipline is immutable once the competition exists.
+  if (!ctx.tenant.config.enabledDisciplines.includes(discipline))
+    return fail(
+      `${discipline} is not enabled for this tenant. A tenant admin can enable it in Settings → Disciplines.`,
+    );
 
   const id = newId("comp");
   // One transaction: a competition without its config row would make the
   // Scoring-rules panel silently save nothing (config updates are upserts now,
   // but partial creation is still wrong).
-  await db.transaction(async (tx) => {
+  await dbTx.transaction(async (tx) => {
     await tx.insert(competitions).values({
       id,
       tenantId: ctx.tenant.id,

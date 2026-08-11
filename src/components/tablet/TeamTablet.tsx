@@ -54,28 +54,38 @@ export function TeamTablet({
   }, [state]);
 
   // Authoritative read-only state from /state (realtime only signals — §B1).
-  const fetchState = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/matches/${matchId}/state`, {
-        cache: "no-store",
-      });
-      if (!res.ok) return;
-      const data = (await res.json()) as {
-        state: IndoorMatchState;
-        config?: TournamentConfig;
-        serverNow?: number;
-      };
-      if (typeof data.serverNow === "number") {
-        const off = data.serverNow - Date.now();
-        setClockOffset((prev) => (Math.abs(off - prev) > 1000 ? off : prev));
+  // `since` makes the backstop probe a 204 off one indexed MAX() instead of a
+  // full snapshot load + tail replay (spec/24 §9.5 F1); the mount fetch and
+  // broadcast-triggered refetches go without it so they are complete and never
+  // answered from the CDN micro-cache (spec/24 §9.5 F2).
+  const fetchState = useCallback(
+    async (since?: number) => {
+      try {
+        const url =
+          since != null
+            ? `/api/matches/${matchId}/state?since=${since}`
+            : `/api/matches/${matchId}/state`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (res.status === 204) return; // already current
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          state: IndoorMatchState;
+          config?: TournamentConfig;
+          serverNow?: number;
+        };
+        if (typeof data.serverNow === "number") {
+          const off = data.serverNow - Date.now();
+          setClockOffset((prev) => (Math.abs(off - prev) > 1000 ? off : prev));
+        }
+        if (data.config) setConfig(data.config);
+        if (data.state.lastSequence >= stateRef.current.lastSequence)
+          setState(data.state);
+      } catch {
+        /* keep last good state */
       }
-      if (data.config) setConfig(data.config);
-      if (data.state.lastSequence >= stateRef.current.lastSequence)
-        setState(data.state);
-    } catch {
-      /* keep last good state */
-    }
-  }, [matchId]);
+    },
+    [matchId],
+  );
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
@@ -95,8 +105,11 @@ export function TeamTablet({
     // Fetch once on mount (delivers `config`, so a tablet loaded mid-timeout /
     // mid-set-break shows the countdown immediately) and run a slow backstop so
     // a missed fire-and-forget broadcast never leaves the tablet stale.
-    const first = setTimeout(fetchState, 0);
-    const backstop = setInterval(fetchState, 15000);
+    const first = setTimeout(() => void fetchState(), 0);
+    const backstop = setInterval(
+      () => void fetchState(stateRef.current.lastSequence),
+      15000,
+    );
     return () => {
       clearTimeout(first);
       clearInterval(backstop);
@@ -120,16 +133,24 @@ export function TeamTablet({
     }
   }, [matchId, team, token]);
 
+  // The only moment this poll needs to be quick is while a request is sitting
+  // with the scorer, so it runs at 4s then backs off to 15s once nothing is
+  // outstanding, and stops altogether on a finished match (spec/24 §9.5 F4 —
+  // the flat 4s cost 2 DB queries/tick per tablet for the whole match). Both
+  // transitions re-run the effect, which fires an immediate catch-up poll.
+  const awaitingDecision = requests.some((r) => r.status === "PENDING");
+  const matchFinished = state.status === "FINISHED";
   useEffect(() => {
+    if (matchFinished) return;
     // First poll via a 0ms timer (not synchronously) so the effect body doesn't
     // call setState directly (react-hooks/set-state-in-effect).
     const first = setTimeout(pollRequests, 0);
-    const id = setInterval(pollRequests, 4000);
+    const id = setInterval(pollRequests, awaitingDecision ? 4000 : 15000);
     return () => {
       clearTimeout(first);
       clearInterval(id);
     };
-  }, [pollRequests]);
+  }, [pollRequests, awaitingDecision, matchFinished]);
 
   const sendRequest = async (
     requestType: string,

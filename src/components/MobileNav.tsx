@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { activeHref } from "@/components/TenantNav";
 
 // Mobile-only nav: collapses the menu behind a ☰ button at the top-left so
 // phones don't spend a whole UI row on the nav. The expanded panel uses slim
@@ -15,6 +17,8 @@ export function MobileNav({
   menuLabel: string;
 }) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const active = activeHref(pathname, links);
 
   return (
     <div className="md:hidden">
@@ -49,7 +53,12 @@ export function MobileNav({
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className="px-4 py-1.5 text-sm text-score-dim transition-colors hover:bg-surface-raised hover:text-foreground"
+                aria-current={l.href === active ? "page" : undefined}
+                className={`px-4 py-1.5 text-sm transition-colors ${
+                  l.href === active
+                    ? "bg-surface-raised font-medium text-foreground"
+                    : "text-score-dim hover:bg-surface-raised hover:text-foreground"
+                }`}
               >
                 {l.label}
               </Link>

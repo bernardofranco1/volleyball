@@ -39,6 +39,9 @@ import { CopyButton } from "@/components/CopyButton";
 import { LocalTime } from "@/components/LocalTime";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { matchStatusLabel, statusBadgeClass, ui } from "@/components/admin/styles";
+import { MatchTabs } from "@/components/admin/MatchTabs";
+import { isReportableStatus } from "@/lib/reports";
+import { searchPeople } from "@/lib/people";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +127,13 @@ export default async function MatchDetailPage({
   if (!competition) notFound();
   if (!match || match.competitionId !== competitionId) notFound();
 
+  // Autocomplete sources for the officials pickers (spec/24 §6.3).
+  const [refereePeople, scorerPeople] = await Promise.all([
+    searchPeople(ctx.tenant.id, { roles: ["REFEREE"], limit: 500 }),
+    searchPeople(ctx.tenant.id, { roles: ["SCORER"], limit: 500 }),
+  ]);
+  const officialsPickers = { referees: refereePeople, scorers: scorerPeople };
+
   const configRow = await getCompetitionConfig(competitionId);
   const config = resolveConfig(
     match.discipline as Discipline,
@@ -136,6 +146,8 @@ export default async function MatchDetailPage({
   const confirmedVia = match.confirmedVia;
   const log = [...logRows].reverse(); // stored desc for LIMIT; display asc
   const base = `/t/${tenantSlug}/competitions/${competitionId}`;
+  // Reports only exist once there is a result to report on (spec/24 A2).
+  const reportable = isReportableStatus(match.status);
 
   // Signed scorer deep-link: scanning it opens the scorer with the PIN gate
   // pre-satisfied (login + role still required). Rotating the PIN kills it.
@@ -182,54 +194,16 @@ export default async function MatchDetailPage({
           >
             {t("match.viewScoreboard")}
           </a>
-          {/* FIVB-style official scoresheet replica (spec/21). */}
-          <a
-            href={`/api/matches/${matchId}/export.pdf?type=official`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={ui.btnSecondary}
-          >
-            {t("match.exportOfficialSheet")}
-          </a>
-          {/* The official document the officials sign and hand in (spec/20). */}
-          <a
-            href={`/api/matches/${matchId}/export.pdf?type=sheet`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={ui.btnSecondary}
-          >
-            {t("match.exportScoresheet")}
-          </a>
-          <a
-            href={`/api/matches/${matchId}/export.pdf`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={ui.btnSecondary}
-          >
-            {t("match.exportPdf")}
-          </a>
-          <a
-            href={`/api/matches/${matchId}/export.pdf?type=log`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={ui.btnSecondary}
-          >
-            {t("match.exportLogPdf")}
-          </a>
-          {/* VolleyStation-style match log snapshot (spec/22). */}
-          <a
-            href={`/api/matches/${matchId}/export.vsr`}
-            className={ui.btnSecondary}
-          >
-            {t("match.exportVsr")}
-          </a>
-          {/* Per-rally / per-set / per-break timing breakdown (spec/22). */}
-          <a
-            href={`/api/matches/${matchId}/export.timings`}
-            className={ui.btnSecondary}
-          >
-            {t("match.exportTimings")}
-          </a>
+          {/* Every export moved to the Reports tab (spec/24 §3.2) — one home for
+              match documents, and the tab respects the tenant's allow-list. */}
+          {reportable && (
+            <Link
+              href={`${base}/matches/${matchId}/reports`}
+              className={ui.btnSecondary}
+            >
+              {t("reports.title")}
+            </Link>
+          )}
         </div>
       </div>
 
@@ -244,6 +218,15 @@ export default async function MatchDetailPage({
           </>
         )}
       </p>
+
+      <MatchTabs
+        tenantSlug={tenantSlug}
+        competitionId={competitionId}
+        matchId={matchId}
+        active="overview"
+        canManage
+        showReports={reportable}
+      />
 
       {/* A scorer's final point parks the match here until the scoresheet is
           signed on the console or a manager confirms it (spec/20). */}
@@ -396,6 +379,8 @@ export default async function MatchDetailPage({
       {/* Officials for the scoresheet APPROVAL block (spec/21). */}
       <div className="mt-6 flex max-w-2xl flex-col gap-4">
         <MatchOfficialsForm
+          referees={officialsPickers.referees}
+          scorers={officialsPickers.scorers}
           tenantSlug={tenantSlug}
           competitionId={competitionId}
           matchId={matchId}

@@ -80,3 +80,78 @@ export const PLAYERS_PER_SIDE: Partial<Record<Discipline, number[]>> = {
   GRASS: [3, 4],
   LIGHT: [4, 5],
 };
+
+// ── Reports (spec/24 §4) ─────────────────────────────────────────────────────
+//
+// The documents a finished match can produce. Each tenant enables a subset
+// (tenant_config.enabled_report_types) and the Reports tab offers only those.
+// One list drives the settings checkboxes, the tab, and the export-route guard,
+// so what a tenant can tick and what the server will serve cannot drift.
+export const REPORT_TYPES = [
+  "OFFICIAL_SCORESHEET",
+  "SCORESHEET",
+  "MATCH_REPORT",
+  "EVENT_LOG",
+  "VSR_LOG",
+  "TIMINGS",
+] as const;
+export type ReportType = (typeof REPORT_TYPES)[number];
+
+export function isReportType(v: string): v is ReportType {
+  return (REPORT_TYPES as readonly string[]).includes(v);
+}
+
+/**
+ * The three match documents any tenant member may download, versus the
+ * technical exports that stay behind SCORING_ROLES (spec/24 §1 decision 4).
+ */
+export const VIEWER_REPORT_TYPES: readonly ReportType[] = [
+  "OFFICIAL_SCORESHEET",
+  "SCORESHEET",
+  "MATCH_REPORT",
+];
+
+/** A tenant must keep at least one of these enabled or the tab is empty. */
+export const CORE_REPORT_TYPES = VIEWER_REPORT_TYPES;
+
+/**
+ * Where each report type is served from. `pdfType` is the `?type=` value on
+ * /api/matches/[id]/export.pdf; the two JSON exports have their own routes.
+ */
+export const REPORT_ROUTES: Record<
+  ReportType,
+  { path: (matchId: string) => string; format: "PDF" | "JSON" }
+> = {
+  OFFICIAL_SCORESHEET: {
+    path: (id) => `/api/matches/${id}/export.pdf?type=official`,
+    format: "PDF",
+  },
+  SCORESHEET: {
+    path: (id) => `/api/matches/${id}/export.pdf?type=sheet`,
+    format: "PDF",
+  },
+  MATCH_REPORT: {
+    path: (id) => `/api/matches/${id}/export.pdf`,
+    format: "PDF",
+  },
+  EVENT_LOG: {
+    path: (id) => `/api/matches/${id}/export.pdf?type=log`,
+    format: "PDF",
+  },
+  VSR_LOG: { path: (id) => `/api/matches/${id}/export.vsr`, format: "JSON" },
+  TIMINGS: {
+    path: (id) => `/api/matches/${id}/export.timings`,
+    format: "JSON",
+  },
+};
+
+/**
+ * Only beach and indoor have true official-scoresheet renderers; the other two
+ * disciplines fall back to the generic sheet, which the export route already
+ * does. Used to label the Reports tab honestly rather than promising an
+ * official sheet the renderer can't produce.
+ */
+export const OFFICIAL_SHEET_DISCIPLINES: readonly Discipline[] = [
+  "BEACH",
+  "INDOOR",
+];

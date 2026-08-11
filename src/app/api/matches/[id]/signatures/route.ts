@@ -17,7 +17,7 @@ import type { NextRequest } from "next/server";
 import { after as afterResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
-import { db } from "@/db";
+import { db, dbTx } from "@/db";
 import {
   competitions,
   matchOfficials,
@@ -286,7 +286,7 @@ export async function POST(
   const completesResult = isConfirmationRole(role) && remaining.length === 0;
 
   try {
-    await db.transaction(async (tx) => {
+    await dbTx.transaction(async (tx) => {
     // Supersede any live signature for this role (kept for the record).
     await tx
       .update(matchSignatures)

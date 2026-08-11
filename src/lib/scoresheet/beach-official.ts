@@ -221,14 +221,16 @@ function setPanel(
   // The service-order rows (player numbers, sanctions cells) and the 1-21
   // service boxes are the SAME physical row on the paper sheet — one line
   // per player straight across. Shared y/h keeps them aligned.
-  teamLeftBlock(g, x + 3, y + 4, leftW, top, false);
+  const coachOf = (side: TeamId) =>
+    side === "A" ? report.coachA : report.coachB;
+  teamLeftBlock(g, x + 3, y + 4, leftW, top, false, coachOf(topTeam));
   serviceRow(g, cx0, y + 18, cw, 14, top?.rows[0] ?? []);
   serviceRow(g, cx0, y + 34, cw, 14, top?.rows[1] ?? []);
   hLadder(g, cx0, y + 87, cw, 16, ladderMax, top?.points ?? 0);
   hLadder(g, cx0, y + 123, cw, 16, ladderMax, bot?.points ?? 0);
   serviceRow(g, cx0, y + 178, cw, 14, bot?.rows[0] ?? []);
   serviceRow(g, cx0, y + 194, cw, 14, bot?.rows[1] ?? []);
-  teamLeftBlock(g, x + 3, y + 123, leftW, bot, true);
+  teamLeftBlock(g, x + 3, y + 123, leftW, bot, true, coachOf(botTeam));
   if (set?.endedAt)
     g.text(`End time: ${hhmmss(set.endedAt)}`, cx0 + cw - 110, y + h - 14, { size: 6.5, bold: true, color: INK });
 
@@ -264,6 +266,8 @@ function teamLeftBlock(
   w: number,
   t: HalfData | null,
   mirror: boolean,
+  /** Head coach of the side occupying this half, printed in the coach cell. */
+  coachName: string | null,
 ) {
   const cwCols = [26, 15, 23, 23.5, 23.5, 23.5, 23.5];
   const colX = (i: number) => x + cwCols.slice(0, i).reduce((a, b) => a + b, 0);
@@ -309,6 +313,12 @@ function teamLeftBlock(
     for (let i = 0; i < 7; i++) g.rect(colX(i), yy, cwCols[i], 9);
     g.ctext("C", x + 13, yy + 4.5, { size: 5, bold: true });
     g.ctext("Coach", x + 33.5, yy + 4.5, { size: 3.4 });
+    // Head coach name, now that coaches are an entity (spec/24 §2.5, spec/21 G4).
+    if (coachName)
+      g.ctext(coachName.slice(0, 22), x + 33.5, yy + 7.4, {
+        size: 2.9,
+        color: INK,
+      });
   };
   const toDelayRow = (yy: number) => {
     g.rect(x, yy, 41, 24);

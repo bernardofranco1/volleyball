@@ -10,23 +10,44 @@ import {
   eq,
   ilike,
   inArray,
+  sql,
 } from "drizzle-orm";
 import { db } from "@/db";
 import {
   competitions,
   matches,
+  people,
   players,
   pools,
   teams,
   tournamentConfig,
 } from "@/db/schema";
-import { isCompetitionStatus, isDiscipline } from "@/lib/domain";
+import { DISCIPLINES, isCompetitionStatus, isDiscipline } from "@/lib/domain";
 
 export type Competition = typeof competitions.$inferSelect;
 export type TournamentConfigRow = typeof tournamentConfig.$inferSelect;
 export type Team = typeof teams.$inferSelect;
 export type Player = typeof players.$inferSelect;
 export type Pool = typeof pools.$inferSelect;
+
+/**
+ * Which disciplines a tenant's filter dropdowns should offer: everything it is
+ * currently allowed to create, plus anything already sitting in its data
+ * (spec/24 §5.2, A1). Disabling a discipline is forward-looking — it stops new
+ * competitions, it does not hide or break existing ones, so those must stay
+ * filterable. Returned in the canonical DISCIPLINES order.
+ */
+export async function disciplineFilterOptions(
+  tenantId: string,
+  enabled: readonly string[],
+): Promise<string[]> {
+  const used = await db
+    .selectDistinct({ discipline: competitions.discipline })
+    .from(competitions)
+    .where(eq(competitions.tenantId, tenantId));
+  const set = new Set<string>([...enabled, ...used.map((r) => r.discipline)]);
+  return DISCIPLINES.filter((d) => set.has(d));
+}
 
 export async function listCompetitions(
   tenantId: string,
@@ -105,11 +126,31 @@ export async function listPlayersByTeam(
 ): Promise<Map<string, Player[]>> {
   const byTeam = new Map<string, Player[]>();
   if (teamIds.length === 0) return byTeam;
+  // Names come from the linked person when there is one (spec/24 §6.2), falling
+  // back to the row's own columns for anything the backfill hasn't linked yet.
+  // COALESCE rather than two code paths, so the contract migration that drops
+  // players.full_name changes nothing here.
   const rows = await db
-    .select()
+    .select({
+      id: players.id,
+      teamId: players.teamId,
+      tenantId: players.tenantId,
+      personId: players.personId,
+      firstName: sql<string | null>`coalesce(${people.firstName}, ${players.firstName})`,
+      lastName: sql<string | null>`coalesce(${people.lastName}, ${players.lastName})`,
+      fullName: sql<string>`coalesce(${people.displayName}, ${players.fullName})`,
+      jerseyNumber: players.jerseyNumber,
+      isCaptain: players.isCaptain,
+      isLibero: players.isLibero,
+      role: players.role,
+    })
     .from(players)
+    .leftJoin(people, eq(people.id, players.personId))
     .where(inArray(players.teamId, teamIds))
-    .orderBy(asc(players.jerseyNumber), asc(players.fullName));
+    .orderBy(
+      asc(players.jerseyNumber),
+      asc(sql`coalesce(${people.displayName}, ${players.fullName})`),
+    );
   for (const p of rows) {
     const list = byTeam.get(p.teamId) ?? [];
     list.push(p);
@@ -209,7 +250,13 @@ export async function listTenantMatches(
     );
   if (opts.status === "live") conds.push(eq(matches.status, "LIVE"));
   else if (opts.status === "finished")
-    conds.push(eq(matches.status, "FINISHED"));
+    // Every status that has a result to look at, not just FINISHED. A match
+    // awaiting confirmation, or abandoned/forfeited, used to fall out of all
+    // three filter buckets and was reachable only from the unfiltered list —
+    // which is exactly where someone goes looking for its report (spec/24 §3.4).
+    conds.push(
+      inArray(matches.status, ["PENDING_CONFIRMATION", "FINISHED", "ABANDONED"]),
+    );
   else if (opts.status === "scheduled")
     conds.push(inArray(matches.status, ["SCHEDULED", "WARMUP", "COIN_TOSS"]));
   const dir = opts.order === "desc" ? desc : asc;
@@ -321,12 +368,14 @@ export async function loadMatchRosters(matchId: string): Promise<{
     .select({
       id: players.id,
       teamId: players.teamId,
-      fullName: players.fullName,
+      // Linked person wins; fall back to the row for un-backfilled data.
+      fullName: sql<string>`coalesce(${people.displayName}, ${players.fullName})`,
       jerseyNumber: players.jerseyNumber,
       isLibero: players.isLibero,
       isCaptain: players.isCaptain,
     })
     .from(players)
+    .leftJoin(people, eq(people.id, players.personId))
     .where(inArray(players.teamId, [m.teamAId, m.teamBId]));
   const lite = (teamId: string) =>
     rows

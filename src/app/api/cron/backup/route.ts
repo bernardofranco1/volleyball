@@ -5,10 +5,15 @@
 //
 // Time budget: tenants are processed sequentially with a guard; whatever
 // doesn't fit is recorded as a FAILED run ("time budget") so a missed backup
-// is visible in the console, never silently absent.
+// is visible in the console, never silently absent. Least-recently-backed-up
+// tenants go first, so the cut-off rotates instead of stranding the same tail
+// of tenants every night (spec/24 §9.5 F6).
 import type { NextRequest } from "next/server";
 import { runBackup, pruneBackups } from "@/lib/backup";
-import { listLiveTenantIds, purgeExpiredTenants } from "@/lib/tenant-admin";
+import {
+  listTenantsByBackupStaleness,
+  purgeExpiredTenants,
+} from "@/lib/tenant-admin";
 import { db } from "@/db";
 import { backupRuns } from "@/db/schema";
 import { captureError } from "@/lib/observability";
@@ -36,7 +41,7 @@ export async function GET(req: NextRequest) {
   const startedAt = Date.now();
   const results: Record<string, string> = {};
   try {
-    const tenants = await listLiveTenantIds();
+    const tenants = await listTenantsByBackupStaleness();
     let outOfTime = false;
 
     for (const t of tenants) {
@@ -49,7 +54,8 @@ export async function GET(req: NextRequest) {
           kind: "FULL",
           trigger: "CRON",
           status: "FAILED",
-          error: "time budget exhausted — raise maxDuration or split the cron",
+          error:
+            "time budget exhausted — retried first on the next run (staleness order)",
           finishedAt: new Date(),
         });
         results[t.slug] = "skipped (time budget)";

@@ -4,7 +4,7 @@
 import { and, eq } from "drizzle-orm";
 import { createClient } from "@supabase/supabase-js";
 import { headers } from "next/headers";
-import { db } from "@/db";
+import { db, dbTx } from "@/db";
 import { users, userTenantRoles } from "@/db/schema";
 import type { Role } from "@/lib/authz";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -303,7 +303,7 @@ export async function setSingleRole(
   userId: string,
   role: Role,
 ): Promise<void> {
-  await db.transaction(async (tx) => {
+  await dbTx.transaction(async (tx) => {
     await tx
       .delete(userTenantRoles)
       .where(

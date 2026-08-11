@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { and, asc, eq, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { db, dbTx } from "@/db";
 import { matches, pools, teams } from "@/db/schema";
 import { gateCompetition } from "@/lib/action-gate";
 import { computeStandings } from "@/lib/standings";
@@ -80,7 +80,7 @@ export async function deletePool(
   const poolId = str(fd, "poolId");
   if (!poolId) return fail("Missing pool.");
 
-  await db.transaction(async (tx) => {
+  await dbTx.transaction(async (tx) => {
     await tx
       .update(teams)
       .set({ poolId: null })
@@ -156,7 +156,7 @@ export async function savePoolAssignments(
   }
 
   if (changes.length > 0) {
-    await db.transaction(async (tx) => {
+    await dbTx.transaction(async (tx) => {
       for (const c of changes) {
         await tx
           .update(teams)
@@ -206,7 +206,7 @@ export async function distributePoolsBySeed(
   if (teamRows.length === 0) return fail("No teams to distribute.");
 
   const k = poolRows.length;
-  await db.transaction(async (tx) => {
+  await dbTx.transaction(async (tx) => {
     for (let i = 0; i < teamRows.length; i++) {
       // Serpentine: rows of k seeds alternate direction.
       const row = Math.floor(i / k);
@@ -246,7 +246,7 @@ export async function generateBracket(
   if (!g) return fail("Competition not found.");
 
   let outcome: FormState = ok("Bracket generated.");
-  await db.transaction(async (tx) => {
+  await dbTx.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${g.competitionId}))`);
 
     const existing = await tx
@@ -336,7 +336,7 @@ export async function advanceBracket(
   if (!g) return fail("Competition not found.");
 
   let createdTotal = 0;
-  await db.transaction(async (tx) => {
+  await dbTx.transaction(async (tx) => {
     // Serialize concurrent advances for this competition (spec/14 §E1).
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${g.competitionId}))`);
 
@@ -451,7 +451,7 @@ export async function seedFromStandings(
   }
   if (ranked.length === 0) return fail("No standings yet to seed from.");
 
-  await db.transaction(async (tx) => {
+  await dbTx.transaction(async (tx) => {
     for (let i = 0; i < ranked.length; i++) {
       await tx
         .update(teams)

@@ -106,6 +106,8 @@ function baseReport(discipline: string, events: ReportEvent[]): MatchReportData 
         },
       ],
     },
+    coachA: null,
+    coachB: null,
     rosterA: [
       { id: "a1", fullName: "Duda Lisboa", jerseyNumber: 1, isCaptain: true, isLibero: false },
       { id: "a2", fullName: "Ana Patricia", jerseyNumber: 2, isCaptain: false, isLibero: false },

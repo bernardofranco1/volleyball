@@ -9,7 +9,8 @@
 //
 // Restores are deliberately NOT triggered from the app: scripts/restore-backup.mts
 // is run by an operator against an explicit DATABASE_URL.
-import { gzipSync } from "node:zlib";
+import { gzip } from "node:zlib";
+import { promisify } from "node:util";
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -24,12 +25,16 @@ import {
   matchOfficials,
   matchSessions,
   matchSignatures,
+  people,
+  personRoles,
   players,
   pools,
   poolTeams,
   teams,
+  teamStaff,
   tenantBilling,
   tenantBranding,
+  tenantConfig,
   tenants,
   tournamentConfig,
   users,
@@ -53,6 +58,8 @@ import {
 // Pure policy (constants, naming, retention math) lives in backup-policy.ts —
 // re-exported so existing importers and tests keep one entry point.
 export * from "@/lib/backup-policy";
+
+const gzipAsync = promisify(gzip);
 
 export interface TenantExport {
   formatVersion: number;
@@ -110,11 +117,22 @@ export async function exportTenant(
       .select()
       .from(tenantBilling)
       .where(eq(tenantBilling.tenantId, tenantId)),
+    tenant_config: await db
+      .select()
+      .from(tenantConfig)
+      .where(eq(tenantConfig.tenantId, tenantId)),
     users: await db.select().from(users).where(inArray(users.id, memberIds)),
     user_tenant_roles: await db
       .select()
       .from(userTenantRoles)
       .where(eq(userTenantRoles.tenantId, tenantId)),
+    // Tenant-level, so included in an INCREMENTAL competition export too: a
+    // standalone restore of one competition needs the people its rosters point at.
+    people: await db.select().from(people).where(eq(people.tenantId, tenantId)),
+    person_roles: await db
+      .select()
+      .from(personRoles)
+      .where(eq(personRoles.tenantId, tenantId)),
     competitions: await db.select().from(competitions).where(compFilter),
     tournament_config: await db
       .select()
@@ -129,6 +147,10 @@ export async function exportTenant(
       .select()
       .from(teams)
       .where(inArray(teams.competitionId, compIds)),
+    team_staff: await db
+      .select()
+      .from(teamStaff)
+      .where(inArray(teamStaff.teamId, teamIds)),
     pool_teams: await db
       .select()
       .from(poolTeams)
@@ -217,7 +239,10 @@ export async function runBackup(opts: {
       opts.tenantId,
       opts.kind === "INCREMENTAL" ? opts.scope : undefined,
     );
-    const body = gzipSync(Buffer.from(JSON.stringify(doc)), { level: 6 });
+    // Async gzip: compressing a whole tenant export synchronously blocked this
+    // instance's event loop, and a backup can be triggered from a scoring
+    // request's after() hook (spec/24 §9.5 F6).
+    const body = await gzipAsync(Buffer.from(JSON.stringify(doc)), { level: 6 });
     const rowCounts = Object.fromEntries(
       Object.entries(doc.tables).map(([name, rows]) => [name, rows.length]),
     );

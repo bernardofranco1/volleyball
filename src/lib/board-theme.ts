@@ -16,10 +16,8 @@ export interface BoardTheme {
   radius: string;
 }
 
-const FF_FALLBACK =
-  "'Barlow Condensed','Archivo',system-ui,-apple-system,sans-serif";
-
-// Fonts offered in the config tab (loaded by the scoreboard route via next/font).
+// Fonts offered in the config tab. Self-hosted at build time by
+// src/lib/board-fonts.ts, which the scoreboard route applies (spec/24 §9.5 F7).
 export const BOARD_FONTS = [
   "Saira Condensed",
   "Barlow Condensed",
@@ -27,12 +25,43 @@ export const BOARD_FONTS = [
   "Anton",
 ] as const;
 
+// Human family name (as stored on competition branding) → the CSS variable
+// next/font generates. next/font hashes the family it registers, so naming
+// 'Saira Condensed' directly no longer resolves; going through variables keeps
+// the stored branding values working with no data migration.
+const FONT_VAR: Record<string, string> = {
+  "Saira Condensed": "var(--font-saira-condensed)",
+  "Barlow Condensed": "var(--font-barlow-condensed)",
+  Archivo: "var(--font-archivo)",
+  Anton: "var(--font-anton)",
+};
+
+const SYSTEM_FALLBACK = "system-ui,-apple-system,sans-serif";
+
+/**
+ * CSS font-family stack for a board. Unknown/absent names fall back to Saira
+ * Condensed, the default every per-discipline theme has always used. The other
+ * condensed faces stay in the stack as near-metric fallbacks, mirroring the
+ * previous hand-written stack.
+ */
+export function boardFontStack(fontFamily?: string | null): string {
+  const primary =
+    (fontFamily ? FONT_VAR[fontFamily] : undefined) ??
+    FONT_VAR["Saira Condensed"];
+  const fallbacks = [
+    FONT_VAR["Barlow Condensed"],
+    FONT_VAR.Archivo,
+    SYSTEM_FALLBACK,
+  ].filter((f) => f !== primary);
+  return [primary, ...fallbacks].join(",");
+}
+
 const BEACH_DEFAULT: BoardTheme = {
   bg: "#0E1A2B",
   line: "#F2A01E",
   accent: "#F2A01E",
   font: "#FFFFFF",
-  ff: `'Saira Condensed',${FF_FALLBACK}`,
+  ff: boardFontStack(),
   radius: "0px",
 };
 
@@ -41,7 +70,7 @@ const INDOOR_DEFAULT: BoardTheme = {
   line: "#5A5F6A",
   accent: "#E9EBEF",
   font: "#FFFFFF",
-  ff: `'Saira Condensed',${FF_FALLBACK}`,
+  ff: boardFontStack(),
   radius: "0px",
 };
 
@@ -96,7 +125,7 @@ export function resolveBoardTheme(
     line: b?.lineColor || d.line,
     accent: b?.accentColor || d.accent,
     font: b?.fontColor || d.font,
-    ff: b?.fontFamily ? `'${b.fontFamily}',${FF_FALLBACK}` : d.ff,
+    ff: b?.fontFamily ? boardFontStack(b.fontFamily) : d.ff,
     radius: d.radius,
   };
 }

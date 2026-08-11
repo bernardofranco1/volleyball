@@ -65,6 +65,8 @@ function report(events: ReportEvent[]): MatchReportData {
     sets: [],
     events,
     approval: { confirmedVia: null, confirmedAt: null, officials: [], signatures: [] },
+    coachA: null,
+    coachB: null,
     rosterA: [],
     rosterB: [],
   };

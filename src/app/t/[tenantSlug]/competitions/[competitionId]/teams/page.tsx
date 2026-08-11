@@ -17,6 +17,8 @@ import { getT } from "@/lib/i18n/server";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { AddTeamForm } from "@/components/admin/AddTeamForm";
 import { AddPlayerForm } from "@/components/admin/AddPlayerForm";
+import { listTeamStaff, searchPeople } from "@/lib/people";
+import { TeamStaffPanel } from "@/components/admin/TeamStaffPanel";
 import { CompetitionHeader } from "@/components/admin/CompetitionHeader";
 import { CsvImport } from "@/components/admin/CsvImport";
 import { SubmitButton } from "@/components/admin/SubmitButton";
@@ -51,7 +53,21 @@ export default async function TeamsPage({
     listTeams(competitionId),
   ]);
   if (!competition) notFound();
-  const playersByTeam = await listPlayersByTeam(teams.map((t) => t.id));
+  const [playersByTeam, registryPlayers, registryCoaches, staffRows] =
+    await Promise.all([
+      listPlayersByTeam(teams.map((t) => t.id)),
+      // Autocomplete sources for the pickers (spec/24 §6.2/§6.4). Role-filtered so
+      // a roster slot doesn't suggest referees, nor a coach slot players.
+      searchPeople(ctx.tenant.id, { roles: ["PLAYER"], limit: 500 }),
+      searchPeople(ctx.tenant.id, { roles: ["COACH"], limit: 500 }),
+      Promise.all(
+        teams.map(async (t) => ({
+          teamId: t.id,
+          staff: await listTeamStaff(ctx.tenant.id, t.id),
+        })),
+      ),
+    ]);
+  const staffByTeam = new Map(staffRows.map((r) => [r.teamId, r.staff]));
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -235,6 +251,14 @@ export default async function TeamsPage({
                     tenantSlug={tenantSlug}
                     competitionId={competitionId}
                     teamId={team.id}
+                    people={registryPlayers}
+                  />
+
+                  <TeamStaffPanel
+                    tenantSlug={tenantSlug}
+                    teamId={team.id}
+                    people={registryCoaches}
+                    staff={staffByTeam.get(team.id) ?? []}
                   />
 
                   <div className="mt-4 border-t border-border pt-3">

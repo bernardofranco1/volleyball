@@ -84,19 +84,10 @@ export default async function ScoreboardPage({
   const theme = resolveBoardTheme(view.discipline, branding);
   const boardLogo = branding?.logoUrl ?? tenant.branding.logoUrl;
 
+  // Board fonts are self-hosted (spec/24 §9.5 F7); the --font-* variables their
+  // theme stacks resolve against are defined on <html> in the root layout.
   return (
     <>
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link
-        rel="preconnect"
-        href="https://fonts.gstatic.com"
-        crossOrigin="anonymous"
-      />
-      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-      <link
-        href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800;900&family=Barlow+Condensed:wght@600;700;800&family=Archivo:wght@700;800;900&family=Anton&display=swap"
-        rel="stylesheet"
-      />
       <ScoreboardDisplay
       matchId={view.matchId}
       // The read-only board renders the fields common to all four discipline

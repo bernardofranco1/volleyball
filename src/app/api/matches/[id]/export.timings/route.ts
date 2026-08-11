@@ -3,7 +3,7 @@
 // as JSON, derivable at any moment and final once the match ends.
 
 import type { NextRequest } from "next/server";
-import { authorizeMatch, SCORING_ROLES } from "@/lib/authz";
+import { authorizeReport } from "@/lib/report-access";
 import { loadMatchReport, MatchReportNotFound } from "@/lib/match-report";
 import { computeMatchTimings } from "@/lib/timings";
 
@@ -15,9 +15,14 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id } = await ctx.params;
-  const authed = await authorizeMatch(id, SCORING_ROLES);
+  // Technical export: managers/scorers only, and only while the tenant has this
+  // export enabled (spec/24 §3.3). Disabled ⇒ 404, same as the PDF route.
+  const authed = await authorizeReport(id, "TIMINGS");
   if (!authed.ok)
-    return Response.json({ error: "Forbidden" }, { status: authed.status });
+    return Response.json(
+      { error: authed.status === 404 ? "Not found" : "Forbidden" },
+      { status: authed.status },
+    );
 
   try {
     const report = await loadMatchReport(id);

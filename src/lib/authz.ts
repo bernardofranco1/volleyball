@@ -23,16 +23,33 @@ export interface AuthContext {
 }
 
 /**
- * The authenticated user for this request, memoised so the proxy, layout, page,
- * and any nested guard share a single `getUser()` network validation (D / M3).
+ * The authenticated user for this request, memoised so the layout, page, and any
+ * nested guard share one verification (D / M3).
+ *
+ * `getClaims()` rather than `getUser()`: it verifies the access token locally
+ * against the project's published ES256 JWKS instead of spending an Auth-server
+ * round trip (20–80ms) on every scoring POST, every state resync and every page
+ * render — the proxy already moved to it, authz.ts had not (spec/24 §9.5 F5).
+ * On a project still using the legacy symmetric secret the SDK falls back to a
+ * network check, so this is never *less* correct, only sometimes slower.
+ *
+ * Safe for revocation because a token is never the authority here: every gate
+ * funnels through rolesFor(), a live DB read, and removing someone's access
+ * deletes their user_tenant_roles rows (user-admin-actions.ts deleteUserAccount),
+ * so a still-unexpired token resolves to zero roles and is refused.
  */
-export const getCurrentUser = cache(async () => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
-});
+export const getCurrentUser = cache(
+  async (): Promise<{ id: string; email: string | null } | null> => {
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase.auth.getClaims();
+    const claims = data?.claims;
+    if (!claims?.sub) return null;
+    return {
+      id: claims.sub,
+      email: typeof claims.email === "string" ? claims.email : null,
+    };
+  },
+);
 
 /** TENANT_ADMIN is a superuser within its tenant and satisfies any requirement. */
 export function hasRole(roles: Role[], allowed: Role[]): boolean {

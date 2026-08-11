@@ -6,7 +6,12 @@ import {
   hasRole,
   requireRole,
 } from "@/lib/authz";
-import { listTenantMatches, type TenantMatchRow } from "@/lib/competitions";
+import {
+  disciplineFilterOptions,
+  listTenantMatches,
+  type TenantMatchRow,
+} from "@/lib/competitions";
+import { isReportableStatus } from "@/lib/reports";
 import { readableTextOn } from "@/lib/colors";
 import { DISCIPLINES } from "@/lib/domain";
 import { getT } from "@/lib/i18n/server";
@@ -50,12 +55,15 @@ export default async function MatchesPage({
   const orderDir = order === "desc" ? "desc" : "asc";
 
   const page = Math.max(0, Number.parseInt(pageParam ?? "0", 10) || 0);
-  const { rows, hasMore } = await listTenantMatches(ctx.tenant.id, {
-    discipline,
-    status: statusFilter,
-    order: orderDir,
-    page,
-  });
+  const [{ rows, hasMore }, disciplineOptions] = await Promise.all([
+    listTenantMatches(ctx.tenant.id, {
+      discipline,
+      status: statusFilter,
+      order: orderDir,
+      page,
+    }),
+    disciplineFilterOptions(ctx.tenant.id, ctx.tenant.config.enabledDisciplines),
+  ]);
 
   // Live matches pin to a section on top (unless a status filter says otherwise).
   const liveRows = statusFilter ? [] : rows.filter((m) => m.status === "LIVE");
@@ -68,9 +76,14 @@ export default async function MatchesPage({
   const canScore = hasRole(ctx.roles, SCORING_ROLES);
 
   // Primary card link routes by role: managers → match management, scorers →
-  // the scoring interface, view-only → the public scoreboard.
+  // the scoring interface, view-only → the public scoreboard. A match with a
+  // result goes to its Reports tab for every role instead: there is nothing left
+  // to score, the reports are what people come back for, and a viewer had no
+  // route to them at all before (spec/24 §3.4). Managers still get the hub from
+  // the tab bar there.
   const matchHref = (m: TenantMatchRow) => {
     const detail = `/t/${tenantSlug}/competitions/${m.competitionId}/matches/${m.id}`;
+    if (isReportableStatus(m.status)) return `${detail}/reports`;
     if (canManage) return detail;
     if (canScore) return `${detail}/live`;
     return `/t/${tenantSlug}/scoreboard/${m.id}`;
@@ -176,7 +189,7 @@ export default async function MatchesPage({
           {t("common.discipline")}
           <select name="discipline" defaultValue={discipline ?? ""} className={selectCls}>
             <option value="">{t("common.all")}</option>
-            {DISCIPLINES.map((d) => (
+            {DISCIPLINES.filter((d) => disciplineOptions.includes(d)).map((d) => (
               <option key={d} value={d}>
                 {d}
               </option>

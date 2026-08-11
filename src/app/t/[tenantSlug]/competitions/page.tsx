@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
-import { listCompetitions } from "@/lib/competitions";
+import { disciplineFilterOptions, listCompetitions } from "@/lib/competitions";
 import { getT } from "@/lib/i18n/server";
 import { CompetitionFilters } from "@/components/admin/CompetitionFilters";
 import { NewCompetitionForm } from "@/components/admin/NewCompetitionForm";
@@ -25,11 +25,10 @@ export default async function CompetitionsPage({
   );
 
   // Filters are applied in the WHERE clause, not in JS after fetching all rows.
-  const competitions = await listCompetitions(ctx.tenant.id, {
-    discipline,
-    status,
-    q,
-  });
+  const [competitions, disciplineOptions] = await Promise.all([
+    listCompetitions(ctx.tenant.id, { discipline, status, q }),
+    disciplineFilterOptions(ctx.tenant.id, ctx.tenant.config.enabledDisciplines),
+  ]);
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -48,7 +47,12 @@ export default async function CompetitionsPage({
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
         {/* List + filters */}
         <section className={competitions.length === 0 ? "order-last lg:order-none" : ""}>
-          <CompetitionFilters discipline={discipline} status={status} q={q} />
+          <CompetitionFilters
+            discipline={discipline}
+            status={status}
+            q={q}
+            disciplineOptions={disciplineOptions}
+          />
 
           {competitions.length === 0 ? (
             <div className={`${ui.card} text-sm text-score-dim`}>
@@ -89,7 +93,10 @@ export default async function CompetitionsPage({
         </section>
 
         <aside>
-          <NewCompetitionForm tenantSlug={tenantSlug} />
+          <NewCompetitionForm
+            tenantSlug={tenantSlug}
+            enabledDisciplines={ctx.tenant.config.enabledDisciplines}
+          />
         </aside>
       </div>
     </main>

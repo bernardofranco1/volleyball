@@ -15,10 +15,15 @@ export function CompetitionFilters({
   discipline,
   status,
   q,
+  // Disciplines worth offering: the tenant's enabled set, plus any already
+  // present in its data. A discipline disabled after competitions existed must
+  // stay filterable or those competitions become hard to find (spec/24 A1).
+  disciplineOptions = [...DISCIPLINES],
 }: {
   discipline?: string;
   status?: string;
   q?: string;
+  disciplineOptions?: string[];
 }) {
   const t = useT();
   const router = useRouter();
@@ -70,7 +75,7 @@ export function CompetitionFilters({
           onChange={apply}
         >
           <option value="">{t("common.all")}</option>
-          {DISCIPLINES.map((d) => (
+          {DISCIPLINES.filter((d) => disciplineOptions.includes(d)).map((d) => (
             <option key={d} value={d}>
               {d}
             </option>

@@ -2,10 +2,19 @@
 // best-effort engine replay for per-set detail; no PDF concerns here (the route
 // owns PDFKit, which is nodejs-only). Beach-only set detail for now; other
 // disciplines fall back to the denormalised matches row.
-import { aliasedTable, asc, eq, inArray } from "drizzle-orm";
+import { aliasedTable, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { competitions, events, matches, players, teams, tenants } from "@/db/schema";
+import {
+  competitions,
+  events,
+  matches,
+  people,
+  players,
+  teams,
+  tenants,
+} from "@/db/schema";
 import { loadMatchState } from "@/lib/match-engine";
+import { headCoachName } from "@/lib/people";
 import {
   loadOfficials,
   loadSignatures,
@@ -97,6 +106,13 @@ export interface MatchReportData {
   approval: ReportApproval;
   rosterA: ReportPlayer[];
   rosterB: ReportPlayer[];
+  /**
+   * Head coach per side, for the coach box the official sheets print. Blank
+   * until a coach is assigned on the team's roster page (spec/21 gap G4 —
+   * there was no coach entity to read before spec/24 §2.5).
+   */
+  coachA: string | null;
+  coachB: string | null;
 }
 
 export class MatchReportNotFound extends Error {}
@@ -171,15 +187,19 @@ export async function loadMatchReport(
     .select({
       id: players.id,
       teamId: players.teamId,
-      fullName: players.fullName,
-      firstName: players.firstName,
-      lastName: players.lastName,
+      // Names resolve through the linked person when there is one (spec/24 §6.2).
+      // COALESCE so un-backfilled rows still print, and so the later contract
+      // migration that drops players.full_name needs no change here.
+      fullName: sql<string>`coalesce(${people.displayName}, ${players.fullName})`,
+      firstName: sql<string | null>`coalesce(${people.firstName}, ${players.firstName})`,
+      lastName: sql<string | null>`coalesce(${people.lastName}, ${players.lastName})`,
       role: players.role,
       jerseyNumber: players.jerseyNumber,
       isCaptain: players.isCaptain,
       isLibero: players.isLibero,
     })
     .from(players)
+    .leftJoin(people, eq(people.id, players.personId))
     .where(inArray(players.teamId, [m.teamAId, m.teamBId]))
     .orderBy(asc(players.jerseyNumber));
   const rosterOf = (teamId: string): ReportPlayer[] =>
@@ -200,9 +220,11 @@ export async function loadMatchReport(
 
   // Officials + signatures for the APPROVAL block. Retained forever, so a
   // reprint of an old sheet shows exactly who signed it and when.
-  const [officials, signatures] = await Promise.all([
+  const [officials, signatures, coachA, coachB] = await Promise.all([
     loadOfficials(matchId),
     loadSignatures(matchId),
+    headCoachName(m.teamAId),
+    headCoachName(m.teamBId),
   ]);
 
   // Per-set detail from an engine replay (beach only — best effort).
@@ -261,6 +283,8 @@ export async function loadMatchReport(
     },
     rosterA,
     rosterB,
+    coachA,
+    coachB,
   };
 }
 

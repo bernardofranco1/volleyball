@@ -52,6 +52,24 @@ export const tenantBranding = pgTable("tenant_branding", {
   courtColorOverrides: jsonb("court_color_overrides"),
 }).enableRLS();
 
+// Per-tenant capability configuration (spec/24 §2.1). Separate from branding
+// because it gates behaviour, not looks — which disciplines this tenant may run
+// competitions in, and which match documents its Reports tab offers.
+//
+// A missing row means "everything enabled", so existing tenants keep working
+// unchanged until an admin narrows it; readers fall back to the defaults below
+// rather than requiring a backfill. Stored as jsonb string arrays and always
+// re-validated on read against DISCIPLINES / REPORT_TYPES — never trusted raw,
+// since a hand-edited row or a removed enum member would otherwise reach the UI.
+export const tenantConfig = pgTable("tenant_config", {
+  tenantId: text("tenant_id")
+    .primaryKey()
+    .references(() => tenants.id),
+  enabledDisciplines: jsonb("enabled_disciplines").$type<string[]>(),
+  enabledReportTypes: jsonb("enabled_report_types").$type<string[]>(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}).enableRLS();
+
 // Per-competition scoreboard appearance (configurable from the competition's
 // Scoreboard config tab). All nullable → fall back to per-discipline board
 // defaults. Applies to every discipline's broadcast board.
@@ -242,6 +260,127 @@ export const teams = pgTable(
   (t) => [index("teams_competition_idx").on(t.competitionId)],
 ).enableRLS();
 
+// ── People (spec/24 §6) ──────────────────────────────────────────────────────
+//
+// Tenant-level registry of the humans a competition involves: players, referees,
+// coaches, scorers. Before this, a "player" existed only as a row under one
+// team in one competition and an official was a name retyped on every match, so
+// nothing about a person could be reused, corrected once, or matched to an
+// external record.
+//
+// Field choices are deliberately VIS-shaped so a future push into the FIVB VIS
+// person modules is a mapping rather than a redesign (spec/24 §7):
+//   - `displayName` is separate from `lastName` because VIS's TeamName is a
+//     shirt/scoreboard label, NOT a surname. Treating it as one is a real
+//     production incident: names rendered as "Thatdao N.Thatdao".
+//   - `lastName` is nullable: VIS holds players who genuinely have no surname.
+//   - measurements are human units here; VIS's 1/1000-mm and 1/1000-g scaling
+//     belongs in the connector, not the store.
+//   - `visPersonNo` is VIS's person `No` — the join key for any later sync. It
+//     is NOT the registration number, which is a different id space entirely.
+export const people = pgTable(
+  "people",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    /** Shirt / scoreboard label. Never a surname fallback. */
+    displayName: text("display_name").notNull(),
+    gender: text("gender", { enum: ["M", "W"] }),
+    // ── Identity (spec/25) ────────────────────────────────────────────────
+    // The goal is one row per human per tenant. These are what make that
+    // enforceable: names alone can't identify a person (they collide, and some
+    // people have no surname), so matching goes vis_person_no → email →
+    // (last, first, birthdate, federation).
+    //
+    // Both email and birthdate are NULLABLE by necessity, not by laziness:
+    // minors frequently have no address of their own, families share one, and
+    // referees change theirs. Hence unique-WHEN-PRESENT below rather than a
+    // plain unique, which would make the field effectively mandatory.
+    email: text("email"),
+    birthdate: date("birthdate"),
+    /**
+     * Login account, when this person has one (spec/25 §3). Nullable — most
+     * people in the registry never sign in. This is what will let a referee open
+     * their own nominations and availability card in the Referees' Hub, rather
+     * than an admin reading them out.
+     */
+    userId: text("user_id").references(() => users.id),
+    /** 3-letter federation code as VIS uses them (NOR, ITA, …). */
+    federationCode: text("federation_code"),
+    heightCm: integer("height_cm"),
+    weightKg: integer("weight_kg"),
+    position: text("position", {
+      enum: [
+        "SETTER",
+        "WING_SPIKER",
+        "MIDDLE_BLOCKER",
+        "LIBERO",
+        "UNIVERSAL",
+        "OPPOSITE",
+      ],
+    }),
+    spikeReachCm: integer("spike_reach_cm"),
+    blockReachCm: integer("block_reach_cm"),
+    handedness: text("handedness", { enum: ["LEFT", "RIGHT"] }),
+    photoUrl: text("photo_url"),
+    /** Free text until FIVB supply the GetReferee field list (spec/24 §7.4). */
+    refereeLevel: text("referee_level"),
+    visPersonNo: integer("vis_person_no"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    deletedAt: timestamp("deleted_at"),
+  },
+  (t) => [
+    index("people_tenant_idx").on(t.tenantId),
+    index("people_tenant_name_idx").on(t.tenantId, t.lastName, t.firstName),
+    // One row per VIS person per tenant, but only for rows that carry an id.
+    uniqueIndex("people_tenant_vis_uq")
+      .on(t.tenantId, t.visPersonNo)
+      .where(sql`${t.visPersonNo} is not null`),
+    // Same idea for the two other identity keys (spec/25 §2). Scoped to the
+    // tenant, not global: a person who works for two customers of the platform
+    // gets one row in each, correlated by these keys but never readable across
+    // the boundary — sharing the row would let one tenant discover a person the
+    // other registered.
+    uniqueIndex("people_tenant_email_uq")
+      .on(t.tenantId, t.email)
+      .where(sql`${t.email} is not null`),
+    uniqueIndex("people_tenant_user_uq")
+      .on(t.tenantId, t.userId)
+      .where(sql`${t.userId} is not null`),
+    // Supports the duplicate finder's name+birthdate probe.
+    index("people_tenant_birthdate_idx").on(t.tenantId, t.birthdate),
+  ],
+).enableRLS();
+
+// A person can hold several roles at once — a coach who also referees, a scorer
+// who plays. Role-specific attributes beyond refereeLevel wait for the FIVB
+// field lists rather than being invented here (spec/24 §7.4).
+export const personRoles = pgTable(
+  "person_roles",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    role: text("role", {
+      enum: ["PLAYER", "REFEREE", "COACH", "SCORER"],
+    }).notNull(),
+  },
+  (t) => [
+    unique().on(t.personId, t.role),
+    index("person_roles_tenant_role_idx").on(t.tenantId, t.role),
+  ],
+).enableRLS();
+
 export const players = pgTable("players", {
   id: text("id").primaryKey(),
   teamId: text("team_id")
@@ -250,6 +389,13 @@ export const players = pgTable("players", {
   tenantId: text("tenant_id")
     .notNull()
     .references(() => tenants.id),
+  // Link to the tenant-level person (spec/24 §2.3). Nullable during the expand
+  // phase so existing rows stay valid; the backfill fills it and the contract
+  // migration makes it NOT NULL and drops the name columns below. Jersey,
+  // captain and libero stay here — they are facts about this roster spot, not
+  // about the person, which is also how VIS models it (shirt number lives on
+  // the tournament registration).
+  personId: text("person_id").references(() => people.id),
   firstName: text("first_name"),
   lastName: text("last_name"),
   fullName: text("full_name").notNull(),
@@ -263,6 +409,13 @@ export const players = pgTable("players", {
   // One jersey number per team. NULLs are distinct in Postgres, so bench/staff
   // without a number are unaffected. Brief §2.1.
   uniqueIndex("players_team_jersey_uq").on(t.teamId, t.jerseyNumber),
+  // One roster spot per person per team (spec/25 §4). Without this, the same
+  // person could be added to a team twice — trivially, by giving them a second
+  // jersey or no jersey at all — which is exactly the duplication the registry
+  // exists to remove. Partial so rows not yet linked to a person are unaffected.
+  uniqueIndex("players_team_person_uq")
+    .on(t.teamId, t.personId)
+    .where(sql`${t.personId} is not null`),
 ]).enableRLS();
 
 // ── Matches ──────────────────────────────────────────────────────────────────
@@ -479,6 +632,14 @@ export const matchOfficials = pgTable(
         "LINE_JUDGE_4",
       ],
     }).notNull(),
+    // Link to the tenant-level person (spec/24 §2.4). Nullable in the expand
+    // phase; the backfill fills it from the existing names.
+    personId: text("person_id").references(() => people.id),
+    // name/country/level are KEPT after the migration, as a snapshot of what was
+    // printed on the sheet at match time. A scoresheet is a historical record:
+    // correcting a person's spelling next season must not silently rewrite an
+    // already-signed document, so the officials form copies these from the
+    // picked person on save rather than joining at print time (spec/24 §2.4).
     name: text("name").notNull(),
     // Printed by the beach sheet (Country) and the indoor sheet (Level). Both
     // optional — name only is required today.
@@ -491,6 +652,42 @@ export const matchOfficials = pgTable(
     createdBy: text("created_by"),
   },
   (t) => [unique("match_officials_role").on(t.matchId, t.role)],
+).enableRLS();
+
+// Bench staff for a team (spec/24 §2.5). Closes spec/21 gap G4 on the data side:
+// the coach box on the official scoresheets printed blank because no coach
+// entity existed anywhere.
+//
+// The function list mirrors VIS's VolleyTeam staff fields (HeadCoachName/
+// CtryCode, AssistCoachName, AssistCoach2, Doctor, Trainer, Manager) so a later
+// VIS push has a 1:1 target. Note VIS stores these as plain name+country strings
+// with no person ids, so this direction of the mapping is lossy by VIS's design,
+// not ours (spec/24 §7.3).
+export const teamStaff = pgTable(
+  "team_staff",
+  {
+    id: text("id").primaryKey(),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    function: text("function", {
+      enum: [
+        "HEAD_COACH",
+        "ASSISTANT_COACH",
+        "ASSISTANT_COACH_2",
+        "DOCTOR",
+        "TRAINER",
+        "MANAGER",
+      ],
+    }).notNull(),
+  },
+  (t) => [unique("team_staff_function").on(t.teamId, t.function)],
 ).enableRLS();
 
 /**

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { and, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, dbTx } from "@/db";
 import { matchOfficials, matches } from "@/db/schema";
 import { ADMIN_ROLES, authorizeMatch } from "@/lib/authz";
 import { recordAudit } from "@/lib/audit";
@@ -25,6 +25,7 @@ import {
 import { fail, ok, type FormState } from "@/lib/action-state";
 import { intOrNull, str } from "@/lib/form-data";
 import { newId } from "@/lib/id";
+import { resolvePickedPerson } from "@/lib/people-actions";
 
 /**
  * Rewind a match to just before a chosen event and let scoring resume manually
@@ -260,6 +261,9 @@ export async function reopenMatchResult(
  * other result-adjacent actions; the 1st-referee sign-off (spec/20) remains
  * the other writer and wins by the same upsert.
  */
+/** Slots that are table officials rather than referees (spec/24 A3). */
+const SCORER_OFFICIAL_ROLES = new Set(["SCORER", "ASSISTANT_SCORER"]);
+
 export async function saveMatchOfficials(
   _prev: FormState,
   fd: FormData,
@@ -269,9 +273,27 @@ export async function saveMatchOfficials(
   if (!authed.ok) return fail("Only a competition admin can assign officials.");
 
   const roles = matchOfficials.role.enumValues;
+
+  // Resolve each filled slot to a registry person BEFORE the transaction
+  // (spec/24 §6.3): resolvePickedPerson may create a person, and doing that
+  // inside the officials transaction would tie an unrelated insert to it. A slot
+  // whose person can't be resolved keeps its typed name and stays unlinked
+  // rather than failing the whole save.
+  const personIds = new Map<string, string>();
+  for (const role of roles) {
+    const name = str(fd, `name_${role}`).slice(0, 120);
+    if (!name) continue;
+    const resolved = await resolvePickedPerson(
+      authed.auth.tenantId,
+      { personId: str(fd, `personId_${role}`), personName: name },
+      SCORER_OFFICIAL_ROLES.has(role) ? "SCORER" : "REFEREE",
+    );
+    if (!("error" in resolved)) personIds.set(role, resolved.id);
+  }
+
   let saved = 0;
   let removed = 0;
-  await db.transaction(async (tx) => {
+  await dbTx.transaction(async (tx) => {
     for (const role of roles) {
       const name = str(fd, `name_${role}`).slice(0, 120);
       const country = str(fd, `country_${role}`).slice(0, 40);
@@ -296,6 +318,7 @@ export async function saveMatchOfficials(
           matchId,
           tenantId: authed.auth.tenantId,
           role,
+          personId: personIds.get(role) ?? null,
           name,
           country: country || null,
           level: level || null,
@@ -305,6 +328,7 @@ export async function saveMatchOfficials(
         .onConflictDoUpdate({
           target: [matchOfficials.matchId, matchOfficials.role],
           set: {
+            personId: personIds.get(role) ?? null,
             name,
             country: country || null,
             level: level || null,

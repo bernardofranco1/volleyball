@@ -10,8 +10,9 @@ import {
   isNull,
   lt,
   max,
+  sql,
 } from "drizzle-orm";
-import { db } from "@/db";
+import { db, dbTx } from "@/db";
 import {
   auditLog,
   backupRuns,
@@ -24,17 +25,22 @@ import {
   matchOfficials,
   matchSessions,
   matchSignatures,
+  people,
+  personRoles,
   players,
   pools,
   poolTeams,
   teams,
+  teamStaff,
   tenantBilling,
   tenantBranding,
+  tenantConfig,
   tenants,
   tournamentConfig,
   userTenantRoles,
 } from "@/db/schema";
 import { captureError } from "@/lib/observability";
+import { resolveTenantConfig, type TenantConfig } from "@/lib/tenant";
 
 /** Days a soft-deleted tenant stays restorable before the cron purges it. */
 export const DELETE_GRACE_DAYS = 7;
@@ -156,6 +162,8 @@ export interface AdminTenantDetail {
     fontFamily: string | null;
     courtColorOverrides: Record<string, string> | null;
   };
+  /** Capability config, fully resolved (spec/24 §2.1). */
+  config: TenantConfig;
 }
 
 /** One tenant by id, soft-deleted included (the console must show those). */
@@ -177,9 +185,12 @@ export async function getTenantById(
         logoUrl: tenantBranding.logoUrl,
         fontFamily: tenantBranding.fontFamily,
         courtColorOverrides: tenantBranding.courtColorOverrides,
+        enabledDisciplines: tenantConfig.enabledDisciplines,
+        enabledReportTypes: tenantConfig.enabledReportTypes,
       })
       .from(tenants)
       .leftJoin(tenantBranding, eq(tenantBranding.tenantId, tenants.id))
+      .leftJoin(tenantConfig, eq(tenantConfig.tenantId, tenants.id))
       .where(eq(tenants.id, tenantId))
       .limit(1)
   )[0];
@@ -200,6 +211,7 @@ export async function getTenantById(
       courtColorOverrides:
         (r.courtColorOverrides as Record<string, string> | null) ?? null,
     },
+    config: resolveTenantConfig(r),
   };
 }
 
@@ -229,7 +241,7 @@ export async function hardDeleteTenant(tenantId: string): Promise<void> {
     .from(pools)
     .where(eq(pools.tenantId, tenantId));
 
-  await db.transaction(async (tx) => {
+  await dbTx.transaction(async (tx) => {
     await tx.delete(events).where(eq(events.tenantId, tenantId));
     await tx.delete(matchSessions).where(eq(matchSessions.tenantId, tenantId));
     await tx
@@ -241,6 +253,7 @@ export async function hardDeleteTenant(tenantId: string): Promise<void> {
       .where(eq(matchSignatures.tenantId, tenantId));
     await tx.delete(matches).where(eq(matches.tenantId, tenantId));
     await tx.delete(players).where(eq(players.tenantId, tenantId));
+    await tx.delete(teamStaff).where(eq(teamStaff.tenantId, tenantId));
     await tx.delete(poolTeams).where(inArray(poolTeams.poolId, poolIds));
     await tx.delete(teams).where(eq(teams.tenantId, tenantId));
     await tx.delete(pools).where(eq(pools.tenantId, tenantId));
@@ -251,6 +264,9 @@ export async function hardDeleteTenant(tenantId: string): Promise<void> {
       .delete(competitionBranding)
       .where(inArray(competitionBranding.competitionId, compIds));
     await tx.delete(competitions).where(eq(competitions.tenantId, tenantId));
+    // After players / match_officials / team_staff, which reference them.
+    await tx.delete(personRoles).where(eq(personRoles.tenantId, tenantId));
+    await tx.delete(people).where(eq(people.tenantId, tenantId));
     await tx.delete(csvImports).where(eq(csvImports.tenantId, tenantId));
     await tx.delete(auditLog).where(eq(auditLog.tenantId, tenantId));
     await tx
@@ -259,6 +275,7 @@ export async function hardDeleteTenant(tenantId: string): Promise<void> {
     await tx.delete(tenantBilling).where(eq(tenantBilling.tenantId, tenantId));
     await tx.delete(backupRuns).where(eq(backupRuns.tenantId, tenantId));
     await tx.delete(tenantBranding).where(eq(tenantBranding.tenantId, tenantId));
+    await tx.delete(tenantConfig).where(eq(tenantConfig.tenantId, tenantId));
     await tx.delete(tenants).where(eq(tenants.id, tenantId));
   });
 }
@@ -296,4 +313,34 @@ export async function listLiveTenantIds(): Promise<
     .from(tenants)
     .where(isNull(tenants.deletedAt))
     .orderBy(tenants.createdAt);
+}
+
+/**
+ * Live tenants, least-recently-backed-up first (never-backed-up before all
+ * others). The backup cron cannot fit many tenants' full exports into one
+ * invocation's time budget, and a fixed creation-date order meant the same tail
+ * of tenants was skipped every night, forever (spec/24 §9.5 F6). Ordering by
+ * staleness turns the budget cut-off into a rotation that self-corrects: whoever
+ * got skipped sorts to the front tomorrow. Derived from backup_runs rather than
+ * new bookkeeping state, so there is nothing to keep in sync.
+ */
+export async function listTenantsByBackupStaleness(): Promise<
+  { id: string; slug: string }[]
+> {
+  const lastOk = db
+    .select({
+      tenantId: backupRuns.tenantId,
+      lastOkAt: max(backupRuns.startedAt).as("last_ok_at"),
+    })
+    .from(backupRuns)
+    .where(and(eq(backupRuns.kind, "FULL"), eq(backupRuns.status, "OK")))
+    .groupBy(backupRuns.tenantId)
+    .as("last_ok");
+
+  return db
+    .select({ id: tenants.id, slug: tenants.slug })
+    .from(tenants)
+    .leftJoin(lastOk, eq(lastOk.tenantId, tenants.id))
+    .where(isNull(tenants.deletedAt))
+    .orderBy(sql`${lastOk.lastOkAt} asc nulls first`, tenants.createdAt);
 }
