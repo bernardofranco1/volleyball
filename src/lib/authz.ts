@@ -12,14 +12,31 @@ import { notFound, redirect } from "next/navigation";
 import { db } from "@/db";
 import { matches, users, userTenantRoles } from "@/db/schema";
 import { createSupabaseServerClient } from "@/lib/supabase";
+import {
+  currentImpersonationCookie,
+  readImpersonationCookie,
+} from "@/lib/impersonation";
 import { getTenantBySlug, type TenantWithBranding } from "@/lib/tenant";
 
 export type Role = "TENANT_ADMIN" | "COMPETITION_ADMIN" | "SCORER" | "VIEWER";
+
+/** The real signed-in admin behind an active "sign in as…" session (spec/26). */
+export interface ImpersonationActor {
+  id: string;
+  email: string | null;
+}
 
 export interface AuthContext {
   user: { id: string; email: string | null };
   tenant: TenantWithBranding;
   roles: Role[];
+  /**
+   * Non-null only while impersonating: `user` is the target being tested,
+   * `actor` is the global admin actually driving. Gates decide on `user`;
+   * anything that RECORDS who did something must attribute to `actor` first
+   * (spec/26 §8).
+   */
+  actor: ImpersonationActor | null;
 }
 
 /**
@@ -38,7 +55,7 @@ export interface AuthContext {
  * deletes their user_tenant_roles rows (user-admin-actions.ts deleteUserAccount),
  * so a still-unexpired token resolves to zero roles and is refused.
  */
-export const getCurrentUser = cache(
+export const getRealUser = cache(
   async (): Promise<{ id: string; email: string | null } | null> => {
     const supabase = await createSupabaseServerClient();
     const { data } = await supabase.auth.getClaims();
@@ -50,6 +67,102 @@ export const getCurrentUser = cache(
     };
   },
 );
+
+/**
+ * The active "sign in as…" overlay, or null (spec/26 §5).
+ *
+ * The cookie is NEVER sufficient on its own. Every request re-establishes:
+ *   1. there is a real session, and it belongs to the cookie's actor;
+ *   2. that actor is STILL a global admin (live DB read);
+ *   3. the target still exists and is NOT a global admin.
+ * Any failure — including a revoked flag or a deleted target — resolves to
+ * null, i.e. the admin is simply themselves again. Memoised per request so the
+ * layout, the page and every nested gate agree.
+ */
+export const getImpersonation = cache(
+  async (): Promise<{
+    target: { id: string; email: string | null };
+    actor: ImpersonationActor;
+    expiresAt: number;
+  } | null> => {
+    const claim = readImpersonationCookie(await currentImpersonationCookie());
+    if (!claim) return null;
+
+    const real = await getRealUser();
+    if (!real || real.id !== claim.actorUserId) return null;
+    if (!(await isGlobalAdmin(real.id))) return null;
+
+    const target = (
+      await db
+        .select({
+          id: users.id,
+          email: users.email,
+          isGlobalAdmin: users.isGlobalAdmin,
+        })
+        .from(users)
+        .where(eq(users.id, claim.targetUserId))
+        .limit(1)
+    )[0];
+    // Impersonating a global admin is refused at the door and re-refused here:
+    // a target promoted mid-session must not carry the overlay into /admin.
+    if (!target || target.isGlobalAdmin) return null;
+
+    return {
+      target: { id: target.id, email: target.email },
+      actor: { id: real.id, email: real.email },
+      expiresAt: claim.expiresAt,
+    };
+  },
+);
+
+/**
+ * The EFFECTIVE user for this request: the impersonation target when a
+ * "sign in as…" session is active, otherwise the real signed-in user.
+ *
+ * Every authorization gate resolves identity here, which is what makes the
+ * overlay complete: requireRole, requireGlobalAdmin, authorizeMatch and
+ * rolesFor all see the target and therefore behave exactly as they would for
+ * that user — including refusing /admin.
+ */
+export const getCurrentUser = cache(
+  async (): Promise<{ id: string; email: string | null } | null> => {
+    const imp = await getImpersonation();
+    if (imp) return imp.target;
+    return getRealUser();
+  },
+);
+
+/**
+ * The user to ATTRIBUTE a write to: the real admin while impersonating, else
+ * the current user (spec/26 §8).
+ */
+export async function getAttributionUser(): Promise<{
+  id: string;
+  email: string | null;
+} | null> {
+  const imp = await getImpersonation();
+  return imp ? imp.actor : getCurrentUser();
+}
+
+/** Minimal shape shared by AuthContext and MatchAuth for attribution. */
+type Attributable = { user: { id: string }; actor: ImpersonationActor | null };
+
+/**
+ * Whose id belongs in an identity column (`events.actor_user_id`,
+ * `confirmed_by`, `captured_by`, `created_by`): the human actually driving.
+ */
+export function writerId(a: Attributable): string {
+  return a.actor?.id ?? a.user.id;
+}
+
+/**
+ * Human-readable provenance for the free-text `device_info` column: while
+ * impersonating it records BOTH halves, so an auditor reading the event log
+ * sees the admin and who they were testing as.
+ */
+export function writerNote(a: Attributable): string {
+  return a.actor ? `${a.actor.id} (as ${a.user.id})` : a.user.id;
+}
 
 /** TENANT_ADMIN is a superuser within its tenant and satisfies any requirement. */
 export function hasRole(roles: Role[], allowed: Role[]): boolean {
@@ -120,9 +233,10 @@ export async function getAuthContext(
 ): Promise<AuthContext | null> {
   // The user check (Supabase Auth HTTP call) and the tenant lookup are
   // independent — run them concurrently.
-  const [user, tenant] = await Promise.all([
+  const [user, tenant, imp] = await Promise.all([
     getCurrentUser(),
     getTenantBySlug(tenantSlug),
+    getImpersonation(),
   ]);
   if (!user) return null;
   if (!tenant) return null;
@@ -130,6 +244,7 @@ export async function getAuthContext(
     user: { id: user.id, email: user.email ?? null },
     tenant,
     roles: await rolesFor(user.id, tenant.id),
+    actor: imp?.actor ?? null,
   };
 }
 
@@ -168,6 +283,8 @@ export interface MatchAuth {
   user: { id: string; email: string | null };
   tenantId: string;
   roles: Role[];
+  /** Real admin while impersonating — attribute writes to this (spec/26 §8). */
+  actor: ImpersonationActor | null;
 }
 export type MatchAuthResult =
   | { ok: true; auth: MatchAuth }
@@ -196,6 +313,7 @@ export async function authorizeMatch(
       user: { id: user.id, email: user.email ?? null },
       tenantId: row.tenantId,
       roles,
+      actor: (await getImpersonation())?.actor ?? null,
     },
   };
 }

@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase";
+import { clearImpersonationCookie } from "@/lib/impersonation";
 import { postLoginDestination } from "@/lib/login-destination";
 import { rateLimitAuth } from "@/lib/ratelimit";
 
@@ -61,5 +62,9 @@ export async function login(
 export async function logout() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
+  // signOut() clears only the Supabase cookies. An impersonation overlay
+  // (spec/26) must not survive the session it hangs off — clear it too, or the
+  // next sign-in on this browser would resume "as" the old target.
+  await clearImpersonationCookie();
   redirect("/login");
 }

@@ -26,7 +26,13 @@ import {
   players,
   tenants,
 } from "@/db/schema";
-import { ADMIN_ROLES, authorizeMatch, hasRole, SCORING_ROLES } from "@/lib/authz";
+import {
+  ADMIN_ROLES,
+  authorizeMatch,
+  hasRole,
+  SCORING_ROLES,
+  writerId,
+} from "@/lib/authz";
 import { scheduleIncrementalBackup } from "@/lib/backup";
 import { sameOriginOk } from "@/lib/http";
 import { rateLimit } from "@/lib/ratelimit";
@@ -280,7 +286,7 @@ export async function POST(
   }
 
   const now = new Date();
-  const capturedBy = authed.auth.user.id;
+  const capturedBy = writerId(authed.auth);
   // Does this signature complete the confirmation trio? Pre-match and bench
   // signatures never confirm the result. (The one being written counts.)
   const remaining = p.missing.filter((r) => r !== role);

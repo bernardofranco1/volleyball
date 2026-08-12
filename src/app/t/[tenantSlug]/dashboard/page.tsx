@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase";
+import { getCurrentUser } from "@/lib/authz";
 import { getT } from "@/lib/i18n/server";
 
 // Tenant surfaces. `href` links to a shipped section; `titleKey`/`noteKey` are
@@ -20,10 +20,10 @@ export default async function DashboardPage({
   const { tenantSlug } = await params;
   const { t } = await getT();
 
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getCurrentUser, not supabase.auth.getUser(): this must show the EFFECTIVE
+  // user so "Signed in as" is honest while impersonating (spec/26 §10), and it
+  // saves an Auth-server round trip on every dashboard render.
+  const user = await getCurrentUser();
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">

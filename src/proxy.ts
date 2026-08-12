@@ -13,6 +13,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import {
   authCookieOptions,
+  IMPERSONATION_COOKIE,
   isProtectedTenantPath,
   LAST_TENANT_COOKIE,
   legacyDemoPath,
@@ -145,9 +146,17 @@ export async function proxy(request: NextRequest) {
   }
 
   // Remember the tenant for the next login (spec/23 §4). Written only on
-  // authenticated tenant pages, only when it changed.
+  // authenticated tenant pages, only when it changed — and never while a
+  // "sign in as…" overlay is active (spec/26 §10), or an admin's own routing
+  // history would fill up with the tenants of whoever they were testing.
+  // Presence check only: the edge never verifies this cookie or makes an
+  // authorization decision from it.
   const slugMatch = /^\/t\/([^/]+)/.exec(pathname);
-  if (slugMatch && request.cookies.get(LAST_TENANT_COOKIE)?.value !== slugMatch[1]) {
+  if (
+    slugMatch &&
+    !request.cookies.has(IMPERSONATION_COOKIE) &&
+    request.cookies.get(LAST_TENANT_COOKIE)?.value !== slugMatch[1]
+  ) {
     const { domain } = authCookieOptions();
     response.cookies.set(LAST_TENANT_COOKIE, slugMatch[1], {
       path: "/",

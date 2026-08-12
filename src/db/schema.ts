@@ -833,9 +833,12 @@ export const auditLog = pgTable(
   "audit_log",
   {
     id: text("id").primaryKey(),
-    tenantId: text("tenant_id")
-      .notNull()
-      .references(() => tenants.id),
+    // NULL = a PLATFORM-level event with no tenant to file under: impersonation
+    // start/stop, global-admin flag flips, password resets (spec/26 §9). Before
+    // migration 0017 this was NOT NULL, and those actions were simply not
+    // audited at all. Tenant-scoped exports filter on tenant_id, so platform
+    // rows are deliberately absent from per-tenant backups.
+    tenantId: text("tenant_id").references(() => tenants.id),
     actorUserId: text("actor_user_id"),
     actorEmail: text("actor_email"),
     action: text("action").notNull(), // e.g. "competition.activate"

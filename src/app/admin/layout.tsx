@@ -49,6 +49,12 @@ export default async function AdminLayout({
             >
               Backups
             </Link>
+            <Link
+              href="/admin/audit"
+              className="rounded-lg px-3 py-1.5 text-sm text-score-dim transition-colors hover:bg-surface-raised hover:text-foreground"
+            >
+              Audit
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-2">

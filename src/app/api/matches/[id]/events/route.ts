@@ -13,7 +13,14 @@ import type { NextRequest } from "next/server";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { events as eventsTable } from "@/db/schema";
-import { ADMIN_ROLES, authorizeMatch, hasRole, SCORING_ROLES } from "@/lib/authz";
+import {
+  ADMIN_ROLES,
+  authorizeMatch,
+  hasRole,
+  SCORING_ROLES,
+  writerId,
+  writerNote,
+} from "@/lib/authz";
 import { sameOriginOk } from "@/lib/http";
 import { rateLimit } from "@/lib/ratelimit";
 import { scorerPinSatisfied } from "@/lib/scorer-pin";
@@ -141,8 +148,8 @@ export async function POST(
       // match's legal record and must say who scored it. actorUserId is the
       // dedicated column; deviceInfo keeps carrying it too so rows written
       // before migration 0016 and after read the same way.
-      actorUserId: authed.auth.user.id,
-      deviceInfo: authed.auth.user.id,
+      actorUserId: writerId(authed.auth),
+      deviceInfo: writerNote(authed.auth),
     });
     return Response.json({
       state,

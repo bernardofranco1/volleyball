@@ -5,7 +5,12 @@ import { after } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db, dbTx } from "@/db";
 import { matchOfficials, matches } from "@/db/schema";
-import { ADMIN_ROLES, authorizeMatch } from "@/lib/authz";
+import {
+  ADMIN_ROLES,
+  authorizeMatch,
+  writerId,
+  writerNote,
+} from "@/lib/authz";
 import { recordAudit } from "@/lib/audit";
 import { scheduleIncrementalBackup } from "@/lib/backup";
 import {
@@ -57,8 +62,8 @@ export async function rewindMatchAction(
   try {
     const { state } = await rewindMatch(matchId, fromSequence, {
       actor: "SCORER",
-      actorUserId: authed.auth.user.id,
-      deviceInfo: authed.auth.user.id,
+      actorUserId: writerId(authed.auth),
+      deviceInfo: writerNote(authed.auth),
       reason: reason ?? undefined,
     });
     await recordAudit({
@@ -139,7 +144,7 @@ export async function confirmMatchResult(
       status: "FINISHED",
       finishedAt: now,
       confirmedAt: now,
-      confirmedBy: authed.auth.user.id,
+      confirmedBy: writerId(authed.auth),
       confirmedVia: "ADMIN",
     })
     .where(eq(matches.id, matchId));
@@ -329,7 +334,7 @@ export async function saveMatchOfficials(
           country: country || null,
           level: level || null,
           source: "MANUAL",
-          createdBy: authed.auth.user.id,
+          createdBy: writerId(authed.auth),
         })
         .onConflictDoUpdate({
           target: [matchOfficials.matchId, matchOfficials.role],
@@ -339,7 +344,7 @@ export async function saveMatchOfficials(
             country: country || null,
             level: level || null,
             source: "MANUAL",
-            createdBy: authed.auth.user.id,
+            createdBy: writerId(authed.auth),
           },
         });
       saved += 1;

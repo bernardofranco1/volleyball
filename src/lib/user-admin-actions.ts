@@ -5,9 +5,10 @@
 // keep their own tenant-scoped Access page (access-actions.ts) — this console
 // is the superset for platform operators.
 //
-// Platform-level events (global-admin flag, password resets) have no tenant to
-// audit into (audit_log.tenant_id is NOT NULL by design); tenant-scoped grants
-// are audited into the affected tenant like the tenant Access page does.
+// Platform-level events (global-admin flag, password resets, deletions) have no
+// tenant to audit into: since migration 0017 they are recorded with a NULL
+// tenant_id and surface on /admin/audit (spec/26 §9). Tenant-scoped grants are
+// still audited into the affected tenant, like the tenant Access page does.
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
@@ -124,6 +125,16 @@ export async function setGlobalAdminFlag(
     .returning({ email: users.email });
   if (r.length === 0) return fail("Unknown user.");
 
+  await recordAudit({
+    tenantId: null,
+    actor: { userId: actor.id, email: actor.email },
+    action: enable ? "admin.globalAdmin.grant" : "admin.globalAdmin.revoke",
+    entityType: "user",
+    entityId: userId,
+    summary: `${enable ? "Granted" : "Revoked"} global admin for ${r[0].email}`,
+    metadata: { targetEmail: r[0].email },
+  });
+
   revalidatePath("/admin/access");
   return ok(enable ? "Global access granted." : "Global access revoked.");
 }
@@ -236,6 +247,16 @@ export async function deleteUserAccount(
     return fail(`App access removed, but the sign-in account could not be deleted: ${error.message}`);
   }
 
+  await recordAudit({
+    tenantId: null,
+    actor: { userId: actor.id, email: actor.email },
+    action: "admin.user.delete",
+    entityType: "user",
+    entityId: userId,
+    summary: `Deleted platform account ${row.email}`,
+    metadata: { targetEmail: row.email },
+  });
+
   revalidatePath("/admin/access");
   return ok(`${row.email} deleted.`);
 }
@@ -249,7 +270,7 @@ export async function sendPasswordEmail(
   _prev: FormState,
   fd: FormData,
 ): Promise<FormState> {
-  await requireGlobalAdmin();
+  const { user: actor } = await requireGlobalAdmin();
   const userId = str(fd, "userId");
   const row = (
     await db
@@ -264,6 +285,16 @@ export async function sendPasswordEmail(
     name: row.name,
   });
   if (!sent.sent) return fail(`Email not sent: ${sent.reason}.`);
+
+  await recordAudit({
+    tenantId: null,
+    actor: { userId: actor.id, email: actor.email },
+    action: "admin.user.passwordEmail",
+    entityType: "user",
+    entityId: userId,
+    summary: `Sent a set-password email to ${row.email}`,
+    metadata: { targetEmail: row.email },
+  });
   return ok(`Password email sent to ${row.email}.`);
 }
 
@@ -272,7 +303,7 @@ export async function resetPassword(
   _prev: AddMemberState,
   fd: FormData,
 ): Promise<AddMemberState> {
-  await requireGlobalAdmin();
+  const { user: actor } = await requireGlobalAdmin();
   const userId = str(fd, "userId");
   if (!userId) return { error: "Missing user." };
   const row = (
@@ -286,6 +317,16 @@ export async function resetPassword(
 
   const r = await resetUserPassword(userId);
   if ("error" in r) return { error: r.error };
+
+  await recordAudit({
+    tenantId: null,
+    actor: { userId: actor.id, email: actor.email },
+    action: "admin.user.passwordReset",
+    entityType: "user",
+    entityId: userId,
+    summary: `Issued a temporary password for ${row.email}`,
+    metadata: { targetEmail: row.email },
+  });
   return {
     error: null,
     created: {

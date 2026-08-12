@@ -10,6 +10,13 @@
 export const LAST_TENANT_COOKIE = "lastTenant";
 
 /**
+ * Name of the "sign in as…" overlay cookie (spec/26). The NAME lives here, in
+ * the dependency-free module, so the edge Proxy can check its presence; the
+ * value is signed and verified only in Node (src/lib/impersonation.ts).
+ */
+export const IMPERSONATION_COOKIE = "vbimp";
+
+/**
  * How long a signed-in session persists in the browser without re-entering a
  * password: 8 days (product decision, 2026-07-30). Auth cookies are rewritten
  * on every token refresh, so this is a ROLLING window — active users are never

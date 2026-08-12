@@ -12,6 +12,7 @@ import {
   sendPasswordEmail,
   setGlobalAdminFlag,
 } from "@/lib/user-admin-actions";
+import { startImpersonation } from "@/lib/impersonation-actions";
 import { ASSIGNABLE_ROLES, ROLE_LABEL } from "@/lib/roles";
 import type { Role } from "@/lib/authz";
 import { ActionForm } from "@/components/admin/ActionForm";
@@ -120,6 +121,19 @@ export function PeopleList({
                 </SubmitButton>
               </ActionForm>
               <ResetPasswordButton userId={u.id} email={u.email} />
+              {/* Global admins can't be impersonated (spec/26 §3.2); the
+                  server re-checks regardless of what this renders. */}
+              {u.id !== meId && !u.isGlobalAdmin && (
+                <ActionForm
+                  action={startImpersonation}
+                  confirm={`Sign in as ${u.email}? You'll browse the platform with exactly their access for up to an hour. Everything you do is recorded as you.`}
+                >
+                  <input type="hidden" name="userId" value={u.id} />
+                  <SubmitButton variant="secondary" pendingLabel="Switching…">
+                    Sign in as
+                  </SubmitButton>
+                </ActionForm>
+              )}
               {u.id !== meId && (
                 <ActionForm
                   action={deleteUserAccount}

@@ -6,7 +6,12 @@ import type { NextRequest } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { interruptRequests } from "@/db/schema";
-import { authorizeMatch, SCORING_ROLES } from "@/lib/authz";
+import {
+  authorizeMatch,
+  SCORING_ROLES,
+  writerId,
+  writerNote,
+} from "@/lib/authz";
 import { sameOriginOk } from "@/lib/http";
 import { rateLimit } from "@/lib/ratelimit";
 import { validateTabletToken } from "@/lib/match-session";
@@ -245,7 +250,7 @@ export async function PATCH(
 
   await db
     .update(interruptRequests)
-    .set({ status: body.status, resolvedAt: new Date(), resolvedBy: authed.auth.user.id })
+    .set({ status: body.status, resolvedAt: new Date(), resolvedBy: writerId(authed.auth) })
     .where(eq(interruptRequests.id, body.requestId));
 
   // Approving a request applies the real engine event immediately. TIMEOUT starts
@@ -276,7 +281,7 @@ export async function PATCH(
       try {
         await appendMatchEvent(id, event, {
           actor: "SCORER",
-          deviceInfo: authed.auth.user.id,
+          deviceInfo: writerNote(authed.auth),
         });
       } catch {
         // Invalid (phase/legality/quota) — scorer handles manually.
