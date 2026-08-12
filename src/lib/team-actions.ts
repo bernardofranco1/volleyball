@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { and, eq, or } from "drizzle-orm";
 import { db, dbTx } from "@/db";
 import { matches, players, teams } from "@/db/schema";
@@ -198,7 +199,10 @@ export async function deleteTeam(
     metadata: { competitionId: g.competitionId },
   });
   revalidatePath(teamsPath(g.tenantSlug, g.competitionId));
-  return ok("Team deleted.");
+  // Deletion is driven from the team's own page, which no longer exists once
+  // the row is gone — send the admin back to the list rather than re-rendering
+  // a 404. redirect() throws NEXT_REDIRECT, so it must sit outside try/catch.
+  redirect(teamsPath(g.tenantSlug, g.competitionId));
 }
 
 export async function createPlayer(

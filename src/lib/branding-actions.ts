@@ -118,10 +118,21 @@ export async function updateBranding(
   if (fontFamily && !/^[\w\s,'-]{1,100}$/.test(fontFamily))
     return fail("Font family contains unsupported characters.");
 
-  const overrides: Record<string, string> = {};
+  // Start from what is already stored and only overwrite the keys this form
+  // actually submitted. The picker is filtered to the tenant's disciplines
+  // (courtVarsFor), so a plain rebuild would silently DROP the colours of every
+  // hidden discipline the moment an indoor-only tenant pressed Save.
+  const existing = (
+    await db
+      .select({ overrides: tenantBranding.courtColorOverrides })
+      .from(tenantBranding)
+      .where(eq(tenantBranding.tenantId, ctx.tenant.id))
+      .limit(1)
+  )[0]?.overrides as Record<string, string> | null | undefined;
+  const overrides: Record<string, string> = { ...(existing ?? {}) };
   for (const { key } of COURT_VARS) {
     const v = str(fd, key);
-    if (!v) continue;
+    if (!v) continue; // not offered on this form — keep whatever was stored
     const hex = normalizeHex(v);
     if (!hex) return fail(`Court colour “${key}” must be a hex value.`);
     overrides[key] = hex;

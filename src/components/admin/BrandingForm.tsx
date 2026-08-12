@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { updateBranding } from "@/lib/branding-actions";
-import { COURT_VARS } from "@/lib/branding";
+import { courtVarsFor } from "@/lib/branding";
 import { OK } from "@/lib/action-state";
 import { useT } from "@/lib/i18n/client";
 import { SubmitButton } from "@/components/admin/SubmitButton";
@@ -12,8 +12,11 @@ import { ui } from "@/components/admin/styles";
 export function BrandingForm({
   tenantSlug,
   branding,
+  enabledDisciplines,
 }: {
   tenantSlug: string;
+  /** Only these disciplines' court colours are offered (spec/24 §2.1). */
+  enabledDisciplines?: readonly ("BEACH" | "INDOOR" | "GRASS" | "LIGHT")[];
   branding: {
     title: string | null;
     primaryColor: string;
@@ -139,7 +142,7 @@ export function BrandingForm({
 
       <h3 className="mb-2 mt-5 text-sm font-medium">{t("settings.courtColors")}</h3>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {COURT_VARS.map((c) => (
+        {courtVarsFor(enabledDisciplines).map((c) => (
           <div key={c.key}>
             <label className="mb-1 block text-[11px] text-score-dim">{c.label}</label>
             <input

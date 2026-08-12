@@ -74,7 +74,11 @@ export default async function AdminTenantPage({
           >
             Branding
           </h2>
-          <BrandingForm tenantSlug={tenant.slug} branding={tenant.branding} />
+          <BrandingForm
+            tenantSlug={tenant.slug}
+            branding={tenant.branding}
+            enabledDisciplines={tenant.config.enabledDisciplines}
+          />
         </section>
 
         <section aria-labelledby="admin-members">

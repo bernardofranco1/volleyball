@@ -6,20 +6,11 @@ import {
   listPlayersByTeam,
   listTeams,
 } from "@/lib/competitions";
-import {
-  bulkAddTeams,
-  deletePlayer,
-  deleteTeam,
-  updatePlayer,
-  updateTeam,
-} from "@/lib/team-actions";
+import { bulkAddTeams } from "@/lib/team-actions";
 import { importRoster } from "@/lib/csv-actions";
 import { getT } from "@/lib/i18n/server";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { AddTeamForm } from "@/components/admin/AddTeamForm";
-import { AddPlayerForm } from "@/components/admin/AddPlayerForm";
-import { listTeamStaff, personName, searchPeople } from "@/lib/people";
-import { TeamStaffPanel } from "@/components/admin/TeamStaffPanel";
 import { CompetitionHeader } from "@/components/admin/CompetitionHeader";
 import { CsvImport } from "@/components/admin/CsvImport";
 import { SubmitButton } from "@/components/admin/SubmitButton";
@@ -36,6 +27,10 @@ const ROSTER_TEMPLATE =
       "Example Team,John,Doe,7,yes,no,SUI\n",
   );
 
+// Teams index: one compact row per team, drilling into [teamId] for the
+// details, roster and staff. It used to render every team's full editor inline,
+// which for a league of eight 14-player squads was hundreds of open inputs on
+// one page. Adding teams stays here, where it applies to the whole list.
 export default async function TeamsPage({
   params,
 }: {
@@ -54,21 +49,7 @@ export default async function TeamsPage({
     listTeams(competitionId),
   ]);
   if (!competition) notFound();
-  const [playersByTeam, registryPlayers, registryCoaches, staffRows] =
-    await Promise.all([
-      listPlayersByTeam(teams.map((t) => t.id)),
-      // Autocomplete sources for the pickers (spec/24 §6.2/§6.4). Role-filtered so
-      // a roster slot doesn't suggest referees, nor a coach slot players.
-      searchPeople(ctx.tenant.id, { roles: ["PLAYER"], limit: 500 }),
-      searchPeople(ctx.tenant.id, { roles: ["COACH"], limit: 500 }),
-      Promise.all(
-        teams.map(async (t) => ({
-          teamId: t.id,
-          staff: await listTeamStaff(ctx.tenant.id, t.id),
-        })),
-      ),
-    ]);
-  const staffByTeam = new Map(staffRows.map((r) => [r.teamId, r.staff]));
+  const playersByTeam = await listPlayersByTeam(teams.map((x) => x.id));
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -80,7 +61,7 @@ export default async function TeamsPage({
       />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
-        <section className="space-y-4 lg:order-none order-last">
+        <section className="space-y-2 lg:order-none order-last">
           {teams.length === 0 ? (
             <div className={`${ui.card} text-sm text-score-dim`}>
               {t("teams.empty")}
@@ -88,205 +69,39 @@ export default async function TeamsPage({
           ) : (
             teams.map((team) => {
               const roster = playersByTeam.get(team.id) ?? [];
+              const captain = roster.find((p) => p.isCaptain);
               return (
-                <div key={team.id} className={ui.card}>
-                  <ActionForm
-                    action={updateTeam}
-                    className="flex flex-wrap items-end gap-2"
-                  >
-                    <input type="hidden" name="tenantSlug" value={tenantSlug} />
-                    <input
-                      type="hidden"
-                      name="competitionId"
-                      value={competitionId}
-                    />
-                    <input type="hidden" name="teamId" value={team.id} />
-                    <div className="flex-1">
-                      <label className={ui.label} htmlFor={`name-${team.id}`}>
-                        {t("common.name")}
-                      </label>
-                      <input
-                        id={`name-${team.id}`}
-                        name="displayName"
-                        required
-                        defaultValue={team.displayName}
-                        className={ui.input}
-                      />
-                    </div>
-                    <div>
-                      <label
-                        className={ui.label}
-                        htmlFor={`country-${team.id}`}
-                      >
-                        {t("common.country")}
-                      </label>
-                      <input
-                        id={`country-${team.id}`}
-                        name="countryCode"
-                        defaultValue={team.countryCode ?? ""}
-                        maxLength={3}
-                        className={`${ui.input} w-20`}
-                      />
-                    </div>
-                    <div>
-                      <label className={ui.label} htmlFor={`seed-${team.id}`}>
-                        {t("common.seed")}
-                      </label>
-                      <input
-                        id={`seed-${team.id}`}
-                        name="seed"
-                        type="number"
-                        min={1}
-                        defaultValue={team.seed ?? ""}
-                        className={`${ui.input} w-16`}
-                      />
-                    </div>
-                    <SubmitButton variant="secondary" pendingLabel="…">
-                      {t("common.save")}
-                    </SubmitButton>
-                  </ActionForm>
-
-                  {/* Roster — each player is editable in place. */}
-                  <ul className="mt-4 divide-y divide-border">
-                    {roster.length === 0 ? (
-                      <li className="py-2 text-sm text-score-dim">
-                        {t("teams.noPlayers")}
-                      </li>
-                    ) : (
-                      roster.map((p) => (
-                        <li key={p.id} className="py-2">
-                          <ActionForm
-                            action={updatePlayer}
-                            className="flex flex-wrap items-center gap-2 text-sm"
-                          >
-                            <input
-                              type="hidden"
-                              name="tenantSlug"
-                              value={tenantSlug}
-                            />
-                            <input
-                              type="hidden"
-                              name="competitionId"
-                              value={competitionId}
-                            />
-                            <input type="hidden" name="playerId" value={p.id} />
-                            <input
-                              name="jerseyNumber"
-                              type="number"
-                              min={0}
-                              defaultValue={p.jerseyNumber ?? ""}
-                              aria-label={t("common.jerseyNumber")}
-                              placeholder="#"
-                              className={`${ui.input} w-14 px-2 py-1 text-sm`}
-                            />
-                            {/* The name belongs to the person, not to this
-                                roster spot (spec/24 §2.3) — editing it here
-                                would only change one competition's copy. This
-                                row owns the jersey and the C/L flags; the name
-                                is a link to the registry record. */}
-                            <Link
-                              href={`/t/${tenantSlug}/people/${p.personId}`}
-                              className="w-36 flex-1 truncate px-1 text-sm hover:text-primary hover:underline sm:flex-none"
-                              title={`Edit ${personName(p)} in People — shirt name “${p.jerseyName}”`}
-                            >
-                              {personName(p)}
-                              {p.jerseyName !== personName(p) && (
-                                <span className="ml-1 text-xs text-score-dim">
-                                  · {p.jerseyName}
-                                </span>
-                              )}
-                            </Link>
-                            <label className="flex items-center gap-1 text-xs text-score-dim">
-                              <input
-                                type="checkbox"
-                                name="isCaptain"
-                                defaultChecked={p.isCaptain}
-                                aria-label={t("teams.isCaptain", { name: p.jerseyName })}
-                              />
-                              C
-                            </label>
-                            <label className="flex items-center gap-1 text-xs text-score-dim">
-                              <input
-                                type="checkbox"
-                                name="isLibero"
-                                defaultChecked={p.isLibero}
-                                aria-label={t("teams.isLibero", { name: p.jerseyName })}
-                              />
-                              L
-                            </label>
-                            <button
-                              type="submit"
-                              className="text-xs text-score-dim hover:text-foreground"
-                              aria-label={t("teams.savePlayer", { name: p.jerseyName })}
-                            >
-                              {t("common.save")}
-                            </button>
-                          </ActionForm>
-                          <ActionForm
-                            action={deletePlayer}
-                            confirm={t("teams.removeConfirm", { player: p.jerseyName, team: team.displayName })}
-                            className="mt-0.5"
-                          >
-                            <input
-                              type="hidden"
-                              name="tenantSlug"
-                              value={tenantSlug}
-                            />
-                            <input
-                              type="hidden"
-                              name="competitionId"
-                              value={competitionId}
-                            />
-                            <input type="hidden" name="playerId" value={p.id} />
-                            <button
-                              type="submit"
-                              className="text-xs text-score-dim hover:text-red-400"
-                              aria-label={t("teams.removePlayer", { name: p.jerseyName })}
-                            >
-                              {t("common.remove")}
-                            </button>
-                          </ActionForm>
-                        </li>
-                      ))
-                    )}
-                  </ul>
-
-                  <AddPlayerForm
-                    tenantSlug={tenantSlug}
-                    competitionId={competitionId}
-                    teamId={team.id}
-                    people={registryPlayers}
-                  />
-
-                  <TeamStaffPanel
-                    tenantSlug={tenantSlug}
-                    teamId={team.id}
-                    people={registryCoaches}
-                    staff={staffByTeam.get(team.id) ?? []}
-                  />
-
-                  <div className="mt-4 border-t border-border pt-3">
-                    <ActionForm
-                      action={deleteTeam}
-                      confirm={t("teams.deleteConfirm", { team: team.displayName, count: roster.length })}
+                <Link
+                  key={team.id}
+                  href={`/t/${tenantSlug}/competitions/${competitionId}/teams/${team.id}`}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-surface-raised px-4 py-3 transition-colors hover:border-primary"
+                >
+                  {team.seed != null && (
+                    <span
+                      className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-surface text-xs font-medium text-score-dim"
+                      title={t("common.seed")}
                     >
-                      <input
-                        type="hidden"
-                        name="tenantSlug"
-                        value={tenantSlug}
-                      />
-                      <input
-                        type="hidden"
-                        name="competitionId"
-                        value={competitionId}
-                      />
-                      <input type="hidden" name="teamId" value={team.id} />
-                      <SubmitButton variant="danger" pendingLabel="…">
-                        {t("teams.deleteTeam")}
-                      </SubmitButton>
-                    </ActionForm>
-                  </div>
-                </div>
+                      {team.seed}
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">
+                      {team.displayName}
+                      {team.countryCode && (
+                        <span className="ml-2 text-xs font-normal text-score-dim">
+                          {team.countryCode.toUpperCase()}
+                        </span>
+                      )}
+                    </span>
+                    <span className="block truncate text-xs text-score-dim">
+                      {t("teams.playerCount", { count: roster.length })}
+                      {captain && ` · ${t("teams.captainShort")} ${captain.jerseyName}`}
+                    </span>
+                  </span>
+                  <span aria-hidden className="text-score-dim">
+                    ›
+                  </span>
+                </Link>
               );
             })
           )}
@@ -297,9 +112,7 @@ export default async function TeamsPage({
 
           <ActionForm action={bulkAddTeams} className={ui.card} resetOnOk>
             <h2 className="mb-1 font-medium">{t("teams.bulkTitle")}</h2>
-            <p className="mb-3 text-xs text-score-dim">
-              {t("teams.bulkHint")}
-            </p>
+            <p className="mb-3 text-xs text-score-dim">{t("teams.bulkHint")}</p>
             <input type="hidden" name="tenantSlug" value={tenantSlug} />
             <input type="hidden" name="competitionId" value={competitionId} />
             <label className="sr-only" htmlFor="bulk-names">

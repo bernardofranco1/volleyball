@@ -62,7 +62,11 @@ export default async function SettingsPage({
           >
             Branding
           </h2>
-          <BrandingForm tenantSlug={tenantSlug} branding={ctx.tenant.branding} />
+          <BrandingForm
+            tenantSlug={tenantSlug}
+            branding={ctx.tenant.branding}
+            enabledDisciplines={ctx.tenant.config.enabledDisciplines}
+          />
         </section>
 
         {/* ── Disciplines (spec/24 §5) ── */}
