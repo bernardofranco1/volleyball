@@ -40,6 +40,7 @@ function report(events: ReportEvent[]): MatchReportData {
     discipline: "BEACH",
     competitionName: "Cup",
     tenantName: "Tenant",
+    scoresheetLogoUrl: null,
     teamAName: "A",
     teamBName: "B",
     teamACountry: null,

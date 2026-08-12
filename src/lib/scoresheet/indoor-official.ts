@@ -19,6 +19,7 @@ import {
   Sheet,
   durationHhMm,
   durationMin,
+  fetchSheetLogo,
   hhmm,
   registerSheetFonts,
   teamCode,
@@ -35,11 +36,12 @@ interface TeamPanelData {
   set: SheetSetData;
 }
 
-export function renderIndoorOfficialPdf(
+export async function renderIndoorOfficialPdf(
   report: MatchReportData,
   sheet: OfficialSheetData,
   config: TournamentConfig,
 ): Promise<Buffer> {
+  const sheetLogo = await fetchSheetLogo(report.scoresheetLogoUrl);
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: [PAGE_W, PAGE_H], margin: 0 });
     const chunks: Buffer[] = [];
@@ -57,7 +59,7 @@ export function renderIndoorOfficialPdf(
       (config.setScore ?? 25) >= 25 ? 48 : Math.max(20, (config.setScore ?? 25) * 2 - 2);
     const deciderMax = Math.max(16, Math.min(30, (config.setScoreTiebreak ?? 15) * 2));
 
-    header(g, report);
+    header(g, report, sheetLogo);
 
     // ── set panels ──────────────────────────────────────────────────────────
     const bestOf = Math.max(1, config.bestOf ?? 5);
@@ -112,10 +114,21 @@ export function renderIndoorOfficialPdf(
 
 // ── header ───────────────────────────────────────────────────────────────────
 
-function header(g: Sheet, r: MatchReportData) {
+function header(g: Sheet, r: MatchReportData, sheetLogo: Buffer | null) {
   g.rect(12, 12, 818, 52, { lw: 1 });
   g.rect(740, 12, 90, 52, { lw: 0.8 });
-  g.ctext(r.tenantName.slice(0, 16), 785, 28, { size: 10, bold: true });
+  // Top-right box: the tenant's federation/organiser logo when configured,
+  // else the tenant name — the FIVB model sheet carries the logo there.
+  let drewLogo = false;
+  if (sheetLogo) {
+    try {
+      g.d.image(sheetLogo, 745, 15, { fit: [80, 24], align: "center", valign: "center" });
+      drewLogo = true;
+    } catch {
+      // corrupt/unsupported image despite the sniff — keep the text header
+    }
+  }
+  if (!drewLogo) g.ctext(r.tenantName.slice(0, 16), 785, 28, { size: 10, bold: true });
   g.ctext("OFFICIAL E-SCORESHEET", 785, 42, { size: 4 });
   g.ctext("VOLLEYBALL — INDOOR", 785, 49, { size: 3.6, color: DIM });
 

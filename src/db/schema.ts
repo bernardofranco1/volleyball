@@ -46,6 +46,10 @@ export const tenantBranding = pgTable("tenant_branding", {
   // (header wordmark + browser tab). Null → fall back to the tenant name.
   title: text("title"),
   logoUrl: text("logo_url"),
+  // Printed in the top-right box of official e-scoresheets (e.g. a federation
+  // logo). PNG/JPEG only — pdfkit can't embed WebP/SVG; non-embeddable or
+  // unreachable URLs fall back to the text header at render time.
+  scoresheetLogoUrl: text("scoresheet_logo_url"),
   primaryColor: text("primary_color").default("#0066cc"),
   secondaryColor: text("secondary_color").default("#ffffff"),
   fontFamily: text("font_family"),

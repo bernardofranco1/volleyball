@@ -35,6 +35,7 @@ const DATA: MatchReportData = {
   discipline: "BEACH",
   competitionName: "Beach Open",
   tenantName: "Demo Tenant",
+  scoresheetLogoUrl: null,
   teamAName: "Rossi / Bianchi",
   teamBName: "Silva / Costa",
   teamACountry: "ITA",

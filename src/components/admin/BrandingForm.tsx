@@ -19,6 +19,7 @@ export function BrandingForm({
     primaryColor: string;
     secondaryColor: string;
     logoUrl: string | null;
+    scoresheetLogoUrl: string | null;
     fontFamily: string | null;
     courtColorOverrides: Record<string, string> | null;
   };
@@ -88,6 +89,18 @@ export function BrandingForm({
             placeholder="https://…/logo.svg"
             className={ui.input}
           />
+        </div>
+        <div className="sm:col-span-2">
+          <label className={ui.label}>{t("settings.scoresheetLogoUrl")}</label>
+          <input
+            name="scoresheetLogoUrl"
+            defaultValue={branding.scoresheetLogoUrl ?? ""}
+            placeholder="https://…/federation-logo.png"
+            className={ui.input}
+          />
+          <p className="mt-1 text-xs text-neutral-500">
+            {t("settings.scoresheetLogoUrlHint")}
+          </p>
         </div>
         <div className="sm:col-span-2">
           <label className={ui.label}>{t("settings.fontFamily")}</label>

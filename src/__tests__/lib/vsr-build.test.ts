@@ -41,6 +41,7 @@ function report(discipline: string, events: ReportEvent[]): MatchReportData {
     discipline,
     competitionName: "Test Cup",
     tenantName: "Tenant",
+    scoresheetLogoUrl: null,
     teamAName: "Alpha",
     teamBName: "Beta",
     teamACountry: "SUI",

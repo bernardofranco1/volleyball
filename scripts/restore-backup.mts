@@ -17,7 +17,11 @@ import { gunzipSync } from "node:zlib";
 import postgres from "postgres";
 
 const EXPECTED_FORMAT = 1;
-const KNOWN_JOURNAL_IDX = 8; // keep in sync with src/lib/backup.ts
+// Keep in sync with MIGRATION_JOURNAL_IDX in src/lib/backup-policy.ts. Had
+// drifted to 8 while the exporter stamped 14 — every backup since migration 9
+// would have been refused here despite restoring fine (exports carry full rows,
+// so additive columns flow through).
+const KNOWN_JOURNAL_IDX = 15;
 
 // Restore order = EXPORTED_TABLES order (FK-safe). Column lists come from the
 // backup rows themselves (drizzle exports camelCase keys → snake_case here).

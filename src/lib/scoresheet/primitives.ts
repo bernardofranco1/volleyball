@@ -220,6 +220,29 @@ export function durationHhMm(a: Date | string | null, b: Date | string | null): 
   return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, "0")}`;
 }
 
+/**
+ * Fetch a scoresheet logo for embedding. pdfkit can only embed PNG/JPEG, so
+ * anything else (WebP, SVG, an HTML error page) is rejected by magic bytes.
+ * Best-effort by design: any failure returns null and the sheet renders its
+ * text-only header — a dead logo URL must never block an official sheet.
+ */
+export async function fetchSheetLogo(url: string | null): Promise<Buffer | null> {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    const res = await fetch(u, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length === 0 || buf.length > 1024 * 1024) return null;
+    const png = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+    const jpeg = buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+    return png || jpeg ? buf : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Team code for the sheet: ISO country when present, else name initials. */
 export function teamCode(country: string | null, name: string): string {
   if (country) return country.toUpperCase().slice(0, 3);

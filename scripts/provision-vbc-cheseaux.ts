@@ -42,6 +42,9 @@ const TENANT = {
 // wordmark — white lettering, dark backgrounds only — swap it in here if the
 // header ever goes permanently dark.
 const LOGO_FILE = new URL("./assets/vbc-cheseaux-badge.png", import.meta.url);
+// Federation logo for the top-right box of official e-scoresheets (PNG only —
+// pdfkit cannot embed WebP/SVG).
+const SHEET_LOGO_FILE = new URL("./assets/swiss-volley.png", import.meta.url);
 
 const execute = process.argv.includes("--execute");
 
@@ -53,6 +56,13 @@ async function main() {
     throw new Error("logo is not a PNG");
   }
   const hash8 = createHash("sha256").update(logo).digest("hex").slice(0, 8);
+
+  const sheetLogo = readFileSync(SHEET_LOGO_FILE);
+  if (sheetLogo.length > 1024 * 1024) throw new Error("sheet logo exceeds the 1MB app limit");
+  if (!(sheetLogo[0] === 0x89 && sheetLogo[1] === 0x50 && sheetLogo[2] === 0x4e && sheetLogo[3] === 0x47)) {
+    throw new Error("sheet logo is not a PNG");
+  }
+  const sheetHash8 = createHash("sha256").update(sheetLogo).digest("hex").slice(0, 8);
 
   const existing = await db
     .select({ id: tenants.id, deletedAt: tenants.deletedAt })
@@ -67,12 +77,14 @@ async function main() {
   const tenantId = existing[0]?.id ?? newId("tnt");
   // Path convention from branding-actions.ts: <tenantId>/logo-<sha256[0:8]>.<ext>
   const logoPath = `${tenantId}/logo-${hash8}.png`;
+  const sheetLogoPath = `${tenantId}/scoresheet-${sheetHash8}.png`;
 
   console.log(`${execute ? "APPLYING" : "DRY RUN (pass --execute to apply)"}`);
   console.log(existing[0] ? `  tenant:   reuse ${tenantId} (slug exists)` : `  tenant:   create ${tenantId}`);
   console.log(`  slug:     ${TENANT.slug}   name/title: ${TENANT.name}`);
   console.log(`  colors:   primary ${TENANT.primaryColor}  text-on-primary ${TENANT.secondaryColor}`);
   console.log(`  logo:     branding/${logoPath} (${logo.length} bytes)`);
+  console.log(`  sheet:    branding/${sheetLogoPath} (${sheetLogo.length} bytes, Swiss Volley)`);
   console.log(`  config:   disciplines ${TENANT.enabledDisciplines.join(", ")} (reports: all)`);
   if (!execute) return;
 
@@ -83,6 +95,14 @@ async function main() {
     .upload(logoPath, logo, { contentType: "image/png", upsert: true });
   if (upErr) throw new Error(`logo upload failed: ${upErr.message}`);
   const logoUrl = admin.storage.from("branding").getPublicUrl(logoPath).data.publicUrl;
+
+  const { error: sheetErr } = await admin.storage
+    .from("branding")
+    .upload(sheetLogoPath, sheetLogo, { contentType: "image/png", upsert: true });
+  if (sheetErr) throw new Error(`sheet logo upload failed: ${sheetErr.message}`);
+  const scoresheetLogoUrl = admin.storage
+    .from("branding")
+    .getPublicUrl(sheetLogoPath).data.publicUrl;
 
   // 2. Tenant (idempotent on slug, like src/db/seed.ts).
   await db
@@ -100,6 +120,7 @@ async function main() {
       primaryColor: TENANT.primaryColor,
       secondaryColor: TENANT.secondaryColor,
       logoUrl,
+      scoresheetLogoUrl,
     })
     .onConflictDoUpdate({
       target: tenantBranding.tenantId,
@@ -108,6 +129,7 @@ async function main() {
         primaryColor: TENANT.primaryColor,
         secondaryColor: TENANT.secondaryColor,
         logoUrl,
+        scoresheetLogoUrl,
       },
     });
 

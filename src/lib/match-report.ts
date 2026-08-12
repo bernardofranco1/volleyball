@@ -11,6 +11,7 @@ import {
   people,
   players,
   teams,
+  tenantBranding,
   tenants,
 } from "@/db/schema";
 import { loadMatchState } from "@/lib/match-engine";
@@ -77,6 +78,8 @@ export interface MatchReportData {
   discipline: string;
   competitionName: string;
   tenantName: string;
+  /** Federation/organiser logo for the official sheet's top-right box. */
+  scoresheetLogoUrl: string | null;
   teamAName: string;
   teamBName: string;
   teamACountry: string | null;
@@ -128,6 +131,7 @@ export async function loadMatchReport(
       status: matches.status,
       competitionName: competitions.name,
       tenantName: tenants.name,
+      scoresheetLogoUrl: tenantBranding.scoresheetLogoUrl,
       teamAId: matches.teamAId,
       teamBId: matches.teamBId,
       teamAName: teamA.displayName,
@@ -157,6 +161,7 @@ export async function loadMatchReport(
     .from(matches)
     .innerJoin(competitions, eq(competitions.id, matches.competitionId))
     .innerJoin(tenants, eq(tenants.id, matches.tenantId))
+    .leftJoin(tenantBranding, eq(tenantBranding.tenantId, matches.tenantId))
     .innerJoin(teamA, eq(teamA.id, matches.teamAId))
     .innerJoin(teamB, eq(teamB.id, matches.teamBId))
     .where(eq(matches.id, matchId))
@@ -249,6 +254,7 @@ export async function loadMatchReport(
     discipline: m.discipline,
     competitionName: m.competitionName,
     tenantName: m.tenantName,
+    scoresheetLogoUrl: m.scoresheetLogoUrl,
     teamAName: m.teamAName,
     teamBName: m.teamBName,
     teamACountry: m.teamACountry,

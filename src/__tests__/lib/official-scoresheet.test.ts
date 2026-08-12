@@ -47,6 +47,7 @@ function baseReport(discipline: string, events: ReportEvent[]): MatchReportData 
     discipline,
     competitionName: "Test Open",
     tenantName: "Tenant",
+    scoresheetLogoUrl: null,
     teamAName: discipline === "BEACH" ? "Duda/Ana" : "Lausanne UC",
     teamBName: discipline === "BEACH" ? "Nuss/Brasher" : "Volley SW",
     teamACountry: "BRA",

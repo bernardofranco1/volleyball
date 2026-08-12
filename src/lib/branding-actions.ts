@@ -81,6 +81,16 @@ export async function updateBranding(
     }
   }
 
+  const scoresheetLogoUrl = str(fd, "scoresheetLogoUrl") || null;
+  if (scoresheetLogoUrl) {
+    try {
+      const u = new URL(scoresheetLogoUrl);
+      if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error();
+    } catch {
+      return fail("Scoresheet logo must be an http(s) URL.");
+    }
+  }
+
   // Uploaded file wins over the URL field (spec/23 §5.2).
   const file = fd.get("logoFile");
   let uploadedPath: string | null = null;
@@ -136,6 +146,7 @@ export async function updateBranding(
       primaryColor,
       secondaryColor,
       logoUrl,
+      scoresheetLogoUrl,
       fontFamily,
       courtColorOverrides,
     })
@@ -146,6 +157,7 @@ export async function updateBranding(
         primaryColor,
         secondaryColor,
         logoUrl,
+        scoresheetLogoUrl,
         fontFamily,
         courtColorOverrides,
       },

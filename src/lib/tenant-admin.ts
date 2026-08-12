@@ -159,6 +159,7 @@ export interface AdminTenantDetail {
     primaryColor: string;
     secondaryColor: string;
     logoUrl: string | null;
+    scoresheetLogoUrl: string | null;
     fontFamily: string | null;
     courtColorOverrides: Record<string, string> | null;
   };
@@ -183,6 +184,7 @@ export async function getTenantById(
         primaryColor: tenantBranding.primaryColor,
         secondaryColor: tenantBranding.secondaryColor,
         logoUrl: tenantBranding.logoUrl,
+        scoresheetLogoUrl: tenantBranding.scoresheetLogoUrl,
         fontFamily: tenantBranding.fontFamily,
         courtColorOverrides: tenantBranding.courtColorOverrides,
         enabledDisciplines: tenantConfig.enabledDisciplines,
@@ -207,6 +209,7 @@ export async function getTenantById(
       primaryColor: r.primaryColor ?? "#0066cc",
       secondaryColor: r.secondaryColor ?? "#ffffff",
       logoUrl: r.logoUrl,
+      scoresheetLogoUrl: r.scoresheetLogoUrl,
       fontFamily: r.fontFamily,
       courtColorOverrides:
         (r.courtColorOverrides as Record<string, string> | null) ?? null,

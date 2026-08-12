@@ -27,6 +27,8 @@ export interface TenantBranding {
   primaryColor: string;
   secondaryColor: string;
   logoUrl: string | null;
+  /** Federation/organiser logo printed on official e-scoresheets (PNG/JPEG). */
+  scoresheetLogoUrl: string | null;
   fontFamily: string | null;
   courtColorOverrides: Record<string, string> | null;
 }
@@ -54,6 +56,7 @@ export const DEFAULT_BRANDING: TenantBranding = {
   primaryColor: "#0066cc",
   secondaryColor: "#ffffff",
   logoUrl: null,
+  scoresheetLogoUrl: null,
   fontFamily: null,
   courtColorOverrides: null,
 };
@@ -134,6 +137,7 @@ export const getTenantBySlug = cache(async function getTenantBySlug(
           primaryColor: tenantBranding.primaryColor,
           secondaryColor: tenantBranding.secondaryColor,
           logoUrl: tenantBranding.logoUrl,
+          scoresheetLogoUrl: tenantBranding.scoresheetLogoUrl,
           fontFamily: tenantBranding.fontFamily,
           courtColorOverrides: tenantBranding.courtColorOverrides,
           // Joined into the same cached read rather than fetched separately:
@@ -165,6 +169,7 @@ export const getTenantBySlug = cache(async function getTenantBySlug(
       primaryColor: r.primaryColor ?? DEFAULT_BRANDING.primaryColor,
       secondaryColor: r.secondaryColor ?? DEFAULT_BRANDING.secondaryColor,
       logoUrl: r.logoUrl,
+      scoresheetLogoUrl: r.scoresheetLogoUrl,
       fontFamily: r.fontFamily,
       courtColorOverrides:
         (r.courtColorOverrides as Record<string, string> | null) ?? null,
