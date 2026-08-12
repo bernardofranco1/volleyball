@@ -2,7 +2,8 @@
 // and the daily cron route (src/app/api/cron/reseed/route.ts).
 //
 // Wipes EVERY competition under the demo tenant (FK-safe) and rebuilds four —
-// one per discipline — each with a finished match and a live (mid-match) match.
+// one per discipline — each with a finished match, a live (mid-match) match,
+// and a scheduled (not yet started) match.
 // Matches are produced through the real engine so events + denormalised columns
 // are correct by construction.
 //
@@ -19,7 +20,9 @@ import {
   competitions,
   events,
   interruptRequests,
+  matchOfficials,
   matchSessions,
+  matchSignatures,
   matches,
   players,
   pools,
@@ -100,6 +103,10 @@ async function wipeCompetition(compId: string) {
     await db
       .delete(interruptRequests)
       .where(inArray(interruptRequests.matchId, matchIds));
+    // No cascade on either — a signature or officials assignment made through
+    // the UI would otherwise FK-block the matches delete and fail the reseed.
+    await db.delete(matchSignatures).where(inArray(matchSignatures.matchId, matchIds));
+    await db.delete(matchOfficials).where(inArray(matchOfficials.matchId, matchIds));
   }
   await db.delete(matches).where(eq(matches.competitionId, compId));
 
@@ -128,6 +135,18 @@ async function wipeAllForTenant() {
     .from(competitions)
     .where(eq(competitions.tenantId, TENANT.id));
   for (const c of comps) await wipeCompetition(c.id);
+
+  // The registry is tenant-scoped and rebuilt from scratch each run; without
+  // this, every reseed leaks ~50 orphaned people into the demo tenant.
+  const ppl = await db
+    .select({ id: people.id })
+    .from(people)
+    .where(eq(people.tenantId, TENANT.id));
+  const personIds = ppl.map((p) => p.id);
+  if (personIds.length) {
+    await db.delete(personRoles).where(inArray(personRoles.personId, personIds));
+    await db.delete(people).where(inArray(people.id, personIds));
+  }
 }
 
 async function createTeam(compId: string, spec: TeamSpec): Promise<CreatedTeam> {
@@ -191,6 +210,7 @@ async function createMatch(
   b: string,
   matchNumber: number,
   roundName: string,
+  scheduledHourUtc?: number,
 ): Promise<string> {
   const id = newId("match");
   await db.insert(matches).values({
@@ -203,6 +223,12 @@ async function createMatch(
     status: "SCHEDULED",
     roundName,
     matchNumber,
+    // The tenant match list orders by scheduledAt — matches without one sort
+    // unpredictably, which matters now that a permanently-SCHEDULED match exists.
+    scheduledAt:
+      scheduledHourUtc === undefined
+        ? null
+        : new Date(`${TODAY}T${String(scheduledHourUtc).padStart(2, "0")}:00:00.000Z`),
   });
   return id;
 }
@@ -445,12 +471,14 @@ async function seedBeach() {
     { firstName: "Julia", lastName: "Sude", jerseyNumber: 2 },
   ] });
 
-  const m1 = await createMatch(id, "BEACH", A.id, B.id, 1, "Pool");
+  const m1 = await createMatch(id, "BEACH", A.id, B.id, 1, "Pool", 8);
   await playMatch(m1, "BEACH", A, B, 2, [[21, 18], [21, 16]]);
 
-  const m2 = await createMatch(id, "BEACH", C.id, D.id, 2, "Pool");
+  const m2 = await createMatch(id, "BEACH", C.id, D.id, 2, "Pool", 10);
   await playMatch(m2, "BEACH", C, D, 2, [[21, 19]], [14, 11]);
-  console.log("✓ Beach: finished 2-0, live set 2 @ 14-11");
+
+  await createMatch(id, "BEACH", A.id, C.id, 3, "Pool", 17);
+  console.log("✓ Beach: finished 2-0, live set 2 @ 14-11, scheduled 17:00");
 }
 
 async function seedIndoor() {
@@ -496,12 +524,14 @@ async function seedIndoor() {
     { firstName: "Monika", lastName: "Schwartz", jerseyNumber: 7, bench: true },
   ] });
 
-  const m1 = await createMatch(id, "INDOOR", A.id, B.id, 1, "Round 5");
+  const m1 = await createMatch(id, "INDOOR", A.id, B.id, 1, "Round 5", 8);
   await playMatch(m1, "INDOOR", A, B, 6, [[22, 25], [25, 22], [21, 25], [25, 20], [12, 15]]);
 
-  const m2 = await createMatch(id, "INDOOR", A.id, B.id, 2, "Round 5");
+  const m2 = await createMatch(id, "INDOOR", A.id, B.id, 2, "Round 5", 10);
   await playMatch(m2, "INDOOR", A, B, 6, [[25, 22], [23, 25]], [12, 14]);
-  console.log("✓ Indoor: finished 2-3, live set 3 @ 12-14");
+
+  await createMatch(id, "INDOOR", B.id, A.id, 3, "Round 5", 17);
+  console.log("✓ Indoor: finished 2-3, live set 3 @ 12-14, scheduled 17:00");
 }
 
 async function seedGrass() {
@@ -535,12 +565,14 @@ async function seedGrass() {
   const C = await mk("Bern Eagles", 3, [["Felix", "Keller"], ["Jonas", "Frei"], ["Noah", "Brunner"], ["Tim", "Suter"]]);
   const D = await mk("Zurich Thunder", 4, [["David", "Meier"], ["Leon", "Graf"], ["Elias", "Roth"], ["Robin", "Widmer"]]);
 
-  const m1 = await createMatch(id, "GRASS", A.id, B.id, 1, "Pool");
+  const m1 = await createMatch(id, "GRASS", A.id, B.id, 1, "Pool", 8);
   await playMatch(m1, "GRASS", A, B, 3, [[21, 18], [19, 21], [15, 11]]);
 
-  const m2 = await createMatch(id, "GRASS", C.id, D.id, 2, "Pool");
+  const m2 = await createMatch(id, "GRASS", C.id, D.id, 2, "Pool", 10);
   await playMatch(m2, "GRASS", C, D, 3, [[21, 17]], [9, 11]);
-  console.log("✓ Grass: finished 2-1, live set 2 @ 9-11");
+
+  await createMatch(id, "GRASS", B.id, C.id, 3, "Pool", 17);
+  console.log("✓ Grass: finished 2-1, live set 2 @ 9-11, scheduled 17:00");
 }
 
 async function seedLight() {
@@ -574,15 +606,17 @@ async function seedLight() {
   const C = await mk("Lausanne Vets", 3, [["Olivier", "Faure"], ["Daniel", "Mercier"], ["Bernard", "Bonnet"], ["Alain", "Lopez"], ["Gérard", "Fabre"]]);
   const D = await mk("Bienne Classics", 4, [["Marcel", "Gauthier"], ["Roger", "Perrin"], ["Yves", "Robin"], ["Serge", "Clément"], ["Hervé", "Masson"]]);
 
-  const m1 = await createMatch(id, "LIGHT", A.id, B.id, 1, "Pool");
+  const m1 = await createMatch(id, "LIGHT", A.id, B.id, 1, "Pool", 8);
   await playMatch(m1, "LIGHT", A, B, 4, [[21, 17], [21, 14]]);
 
-  const m2 = await createMatch(id, "LIGHT", C.id, D.id, 2, "Pool");
+  const m2 = await createMatch(id, "LIGHT", C.id, D.id, 2, "Pool", 10);
   const cfg = await resolveMatchConfig(m2);
   const payloads = buildPayloads("LIGHT", C, D, 4, [], [8, 6]);
   payloads.push({ type: "JUMP_SERVE_FOOT_FAULT", team: "B" });
   await generateMatch(m2, "LIGHT", cfg, payloads);
-  console.log("✓ Light: finished 2-0, live set 1 @ ~8-6 (+ jump-serve fault)");
+
+  await createMatch(id, "LIGHT", A.id, D.id, 3, "Pool", 17);
+  console.log("✓ Light: finished 2-0, live set 1 @ ~8-6 (+ fault), scheduled 17:00");
 }
 
 /**
