@@ -549,6 +549,10 @@ export const events = pgTable(
     actor: text("actor", {
       enum: ["SCORER", "TEAM_A", "TEAM_B", "SYSTEM"],
     }).notNull(),
+    // The authenticated user (Supabase auth uuid) behind the action, when one
+    // exists — the audit anchor for corrections (UNDO/REWIND). No FK: this is
+    // the hottest insert path, and the record must outlive account deletion.
+    actorUserId: text("actor_user_id"),
     deviceInfo: text("device_info"),
     notes: text("notes"),
   },

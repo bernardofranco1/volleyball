@@ -442,7 +442,7 @@ function scheduleBackupOnStatusChange(meta: MatchMeta, newStatus: string): void 
 export async function appendMatchEvent(
   matchId: string,
   payload: { type: string } & Record<string, unknown>,
-  opts: { actor?: Actor; deviceInfo?: string } = {},
+  opts: { actor?: Actor; deviceInfo?: string; actorUserId?: string } = {},
 ): Promise<AppendOutcome> {
   const meta = await loadMatchMeta(matchId);
 
@@ -458,6 +458,7 @@ export async function appendMatchEvent(
       opts.actor ?? "SCORER",
       scope,
       opts.deviceInfo,
+      opts.actorUserId,
     );
   }
 
@@ -496,6 +497,7 @@ export async function appendMatchEvent(
       eventType: ev.payload.type,
       payload: ev.payload,
       actor: SYSTEM_EVENTS.has(ev.payload.type) ? ("SYSTEM" as Actor) : actor,
+      actorUserId: opts.actorUserId ?? null,
       deviceInfo: opts.deviceInfo ?? null,
       ...d,
     };
@@ -648,6 +650,7 @@ async function undoLastEvent(
   actor: Actor,
   scope: UndoScope,
   deviceInfo?: string,
+  actorUserId?: string,
 ): Promise<AppendOutcome> {
   const log = await loadEvents(matchId);
   const targets = selectUndoTargets(log, scope);
@@ -681,6 +684,7 @@ async function undoLastEvent(
           eventType: "UNDO",
           payload: ev.payload,
           actor,
+          actorUserId: actorUserId ?? null,
           deviceInfo: deviceInfo ?? null,
           ...d,
         })),
@@ -725,7 +729,13 @@ export class RewindRejectedError extends Error {}
 export async function rewindMatch(
   matchId: string,
   fromSequence: number,
-  opts: { actor?: Actor; deviceInfo?: string } = {},
+  opts: {
+    actor?: Actor;
+    deviceInfo?: string;
+    actorUserId?: string;
+    /** Free-text justification, stored in events.notes on the REWIND row. */
+    reason?: string;
+  } = {},
 ): Promise<AppendOutcome> {
   const meta = await loadMatchMeta(matchId);
   const log = await loadEvents(matchId);
@@ -757,7 +767,9 @@ export async function rewindMatch(
         eventType: "REWIND",
         payload: rewind.payload,
         actor: opts.actor ?? "SCORER",
+        actorUserId: opts.actorUserId ?? null,
         deviceInfo: opts.deviceInfo ?? null,
+        notes: opts.reason?.trim() || null,
         ...meta.engine.denormalize(finalState),
       });
       await tx

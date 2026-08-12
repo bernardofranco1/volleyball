@@ -138,7 +138,10 @@ export async function POST(
     const { state, newEvents, undone } = await appendMatchEvent(id, body.payload, {
       actor: "SCORER",
       // Attribute the entry to the signed-in user — the event log is the
-      // match's legal record and must say who scored it.
+      // match's legal record and must say who scored it. actorUserId is the
+      // dedicated column; deviceInfo keeps carrying it too so rows written
+      // before migration 0016 and after read the same way.
+      actorUserId: authed.auth.user.id,
       deviceInfo: authed.auth.user.id,
     });
     return Response.json({

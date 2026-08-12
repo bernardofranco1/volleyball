@@ -336,6 +336,41 @@ function renderApproval(
 
 const NOISE_EVENTS = new Set(["MATCH_CREATED"]);
 
+/**
+ * Replicate the engine's survivor pass over the raw log to work out which
+ * rows were struck by a correction: UNDO removes its target, REWIND removes
+ * every survivor after its cutoff. Returns event id → the correction that
+ * removed it (e.g. "undo #14"), so the printed log can annotate both sides —
+ * the auditor sees what happened AND what corrected it without chasing ids.
+ */
+export function removedByCorrections(events: ReportEvent[]): Map<string, string> {
+  const removedBy = new Map<string, string>();
+  const survivors: ReportEvent[] = [];
+  for (const e of events) {
+    const p = (e.payload ?? {}) as Record<string, unknown>;
+    if (e.eventType === "UNDO") {
+      const i = survivors.findIndex((s) => s.id === p.targetEventId);
+      if (i !== -1) {
+        removedBy.set(survivors[i].id, `undo #${e.sequence}`);
+        survivors.splice(i, 1);
+      }
+      continue;
+    }
+    if (e.eventType === "REWIND") {
+      const cutoff = typeof p.toSequence === "number" ? p.toSequence : Infinity;
+      for (let i = survivors.length - 1; i >= 0; i--) {
+        if (survivors[i].sequence > cutoff) {
+          removedBy.set(survivors[i].id, `rewind #${e.sequence}`);
+          survivors.splice(i, 1);
+        }
+      }
+      continue;
+    }
+    survivors.push(e);
+  }
+  return removedBy;
+}
+
 function describeLogEvent(
   e: ReportEvent,
   teamAName: string,
@@ -411,8 +446,12 @@ function describeLogEvent(
       return `Note: ${typeof p.text === "string" ? p.text : (e.notes ?? "")}`;
     case "UNDO":
       return "Undo";
-    case "REWIND":
-      return "Admin rewind (events after this point erased)";
+    case "REWIND": {
+      const c = typeof p.toSequence === "number" ? ` after #${p.toSequence}` : "";
+      // The reason (e.notes) prints on its own indented line in renderLogPdf —
+      // inlined here it wraps the fixed-height table row into its neighbour.
+      return `Admin rewind (events${c} erased)`;
+    }
     default:
       return e.eventType.toLowerCase().replace(/_/g, " ");
   }
@@ -455,6 +494,10 @@ export function renderLogPdf(data: MatchReportData): Promise<Buffer> {
       { label: "Time (UTC)", w: 0.16 },
     ];
     const visible = data.events.filter((e) => !NOISE_EVENTS.has(e.eventType));
+    // Corrections are printed on both sides: struck rows carry which UNDO/
+    // REWIND removed them, and each UNDO names the sequence it removed.
+    const removedBy = removedByCorrections(data.events);
+    const seqById = new Map(data.events.map((e) => [e.id, e.sequence]));
     tableHeader(doc, left, width, cols);
     let lastSet: number | null = null;
     for (const e of visible) {
@@ -470,16 +513,47 @@ export function renderLogPdf(data: MatchReportData): Promise<Buffer> {
         doc.moveDown(0.2);
       }
       ensureSpace(doc, 16);
-      tableRow(doc, left, width, cols, [
-        String(e.sequence),
-        e.setNumber != null ? String(e.setNumber) : "—",
-        e.scoreAfterA != null && e.scoreAfterB != null
-          ? `${e.scoreAfterA}–${e.scoreAfterB}`
-          : "—",
-        describeLogEvent(e, data.teamAName, data.teamBName),
-        e.actor,
-        new Date(e.timestamp).toUTCString().slice(17, 25),
-      ]);
+      let desc = describeLogEvent(e, data.teamAName, data.teamBName);
+      if (e.eventType === "UNDO") {
+        const p = (e.payload ?? {}) as Record<string, unknown>;
+        const targetSeq =
+          typeof p.targetEventId === "string" ? seqById.get(p.targetEventId) : undefined;
+        if (targetSeq != null) desc = `Undo — removed #${targetSeq}`;
+      }
+      const struck = removedBy.get(e.id);
+      if (struck) desc = `${desc}  · struck by ${struck}`;
+      tableRow(
+        doc,
+        left,
+        width,
+        cols,
+        [
+          String(e.sequence),
+          e.setNumber != null ? String(e.setNumber) : "—",
+          e.scoreAfterA != null && e.scoreAfterB != null
+            ? `${e.scoreAfterA}–${e.scoreAfterB}`
+            : "—",
+          desc,
+          e.actor,
+          new Date(e.timestamp).toUTCString().slice(17, 25),
+        ],
+        // Struck rows print greyed so the corrected narrative reads at a
+        // glance, while the removed entries stay fully legible on the record.
+        { color: struck ? DIM : INK },
+      );
+      // A rewind's recorded justification gets its own wrapped line — audit
+      // remarks must print in full, never ellipsized into the table cell.
+      if (e.eventType === "REWIND" && e.notes) {
+        ensureSpace(doc, 14);
+        doc
+          .fillColor(DIM)
+          .font("Helvetica-Oblique")
+          .fontSize(9)
+          .text(`reason: ${e.notes}`, left + width * 0.25, doc.y, {
+            width: width * 0.72,
+          });
+        doc.moveDown(0.2);
+      }
     }
     if (visible.length === 0) {
       doc.fillColor(DIM).font("Helvetica").fontSize(10).text("No events.");
@@ -527,8 +601,9 @@ function tableRow(
   width: number,
   cols: Col[],
   cells: string[],
+  opts: { color?: string } = {},
 ) {
-  doc.font("Helvetica").fontSize(9).fillColor(INK);
+  doc.font("Helvetica").fontSize(9).fillColor(opts.color ?? INK);
   let x = left;
   const y = doc.y;
   cols.forEach((c, i) => {

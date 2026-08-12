@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderLogPdf, renderPdf } from "@/lib/match-report-pdf";
+import { removedByCorrections, renderLogPdf, renderPdf } from "@/lib/match-report-pdf";
 import { renderScoresheetPdf } from "@/lib/scoresheet-pdf";
 import type { MatchReportData, ReportEvent } from "@/lib/match-report";
 
@@ -98,6 +98,53 @@ describe("event-log PDF export", () => {
   it("renders an empty log without crashing", async () => {
     const pdf = await renderLogPdf({ ...DATA, events: [] });
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  });
+
+  it("renders corrections (UNDO target + REWIND reason) without crashing", async () => {
+    const events = [
+      ev(1, "MATCH_CREATED", { matchId: "m1" }, null, null),
+      ev(2, "RALLY_WON_A", {}, 1, [1, 0]),
+      ev(3, "RALLY_WON_B", {}, 1, [1, 1]),
+      ev(4, "UNDO", { targetEventId: "evt_3" }, 1, [1, 0]),
+      ev(5, "RALLY_WON_A", {}, 1, [2, 0]),
+      { ...ev(6, "REWIND", { toSequence: 2 }, 1, [1, 0]), notes: "referee protest upheld" },
+    ];
+    const pdf = await renderLogPdf({ ...DATA, events });
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  });
+});
+
+// ── Correction survivor pass (audit annotations) ────────────────────────────
+
+describe("removedByCorrections", () => {
+  it("maps UNDO targets and REWIND-truncated rows to their correction", () => {
+    const events = [
+      ev(1, "MATCH_CREATED", null, null, null),
+      ev(2, "RALLY_WON_A", {}, 1, [1, 0]),
+      ev(3, "RALLY_WON_B", {}, 1, [1, 1]),
+      ev(4, "UNDO", { targetEventId: "evt_3" }, 1, [1, 0]),
+      ev(5, "RALLY_WON_A", {}, 1, [2, 0]),
+      ev(6, "REWIND", { toSequence: 2 }, 1, [1, 0]),
+      // re-scored after the rewind — must NOT be marked removed
+      ev(7, "RALLY_WON_B", {}, 1, [1, 1]),
+    ];
+    const removed = removedByCorrections(events);
+    expect(removed.get("evt_3")).toBe("undo #4");
+    expect(removed.get("evt_5")).toBe("rewind #6");
+    expect(removed.has("evt_2")).toBe(false); // at/below the rewind cutoff
+    expect(removed.has("evt_7")).toBe(false); // appended after the rewind
+    expect(removed.has("evt_4")).toBe(false); // control markers never removed
+  });
+
+  it("an UNDO whose target was already rewound away maps nothing", () => {
+    const events = [
+      ev(1, "RALLY_WON_A", {}, 1, [1, 0]),
+      ev(2, "REWIND", { toSequence: 0 }, 1, [0, 0]),
+      ev(3, "UNDO", { targetEventId: "evt_1" }, 1, [0, 0]),
+    ];
+    const removed = removedByCorrections(events);
+    expect(removed.get("evt_1")).toBe("rewind #2");
+    expect(removed.size).toBe(1);
   });
 });
 

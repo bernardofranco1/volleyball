@@ -50,10 +50,16 @@ export async function rewindMatchAction(
       "The scoresheet is signed. Reopen the match first — that invalidates the signatures.",
     );
 
+  // Optional justification for the record (FIVB paper protocol expects a
+  // remark for corrections) — stored on the REWIND event itself.
+  const reason = str(fd, "reason").slice(0, 200) || null;
+
   try {
     const { state } = await rewindMatch(matchId, fromSequence, {
       actor: "SCORER",
+      actorUserId: authed.auth.user.id,
       deviceInfo: authed.auth.user.id,
+      reason: reason ?? undefined,
     });
     await recordAudit({
       tenantId: authed.auth.tenantId,
@@ -61,8 +67,8 @@ export async function rewindMatchAction(
       action: "match.rewind",
       entityType: "match",
       entityId: matchId,
-      summary: `Rewound match to before event #${fromSequence}`,
-      metadata: { fromSequence, resultingSequence: state.lastSequence },
+      summary: `Rewound match to before event #${fromSequence}${reason ? ` — ${reason}` : ""}`,
+      metadata: { fromSequence, resultingSequence: state.lastSequence, reason },
     });
   } catch (err) {
     if (err instanceof RewindRejectedError) return fail(err.message);

@@ -514,6 +514,7 @@ const en: Dict = {
   "match.confirmResultConfirm": "Confirm this final result? The match will be marked finished and counted in standings.",
   "match.rewindHere": "Rewind here",
   "match.rewindConfirm": "Erase this point and everything after it? Scoring resumes manually from here. This can't be undone.",
+  "match.rewindReasonPrompt": "Rewind to here? This erases this event and everything after it (scoring resumes manually). Optionally give a reason for the record — leave empty to continue without one.",
   "match.teamColours": "Team colours",
   "match.teamColoursHint": "Shown on the scoreboard. Pick before the match.",
   "match.saveColours": "Save colours",
@@ -1040,6 +1041,7 @@ const fr: Dict = {
   "match.confirmResultConfirm": "Confirmer ce résultat final ? Le match sera clôturé et compté dans les classements.",
   "match.rewindHere": "Reprendre ici",
   "match.rewindConfirm": "Effacer ce point et tout ce qui suit ? Le score reprend manuellement à partir d'ici. Cette action est irréversible.",
+  "match.rewindReasonPrompt": "Revenir à ce point ? Cet événement et tout ce qui suit seront effacés (le score reprend manuellement). Indiquez éventuellement un motif pour le registre — laissez vide pour continuer sans motif.",
   "match.teamColours": "Couleurs des équipes",
   "match.teamColoursHint":
     "Affichées sur le tableau. À choisir avant le match.",
@@ -1566,6 +1568,7 @@ const de: Dict = {
   "match.confirmResultConfirm": "Dieses Endergebnis bestätigen? Das Spiel wird abgeschlossen und in den Tabellen gezählt.",
   "match.rewindHere": "Hier zurücksetzen",
   "match.rewindConfirm": "Diesen Punkt und alles danach löschen? Die Zählung wird ab hier manuell fortgesetzt. Das kann nicht rückgängig gemacht werden.",
+  "match.rewindReasonPrompt": "Bis hierher zurücksetzen? Dieses Ereignis und alles danach wird gelöscht (die Zählung wird manuell fortgesetzt). Optional einen Grund für das Protokoll angeben — leer lassen, um ohne Grund fortzufahren.",
   "match.teamColours": "Teamfarben",
   "match.teamColoursHint":
     "Auf der Anzeigetafel sichtbar. Vor dem Spiel auswählen.",
@@ -2092,6 +2095,7 @@ const es: Dict = {
   "match.confirmResultConfirm": "¿Confirmar este resultado final? El partido se marcará como finalizado y contará en las clasificaciones.",
   "match.rewindHere": "Rebobinar aquí",
   "match.rewindConfirm": "¿Borrar este punto y todo lo posterior? La puntuación se reanuda manualmente desde aquí. Esto no se puede deshacer.",
+  "match.rewindReasonPrompt": "¿Rebobinar hasta aquí? Se borrará este evento y todo lo posterior (la puntuación se reanuda manualmente). Opcionalmente indique un motivo para el registro — deje vacío para continuar sin motivo.",
   "match.teamColours": "Colores de los equipos",
   "match.teamColoursHint":
     "Se muestran en el marcador. Elígelos antes del partido.",
@@ -2618,6 +2622,7 @@ const pt: Dict = {
   "match.confirmResultConfirm": "Confirmar este resultado final? O jogo será encerrado e contado nas classificações.",
   "match.rewindHere": "Recuar aqui",
   "match.rewindConfirm": "Apagar este ponto e tudo depois dele? A pontuação recomeça manualmente a partir daqui. Isto não pode ser desfeito.",
+  "match.rewindReasonPrompt": "Recuar até aqui? Este evento e tudo o que se segue serão apagados (a pontuação recomeça manualmente). Indique opcionalmente um motivo para o registo — deixe vazio para continuar sem motivo.",
   "match.teamColours": "Cores das equipas",
   "match.teamColoursHint":
     "Mostradas no placar. Escolha antes do jogo.",

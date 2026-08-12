@@ -21,21 +21,29 @@ const EXPECTED_FORMAT = 1;
 // drifted to 8 while the exporter stamped 14 — every backup since migration 9
 // would have been refused here despite restoring fine (exports carry full rows,
 // so additive columns flow through).
-const KNOWN_JOURNAL_IDX = 15;
+const KNOWN_JOURNAL_IDX = 16;
 
 // Restore order = EXPORTED_TABLES order (FK-safe). Column lists come from the
 // backup rows themselves (drizzle exports camelCase keys → snake_case here).
+// Must cover every EXPORTED_TABLES entry (backup-policy.ts), in the same
+// FK-safe order — a table exported but missing here is silently skipped on
+// restore (which is how people/person_roles/team_staff/tenant_config were
+// dropped until 2026-08-12, breaking players.person_id on any restore).
 const PK: Record<string, string[]> = {
   tenants: ["id"],
   tenant_branding: ["tenant_id"],
   tenant_billing: ["tenant_id"],
+  tenant_config: ["tenant_id"],
   users: ["id"],
   user_tenant_roles: ["id"],
+  people: ["id"],
+  person_roles: ["id"],
   competitions: ["id"],
   tournament_config: ["competition_id"],
   competition_branding: ["competition_id"],
   pools: ["id"],
   teams: ["id"],
+  team_staff: ["id"],
   pool_teams: ["pool_id", "team_id"],
   players: ["id"],
   matches: ["id"],

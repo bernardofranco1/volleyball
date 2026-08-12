@@ -26,13 +26,22 @@ export function RewindToHere({
     <form
       action={action}
       onSubmit={(e) => {
-        if (!window.confirm(t("match.rewindConfirm"))) e.preventDefault();
+        // Confirm + optional reason in one prompt: Cancel aborts, empty is a
+        // confirmed rewind without a remark, text becomes the recorded reason.
+        const reason = window.prompt(t("match.rewindReasonPrompt"), "");
+        if (reason === null) {
+          e.preventDefault();
+          return;
+        }
+        (e.currentTarget.elements.namedItem("reason") as HTMLInputElement).value =
+          reason;
       }}
     >
       <input type="hidden" name="tenantSlug" value={tenantSlug} />
       <input type="hidden" name="competitionId" value={competitionId} />
       <input type="hidden" name="matchId" value={matchId} />
       <input type="hidden" name="fromSequence" value={fromSequence} />
+      <input type="hidden" name="reason" defaultValue="" />
       <button
         type="submit"
         className="text-xs text-score-dim underline hover:text-red-400"

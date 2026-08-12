@@ -1,0 +1,1 @@
+ALTER TABLE "events" ADD COLUMN "actor_user_id" text;
