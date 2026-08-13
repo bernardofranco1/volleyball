@@ -12,6 +12,11 @@ export function SelectAll({ label }: { label: string }) {
   return (
     <input
       type="checkbox"
+      // Explicitly uncontrolled. Without defaultChecked, an input that has an
+      // onChange but no checked prop hydrates as a controlled field whose value
+      // the server never rendered, and React discards the server HTML for the
+      // whole table header.
+      defaultChecked={false}
       aria-label={label}
       className="accent-primary"
       onChange={(e) => {

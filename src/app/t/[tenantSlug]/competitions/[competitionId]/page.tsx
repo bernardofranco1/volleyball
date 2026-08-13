@@ -123,7 +123,6 @@ export default async function CompetitionOverviewPage({
   const leader = standings[0]?.rows[0] ?? null;
   const nextMatch = upcoming.rows[0] ?? null;
   const detailRows: [string, React.ReactNode][] = [
-    [t("comp.discipline"), `${discipline} · ${competition.gender ?? "—"}`],
     [t("comp.venue"), competition.venue || "—"],
     [
       t("comp.cityCountry"),
@@ -313,15 +312,14 @@ export default async function CompetitionOverviewPage({
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Panel
-          title={t("comp.editDetails")}
-          className="lg:col-span-2"
-        >
-          <details>
-            <summary className="cursor-pointer text-sm text-score-dim">
+        <details className="rounded-xl border border-border bg-surface-raised p-4 lg:col-span-2">
+          <summary className="cursor-pointer text-sm font-semibold">
+            {t("comp.editDetails")}
+            <span className="ml-2 font-normal text-score-dim">
               {t("comp.editDetailsHint")}
-            </summary>
-            <div className="mt-3">
+            </span>
+          </summary>
+          <div className="mt-3">
               <EditCompetitionForm
                 tenantSlug={tenantSlug}
                 competition={{
@@ -338,10 +336,9 @@ export default async function CompetitionOverviewPage({
                   discipline: competition.discipline,
                   color: competition.color,
                 }}
-              />
-            </div>
-          </details>
-        </Panel>
+            />
+          </div>
+        </details>
 
         {/* Config panel: overrides over discipline defaults. Only the values
             that differ are shown up front; the full form is one click away. */}

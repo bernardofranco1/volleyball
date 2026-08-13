@@ -31,6 +31,9 @@ import { matchStatusLabel, statusBadgeClass, ui } from "@/components/admin/style
 
 export const dynamic = "force-dynamic";
 
+/** Ties the toolbar's export button to the form that wraps the table. */
+const EXPORT_FORM_ID = "match-export";
+
 const STATUS_CHIPS: { value: MatchStatusFilter; labelKey: string; dot?: boolean }[] = [
   { value: "live", labelKey: "matches.live", dot: true },
   { value: "scheduled", labelKey: "matches.scheduled" },
@@ -181,17 +184,17 @@ export default async function MatchesPage({
     {
       key: "time",
       header: t("common.time"),
-      width: "w-16",
+      width: "w-20",
       className: "font-mono tabular-nums",
       cell: (m) => (
-        <span className="text-xs text-score-dim">
+        <span className="whitespace-nowrap text-xs text-score-dim">
           {m.scheduledAt ? <LocalTime date={m.scheduledAt} mode="time" /> : "—"}
         </span>
       ),
     },
     {
       key: "match",
-      header: t("nav.matches"),
+      header: t("matches.thMatch"),
       cell: (m) => (
         <Link
           href={matchHref(tenantSlug, m, { manage: canManage, score: canScore })}
@@ -310,26 +313,13 @@ export default async function MatchesPage({
       />
 
       {/*
-        One GET form wraps toolbar and table: the row checkboxes are plain
-        `id` inputs and the submit button is the CSV export, so bulk selection
-        needs no client state. Filters remain links (instant, and each filtered
-        view has a URL); only free-text search submits this form's `q`.
+        Bulk selection is plain HTML: the row checkboxes are `id` inputs in a
+        GET form pointed at the CSV route, so selecting and exporting needs no
+        client state. The form wraps only the table — the search box is itself a
+        form and forms cannot nest — and the toolbar's export button reaches it
+        by id. Filters stay links: instant, and each filtered view has a URL.
       */}
-      <form method="get" action="/api/matches/export.csv">
-        <input type="hidden" name="tenant" value={tenantSlug} />
-        {sp.discipline && (
-          <input type="hidden" name="discipline" value={sp.discipline} />
-        )}
-        {sp.competition && (
-          <input type="hidden" name="competition" value={sp.competition} />
-        )}
-        {q && <input type="hidden" name="q" value={q} />}
-        {statusFilter && (
-          <input type="hidden" name="status" value={statusFilter} />
-        )}
-        <input type="hidden" name="order" value={orderDir} />
-
-        <div className="mb-3 flex flex-col gap-2">
+      <div className="mb-3 flex flex-col gap-2">
           <Toolbar>
             <SearchBox
               defaultValue={sp.q}
@@ -397,11 +387,29 @@ export default async function MatchesPage({
             >
               {orderDir === "asc" ? t("matches.earliest") : t("matches.latest")}
             </Link>
-            <button type="submit" className={ui.btnSecondary}>
+            <button
+              type="submit"
+              form={EXPORT_FORM_ID}
+              className={ui.btnSecondary}
+            >
               {t("matches.exportCsv")}
             </button>
           </Toolbar>
-        </div>
+      </div>
+
+      <form id={EXPORT_FORM_ID} method="get" action="/api/matches/export.csv">
+        <input type="hidden" name="tenant" value={tenantSlug} />
+        {sp.discipline && (
+          <input type="hidden" name="discipline" value={sp.discipline} />
+        )}
+        {sp.competition && (
+          <input type="hidden" name="competition" value={sp.competition} />
+        )}
+        {q && <input type="hidden" name="q" value={q} />}
+        {statusFilter && (
+          <input type="hidden" name="status" value={statusFilter} />
+        )}
+        <input type="hidden" name="order" value={orderDir} />
 
         <DataTable
           columns={columns}

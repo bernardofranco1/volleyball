@@ -21,18 +21,22 @@ const INIT: FormState = { error: null };
 export function BatchEditForm({
   action,
   children,
-  labelFor,
+  rowLabels = {},
+  fieldLabels = {},
   strings,
 }: {
   action: (prev: FormState, fd: FormData) => Promise<FormState>;
   children: React.ReactNode;
   /**
-   * Human label for a dirty control, used in the bar's summary line. Receives
-   * the control's `data-row` and `data-field`.
+   * Labels for the bar's summary line, keyed by a control's `data-row` /
+   * `data-field`. Plain records rather than a formatter callback: the caller is
+   * a Server Component, and a function can't cross that boundary.
    */
-  labelFor?: (row: string, field: string) => string;
+  rowLabels?: Record<string, string>;
+  fieldLabels?: Record<string, string>;
   strings: {
-    unsaved: (n: number) => string;
+    /** Contains `{count}`, interpolated here. */
+    unsaved: string;
     save: string;
     saving: string;
     discard: string;
@@ -84,7 +88,9 @@ export function BatchEditForm({
   const rows = Array.from(new Set(dirty.map((d) => d.row)));
   const summary = dirty
     .slice(0, 3)
-    .map((d) => labelFor?.(d.row, d.field) ?? `${d.row} ${d.field}`)
+    .map((d) =>
+      `${rowLabels[d.row] ?? ""} ${fieldLabels[d.field] ?? d.field}`.trim(),
+    )
     .join(" · ");
 
   return (
@@ -106,7 +112,9 @@ export function BatchEditForm({
 
       {dirty.length > 0 && (
         <div className="sticky bottom-4 z-30 mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-warning bg-surface-3 px-4 py-2.5 shadow-lg">
-          <b className="text-sm text-warning">{strings.unsaved(dirty.length)}</b>
+          <b className="text-sm text-warning">
+            {strings.unsaved.replace("{count}", String(dirty.length))}
+          </b>
           {summary && (
             <span className="min-w-0 truncate text-xs text-score-dim">
               {summary}

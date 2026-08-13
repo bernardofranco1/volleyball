@@ -108,14 +108,14 @@ export default async function SchedulePage({
     {
       key: "time",
       header: t("schedule.localTime"),
-      width: "w-52",
+      width: "w-60",
       cell: (m) => (
         <LocalDateTimeInput
           name={`time:${m.id}`}
           utcValue={toUtcInputValue(m.scheduledAt)}
           row={m.id}
           ariaLabel={`${t("schedule.localTime")} — ${m.teamAName} / ${m.teamBName}`}
-          className={`${inputCls} w-48`}
+          className={`${inputCls} w-56`}
         />
       ),
     },
@@ -224,15 +224,16 @@ export default async function SchedulePage({
       ) : (
         <BatchEditForm
           action={updateMatchSlots}
-          labelFor={(row, field) => {
-            const m = matchList.find((x) => x.id === row);
-            const label = m ? `#${m.matchNumber ?? "–"}` : row;
-            return `${label} ${
-              field === "court" ? t("common.court") : t("schedule.localTime")
-            }`.toLowerCase();
+          rowLabels={Object.fromEntries(
+            matchList.map((m) => [m.id, `#${m.matchNumber ?? "–"}`]),
+          )}
+          fieldLabels={{
+            court: t("common.court").toLowerCase(),
+            time: t("schedule.localTime").toLowerCase(),
           }}
           strings={{
-            unsaved: (n) => t("schedule.unsaved", { count: n }),
+            // Interpolated in the client component, so the placeholder survives.
+            unsaved: t("schedule.unsaved", { count: "{count}" }),
             save: t("schedule.saveAll"),
             saving: t("common.saving"),
             discard: t("common.discard"),

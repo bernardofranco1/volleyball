@@ -56,16 +56,16 @@ export default async function DashboardPage({
     {
       key: "time",
       header: t("common.time"),
-      width: "w-16",
+      width: "w-20",
       cell: (m) => (
-        <span className="font-mono text-xs tabular-nums text-score-dim">
+        <span className="whitespace-nowrap font-mono text-xs tabular-nums text-score-dim">
           {m.scheduledAt ? <LocalTime date={m.scheduledAt} mode="time" /> : "—"}
         </span>
       ),
     },
     {
       key: "match",
-      header: t("nav.matches"),
+      header: t("matches.thMatch"),
       cell: (m) => (
         <Link
           href={matchHref(tenantSlug, m, { manage: canManage, score: canScore })}

@@ -255,13 +255,24 @@ export default async function TenantLayout({
       </Link>
     );
 
-  const signOut = (
+  const signOut = (compact = false) => (
     <form action={logout}>
       <button
         type="submit"
-        className="rounded-lg border border-border px-3 py-1.5 text-sm text-score-dim transition-colors hover:text-foreground"
+        title={t("nav.signOut")}
+        className={`rounded-lg border border-border text-sm text-score-dim transition-colors hover:text-foreground ${
+          compact
+            ? "px-2 py-1.5 xl:px-3"
+            : "px-3 py-1.5"
+        }`}
       >
-        {t("nav.signOut")}
+        {/* The icon rail has no room for the word; the full sidebar does. */}
+        <span aria-hidden className={compact ? "xl:hidden" : "hidden"}>
+          ⏻
+        </span>
+        <span className={compact ? "max-xl:sr-only" : ""}>
+          {t("nav.signOut")}
+        </span>
       </button>
     </form>
   );
@@ -277,7 +288,7 @@ export default async function TenantLayout({
               footer={
                 <div className="flex items-center gap-1.5 max-xl:flex-col">
                   <ThemeToggle />
-                  {signOut}
+                  {signOut(true)}
                 </div>
               }
             />
@@ -305,7 +316,7 @@ export default async function TenantLayout({
               </div>
               <div className="flex items-center gap-2">
                 <ThemeToggle />
-                {signOut}
+                {signOut()}
               </div>
             </header>
           }
