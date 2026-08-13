@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
+import { DB_SCHEMA, IS_PROD_SCHEMA, searchPathFor } from "./env";
 
 // Supabase pooler (Transaction mode, port 6543) is the runtime connection for
 // all serverless routes. `prepare: false` is required because PgBouncer in
@@ -45,10 +46,22 @@ const connectionString =
 //
 // (`max_pipeline` is a real postgres.js option — parsed in its option ints —
 // but missing from its TypeScript definitions, hence the assertion.)
+/**
+ * Homologation runs against its own tables in the same database (spec/28), so
+ * every connection this process opens is pinned to one schema via the
+ * `search_path` startup parameter. Verified to survive BOTH Supabase poolers
+ * (transaction and session mode).
+ *
+ * Production sets nothing at all — `DB_SCHEMA=public` leaves the connection
+ * exactly as it has always been, so the hot path is untouched by this feature.
+ */
+const searchPath = searchPathFor(DB_SCHEMA);
+
 const SHARED = {
   prepare: false,
   idle_timeout: 20,
   connect_timeout: 10,
+  ...(searchPath ? { connection: { search_path: searchPath } } : {}),
 };
 
 /**
@@ -81,3 +94,33 @@ export const db = drizzle(client, { schema });
 /** Transaction entry point — see the note above. */
 export const dbTx = drizzle(txClient, { schema });
 export { schema };
+export { DB_SCHEMA, IS_PROD_SCHEMA } from "./env";
+
+/**
+ * Fail-closed check that we are really on the schema we think we are.
+ *
+ * The whole safety of the homolog split rests on one startup parameter. If a
+ * pooler ever stopped forwarding it, a homologation deployment would quietly
+ * read and WRITE production tables — the single worst outcome this design has
+ * to prevent. So a non-production process proves it once, on first use, and
+ * refuses to serve otherwise.
+ *
+ * Costs one round trip per warm instance, and only outside production.
+ */
+let schemaVerified: Promise<void> | null = null;
+
+export function assertDbSchema(): Promise<void> {
+  if (IS_PROD_SCHEMA) return Promise.resolve();
+  schemaVerified ??= (async () => {
+    const rows = await client<{ cs: string | null }[]>`select current_schema() as cs`;
+    const actual = rows[0]?.cs ?? null;
+    if (actual !== DB_SCHEMA) {
+      throw new Error(
+        `Database schema mismatch: DB_SCHEMA=${DB_SCHEMA} but the connection resolves to ${
+          actual ?? "nothing"
+        }. Refusing to run — this process could be writing to the wrong tables.`,
+      );
+    }
+  })();
+  return schemaVerified;
+}

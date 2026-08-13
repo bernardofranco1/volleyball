@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
+import { scorerTopic } from "@/lib/realtime-topics";
 
 interface Pending {
   requestId: string;
@@ -96,7 +97,7 @@ export function InterruptNotifications({
     const supabase = createSupabaseBrowserClient();
     ensureRealtimeAuth(supabase);
     const channel = supabase
-      .channel(`match:${matchId}:scorer`, channelConfig())
+      .channel(scorerTopic(matchId), channelConfig())
       .on("broadcast", { event: "interrupt-request" }, () => {
         void poll();
       })

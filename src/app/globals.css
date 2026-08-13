@@ -134,6 +134,16 @@ body {
   --row-py: 0.75rem;
 }
 
+/*
+ * Homologation banner (spec/28) is fixed to the bottom of the viewport, so
+ * reserve its height at the foot of the page — otherwise it permanently covers
+ * whatever sits lowest (the sidebar's sign-out, a scorer's last action row).
+ * Production never sets this attribute and pays nothing.
+ */
+[data-env="homolog"] body {
+  padding-bottom: 1.75rem;
+}
+
 /* Theme-toggle icon visibility (CSS-driven — no JS state, no hydration flash). */
 .theme-icon-light {
   display: none;

@@ -12,6 +12,7 @@ import {
   FloatingCountdown,
 } from "@/components/scoring/shared/CountdownOverlay";
 import { SubPanel } from "@/components/scoring/shared/LiveControls";
+import { matchTopic } from "@/lib/realtime-topics";
 
 interface InterruptRow {
   id: string;
@@ -91,7 +92,7 @@ export function TeamTablet({
     const supabase = createSupabaseBrowserClient();
     ensureRealtimeAuth(supabase);
     const channel = supabase
-      .channel(`match:${matchId}`, channelConfig())
+      .channel(matchTopic(matchId), channelConfig())
       .on(
         "broadcast",
         { event: "state-update" },

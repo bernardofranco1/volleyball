@@ -1,11 +1,47 @@
 # spec/28 — Homologation → Production releases (one URL, one DB, one project)
 
-**Status: PLANNED — no implementation yet.** Written 2026-08-13; **revised the
-same day (v2)** after review: homologation gets **its own tables in the same
-database** (a `homolog` Postgres schema), selected per environment by an env
-var. This supersedes v1's shared-tables model and its homolog-tenant idea, and
-it demotes the expand/contract migration law from "always" to "promote-window
-and rollback safety only".
+**Status: PHASE 1 SHIPPED 2026-08-13** — the database split is built, tested
+and merged. Phases 0/2/3 (Vercel settings, release console, one-URL switch)
+remain planned; §12 tracks what is done.
+
+Written 2026-08-13; **revised the same day (v2)** after review: homologation
+gets **its own tables in the same database** (a `homolog` Postgres schema),
+selected per environment by an env var. This supersedes v1's shared-tables
+model and its homolog-tenant idea, and it demotes the expand/contract migration
+law from "always" to "promote-window and rollback safety only".
+
+## 0. What is built (Phase 1)
+
+`DB_SCHEMA` (`public` | `homolog`) selects the tables, applied as the
+connection's `search_path`; no query in the app changed. Verified on the live
+database:
+
+- `search_path` survives **both** Supabase poolers — transaction mode included,
+  which v2 had flagged as unverified. Homolog therefore needs no special
+  connection string.
+- The path is a **single application schema with no `public` fallback**. With
+  `homolog,public`, a table missing from the clone would silently resolve
+  against production data; with one entry it errors instead.
+- A **fail-closed boot check** (`assertDbSchema`, called from
+  `instrumentation.register`) refuses to start a non-production deployment
+  whose connection does not actually resolve to its schema.
+- `scripts/clone-prod-to-homolog.ts` rebuilds the clone in ~6s (25 tables,
+  9.8k rows, 44 foreign keys re-pointed inside `homolog`, RLS parity, journal
+  seeded, emails scrubbed to `@homolog.invalid` outside an allow-list).
+- Two migration journals: `drizzle.__drizzle_migrations` (production) and
+  `drizzle_homolog.__drizzle_migrations`. `db:migrate` now **requires**
+  `--env homolog|prod` — inheriting the local default would have made the old
+  "migrate production" command quietly migrate the clone.
+- Advisory-lock keys and Realtime channel names are namespaced per environment
+  (`envKey`, `src/lib/realtime-topics.ts`); both are global to the database /
+  project and the clone shares production's ids.
+- The amber banner renders from `DB_SCHEMA` alone — a production build cannot
+  show it and a homolog build cannot hide it.
+
+Proven end to end in a browser: a competition created through the UI in
+homologation appeared in `homolog.competitions` and **never** in `public`;
+production row counts were unchanged throughout; the production build shows no
+banner and reads production data.
 
 ## 1. Goal
 
@@ -215,6 +251,8 @@ boards, PDFs, crons (production deployment only → `public` by construction).
 
 ## 12. Rollout
 
+- **Phase 1 — schema split. ✅ DONE 2026-08-13.** Shipped as described in §0.
+  Local development now defaults to `DB_SCHEMA=homolog`.
 - **Phase 0 — settings (minutes).** `release` branch + both toggles. Pushes
   to `main` stop reaching production that moment. Interim promote: push
   `release` + dashboard Promote button.

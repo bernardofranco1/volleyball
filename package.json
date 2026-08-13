@@ -14,6 +14,9 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate": "tsx --env-file=.env.local src/db/migrate.ts",
+    "db:migrate:prod": "tsx --env-file=.env.local src/db/migrate.ts --env prod",
+    "db:migrate:homolog": "tsx --env-file=.env.local src/db/migrate.ts --env homolog",
+    "db:clone:homolog": "tsx --env-file=.env.local scripts/clone-prod-to-homolog.ts",
     "db:seed": "tsx --env-file=.env.local src/db/seed.ts",
     "db:seed:demo": "tsx --env-file=.env.local src/scripts/seed.ts",
     "typecheck": "tsc --noEmit"

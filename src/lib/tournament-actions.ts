@@ -19,6 +19,7 @@ import { newId } from "@/lib/id";
 import { nextMatchNumber } from "@/lib/match-number";
 import { fail, ok, type FormState } from "@/lib/action-state";
 import { str } from "@/lib/form-data";
+import { envKey } from "@/db/env";
 
 function standingsPath(tenantSlug: string, competitionId: string) {
   return `/t/${tenantSlug}/competitions/${competitionId}/standings`;
@@ -247,7 +248,11 @@ export async function generateBracket(
 
   let outcome: FormState = ok("Bracket generated.");
   await dbTx.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${g.competitionId}))`);
+    await tx.execute(
+      // Advisory locks are DATABASE-global, so homologation and production would
+      // contend on identical (cloned) competition ids — envKey namespaces them.
+      sql`select pg_advisory_xact_lock(hashtext(${envKey(g.competitionId)}))`,
+    );
 
     const existing = await tx
       .select({ roundName: matches.roundName })
@@ -338,7 +343,11 @@ export async function advanceBracket(
   let createdTotal = 0;
   await dbTx.transaction(async (tx) => {
     // Serialize concurrent advances for this competition (spec/14 §E1).
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${g.competitionId}))`);
+    await tx.execute(
+      // Advisory locks are DATABASE-global, so homologation and production would
+      // contend on identical (cloned) competition ids — envKey namespaces them.
+      sql`select pg_advisory_xact_lock(hashtext(${envKey(g.competitionId)}))`,
+    );
 
     for (let guard = 0; guard < 8; guard++) {
       const all = (await tx

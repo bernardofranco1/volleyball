@@ -21,6 +21,7 @@ import {
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
 import type { TournamentConfig } from "@/engine/config";
+import { matchTopic } from "@/lib/realtime-topics";
 
 export interface PlayerLite {
   id: string;
@@ -312,7 +313,7 @@ export function createMatchProvider<
       const supabase = createSupabaseBrowserClient();
       ensureRealtimeAuth(supabase);
       const channel = supabase
-        .channel(`match:${matchId}`, channelConfig())
+        .channel(matchTopic(matchId), channelConfig())
         .on(
           "broadcast",
           { event: "state-update" },

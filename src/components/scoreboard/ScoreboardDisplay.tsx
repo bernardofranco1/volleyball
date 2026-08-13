@@ -25,6 +25,7 @@ import {
   FloatingCountdown,
 } from "@/components/scoring/shared/CountdownOverlay";
 import { resolveTeamColor } from "@/lib/colors";
+import { matchTopic } from "@/lib/realtime-topics";
 
 // Display modes are retained for URL compatibility; the broadcast board always
 // shows score + sets + serving, so they no longer change the layout.
@@ -150,7 +151,7 @@ export function ScoreboardDisplay({
     const supabase = createSupabaseBrowserClient();
     ensureRealtimeAuth(supabase);
     const channel = supabase
-      .channel(`match:${matchId}`, channelConfig())
+      .channel(matchTopic(matchId), channelConfig())
       .on(
         "broadcast",
         { event: "state-update" },

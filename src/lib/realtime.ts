@@ -6,6 +6,7 @@
 // the fallback, so a realtime hiccup must never fail a scoring request.
 
 import { captureError } from "@/lib/observability";
+import { matchTopic, scorerTopic } from "@/lib/realtime-topics";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -54,7 +55,7 @@ export function stateUpdateMessage(
   lastSequence: number,
 ): BroadcastMessage {
   return {
-    topic: `match:${matchId}`,
+    topic: matchTopic(matchId),
     event: "state-update",
     payload: { lastSequence },
   };
@@ -67,7 +68,7 @@ export function serveClockMessage(
   serveClockSecs: number,
 ): BroadcastMessage {
   return {
-    topic: `match:${matchId}`,
+    topic: matchTopic(matchId),
     event: "serve-clock-start",
     payload: { deadline, serveClockSecs },
   };
@@ -83,6 +84,6 @@ export async function broadcastInterruptRequest(
   },
 ): Promise<void> {
   await broadcast([
-    { topic: `match:${matchId}:scorer`, event: "interrupt-request", payload },
+    { topic: scorerTopic(matchId), event: "interrupt-request", payload },
   ]);
 }

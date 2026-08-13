@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import { boardFontClassName } from "@/lib/board-fonts";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
+import { EnvironmentBanner } from "@/components/EnvironmentBanner";
+import { DB_SCHEMA, IS_PROD_SCHEMA } from "@/db/env";
 import { IMPERSONATION_COOKIE } from "@/lib/impersonation";
 import "./globals.css";
 
@@ -45,10 +47,15 @@ export default async function RootLayout({
     <html
       lang="en"
       data-theme={theme}
+      // Drives the padding that keeps the homologation banner from covering
+      // page chrome; absent (and free) in production.
+      data-env={IS_PROD_SCHEMA ? undefined : DB_SCHEMA}
       className={`${geistSans.variable} ${geistMono.variable} ${boardFontClassName} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {children}
+        {/* Renders only when this build is NOT pointed at production tables. */}
+        <EnvironmentBanner />
         {impersonation && (
           <ImpersonationBanner
             targetEmail={impersonation.target.email}
