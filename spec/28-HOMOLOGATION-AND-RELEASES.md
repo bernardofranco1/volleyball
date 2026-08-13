@@ -1,8 +1,17 @@
 # spec/28 — Homologation → Production releases (one URL, one DB, one project)
 
-**Status: PHASE 1 SHIPPED 2026-08-13** — the database split is built, tested
-and merged. Phases 0/2/3 (Vercel settings, release console, one-URL switch)
-remain planned; §12 tracks what is done.
+**Status: PHASES 0 + 1 SHIPPED 2026-08-13** — the database split and the
+deployment pipeline are both live and verified end to end. Phases 2/3 (release
+console, one-URL switch) remain planned; §12 tracks what is done.
+
+**The pipeline as it stands today:** a push to `main` builds a PREVIEW
+deployment on the `homolog` tables, reachable at
+`https://volleyball-homolog.vercel.app` (stable alias) and carrying the amber
+banner. It cannot reach the production domain. Promoting = fast-forward
+`release` to the validated SHA, wait for the staged production build, then
+`POST /v10/projects/{prj}/promote/{dpl}`. Rollback = the same call on an older
+production deployment. `GET /api/version` on any URL reports commit, branch,
+Vercel target and which schema it is serving.
 
 Written 2026-08-13; **revised the same day (v2)** after review: homologation
 gets **its own tables in the same database** (a `homolog` Postgres schema),
@@ -253,9 +262,30 @@ boards, PDFs, crons (production deployment only → `public` by construction).
 
 - **Phase 1 — schema split. ✅ DONE 2026-08-13.** Shipped as described in §0.
   Local development now defaults to `DB_SCHEMA=homolog`.
-- **Phase 0 — settings (minutes).** `release` branch + both toggles. Pushes
-  to `main` stop reaching production that moment. Interim promote: push
-  `release` + dashboard Promote button.
+- **Phase 0 — settings. ✅ DONE 2026-08-13.** `release` branch created;
+  Vercel production branch → `release`; *Auto-assign Custom Production
+  Domains* → off; `DB_SCHEMA` + `NEXT_PUBLIC_DB_SCHEMA` = `homolog` on the
+  **Preview** environment; stable alias `volleyball-homolog.vercel.app`;
+  `/api/version` probe added. Verified live: a `main` push built as a preview
+  and production kept serving the previous build; a `release` push built and
+  sat READY *without* taking the domain; promote flipped it; rollback to the
+  previous deployment flipped it back (~15 s) and forward again.
+
+  Two findings worth recording:
+  - **The production branch is not settable through the public API.** PATCH
+    `/v9/projects/{id}` rejects `link`, `productionBranch` and
+    `gitProductionBranch`. The dashboard uses an undocumented
+    `PATCH /v9/projects/{id}/branch` with `{"branch":"release"}`, which works
+    and is what was used. Unsupported by Vercel — if it ever breaks, the same
+    change is one click in Settings → Git.
+  - **Protection Bypass for Automation is not available on this plan** —
+    every documented endpoint shape returns `not_found`. Consequence:
+    candidate URLs are reachable in a browser (Vercel SSO) but not by scripts,
+    so automated smoke tests of a candidate are blocked until either the
+    project moves to Pro, or `ssoProtection` is turned off for previews. This
+    is also the prerequisite for the Phase-3 one-URL switch, whose proxy
+    authenticates itself with exactly that secret. Decision §14.3 is therefore
+    now load-bearing rather than a preference.
 - **Phase 1 — schema split (~1 day).** `DB_SCHEMA` plumbing, clone script,
   dual journals, banner, `.env.local` → homolog. Validate by cloning and
   driving the app on a preview URL end-to-end (spec/27 QA pattern).
