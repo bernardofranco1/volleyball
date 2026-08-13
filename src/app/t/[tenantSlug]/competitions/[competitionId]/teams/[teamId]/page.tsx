@@ -18,6 +18,7 @@ import { AddPlayerForm } from "@/components/admin/AddPlayerForm";
 import { listTeamStaff, personName, searchPeople } from "@/lib/people";
 import { TeamStaffPanel } from "@/components/admin/TeamStaffPanel";
 import { SubmitButton } from "@/components/admin/SubmitButton";
+import { Page } from "@/components/ui/Page";
 import { ui } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +62,7 @@ export default async function TeamDetailPage({
   const teamsHref = `/t/${tenantSlug}/competitions/${competitionId}/teams`;
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-10">
+    <Page width="wide">
       <div className="mb-6">
         <Link href={teamsHref} className="text-sm text-score-dim hover:text-foreground">
           {t("teams.backToTeams")}
@@ -247,6 +248,6 @@ export default async function TeamDetailPage({
           </SubmitButton>
         </ActionForm>
       </section>
-    </main>
+    </Page>
   );
 }

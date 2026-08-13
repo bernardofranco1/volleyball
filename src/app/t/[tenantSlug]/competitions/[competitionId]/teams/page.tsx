@@ -14,6 +14,10 @@ import { AddTeamForm } from "@/components/admin/AddTeamForm";
 import { CompetitionHeader } from "@/components/admin/CompetitionHeader";
 import { CsvImport } from "@/components/admin/CsvImport";
 import { SubmitButton } from "@/components/admin/SubmitButton";
+import { DataTable, type Column } from "@/components/ui/DataTable";
+import { Drawer } from "@/components/ui/Drawer";
+import { Page } from "@/components/ui/Page";
+import { Toolbar, ToolbarSpacer } from "@/components/ui/Toolbar";
 import { ui } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
@@ -51,8 +55,77 @@ export default async function TeamsPage({
   if (!competition) notFound();
   const playersByTeam = await listPlayersByTeam(teams.map((x) => x.id));
 
+  type TeamRow = (typeof teams)[number];
+  const columns: Column<TeamRow>[] = [
+    {
+      key: "seed",
+      header: t("common.seed"),
+      width: "w-12",
+      align: "center",
+      className: "font-mono tabular-nums text-xs text-score-dim",
+      cell: (team) => team.seed ?? "—",
+    },
+    {
+      key: "name",
+      header: t("common.team"),
+      cell: (team) => (
+        <Link
+          href={`/t/${tenantSlug}/competitions/${competitionId}/teams/${team.id}`}
+          className="font-medium"
+        >
+          {team.displayName}
+        </Link>
+      ),
+    },
+    {
+      key: "country",
+      header: t("teams.country"),
+      width: "w-20",
+      cell: (team) => (
+        <span className="text-xs text-score-dim">
+          {team.countryCode ? team.countryCode.toUpperCase() : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "players",
+      header: t("teams.players"),
+      width: "w-20",
+      align: "right",
+      className: "font-mono tabular-nums text-xs",
+      cell: (team) => (playersByTeam.get(team.id) ?? []).length,
+    },
+    {
+      key: "captain",
+      header: t("teams.captainShort"),
+      className: "max-md:hidden",
+      cell: (team) => {
+        const captain = (playersByTeam.get(team.id) ?? []).find((p) => p.isCaptain);
+        return (
+          <span className="text-xs text-score-dim">
+            {captain ? captain.jerseyName : "—"}
+          </span>
+        );
+      },
+    },
+    {
+      key: "go",
+      header: "",
+      align: "right",
+      width: "w-16",
+      cell: (team) => (
+        <Link
+          href={`/t/${tenantSlug}/competitions/${competitionId}/teams/${team.id}`}
+          className="text-xs text-score-dim hover:text-foreground"
+        >
+          {t("teams.openRoster")} ›
+        </Link>
+      ),
+    },
+  ];
+
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-10">
+    <Page>
       <CompetitionHeader
         tenantSlug={tenantSlug}
         competition={competition}
@@ -60,56 +133,16 @@ export default async function TeamsPage({
         subtitle={` · ${t("comp.teamsCount", { count: teams.length })}`}
       />
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
-        <section className="space-y-2 lg:order-none order-last">
-          {teams.length === 0 ? (
-            <div className={`${ui.card} text-sm text-score-dim`}>
-              {t("teams.empty")}
-            </div>
-          ) : (
-            teams.map((team) => {
-              const roster = playersByTeam.get(team.id) ?? [];
-              const captain = roster.find((p) => p.isCaptain);
-              return (
-                <Link
-                  key={team.id}
-                  href={`/t/${tenantSlug}/competitions/${competitionId}/teams/${team.id}`}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-surface-raised px-4 py-3 transition-colors hover:border-primary"
-                >
-                  {team.seed != null && (
-                    <span
-                      className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-surface text-xs font-medium text-score-dim"
-                      title={t("common.seed")}
-                    >
-                      {team.seed}
-                    </span>
-                  )}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">
-                      {team.displayName}
-                      {team.countryCode && (
-                        <span className="ml-2 text-xs font-normal text-score-dim">
-                          {team.countryCode.toUpperCase()}
-                        </span>
-                      )}
-                    </span>
-                    <span className="block truncate text-xs text-score-dim">
-                      {t("teams.playerCount", { count: roster.length })}
-                      {captain && ` · ${t("teams.captainShort")} ${captain.jerseyName}`}
-                    </span>
-                  </span>
-                  <span aria-hidden className="text-score-dim">
-                    ›
-                  </span>
-                </Link>
-              );
-            })
-          )}
-        </section>
-
-        <aside className="order-first space-y-6 lg:order-none">
-          <AddTeamForm tenantSlug={tenantSlug} competitionId={competitionId} />
-
+      <div className="mb-3">
+        <Toolbar>
+          <span className="text-sm text-score-dim">
+            {t("comp.teamsCount", { count: teams.length })}
+          </span>
+          <ToolbarSpacer />
+          <Drawer label={t("teams.addTeam")} variant="primary">
+            <AddTeamForm tenantSlug={tenantSlug} competitionId={competitionId} />
+          </Drawer>
+          <Drawer label={t("teams.bulkTitle")}>
           <ActionForm action={bulkAddTeams} className={ui.card} resetOnOk>
             <h2 className="mb-1 font-medium">{t("teams.bulkTitle")}</h2>
             <p className="mb-3 text-xs text-score-dim">{t("teams.bulkHint")}</p>
@@ -132,7 +165,8 @@ export default async function TeamsPage({
               </SubmitButton>
             </div>
           </ActionForm>
-
+          </Drawer>
+          <Drawer label={t("teams.importTitle")} width="lg">
           <CsvImport
             tenantSlug={tenantSlug}
             competitionId={competitionId}
@@ -142,8 +176,17 @@ export default async function TeamsPage({
             templateHref={ROSTER_TEMPLATE}
             templateName="roster-template.csv"
           />
-        </aside>
+          </Drawer>
+        </Toolbar>
       </div>
-    </main>
+
+      <DataTable
+        columns={columns}
+        rowKey={(team) => team.id}
+        density="cozy"
+        groups={[{ key: "all", rows: teams }]}
+        empty={t("teams.empty")}
+      />
+    </Page>
   );
 }

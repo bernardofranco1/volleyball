@@ -15,6 +15,8 @@ import {
 } from "@/lib/tournament-actions";
 import { getT } from "@/lib/i18n/server";
 import { ActionForm } from "@/components/admin/ActionForm";
+import { Page } from "@/components/ui/Page";
+import { Drawer } from "@/components/ui/Drawer";
 import { BracketView } from "@/components/admin/BracketView";
 import { CompetitionHeader } from "@/components/admin/CompetitionHeader";
 import { SubmitButton } from "@/components/admin/SubmitButton";
@@ -60,8 +62,81 @@ export default async function StandingsPage({
     </>
   );
 
+  /* Pool create/rename/delete — drawer content built here so it keeps the
+     page's actions and translations in scope. An element, not a component:
+     declaring a component inside render remounts it on every pass. */
+  const poolAdmin = (
+    <>
+      <ActionForm action={createPool} className={ui.card} resetOnOk>
+        <h3 className="mb-3 font-medium">{t("standings.newPool")}</h3>
+        {hidden}
+        <label className="sr-only" htmlFor="new-pool-name">
+          {t("standings.poolName")}
+        </label>
+        <input
+          id="new-pool-name"
+          name="name"
+          required
+          placeholder="Pool A"
+          className={ui.input}
+        />
+        <div className="mt-3">
+          <SubmitButton pendingLabel={t("common.adding")}>{t("standings.createPool")}</SubmitButton>
+        </div>
+      </ActionForm>
+
+      {pools.length > 0 && (
+        <div className={ui.card}>
+          <h3 className="mb-3 font-medium">{t("standings.managePools")}</h3>
+          <ul className="space-y-3">
+            {pools.map((p) => (
+              <li key={p.id}>
+                <ActionForm
+                  action={renamePool}
+                  className="flex items-center gap-2"
+                >
+                  {hidden}
+                  <input type="hidden" name="poolId" value={p.id} />
+                  <label className="sr-only" htmlFor={`rename-${p.id}`}>
+                    {t("standings.renameLabel", { name: p.name })}
+                  </label>
+                  <input
+                    id={`rename-${p.id}`}
+                    name="name"
+                    defaultValue={p.name}
+                    className={`${ui.input} flex-1 px-2 py-1 text-sm`}
+                  />
+                  <button
+                    type="submit"
+                    className="text-xs text-score-dim hover:text-foreground"
+                  >
+                    {t("common.rename")}
+                  </button>
+                </ActionForm>
+                <ActionForm
+                  action={deletePool}
+                  confirm={t("standings.deletePoolConfirm", { name: p.name })}
+                  className="mt-1"
+                >
+                  {hidden}
+                  <input type="hidden" name="poolId" value={p.id} />
+                  <button
+                    type="submit"
+                    className="text-xs text-score-dim hover:text-red-400"
+                  >
+                    {t("standings.deletePool")}
+                  </button>
+                </ActionForm>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  );
+
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-10">
+    <Page>
       <CompetitionHeader
         tenantSlug={tenantSlug}
         competition={competition}
@@ -122,22 +197,34 @@ export default async function StandingsPage({
       <section className="mt-10">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-medium">{t("standings.pools")}</h2>
-          {pools.length >= 2 && teams.length > 0 && (
-            <ActionForm
-              action={distributePoolsBySeed}
-              confirm={t("standings.distributeConfirm", {
-                teams: teams.length,
-                pools: pools.length,
-              })}
-            >
-              {hidden}
-              <SubmitButton variant="secondary" pendingLabel={t("standings.distributing")}>
-                {t("standings.distribute")}
-              </SubmitButton>
-            </ActionForm>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {pools.length >= 2 && teams.length > 0 && (
+              <ActionForm
+                action={distributePoolsBySeed}
+                confirm={t("standings.distributeConfirm", {
+                  teams: teams.length,
+                  pools: pools.length,
+                })}
+              >
+                {hidden}
+                <SubmitButton
+                  variant="secondary"
+                  pendingLabel={t("standings.distributing")}
+                >
+                  {t("standings.distribute")}
+                </SubmitButton>
+              </ActionForm>
+            )}
+            {/* Creating and renaming pools happens once per competition; the
+                assignments below are what the page is for. */}
+            <Drawer label={t("standings.managePools")}>
+              <div className="flex flex-col gap-4">
+                {poolAdmin}
+              </div>
+            </Drawer>
+          </div>
         </div>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
+        <div className="grid grid-cols-1 gap-6">
           <div className={ui.card}>
             {teams.length === 0 ? (
               <p className="text-sm text-score-dim">{t("standings.addTeamsFirst")}</p>
@@ -181,73 +268,6 @@ export default async function StandingsPage({
             )}
           </div>
 
-          <div className="space-y-4">
-            <ActionForm action={createPool} className={ui.card} resetOnOk>
-              <h3 className="mb-3 font-medium">{t("standings.newPool")}</h3>
-              {hidden}
-              <label className="sr-only" htmlFor="new-pool-name">
-                {t("standings.poolName")}
-              </label>
-              <input
-                id="new-pool-name"
-                name="name"
-                required
-                placeholder="Pool A"
-                className={ui.input}
-              />
-              <div className="mt-3">
-                <SubmitButton pendingLabel={t("common.adding")}>{t("standings.createPool")}</SubmitButton>
-              </div>
-            </ActionForm>
-
-            {pools.length > 0 && (
-              <div className={ui.card}>
-                <h3 className="mb-3 font-medium">{t("standings.managePools")}</h3>
-                <ul className="space-y-3">
-                  {pools.map((p) => (
-                    <li key={p.id}>
-                      <ActionForm
-                        action={renamePool}
-                        className="flex items-center gap-2"
-                      >
-                        {hidden}
-                        <input type="hidden" name="poolId" value={p.id} />
-                        <label className="sr-only" htmlFor={`rename-${p.id}`}>
-                          {t("standings.renameLabel", { name: p.name })}
-                        </label>
-                        <input
-                          id={`rename-${p.id}`}
-                          name="name"
-                          defaultValue={p.name}
-                          className={`${ui.input} flex-1 px-2 py-1 text-sm`}
-                        />
-                        <button
-                          type="submit"
-                          className="text-xs text-score-dim hover:text-foreground"
-                        >
-                          {t("common.rename")}
-                        </button>
-                      </ActionForm>
-                      <ActionForm
-                        action={deletePool}
-                        confirm={t("standings.deletePoolConfirm", { name: p.name })}
-                        className="mt-1"
-                      >
-                        {hidden}
-                        <input type="hidden" name="poolId" value={p.id} />
-                        <button
-                          type="submit"
-                          className="text-xs text-score-dim hover:text-red-400"
-                        >
-                          {t("standings.deletePool")}
-                        </button>
-                      </ActionForm>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
         </div>
         <p className="mt-2 text-xs text-score-dim">
           {t("standings.poolsNote")}
@@ -300,6 +320,6 @@ export default async function StandingsPage({
           {t("standings.bracketNote")}
         </p>
       </section>
-    </main>
+    </Page>
   );
 }

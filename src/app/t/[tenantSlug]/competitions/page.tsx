@@ -1,10 +1,17 @@
 import Link from "next/link";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
-import { disciplineFilterOptions, listCompetitions } from "@/lib/competitions";
+import {
+  disciplineFilterOptions,
+  listCompetitions,
+  type Competition,
+} from "@/lib/competitions";
 import { getT } from "@/lib/i18n/server";
 import { CompetitionFilters } from "@/components/admin/CompetitionFilters";
 import { NewCompetitionForm } from "@/components/admin/NewCompetitionForm";
-import { statusBadgeClass, ui } from "@/components/admin/styles";
+import { DataTable, type Column } from "@/components/ui/DataTable";
+import { Drawer } from "@/components/ui/Drawer";
+import { Page, PageHeader } from "@/components/ui/Page";
+import { statusBadgeClass } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
 
@@ -30,75 +37,135 @@ export default async function CompetitionsPage({
     disciplineFilterOptions(ctx.tenant.id, ctx.tenant.config.enabledDisciplines),
   ]);
 
-  return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-10">
-      <div className="mb-8 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("comp.title")}</h1>
-          <p className="mt-1 text-sm text-score-dim">
-            {t("comp.subtitle", { tenant: ctx.tenant.name })}
-          </p>
-        </div>
-        <Link href={`/t/${tenantSlug}/dashboard`} className={ui.btnSecondary}>
-          {t("common.backToDashboard")}
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
-        {/* List + filters */}
-        <section className={competitions.length === 0 ? "order-last lg:order-none" : ""}>
-          <CompetitionFilters
-            discipline={discipline}
-            status={status}
-            q={q}
-            disciplineOptions={disciplineOptions}
-          />
-
-          {competitions.length === 0 ? (
-            <div className={`${ui.card} text-sm text-score-dim`}>
-              {discipline || status || q
-                ? t("comp.emptyFiltered")
-                : t("comp.empty")}
-            </div>
-          ) : (
-            <ul className="space-y-3">
-              {competitions.map((c) => (
-                <li key={c.id}>
-                  <Link
-                    href={`/t/${tenantSlug}/competitions/${c.id}`}
-                    className={`${ui.card} flex items-center justify-between gap-4 transition-colors hover:border-primary`}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{c.name}</span>
-                        <span className={statusBadgeClass(c.status)}>
-                          {c.status}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-sm text-score-dim">
-                        {c.discipline}
-                        {c.gender && c.gender !== "UNSPECIFIED"
-                          ? ` · ${c.gender}`
-                          : ""}
-                        {c.venue ? ` · ${c.venue}` : ""}
-                        {c.startDate ? ` · ${c.startDate}` : ""}
-                      </p>
-                    </div>
-                    <span className="text-score-dim">→</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+  const columns: Column<Competition>[] = [
+    {
+      key: "name",
+      header: t("comp.title"),
+      cell: (c) => (
+        <Link
+          href={`/t/${tenantSlug}/competitions/${c.id}`}
+          className="flex items-center gap-2 font-medium"
+        >
+          {c.color && (
+            <span
+              aria-hidden
+              className="inline-block h-2.5 w-2.5 flex-none rounded-full"
+              style={{ backgroundColor: c.color }}
+            />
           )}
-        </section>
+          {c.name}
+        </Link>
+      ),
+    },
+    {
+      key: "discipline",
+      header: t("common.discipline"),
+      width: "w-24",
+      cell: (c) => <span className="text-xs text-score-dim">{c.discipline}</span>,
+    },
+    {
+      key: "gender",
+      header: t("comp.gender"),
+      width: "w-24",
+      className: "max-md:hidden",
+      cell: (c) => (
+        <span className="text-xs text-score-dim">
+          {c.gender && c.gender !== "UNSPECIFIED" ? c.gender : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "venue",
+      header: t("comp.venue"),
+      className: "max-lg:hidden",
+      cell: (c) => (
+        <span className="text-xs text-score-dim">
+          {[c.venue, c.city].filter(Boolean).join(" · ") || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "dates",
+      header: t("comp.dates"),
+      width: "w-44",
+      className: "max-lg:hidden font-mono tabular-nums text-xs",
+      cell: (c) =>
+        c.startDate ? (
+          <span className="text-score-dim">
+            {c.startDate}
+            {c.endDate ? ` → ${c.endDate}` : ""}
+          </span>
+        ) : (
+          <span className="text-score-dim">—</span>
+        ),
+    },
+    {
+      key: "status",
+      header: t("common.status"),
+      width: "w-24",
+      cell: (c) => (
+        <span className={statusBadgeClass(c.status)}>{c.status}</span>
+      ),
+    },
+    {
+      key: "go",
+      header: "",
+      align: "right",
+      width: "w-24",
+      cell: (c) => (
+        <span className="flex justify-end gap-2 text-xs text-score-dim">
+          <Link
+            href={`/t/${tenantSlug}/competitions/${c.id}/schedule`}
+            className="hover:text-foreground"
+          >
+            {t("tabs.schedule")}
+          </Link>
+          <Link
+            href={`/t/${tenantSlug}/competitions/${c.id}/standings`}
+            className="hover:text-foreground"
+          >
+            {t("tabs.standings")}
+          </Link>
+        </span>
+      ),
+    },
+  ];
 
-        <aside>
-          <NewCompetitionForm
-            tenantSlug={tenantSlug}
-            enabledDisciplines={ctx.tenant.config.enabledDisciplines}
-          />
-        </aside>
+  return (
+    <Page>
+      <PageHeader
+        title={t("comp.title")}
+        meta={t("comp.subtitle", { tenant: ctx.tenant.name })}
+        actions={
+          // The create form was a permanent 360px rail next to a list that is
+          // the actual job of this page.
+          <Drawer label={t("comp.new")} variant="primary" width="lg">
+            <NewCompetitionForm
+              tenantSlug={tenantSlug}
+              enabledDisciplines={ctx.tenant.config.enabledDisciplines}
+            />
+          </Drawer>
+        }
+      />
+
+      <div className="mb-3">
+        <CompetitionFilters
+          discipline={discipline}
+          status={status}
+          q={q}
+          disciplineOptions={disciplineOptions}
+        />
       </div>
-    </main>
+
+      <DataTable
+        columns={columns}
+        rowKey={(c) => c.id}
+        density="cozy"
+        groups={[{ key: "all", rows: competitions }]}
+        empty={
+          discipline || status || q ? t("comp.emptyFiltered") : t("comp.empty")
+        }
+      />
+    </Page>
   );
 }

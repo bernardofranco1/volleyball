@@ -1,10 +1,16 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import {
   competitionCounts,
   getCompetition,
   getCompetitionConfig,
+  listTenantMatches,
 } from "@/lib/competitions";
+import { computeStandings } from "@/lib/standings";
+import { matchBase } from "@/lib/match-links";
+import { LocalTime } from "@/components/LocalTime";
+import { Page, Panel, StatRow, StatTile } from "@/components/ui/Page";
 import {
   setCompetitionStatus,
   updateCompetitionConfig,
@@ -34,6 +40,30 @@ const STATUS_CONFIRM_KEY: Record<string, string | undefined> = {
   DRAFT: undefined,
 };
 
+/**
+ * The tournament-config columns a competition can override, with the label used
+ * when one is set. Everything absent from a competition's config row runs at
+ * its discipline default and is not worth a line on the overview: the rules
+ * card was ~1,000px of mostly-default inputs above the fold, which buried the
+ * two or three values that actually differ from the book.
+ */
+const OVERRIDE_LABELS: { key: string; labelKey: string }[] = [
+  { key: "bestOf", labelKey: "comp.bestOf" },
+  { key: "setScore", labelKey: "comp.setScore" },
+  { key: "setScoreTiebreak", labelKey: "comp.tiebreak" },
+  { key: "playersPerSide", labelKey: "comp.playersPerSide" },
+  { key: "serveClockEnabled", labelKey: "comp.serveClock" },
+  { key: "ttoEnabled", labelKey: "comp.tto" },
+  { key: "ttoDurationSecs", labelKey: "comp.ttoDuration" },
+  { key: "resultSignatures", labelKey: "comp.resultSignatures" },
+  { key: "vcsEnabled", labelKey: "comp.vcs" },
+  { key: "vcsChallengesPerSet", labelKey: "comp.vcsPerSet" },
+  { key: "timeoutsPerSet", labelKey: "comp.timeouts" },
+  { key: "timeoutsPerSetTiebreak", labelKey: "comp.timeoutsTiebreak" },
+  { key: "timeoutDurationSecs", labelKey: "comp.timeoutDuration" },
+  { key: "setBreakDurationsSecs", labelKey: "comp.setBreaks" },
+];
+
 export default async function CompetitionOverviewPage({
   params,
 }: {
@@ -48,12 +78,19 @@ export default async function CompetitionOverviewPage({
   );
 
   // Everything is independent — fetch concurrently, gate on the result.
-  const [competition, configRow, counts, boardBranding] = await Promise.all([
-    getCompetition(ctx.tenant.id, competitionId),
-    getCompetitionConfig(competitionId),
-    competitionCounts(competitionId),
-    getCompetitionBranding(competitionId),
-  ]);
+  const [competition, configRow, counts, boardBranding, standings, upcoming] =
+    await Promise.all([
+      getCompetition(ctx.tenant.id, competitionId),
+      getCompetitionConfig(competitionId),
+      competitionCounts(competitionId),
+      getCompetitionBranding(competitionId),
+      computeStandings(competitionId),
+      listTenantMatches(ctx.tenant.id, {
+        competitionId,
+        status: "scheduled",
+        order: "asc",
+      }),
+    ]);
   if (!competition) notFound();
 
   const discipline = competition.discipline as Discipline;
@@ -65,29 +102,78 @@ export default async function CompetitionOverviewPage({
   const triState = (v: boolean | null | undefined) =>
     v == null ? "" : v ? "on" : "off";
 
+  // Which rules actually differ from the discipline default.
+  const cfg = (configRow ?? {}) as Record<string, unknown>;
+  const overrides = OVERRIDE_LABELS.filter((o) => {
+    const v = cfg[o.key];
+    return v !== null && v !== undefined;
+  }).map((o) => {
+    const v = cfg[o.key];
+    return {
+      label: t(o.labelKey),
+      value:
+        typeof v === "boolean"
+          ? t(v ? "common.on" : "common.off")
+          : Array.isArray(v)
+            ? v.join(" · ")
+            : String(v),
+    };
+  });
+
+  const leader = standings[0]?.rows[0] ?? null;
+  const nextMatch = upcoming.rows[0] ?? null;
+  const detailRows: [string, React.ReactNode][] = [
+    [t("comp.discipline"), `${discipline} · ${competition.gender ?? "—"}`],
+    [t("comp.venue"), competition.venue || "—"],
+    [
+      t("comp.cityCountry"),
+      [competition.city, competition.country].filter(Boolean).join(" · ") || "—",
+    ],
+    [t("comp.hall"), competition.hall || "—"],
+    [t("comp.category"), competition.category || "—"],
+    [
+      t("comp.dates"),
+      competition.startDate
+        ? `${competition.startDate}${competition.endDate ? ` → ${competition.endDate}` : ""}`
+        : "—",
+    ],
+  ];
+
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-10">
+    <Page>
       <CompetitionHeader
         tenantSlug={tenantSlug}
         competition={competition}
         active="overview"
         subtitle={` · ${t("comp.teamsCount", { count: counts.teams })} · ${t("comp.matchesCount", { count: counts.matches })}`}
-        actions={(NEXT_STATUS[competition.status] ?? []).map((tr) => (
-          <ActionForm
-            key={tr.to}
-            action={setCompetitionStatus}
-            confirm={
-              STATUS_CONFIRM_KEY[tr.to] ? t(STATUS_CONFIRM_KEY[tr.to]!) : undefined
-            }
+        actions={[
+          <Link
+            key="public"
+            href={`/t/${tenantSlug}/results/${competitionId}`}
+            className={ui.btnSecondary}
           >
-            <input type="hidden" name="tenantSlug" value={tenantSlug} />
-            <input type="hidden" name="competitionId" value={competitionId} />
-            <input type="hidden" name="status" value={tr.to} />
-            <SubmitButton variant={tr.to === "DRAFT" ? "secondary" : "primary"}>
-              {tr.label}
-            </SubmitButton>
-          </ActionForm>
-        ))}
+            {t("comp.publicResults")} ↗
+          </Link>,
+          // Reverting to DRAFT lives in the danger zone at the foot of the page.
+          ...(NEXT_STATUS[competition.status] ?? [])
+            .filter((tr) => tr.to !== "DRAFT")
+            .map((tr) => (
+              <ActionForm
+                key={tr.to}
+                action={setCompetitionStatus}
+                confirm={
+                  STATUS_CONFIRM_KEY[tr.to]
+                    ? t(STATUS_CONFIRM_KEY[tr.to]!)
+                    : undefined
+                }
+              >
+                <input type="hidden" name="tenantSlug" value={tenantSlug} />
+                <input type="hidden" name="competitionId" value={competitionId} />
+                <input type="hidden" name="status" value={tr.to} />
+                <SubmitButton variant="primary">{tr.label}</SubmitButton>
+              </ActionForm>
+            )),
+        ]}
       />
 
       {competition.status === "DRAFT" && (
@@ -122,31 +208,180 @@ export default async function CompetitionOverviewPage({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <EditCompetitionForm
-          tenantSlug={tenantSlug}
-          competition={{
-            id: competition.id,
-            name: competition.name,
-            venue: competition.venue,
-            city: competition.city,
-            country: competition.country,
-            hall: competition.hall,
-            category: competition.category,
-            startDate: competition.startDate,
-            endDate: competition.endDate,
-            gender: competition.gender,
-            discipline: competition.discipline,
-            color: competition.color,
-          }}
+      {/* Answer the standing questions first: who leads, what's next, how big
+          is this. The forms below are for the rarer act of changing something. */}
+      <StatRow>
+        <StatTile
+          label={t("comp.leader")}
+          value={
+            <span className="block truncate text-base">
+              {leader?.teamName ?? "—"}
+            </span>
+          }
+          hint={
+            leader
+              ? `${leader.w}-${leader.l} · ${leader.sw}:${leader.sl} ${t("comp.setsShort")}`
+              : t("comp.noResultsYet")
+          }
+          href={`/t/${tenantSlug}/competitions/${competitionId}/standings`}
         />
+        <StatTile
+          label={t("comp.nextThrow")}
+          value={
+            <span className="block truncate text-base">
+              {nextMatch?.scheduledAt ? (
+                <LocalTime date={nextMatch.scheduledAt} />
+              ) : (
+                "—"
+              )}
+            </span>
+          }
+          hint={
+            nextMatch
+              ? `${nextMatch.teamAName} – ${nextMatch.teamBName}`
+              : t("comp.nothingScheduled")
+          }
+          href={
+            nextMatch
+              ? matchBase(tenantSlug, nextMatch)
+              : `/t/${tenantSlug}/competitions/${competitionId}/schedule`
+          }
+        />
+        <StatTile
+          label={t("comp.teams")}
+          value={counts.teams}
+          href={`/t/${tenantSlug}/competitions/${competitionId}/teams`}
+        />
+        <StatTile
+          label={t("nav.matches")}
+          value={counts.matches}
+          href={`/t/${tenantSlug}/competitions/${competitionId}/schedule`}
+        />
+      </StatRow>
 
-        {/* Config panel: overrides over discipline defaults. */}
+      <div className="mb-4 grid gap-4 lg:grid-cols-[1fr_22rem]">
+        <Panel
+          title={t("comp.details")}
+          actions={
+            <span className="text-xs text-score-dim">
+              {discipline} · {competition.gender ?? "—"}
+            </span>
+          }
+        >
+          <dl className="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-1.5 text-sm">
+            {detailRows.map(([k, v]) => (
+              <div key={k} className="contents">
+                <dt className="text-score-dim">{k}</dt>
+                <dd className="truncate">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </Panel>
+
+        <Panel
+          title={t("comp.standingsSnapshot")}
+          actions={
+            <Link
+              href={`/t/${tenantSlug}/competitions/${competitionId}/standings`}
+              className="text-xs text-score-dim hover:text-foreground"
+            >
+              {t("comp.fullStandings")} →
+            </Link>
+          }
+        >
+          {!standings[0] || standings[0].rows.length === 0 ? (
+            <p className="text-sm text-score-dim">{t("comp.noResultsYet")}</p>
+          ) : (
+            <ol className="flex flex-col gap-1 text-sm">
+              {standings[0].rows.slice(0, 5).map((r, i) => (
+                <li key={r.teamId} className="flex items-baseline gap-2">
+                  <span className="w-4 text-right font-mono text-xs tabular-nums text-score-dim">
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{r.teamName}</span>
+                  <span className="font-mono text-xs tabular-nums">
+                    {r.w}-{r.l}
+                  </span>
+                  <span className="font-mono text-xs tabular-nums text-score-dim">
+                    {r.sw}:{r.sl}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Panel>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Panel
+          title={t("comp.editDetails")}
+          className="lg:col-span-2"
+        >
+          <details>
+            <summary className="cursor-pointer text-sm text-score-dim">
+              {t("comp.editDetailsHint")}
+            </summary>
+            <div className="mt-3">
+              <EditCompetitionForm
+                tenantSlug={tenantSlug}
+                competition={{
+                  id: competition.id,
+                  name: competition.name,
+                  venue: competition.venue,
+                  city: competition.city,
+                  country: competition.country,
+                  hall: competition.hall,
+                  category: competition.category,
+                  startDate: competition.startDate,
+                  endDate: competition.endDate,
+                  gender: competition.gender,
+                  discipline: competition.discipline,
+                  color: competition.color,
+                }}
+              />
+            </div>
+          </details>
+        </Panel>
+
+        {/* Config panel: overrides over discipline defaults. Only the values
+            that differ are shown up front; the full form is one click away. */}
         <ActionForm action={updateCompetitionConfig} className={ui.card}>
-          <h2 className="mb-1 font-medium">{t("comp.scoringRules")}</h2>
-          <p className="mb-4 text-xs text-score-dim">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <h2 className="font-medium">{t("comp.scoringRules")}</h2>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                overrides.length > 0
+                  ? "bg-primary/15 text-primary"
+                  : "bg-surface-3 text-score-dim"
+              }`}
+            >
+              {overrides.length > 0
+                ? t("comp.overrideCount", { count: overrides.length })
+                : t("comp.allDefaults")}
+            </span>
+          </div>
+          <p className="mb-3 text-xs text-score-dim">
             {t("comp.rulesHint", { discipline: competition.discipline })}
           </p>
+
+          {overrides.length > 0 && (
+            <ul className="mb-3 flex flex-wrap gap-1.5">
+              {overrides.map((o) => (
+                <li
+                  key={o.label}
+                  className="rounded-lg border border-primary/40 px-2 py-1 text-xs"
+                >
+                  <span className="text-score-dim">{o.label}: </span>
+                  {o.value}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <details>
+            <summary className="mb-3 cursor-pointer text-sm text-score-dim">
+              {t("comp.showAllRules", { count: OVERRIDE_LABELS.length })}
+            </summary>
           <input type="hidden" name="tenantSlug" value={tenantSlug} />
           <input type="hidden" name="competitionId" value={competitionId} />
 
@@ -427,17 +662,25 @@ export default async function CompetitionOverviewPage({
             </div>
           )}
 
-          <div className="mt-4">
-            <SubmitButton pendingLabel={t("common.saving")}>{t("comp.saveRules")}</SubmitButton>
-          </div>
+            <div className="mt-4">
+              <SubmitButton pendingLabel={t("common.saving")}>
+                {t("comp.saveRules")}
+              </SubmitButton>
+            </div>
+          </details>
         </ActionForm>
 
-        {/* Scoreboard appearance — per-competition broadcast-board theme. */}
+        {/* Scoreboard appearance — per-competition broadcast-board theme.
+            Almost always left at the tenant's colours, so it starts collapsed. */}
         <ActionForm action={updateCompetitionBranding} className={ui.card}>
           <h2 className="mb-1 font-medium">{t("comp.scoreboard")}</h2>
           <p className="mb-3 text-[11px] text-score-dim">
             {t("comp.scoreboardHint")}
           </p>
+          <details>
+            <summary className="mb-3 cursor-pointer text-sm text-score-dim">
+              {t("comp.customise")}
+            </summary>
           <input type="hidden" name="tenantSlug" value={tenantSlug} />
           <input type="hidden" name="competitionId" value={competitionId} />
           <div className="grid grid-cols-2 gap-3">
@@ -494,13 +737,42 @@ export default async function CompetitionOverviewPage({
               className={ui.input}
             />
           </div>
-          <div className="mt-4">
-            <SubmitButton variant="secondary" pendingLabel={t("common.saving")}>
-              {t("comp.saveScoreboard")}
-            </SubmitButton>
-          </div>
+            <div className="mt-4">
+              <SubmitButton variant="secondary" pendingLabel={t("common.saving")}>
+                {t("comp.saveScoreboard")}
+              </SubmitButton>
+            </div>
+          </details>
         </ActionForm>
       </div>
-    </main>
+
+      {/* Lifecycle reversal is destructive to a published competition (its
+          public results disappear), so it gets its own marked-out area rather
+          than sitting next to Save. */}
+      {(NEXT_STATUS[competition.status] ?? []).some((tr) => tr.to === "DRAFT") && (
+        <section className="mt-6 rounded-xl border border-danger/40 p-4">
+          <h2 className="text-sm font-semibold text-danger">
+            {t("comp.dangerZone")}
+          </h2>
+          <p className="mt-1 mb-3 text-xs text-score-dim">
+            {t("comp.dangerHint")}
+          </p>
+          {(NEXT_STATUS[competition.status] ?? [])
+            .filter((tr) => tr.to === "DRAFT")
+            .map((tr) => (
+              <ActionForm
+                key={tr.to}
+                action={setCompetitionStatus}
+                confirm={t("comp.backToDraftConfirm")}
+              >
+                <input type="hidden" name="tenantSlug" value={tenantSlug} />
+                <input type="hidden" name="competitionId" value={competitionId} />
+                <input type="hidden" name="status" value={tr.to} />
+                <SubmitButton variant="secondary">{tr.label}</SubmitButton>
+              </ActionForm>
+            ))}
+        </section>
+      )}
+    </Page>
   );
 }

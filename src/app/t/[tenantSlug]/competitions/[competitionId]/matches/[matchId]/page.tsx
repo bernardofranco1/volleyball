@@ -9,7 +9,10 @@ import {
   getCompetition,
   getCompetitionConfig,
   getMatch,
+  loadSetScores,
 } from "@/lib/competitions";
+import { Page, PageHeader } from "@/components/ui/Page";
+import { FilterChip, Toolbar } from "@/components/ui/Toolbar";
 import { resolveConfig, type TournamentConfig } from "@/engine/config";
 import type { Discipline } from "@/engine/types";
 import { TeamColorPicker } from "@/components/admin/TeamColorPicker";
@@ -73,10 +76,10 @@ export default async function MatchDetailPage({
     competitionId: string;
     matchId: string;
   }>;
-  searchParams: Promise<{ log?: string }>;
+  searchParams: Promise<{ log?: string; event?: string }>;
 }) {
   const { tenantSlug, competitionId, matchId } = await params;
-  const { log: logParam } = await searchParams;
+  const { log: logParam, event: eventFilter } = await searchParams;
   const { t } = await getT();
   const fullLog = logParam === "full";
   const ctx = await requireRole(
@@ -144,7 +147,17 @@ export default async function MatchDetailPage({
   // the signatures themselves from match_signatures (live rows only).
   const signaturePolicy = config.resultSignatures;
   const confirmedVia = match.confirmedVia;
-  const log = [...logRows].reverse(); // stored desc for LIMIT; display asc
+  const allLog = [...logRows].reverse(); // stored desc for LIMIT; display asc
+  // Event-type filter: a finished indoor match is 300-450 rows and the question
+  // is almost always about one kind of event ("where are the substitutions?").
+  // Filtering client-of-the-URL keeps the row numbering honest — the sequence
+  // numbers stay the real ones.
+  const eventTypes = [...new Set(allLog.map((e) => e.eventType))].sort();
+  const log = eventFilter
+    ? allLog.filter((e) => e.eventType === eventFilter)
+    : allLog;
+  const setScores = await loadSetScores([matchId]);
+  const sets = setScores.get(matchId) ?? [];
   const base = `/t/${tenantSlug}/competitions/${competitionId}`;
   // Reports only exist once there is a result to report on (spec/24 A2).
   const reportable = isReportableStatus(match.status);
@@ -165,59 +178,60 @@ export default async function MatchDetailPage({
   );
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-10">
-      <Link
-        href={`${base}/schedule`}
-        className="text-sm text-score-dim hover:text-foreground"
-      >
-        {t("match.backToSchedule")}
-      </Link>
-
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {match.teamAName} vs {match.teamBName}
-          </h1>
+    <Page>
+      <PageHeader
+        crumbs={[
+          { href: `/t/${tenantSlug}/competitions`, label: t("nav.competitions") },
+          { href: `${base}`, label: competition.name },
+          { href: `${base}/schedule`, label: t("tabs.schedule") },
+        ]}
+        title={`${match.teamAName} vs ${match.teamBName}`}
+        badge={
           <span className={statusBadgeClass(match.status)}>
             {matchStatusLabel(match.status, t("match.pendingBadge"))}
           </span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href={`${base}/matches/${matchId}/live`} className={ui.btnPrimary}>
-            {t("match.openScorer")}
-          </Link>
-          <a
-            href={`/t/${tenantSlug}/scoreboard/${matchId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={ui.btnSecondary}
-          >
-            {t("match.viewScoreboard")}
-          </a>
-          {/* Every export moved to the Reports tab (spec/24 §3.2) — one home for
-              match documents, and the tab respects the tenant's allow-list. */}
-          {reportable && (
-            <Link
-              href={`${base}/matches/${matchId}/reports`}
+        }
+        meta={
+          <>
+            {match.discipline}
+            {match.roundName ? ` · ${match.roundName}` : ""}
+            {match.courtNumber
+              ? ` · ${t("match.court", { number: match.courtNumber })}`
+              : ""}
+            {match.scheduledAt && (
+              <>
+                {" · "}
+                <LocalTime date={match.scheduledAt} />
+              </>
+            )}
+          </>
+        }
+        actions={
+          <>
+            <Link href={`${base}/matches/${matchId}/live`} className={ui.btnPrimary}>
+              {t("match.openScorer")}
+            </Link>
+            <a
+              href={`/t/${tenantSlug}/scoreboard/${matchId}`}
+              target="_blank"
+              rel="noopener noreferrer"
               className={ui.btnSecondary}
             >
-              {t("reports.title")}
-            </Link>
-          )}
-        </div>
-      </div>
-
-      <p className="mt-1 text-sm text-score-dim">
-        {competition.name} · {match.discipline}
-        {match.roundName ? ` · ${match.roundName}` : ""}
-        {match.courtNumber ? ` · ${t("match.court", { number: match.courtNumber })}` : ""}
-        {match.scheduledAt && (
-          <>
-            {" · "}
-            <LocalTime date={match.scheduledAt} />
+              {t("match.viewScoreboard")}
+            </a>
+            {/* Every export moved to the Reports tab (spec/24 §3.2) — one home
+                for match documents, respecting the tenant's allow-list. */}
+            {reportable && (
+              <Link
+                href={`${base}/matches/${matchId}/reports`}
+                className={ui.btnSecondary}
+              >
+                {t("reports.title")}
+              </Link>
+            )}
           </>
-        )}
-      </p>
+        }
+      />
 
       <MatchTabs
         tenantSlug={tenantSlug}
@@ -228,6 +242,15 @@ export default async function MatchDetailPage({
         showReports={reportable}
       />
 
+      {/*
+        Two panes: what happened on the left (approval state, result,
+        event log), what has to be set up on the right (colours, PIN,
+        officials, tablet tokens). The setup cards used to sit between the
+        header and the result, so the score — the reason most people open
+        this page — was three scrolls down.
+      */}
+      <div className="mt-5 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="flex min-w-0 flex-col gap-4">
       {/* A scorer's final point parks the match here until the scoresheet is
           signed on the console or a manager confirms it (spec/20). */}
       {match.status === "PENDING_CONFIRMATION" && (
@@ -342,6 +365,168 @@ export default async function MatchDetailPage({
         </div>
       )}
 
+        <div className={ui.card}>
+          <h2 className="mb-3 font-medium">{t("match.result")}</h2>
+          <div className="flex items-center justify-around text-center">
+            <div>
+              <div className="text-sm text-score-dim">{match.teamAName}</div>
+              <div className="text-4xl font-bold tabular-nums">
+                {match.setsWonA}
+              </div>
+            </div>
+            <div className="text-score-dim">{t("match.sets")}</div>
+            <div>
+              <div className="text-sm text-score-dim">{match.teamBName}</div>
+              <div className="text-4xl font-bold tabular-nums">
+                {match.setsWonB}
+              </div>
+            </div>
+          </div>
+          {/* Set-by-set, not just the tally: the tally alone can't tell a 3-0
+              from a 3-0 that went to 29-27 twice. */}
+          {sets.length > 0 && (
+            <ol className="mt-4 flex flex-wrap justify-center gap-2">
+              {sets.map((s, i) => (
+                <li
+                  key={i}
+                  className="rounded-lg border border-border px-2.5 py-1 text-center"
+                >
+                  <span className="block text-[10px] uppercase tracking-wide text-score-dim">
+                    {t("match.setN", { n: i + 1 })}
+                  </span>
+                  <span className="font-mono text-sm tabular-nums">
+                    <span className={s.a > s.b ? "font-bold" : "text-score-dim"}>
+                      {s.a}
+                    </span>
+                    <span className="text-score-dim">–</span>
+                    <span className={s.b > s.a ? "font-bold" : "text-score-dim"}>
+                      {s.b}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+          {match.winner && (
+            <p className="mt-3 text-center text-sm text-score-dim">
+              {t("match.winner")}{" "}
+              <span className="text-foreground">
+                {match.winner === "A" ? match.teamAName : match.teamBName}
+              </span>
+            </p>
+          )}
+        </div>
+      {/* Event log */}
+      <div className="mt-6">
+        <div className="mb-3 flex items-center gap-3">
+          <h2 className="font-medium">{t("match.eventLog")}</h2>
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+              integrity.ok
+                ? "border-green-500/40 text-green-400"
+                : "border-red-500/50 text-red-400"
+            }`}
+            title={
+              integrity.ok
+                ? t("match.logContiguous")
+                : `Gaps: ${integrity.gaps.join(", ") || "—"} · Dupes: ${integrity.duplicates.join(", ") || "—"}`
+            }
+          >
+            {integrity.ok
+              ? t("match.eventsOk", { count: integrity.count })
+              : t("match.integrityWarn", { count: integrity.gaps.length })}
+          </span>
+          {!fullLog && integrity.count > LOG_PREVIEW_ROWS && (
+            <Link
+              href={`${base}/matches/${matchId}?log=full`}
+              className="text-xs text-score-dim underline hover:text-foreground"
+            >
+              {t("match.showAll", { count: integrity.count })}
+            </Link>
+          )}
+        </div>
+
+        {/* Filter by event type. The chips list only the types this match
+            actually produced, so a beach match doesn't offer "SUBSTITUTION". */}
+        {eventTypes.length > 1 && (
+          <div className="mb-3">
+            <Toolbar>
+              <FilterChip
+                href={`${base}/matches/${matchId}${fullLog ? "?log=full" : ""}`}
+                active={!eventFilter}
+                label={t("common.all")}
+                count={allLog.length}
+              />
+              {eventTypes.map((ty) => (
+                <FilterChip
+                  key={ty}
+                  href={`${base}/matches/${matchId}?event=${encodeURIComponent(ty)}${
+                    fullLog ? "&log=full" : ""
+                  }`}
+                  active={eventFilter === ty}
+                  label={ty}
+                  count={allLog.filter((e) => e.eventType === ty).length}
+                />
+              ))}
+            </Toolbar>
+          </div>
+        )}
+        {log.length === 0 ? (
+          <div className={`${ui.card} text-sm text-score-dim`}>
+            {t("match.noEvents")}
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full border-collapse">
+              <thead className="bg-surface-raised">
+                <tr>
+                  <th className={ui.th}>#</th>
+                  <th className={ui.th}>{t("match.thEvent")}</th>
+                  <th className={ui.th}>{t("match.thSet")}</th>
+                  <th className={ui.th}>{t("match.thScore")}</th>
+                  <th className={ui.th}>{t("match.thActor")}</th>
+                  <th className={ui.th}>{t("match.thTime")}</th>
+                  <th className={ui.th}>{t("match.thRewind")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {log.map((e) => (
+                  <tr key={e.sequence} className="border-t border-border">
+                    <td className={`${ui.td} text-score-dim`}>{e.sequence}</td>
+                    <td className={`${ui.td} font-mono text-xs`}>
+                      {e.eventType}
+                    </td>
+                    <td className={ui.td}>{e.setNumber ?? "–"}</td>
+                    <td className={`${ui.td} tabular-nums`}>
+                      {e.scoreAfterA != null && e.scoreAfterB != null
+                        ? `${e.scoreAfterA}–${e.scoreAfterB}`
+                        : "–"}
+                    </td>
+                    <td className={`${ui.td} text-score-dim`}>{e.actor}</td>
+                    <td className={`${ui.td} text-score-dim`}>
+                      {new Date(e.timestamp).toUTCString().slice(17, 25)}
+                    </td>
+                    <td className={ui.td}>
+                      {/* Can't rewind to before the match was created (#1). */}
+                      {e.sequence > 1 ? (
+                        <RewindToHere
+                          tenantSlug={tenantSlug}
+                          competitionId={competitionId}
+                          matchId={matchId}
+                          fromSequence={e.sequence}
+                        />
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+        </div>
+
+        <aside className="flex flex-col gap-4">
       <div className="mt-6 grid max-w-2xl gap-4 sm:grid-cols-2">
         <TeamColorPicker
           tenantSlug={tenantSlug}
@@ -394,35 +579,6 @@ export default async function MatchDetailPage({
           visId={match.visId}
         />
       </div>
-
-      {/* Result */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className={ui.card}>
-          <h2 className="mb-3 font-medium">{t("match.result")}</h2>
-          <div className="flex items-center justify-around text-center">
-            <div>
-              <div className="text-sm text-score-dim">{match.teamAName}</div>
-              <div className="text-4xl font-bold tabular-nums">
-                {match.setsWonA}
-              </div>
-            </div>
-            <div className="text-score-dim">{t("match.sets")}</div>
-            <div>
-              <div className="text-sm text-score-dim">{match.teamBName}</div>
-              <div className="text-4xl font-bold tabular-nums">
-                {match.setsWonB}
-              </div>
-            </div>
-          </div>
-          {match.winner && (
-            <p className="mt-3 text-center text-sm text-score-dim">
-              {t("match.winner")}{" "}
-              <span className="text-foreground">
-                {match.winner === "A" ? match.teamAName : match.teamBName}
-              </span>
-            </p>
-          )}
-        </div>
 
         {/* Team tablet QR tokens */}
         <div className={ui.card}>
@@ -512,90 +668,8 @@ export default async function MatchDetailPage({
             </p>
           )}
         </div>
+        </aside>
       </div>
-
-      {/* Event log */}
-      <div className="mt-6">
-        <div className="mb-3 flex items-center gap-3">
-          <h2 className="font-medium">{t("match.eventLog")}</h2>
-          <span
-            className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
-              integrity.ok
-                ? "border-green-500/40 text-green-400"
-                : "border-red-500/50 text-red-400"
-            }`}
-            title={
-              integrity.ok
-                ? t("match.logContiguous")
-                : `Gaps: ${integrity.gaps.join(", ") || "—"} · Dupes: ${integrity.duplicates.join(", ") || "—"}`
-            }
-          >
-            {integrity.ok
-              ? t("match.eventsOk", { count: integrity.count })
-              : t("match.integrityWarn", { count: integrity.gaps.length })}
-          </span>
-          {!fullLog && integrity.count > LOG_PREVIEW_ROWS && (
-            <Link
-              href={`${base}/matches/${matchId}?log=full`}
-              className="text-xs text-score-dim underline hover:text-foreground"
-            >
-              {t("match.showAll", { count: integrity.count })}
-            </Link>
-          )}
-        </div>
-        {log.length === 0 ? (
-          <div className={`${ui.card} text-sm text-score-dim`}>
-            {t("match.noEvents")}
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-border">
-            <table className="w-full border-collapse">
-              <thead className="bg-surface-raised">
-                <tr>
-                  <th className={ui.th}>#</th>
-                  <th className={ui.th}>{t("match.thEvent")}</th>
-                  <th className={ui.th}>{t("match.thSet")}</th>
-                  <th className={ui.th}>{t("match.thScore")}</th>
-                  <th className={ui.th}>{t("match.thActor")}</th>
-                  <th className={ui.th}>{t("match.thTime")}</th>
-                  <th className={ui.th}>{t("match.thRewind")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {log.map((e) => (
-                  <tr key={e.sequence} className="border-t border-border">
-                    <td className={`${ui.td} text-score-dim`}>{e.sequence}</td>
-                    <td className={`${ui.td} font-mono text-xs`}>
-                      {e.eventType}
-                    </td>
-                    <td className={ui.td}>{e.setNumber ?? "–"}</td>
-                    <td className={`${ui.td} tabular-nums`}>
-                      {e.scoreAfterA != null && e.scoreAfterB != null
-                        ? `${e.scoreAfterA}–${e.scoreAfterB}`
-                        : "–"}
-                    </td>
-                    <td className={`${ui.td} text-score-dim`}>{e.actor}</td>
-                    <td className={`${ui.td} text-score-dim`}>
-                      {new Date(e.timestamp).toUTCString().slice(17, 25)}
-                    </td>
-                    <td className={ui.td}>
-                      {/* Can't rewind to before the match was created (#1). */}
-                      {e.sequence > 1 ? (
-                        <RewindToHere
-                          tenantSlug={tenantSlug}
-                          competitionId={competitionId}
-                          matchId={matchId}
-                          fromSequence={e.sequence}
-                        />
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </main>
+    </Page>
   );
 }
