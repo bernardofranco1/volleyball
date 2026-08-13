@@ -581,6 +581,39 @@ async function main() {
 
   await wipeTenant(tenant.id);
 
+  // One registry row per official, created before any match needs one. Keyed by
+  // name because that is what REFEREES/SCORERS carry; `officialId` then resolves
+  // a slot to the same person every time they are appointed.
+  const officialIds = new Map<string, string>();
+  const officialId = (firstName: string, lastName: string): string => {
+    const id = officialIds.get(`${firstName}|${lastName}`);
+    if (!id) throw new Error(`official not registered: ${firstName} ${lastName}`);
+    return id;
+  };
+  for (const [role, roster] of [
+    ["REFEREE", REFEREES.map((r) => [r[0], r[1]] as [string, string])],
+    ["SCORER", SCORERS],
+  ] as const) {
+    for (const [firstName, lastName] of roster) {
+      const personId = newId("per");
+      officialIds.set(`${firstName}|${lastName}`, personId);
+      await db.insert(people).values({
+        id: personId,
+        tenantId: tenant.id,
+        firstName,
+        lastName,
+        jerseyName: lastName,
+        email: placeholderEmail(personId),
+      });
+      await db.insert(personRoles).values({
+        id: newId("prl"),
+        personId,
+        tenantId: tenant.id,
+        role,
+      });
+    }
+  }
+
   await db.insert(competitions).values({
     id: COMPETITION_ID,
     tenantId: tenant.id,
@@ -690,37 +723,27 @@ async function main() {
           })
           .where(eq(matches.id, matchId));
 
-        // Officials — the sheet's APPROVAL block prints these.
+        // Officials — the sheet's APPROVAL block prints these. The people rows
+        // are created ONCE up front (see officialRegistry): a referee who works
+        // eight matches is one human, and inserting a fresh person per match
+        // per role filled the directory with 84 rows for 12 officials.
         const refA = REFEREES[n % REFEREES.length];
         const refB = REFEREES[(n + 3) % REFEREES.length];
         const sc = SCORERS[n % SCORERS.length];
-        const officialPeople: [string, [string, string], string | null][] = [
+        const officialSlots: [string, [string, string], string | null][] = [
           ["FIRST_REFEREE", [refA[0], refA[1]], refA[2]],
           ["SECOND_REFEREE", [refB[0], refB[1]], refB[2]],
           ["SCORER", sc, null],
         ];
-        for (const [role, [firstName, lastName], level] of officialPeople) {
-          const personId = newId("per");
-          await db.insert(people).values({
-            id: personId,
-            tenantId: tenant.id,
-            firstName,
-            lastName,
-            jerseyName: lastName,
-            email: placeholderEmail(personId),
-          });
-          await db.insert(personRoles).values({
-            id: newId("prl"),
-            personId,
-            tenantId: tenant.id,
-            role: role === "SCORER" ? "SCORER" : "REFEREE",
-          });
+        for (const [role, [firstName, lastName], level] of officialSlots) {
           await db.insert(matchOfficials).values({
             id: newId("off"),
             matchId,
             tenantId: tenant.id,
             role: role as "FIRST_REFEREE" | "SECOND_REFEREE" | "SCORER",
-            personId,
+            personId: officialId(firstName, lastName),
+            // name/country/level stay a snapshot of what the sheet printed
+            // (spec/24 §2.4), so they are written per match, not joined.
             name: `${lastName} ${firstName[0]}.`,
             country: "SUI",
             level,
