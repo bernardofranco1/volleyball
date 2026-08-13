@@ -11,6 +11,7 @@ import { availableReports, isProvisional, isReportableStatus } from "@/lib/repor
 import { getT } from "@/lib/i18n/server";
 import type { Discipline } from "@/engine/types";
 import { MatchTabs } from "@/components/admin/MatchTabs";
+import { Page } from "@/components/ui/Page";
 import { matchStatusLabel, statusBadgeClass, ui } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
@@ -66,7 +67,7 @@ export default async function MatchReportsPage({
   const base = `/t/${tenantSlug}/competitions/${competitionId}`;
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-10">
+    <Page>
       <Link
         href={`${base}/schedule`}
         className="text-sm text-score-dim hover:text-foreground"
@@ -192,6 +193,6 @@ export default async function MatchReportsPage({
           )}
         </div>
       )}
-    </main>
+    </Page>
   );
 }

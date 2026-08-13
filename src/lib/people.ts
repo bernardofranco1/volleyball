@@ -67,6 +67,8 @@ export async function listPeople(
       jerseyName: people.jerseyName,
       federationCode: people.federationCode,
       visPersonNo: people.visPersonNo,
+      birthdate: people.birthdate,
+      userId: people.userId,
     })
     .from(people)
     .where(and(...conds))
@@ -78,7 +80,11 @@ export async function listPeople(
   const pageRows = hasMore ? rows.slice(0, PEOPLE_PAGE_SIZE) : rows;
   const roles = await rolesFor(pageRows.map((r) => r.id));
   return {
-    rows: pageRows.map((r) => ({ ...r, roles: roles.get(r.id) ?? [] })),
+    rows: pageRows.map(({ userId, ...r }) => ({
+      ...r,
+      roles: roles.get(r.id) ?? [],
+      hasLogin: userId !== null,
+    })),
     hasMore,
   };
 }
@@ -143,6 +149,7 @@ export async function getPerson(
     email: r.email,
     birthdate: r.birthdate,
     userId: r.userId,
+    hasLogin: r.userId !== null,
     heightCm: r.heightCm,
     weightKg: r.weightKg,
     position: r.position as PersonPosition | null,
@@ -189,13 +196,19 @@ export async function searchPeople(
       jerseyName: people.jerseyName,
       federationCode: people.federationCode,
       visPersonNo: people.visPersonNo,
+      birthdate: people.birthdate,
+      userId: people.userId,
     })
     .from(people)
     .where(and(...conds))
     .orderBy(asc(people.lastName), asc(people.firstName))
     .limit(opts.limit ?? 25);
   const roles = await rolesFor(rows.map((r) => r.id));
-  return rows.map((r) => ({ ...r, roles: roles.get(r.id) ?? [] }));
+  return rows.map(({ userId, ...r }) => ({
+    ...r,
+    roles: roles.get(r.id) ?? [],
+    hasLogin: userId !== null,
+  }));
 }
 
 export interface PersonUsage {
@@ -264,6 +277,77 @@ export async function personUsage(
     staff,
     inUse: rosters.length + officials.length + staff.length > 0,
   };
+}
+
+export interface PersonSummary {
+  /** Distinct team names this person is on a roster for. */
+  teams: string[];
+  /** How many matches they appear in as an official, and in which role most. */
+  officialAppearances: number;
+  topOfficialRole: string | null;
+}
+
+/**
+ * Roster and officiating footprint for a whole page of the directory in two
+ * grouped queries, rather than one personUsage call per row.
+ *
+ * This is what makes the directory's preview useful: "which teams is this
+ * player on" and "how many matches has this referee worked" are exactly the
+ * questions that previously cost a page navigation each.
+ */
+export async function peopleSummaries(
+  tenantId: string,
+  ids: string[],
+): Promise<Map<string, PersonSummary>> {
+  const out = new Map<string, PersonSummary>();
+  if (ids.length === 0) return out;
+  const [rosterRows, officialRows] = await Promise.all([
+    db
+      .selectDistinct({
+        personId: players.personId,
+        teamName: teams.displayName,
+      })
+      .from(players)
+      .innerJoin(teams, eq(teams.id, players.teamId))
+      .where(
+        and(eq(players.tenantId, tenantId), sql`${players.personId} in ${ids}`),
+      ),
+    db
+      .select({
+        personId: matchOfficials.personId,
+        role: matchOfficials.role,
+        n: count(),
+      })
+      .from(matchOfficials)
+      .where(
+        and(
+          eq(matchOfficials.tenantId, tenantId),
+          sql`${matchOfficials.personId} in ${ids}`,
+        ),
+      )
+      .groupBy(matchOfficials.personId, matchOfficials.role),
+  ]);
+
+  const get = (id: string) => {
+    const cur = out.get(id) ?? {
+      teams: [],
+      officialAppearances: 0,
+      topOfficialRole: null,
+    };
+    out.set(id, cur);
+    return cur;
+  };
+  for (const r of rosterRows) get(r.personId).teams.push(r.teamName);
+  const topCount = new Map<string, number>();
+  for (const r of officialRows) {
+    const s = get(r.personId);
+    s.officialAppearances += Number(r.n);
+    if (Number(r.n) > (topCount.get(r.personId) ?? 0)) {
+      topCount.set(r.personId, Number(r.n));
+      s.topOfficialRole = r.role;
+    }
+  }
+  return out;
 }
 
 export interface DuplicateCandidate {
@@ -358,6 +442,8 @@ export async function findDuplicateCandidates(
         jerseyName: o.jerseyName,
         federationCode: o.federationCode,
         visPersonNo: o.visPersonNo,
+        birthdate: o.birthdate,
+        hasLogin: false,
         roles: [],
       },
       reason,

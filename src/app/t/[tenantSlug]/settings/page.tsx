@@ -8,16 +8,32 @@ import {
   ReportTypesForm,
 } from "@/components/admin/TenantCapabilityForm";
 import { LanguageSwitcher } from "@/components/admin/LanguageSwitcher";
+import { Page, PageHeader, Panel } from "@/components/ui/Page";
+import { SettingsNav, type SettingsSection } from "@/components/ui/SettingsNav";
 import { ui } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
 
+const SECTIONS = ["general", "branding", "disciplines", "reports"] as const;
+type SectionKey = (typeof SECTIONS)[number];
+
+/**
+ * Settings, one section at a time.
+ *
+ * It used to be five sections stacked in a 768px column, so changing a report
+ * type meant scrolling past the whole branding editor. The section is a URL
+ * parameter rather than client tab state, which makes "Settings → Branding"
+ * something you can link someone to.
+ */
 export default async function SettingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
+  searchParams: Promise<{ section?: string }>;
 }) {
   const { tenantSlug } = await params;
+  const { section: sectionParam } = await searchParams;
   const ctx = await requireRole(
     tenantSlug,
     ["TENANT_ADMIN"],
@@ -26,116 +42,112 @@ export default async function SettingsPage({
   const locale = await getLocale();
   const t = (key: string) => translate(locale, key);
 
+  const active: SectionKey = SECTIONS.includes(sectionParam as SectionKey)
+    ? (sectionParam as SectionKey)
+    : "general";
+
+  const base = `/t/${tenantSlug}/settings`;
+  const sections: SettingsSection[] = [
+    {
+      key: "general",
+      href: `${base}?section=general`,
+      label: "General",
+      hint: "Interface language",
+    },
+    {
+      key: "branding",
+      href: `${base}?section=branding`,
+      label: t("settings.branding"),
+      hint: "Colours, logo, court",
+    },
+    {
+      key: "disciplines",
+      href: `${base}?section=disciplines`,
+      label: "Disciplines",
+      hint: "What this organisation runs",
+    },
+    {
+      key: "reports",
+      href: `${base}?section=reports`,
+      label: "Reports",
+      hint: "Which documents are offered",
+    },
+    // Access and Audit are first-class sidebar destinations now; they stay
+    // listed here because this is still where people look for them.
+    { key: "access", href: `/t/${tenantSlug}/access`, label: "Access" },
+    { key: "audit", href: `/t/${tenantSlug}/audit`, label: "Audit log" },
+  ];
+
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-10">
-      <div className="mb-6 flex items-end justify-between gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("settings.title")}</h1>
-        <Link href={`/t/${tenantSlug}/dashboard`} className={ui.btnSecondary}>
-          ← {t("nav.dashboard")}
-        </Link>
-      </div>
+    <Page>
+      <PageHeader title={t("settings.title")} meta={ctx.tenant.name} />
 
-      <div className="space-y-10">
-        {/* ── General ── */}
-        <section aria-labelledby="settings-general">
-          <h2
-            id="settings-general"
-            className="mb-3 text-xs font-medium uppercase tracking-wide text-score-dim"
-          >
-            General
-          </h2>
-          <div className={ui.card}>
-            <h3 className="mb-3 font-medium">{t("settings.language")}</h3>
-            <LanguageSwitcher current={locale} />
-            <p className="mt-2 text-xs text-score-dim">
-              Your language for the admin interface in this browser — it doesn&apos;t
-              change what other members or the public see.
-            </p>
-          </div>
-        </section>
+      <div className="flex flex-col gap-6 md:flex-row">
+        <SettingsNav sections={sections} active={active} />
 
-        {/* ── Branding ── */}
-        <section aria-labelledby="settings-branding">
-          <h2
-            id="settings-branding"
-            className="mb-3 text-xs font-medium uppercase tracking-wide text-score-dim"
-          >
-            Branding
-          </h2>
-          <BrandingForm
-            tenantSlug={tenantSlug}
-            branding={ctx.tenant.branding}
-            enabledDisciplines={ctx.tenant.config.enabledDisciplines}
-          />
-        </section>
+        <div className="min-w-0 flex-1">
+          {active === "general" && (
+            <Panel title={t("settings.language")} className="max-w-2xl">
+              <LanguageSwitcher current={locale} />
+              <p className="mt-2 text-xs text-score-dim">
+                Your language for the admin interface in this browser — it
+                doesn&apos;t change what other members or the public see.
+              </p>
+            </Panel>
+          )}
 
-        {/* ── Disciplines (spec/24 §5) ── */}
-        <section aria-labelledby="settings-disciplines">
-          <h2
-            id="settings-disciplines"
-            className="mb-3 text-xs font-medium uppercase tracking-wide text-score-dim"
-          >
-            Disciplines
-          </h2>
-          <DisciplinesForm
-            tenantSlug={tenantSlug}
-            enabled={ctx.tenant.config.enabledDisciplines}
-          />
-        </section>
+          {active === "branding" && (
+            <div className="max-w-3xl">
+              <BrandingForm
+                tenantSlug={tenantSlug}
+                branding={ctx.tenant.branding}
+                enabledDisciplines={ctx.tenant.config.enabledDisciplines}
+              />
+            </div>
+          )}
 
-        {/* ── Reports (spec/24 §4) ── */}
-        <section aria-labelledby="settings-reports">
-          <h2
-            id="settings-reports"
-            className="mb-3 text-xs font-medium uppercase tracking-wide text-score-dim"
-          >
-            Reports
-          </h2>
-          <ReportTypesForm
-            tenantSlug={tenantSlug}
-            enabled={ctx.tenant.config.enabledReportTypes}
-          />
-        </section>
+          {active === "disciplines" && (
+            <div className="max-w-2xl">
+              <DisciplinesForm
+                tenantSlug={tenantSlug}
+                enabled={ctx.tenant.config.enabledDisciplines}
+              />
+            </div>
+          )}
 
-        {/* ── People & security ── */}
-        <section aria-labelledby="settings-people">
-          <h2
-            id="settings-people"
-            className="mb-3 text-xs font-medium uppercase tracking-wide text-score-dim"
-          >
-            People &amp; security
-          </h2>
-          <div className="space-y-4">
-            <Link
-              href={`/t/${tenantSlug}/access`}
-              className={`${ui.card} flex items-center justify-between transition-colors hover:border-primary`}
-            >
-              <span>
+          {active === "reports" && (
+            <div className="max-w-2xl">
+              <ReportTypesForm
+                tenantSlug={tenantSlug}
+                enabled={ctx.tenant.config.enabledReportTypes}
+              />
+            </div>
+          )}
+
+          {active === "general" && (
+            <div className="mt-4 grid max-w-2xl gap-3 sm:grid-cols-2">
+              <Link
+                href={`/t/${tenantSlug}/access`}
+                className={`${ui.card} transition-colors hover:border-primary`}
+              >
                 <span className="font-medium">Access</span>
                 <span className="mt-1 block text-sm text-score-dim">
-                  Grant people Manage, Score, or View access. Scoring also asks
-                  for a match&apos;s PIN when one is set.
+                  Grant people Manage, Score, or View access.
                 </span>
-              </span>
-              <span className="text-score-dim">→</span>
-            </Link>
-
-            <Link
-              href={`/t/${tenantSlug}/audit`}
-              className={`${ui.card} flex items-center justify-between transition-colors hover:border-primary`}
-            >
-              <span>
+              </Link>
+              <Link
+                href={`/t/${tenantSlug}/audit`}
+                className={`${ui.card} transition-colors hover:border-primary`}
+              >
                 <span className="font-medium">Audit log</span>
                 <span className="mt-1 block text-sm text-score-dim">
-                  Recent administrative changes (lifecycle, deletes, bracket,
-                  tokens).
+                  Recent administrative changes.
                 </span>
-              </span>
-              <span className="text-score-dim">→</span>
-            </Link>
-          </div>
-        </section>
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
-    </main>
+    </Page>
   );
 }

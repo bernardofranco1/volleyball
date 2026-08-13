@@ -63,6 +63,11 @@ export interface PersonRow {
   federationCode: string | null;
   visPersonNo: number | null;
   roles: PersonRole[];
+  birthdate: string | null;
+  /** Whether this person has a login account (spec/25 §3) — a column in the
+   *  directory, since "can they sign in?" is a question admins ask of the
+   *  list, not of one person at a time. */
+  hasLogin: boolean;
 }
 
 /**

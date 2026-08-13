@@ -4,7 +4,7 @@
 // event: impersonation, global-admin flags, password resets — spec/26 §9). Instrumented at sensitive mutations: competition lifecycle/config,
 // deletes, bracket generate/advance, branding, team-tablet token issuance, and
 // bulk CSV imports.
-import { desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog } from "@/db/schema";
 import { captureError } from "@/lib/observability";
@@ -65,6 +65,78 @@ export async function recordAudit(input: AuditInput): Promise<void> {
 }
 
 export type AuditRow = typeof auditLog.$inferSelect;
+
+export const AUDIT_PAGE_SIZE = 50;
+
+export interface AuditFilters {
+  /** Exact action, e.g. "competition.activate". */
+  action?: string;
+  /** Free text over the actor's email and the summary line. */
+  q?: string;
+}
+
+function auditConds(tenantId: string, f: AuditFilters) {
+  const conds = [eq(auditLog.tenantId, tenantId)];
+  if (f.action) conds.push(eq(auditLog.action, f.action));
+  const q = f.q?.trim();
+  if (q) {
+    const like = `%${q}%`;
+    conds.push(
+      sql`(coalesce(${auditLog.actorEmail}, '') ilike ${like} or coalesce(${auditLog.summary}, '') ilike ${like})`,
+    );
+  }
+  return conds;
+}
+
+/**
+ * Filtered, paginated audit for the tenant viewer.
+ *
+ * The old viewer showed the newest 200 rows and stopped — with no filter and no
+ * page two, anything older than a busy fortnight was simply unreachable from
+ * the UI, which defeats the point of keeping the record.
+ */
+export async function listAuditPage(
+  tenantId: string,
+  opts: AuditFilters & { page?: number; paginate?: boolean } = {},
+): Promise<{ rows: AuditRow[]; hasMore: boolean; total: number }> {
+  const page = Math.max(0, opts.page ?? 0);
+  const paginate = opts.paginate !== false;
+  const conds = auditConds(tenantId, opts);
+  const [rows, totals] = await Promise.all([
+    paginate
+      ? db
+          .select()
+          .from(auditLog)
+          .where(and(...conds))
+          .orderBy(desc(auditLog.createdAt))
+          .limit(AUDIT_PAGE_SIZE + 1)
+          .offset(page * AUDIT_PAGE_SIZE)
+      : db
+          .select()
+          .from(auditLog)
+          .where(and(...conds))
+          .orderBy(desc(auditLog.createdAt))
+          .limit(10000),
+    db
+      .select({ n: count() })
+      .from(auditLog)
+      .where(and(...conds)),
+  ]);
+  return {
+    rows: paginate ? rows.slice(0, AUDIT_PAGE_SIZE) : rows,
+    hasMore: paginate && rows.length > AUDIT_PAGE_SIZE,
+    total: Number(totals[0]?.n ?? 0),
+  };
+}
+
+/** Distinct actions present for this tenant — the viewer's filter options. */
+export async function auditActions(tenantId: string): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ action: auditLog.action })
+    .from(auditLog)
+    .where(eq(auditLog.tenantId, tenantId));
+  return rows.map((r) => r.action).sort();
+}
 
 export async function listAudit(
   tenantId: string,

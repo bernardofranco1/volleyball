@@ -8,13 +8,18 @@ import {
   countPeopleByRole,
   isPersonRole,
   listPeople,
+  peopleSummaries,
   personName,
   PEOPLE_PAGE_SIZE,
   PERSON_ROLES,
   type PersonRole,
+  type PersonRow,
 } from "@/lib/people";
 import { NewPersonForm } from "@/components/admin/PersonForm";
-import { ui } from "@/components/admin/styles";
+import { DataTable, type Column } from "@/components/ui/DataTable";
+import { Drawer } from "@/components/ui/Drawer";
+import { Page, PageHeader } from "@/components/ui/Page";
+import { FilterChip, SearchBox, Toolbar, ToolbarSpacer } from "@/components/ui/Toolbar";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +28,15 @@ const ROLE_LABEL: Record<PersonRole, string> = {
   REFEREE: "Referees",
   COACH: "Coaches",
   SCORER: "Scorers",
+};
+
+const OFFICIAL_ROLE_LABEL: Record<string, string> = {
+  FIRST_REFEREE: "1st referee",
+  SECOND_REFEREE: "2nd referee",
+  SCORER: "scorer",
+  ASSISTANT_SCORER: "assistant scorer",
+  THIRD_REFEREE: "3rd referee",
+  CHALLENGE_REFEREE: "challenge referee",
 };
 
 export default async function PeoplePage({
@@ -47,6 +61,11 @@ export default async function PeoplePage({
     listPeople(ctx.tenant.id, { q, role, page }),
     countPeopleByRole(ctx.tenant.id),
   ]);
+  const summaries = await peopleSummaries(
+    ctx.tenant.id,
+    rows.map((r) => r.id),
+  );
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
   const chipHref = (r?: PersonRole) => {
     const p = new URLSearchParams();
@@ -64,143 +83,193 @@ export default async function PeoplePage({
     return `/t/${tenantSlug}/people${s ? `?${s}` : ""}`;
   };
 
-  return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-10">
-      <div className="mb-8 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">People</h1>
-          <p className="mt-1 text-sm text-score-dim">
-            Players, referees, coaches and scorers for {ctx.tenant.name}. Rosters
-            and match officials reference these records, so a correction here
-            reaches every competition.
-          </p>
-        </div>
-        <Link href={`/t/${tenantSlug}/dashboard`} className={ui.btnSecondary}>
-          ← Home
+  const columns: Column<PersonRow>[] = [
+    {
+      key: "name",
+      header: "Name",
+      cell: (p) => (
+        <Link href={`/t/${tenantSlug}/people/${p.id}`} className="font-medium">
+          {personName(p)}
         </Link>
+      ),
+    },
+    {
+      key: "shirt",
+      header: "Shirt name",
+      className: "max-lg:hidden",
+      cell: (p) => (
+        <span className="text-xs text-score-dim">{p.jerseyName}</span>
+      ),
+    },
+    {
+      key: "roles",
+      header: "Roles",
+      width: "w-40",
+      cell: (p) => (
+        <span className="text-xs text-score-dim">
+          {p.roles.length > 0
+            ? p.roles.map((r) => ROLE_LABEL[r].replace(/s$/, "")).join(" · ")
+            : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "birthdate",
+      header: "Born",
+      width: "w-28",
+      className: "max-xl:hidden font-mono tabular-nums text-xs",
+      cell: (p) => (
+        <span className="text-score-dim">{p.birthdate ?? "—"}</span>
+      ),
+    },
+    {
+      key: "federation",
+      header: "Federation",
+      width: "w-24",
+      className: "max-md:hidden",
+      cell: (p) => (
+        <span className="text-xs text-score-dim">{p.federationCode ?? "—"}</span>
+      ),
+    },
+    {
+      key: "vis",
+      header: "VIS",
+      width: "w-20",
+      className: "max-xl:hidden font-mono tabular-nums text-xs",
+      cell: (p) => (
+        <span className="text-score-dim">{p.visPersonNo ?? "—"}</span>
+      ),
+    },
+    {
+      key: "login",
+      header: "Login",
+      width: "w-16",
+      align: "center",
+      cell: (p) =>
+        p.hasLogin ? (
+          <span className="text-success" title="Has a login account">
+            ✓
+          </span>
+        ) : (
+          <span className="text-score-dim">—</span>
+        ),
+    },
+    {
+      key: "teams",
+      header: "Appears in",
+      cell: (p) => {
+        const s = summaries.get(p.id);
+        const bits: string[] = [];
+        if (s?.teams.length) bits.push(s.teams.slice(0, 2).join(", "));
+        if (s?.teams.length && s.teams.length > 2)
+          bits.push(`+${s.teams.length - 2}`);
+        if (s?.officialAppearances)
+          bits.push(
+            `${s.officialAppearances} match${s.officialAppearances === 1 ? "" : "es"}${
+              s.topOfficialRole
+                ? ` as ${OFFICIAL_ROLE_LABEL[s.topOfficialRole] ?? s.topOfficialRole}`
+                : ""
+            }`,
+          );
+        return (
+          <span className="block truncate text-xs text-score-dim">
+            {bits.join(" · ") || "—"}
+          </span>
+        );
+      },
+    },
+  ];
+
+  return (
+    <Page>
+      <PageHeader
+        title="People"
+        meta={`Players, referees, coaches and scorers for ${ctx.tenant.name}. Rosters and match officials reference these records, so a correction here reaches every competition.`}
+        actions={
+          // Was a permanent 340px rail beside the directory it competes with.
+          <Drawer label="Add person" variant="primary" width="lg">
+            <NewPersonForm tenantSlug={tenantSlug} />
+          </Drawer>
+        }
+      />
+
+      <div className="mb-3">
+        <Toolbar>
+          <SearchBox
+            defaultValue={q}
+            placeholder="Name…"
+            carry={{ role }}
+          />
+          <FilterChip href={chipHref()} active={!role} label="All" count={total} />
+          {PERSON_ROLES.map((r) => (
+            <FilterChip
+              key={r}
+              href={chipHref(r)}
+              active={role === r}
+              label={ROLE_LABEL[r]}
+              count={counts[r]}
+            />
+          ))}
+          <ToolbarSpacer />
+        </Toolbar>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_340px]">
-        <section>
-          {/* Search + role filter. GET form → URL params, server-rendered. */}
-          <form method="get" className="mb-4 flex flex-wrap items-end gap-3">
-            <label className="flex flex-1 flex-col gap-1 text-xs text-score-dim">
-              Search
-              <input
-                type="search"
-                name="q"
-                defaultValue={q ?? ""}
-                placeholder="Name…"
-                className={ui.input}
-              />
-            </label>
-            {role && <input type="hidden" name="role" value={role} />}
-            <button type="submit" className={ui.btnSecondary}>
-              Search
-            </button>
-          </form>
-
-          <div className="mb-4 flex flex-wrap gap-2">
-            <Link
-              href={chipHref()}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                role
-                  ? "border-border text-score-dim hover:text-foreground"
-                  : "border-primary text-foreground"
-              }`}
-            >
-              All
-            </Link>
-            {PERSON_ROLES.map((r) => (
-              <Link
-                key={r}
-                href={chipHref(r)}
-                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                  role === r
-                    ? "border-primary text-foreground"
-                    : "border-border text-score-dim hover:text-foreground"
-                }`}
-              >
-                {ROLE_LABEL[r]} ({counts[r]})
-              </Link>
-            ))}
-          </div>
-
-          {rows.length === 0 ? (
-            <div className={`${ui.card} text-sm text-score-dim`}>
-              {q || role
-                ? "Nobody matches that filter."
-                : "No people yet. Add someone, or import a roster from the Teams tab of a competition — imported names are matched to existing people and created when new."}
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {rows.map((p) => (
-                <li key={p.id}>
+      <DataTable
+        columns={columns}
+        rowKey={(p) => p.id}
+        density="compact"
+        groups={[{ key: "all", rows }]}
+        empty={
+          q || role
+            ? "Nobody matches that filter."
+            : "No people yet. Add someone, or import a roster from the Teams tab of a competition — imported names are matched to existing people and created when new."
+        }
+        footer={
+          <div className="flex items-center justify-between gap-3">
+            <span>
+              {rows.length === 0 ? 0 : page * PEOPLE_PAGE_SIZE + 1}–
+              {page * PEOPLE_PAGE_SIZE + rows.length}
+              {role ? ` of ${counts[role]}` : ` of ${total}`}
+            </span>
+            <span className="flex items-center gap-1">
+              {page > 0 && (
+                <Link href={pageHref(page - 1)} className="px-2 hover:text-foreground">
+                  ←
+                </Link>
+              )}
+              {Array.from(
+                {
+                  length: Math.max(
+                    1,
+                    Math.ceil((role ? counts[role] : total) / PEOPLE_PAGE_SIZE),
+                  ),
+                },
+                (_, i) => i,
+              )
+                .slice(Math.max(0, page - 3), Math.max(0, page - 3) + 7)
+                .map((p) => (
                   <Link
-                    href={`/t/${tenantSlug}/people/${p.id}`}
-                    className={`${ui.card} flex items-center justify-between gap-4 transition-colors hover:border-primary`}
+                    key={p}
+                    href={pageHref(p)}
+                    aria-current={p === page ? "page" : undefined}
+                    className={`rounded px-2 py-0.5 tabular-nums ${
+                      p === page
+                        ? "bg-surface-selected text-foreground"
+                        : "hover:text-foreground"
+                    }`}
                   >
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">
-                        {personName(p)}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-score-dim">
-                        {p.roles.length > 0
-                          ? p.roles.map((r) => ROLE_LABEL[r].replace(/s$/, "")).join(" · ")
-                          : "No role"}
-                        {p.jerseyName !== personName(p) && ` · shirt “${p.jerseyName}”`}
-                      </span>
-                    </span>
-                    <span className="flex flex-none items-center gap-2 text-xs text-score-dim">
-                      {p.federationCode && (
-                        <span className="rounded border border-border px-1.5 py-0.5">
-                          {p.federationCode}
-                        </span>
-                      )}
-                      {p.visPersonNo != null && (
-                        <span
-                          className="rounded border border-border px-1.5 py-0.5"
-                          title="Linked to a VIS person record"
-                        >
-                          VIS {p.visPersonNo}
-                        </span>
-                      )}
-                      →
-                    </span>
+                    {p + 1}
                   </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {(page > 0 || hasMore) && (
-            <div className="mt-4 flex items-center justify-between text-sm">
-              {page > 0 ? (
-                <Link href={pageHref(page - 1)} className={ui.btnSecondary}>
-                  ← Previous
+                ))}
+              {hasMore && (
+                <Link href={pageHref(page + 1)} className="px-2 hover:text-foreground">
+                  →
                 </Link>
-              ) : (
-                <span />
               )}
-              <span className="text-xs text-score-dim">
-                {page * PEOPLE_PAGE_SIZE + 1}–
-                {page * PEOPLE_PAGE_SIZE + rows.length}
-              </span>
-              {hasMore ? (
-                <Link href={pageHref(page + 1)} className={ui.btnSecondary}>
-                  Next →
-                </Link>
-              ) : (
-                <span />
-              )}
-            </div>
-          )}
-        </section>
-
-        <section>
-          <NewPersonForm tenantSlug={tenantSlug} />
-        </section>
-      </div>
-    </main>
+            </span>
+          </div>
+        }
+      />
+    </Page>
   );
 }

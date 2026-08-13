@@ -15,6 +15,7 @@ import {
   EditPersonForm,
   MergePeopleForm,
 } from "@/components/admin/PersonForm";
+import { Page } from "@/components/ui/Page";
 import { ui } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export default async function PersonPage({
   if (!person) notFound();
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-10">
+    <Page>
       <Link
         href={`/t/${tenantSlug}/people`}
         className="text-sm text-score-dim hover:text-foreground"
@@ -156,6 +157,6 @@ export default async function PersonPage({
           />
         </section>
       </div>
-    </main>
+    </Page>
   );
 }
