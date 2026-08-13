@@ -104,9 +104,11 @@ links.
   throwaway TENANT_ADMIN (and `destroy` removes it — dev and prod share one
   database, so never leave it behind).
 
-## Known, not addressed here
+## Data problem it surfaced (fixed, `89b825d`)
 
-The people directory surfaces duplicate person rows in the VBC Cheseaux data
-(one officials row per match rather than one person). That is the spec/25
-dedupe job on seeded data, not a console defect — the table just made it
-visible for the first time.
+The People table's "appears in" column exposed 187 people for 124 humans in the
+VBC Cheseaux data: `scripts/seed-lna-season.ts` inserted a fresh `people` row
+per officials slot per match. The seed now registers the twelve officials once
+up front, and `scripts/dedupe-people.ts` merged the 63 duplicates already
+stored (dry-run by default; mirrors the `mergePeople` action). All 75 officials
+slots were preserved and the played matches' scoresheets still validate.
