@@ -1,262 +1,253 @@
 # spec/28 — Homologation → Production releases (one URL, one DB, one project)
 
-**Status: PLANNED — no implementation yet.** Written 2026-08-13.
+**Status: PLANNED — no implementation yet.** Written 2026-08-13; **revised the
+same day (v2)** after review: homologation gets **its own tables in the same
+database** (a `homolog` Postgres schema), selected per environment by an env
+var. This supersedes v1's shared-tables model and its homolog-tenant idea, and
+it demotes the expand/contract migration law from "always" to "promote-window
+and rollback safety only".
 
 ## 1. Goal
 
-Today a push to `main` goes straight to the production domain. Wanted instead:
-
 - A push to `main` lands in **Homologation**, never directly in production.
-- Once validated, that exact version is **promoted to production from a UI**,
-  where it is also visible which version sits where.
-- **One URL, one database, one Vercel project** — no second address, no second
-  Supabase project.
-- The validator can **switch between the two versions in the UI**, with an
-  unmistakable visual marker (a coloured bar) whenever they are looking at
-  Homologation.
-- Rollback: re-promote a previous version, from the same UI.
+- Homologation runs against **its own tables** — same database, so still one
+  Supabase project — and production tables are untouched by testing.
+- Once validated, the version is **promoted to production from a UI** that
+  shows which version sits where; the same UI does rollback.
+- **One URL**: the validator can switch the canonical address between the two
+  versions, with an amber bar whenever they are looking at Homologation.
 
-## 2. The building blocks (verified against Vercel docs, Aug 2026)
+## 2. The shape in one paragraph
 
-Everything below works on the current Hobby plan.
+Postgres namespaces do the table separation: production lives in schema
+`public` (exactly as today — its connection string does not change at all),
+homologation lives in schema `homolog`, a refreshable clone of production.
+Which schema a running app uses is decided by **one env var** (`DB_SCHEMA`),
+applied as the connection's `search_path` — no query in the codebase changes,
+because Drizzle emits unqualified table names and Postgres resolves them
+through the search path. Vercel's environment split carries the var: **preview
+deployments** (every push to `main`, and every feature branch) get
+`DB_SCHEMA=homolog`; **production deployments** get `public`. Promotion is
+therefore: build the production flavour of the validated commit (staged, not
+yet serving), migrate `public` if needed, then flip the domain to it — from
+the release console.
 
-1. **Staged Production Deployments.** Project Settings → Environments →
-   *Auto-assign Custom Production Domains* → **off**. From then on every push
-   to `main` builds a production-configured deployment that does **not** take
-   the domain — it sits "staged" with its own unique URL until promoted. The
-   Vercel dashboard already has a *Promote* button for staged deployments, so
-   the core workflow exists before we write any code.
-2. **Promote API** — `POST /v10/projects/{projectId}/promote/{deploymentId}`.
-   Promotes the **exact build artifact** that was validated (no rebuild), which
-   is the property that makes homologation meaningful. Same endpoint serves
-   rollback: promote an older deployment.
-3. **Aliases API** — keeps a stable `homolog-…vercel.app` alias pointed at
-   whichever candidate is currently under validation.
-4. **Middleware rewrites to another deployment.** `proxy.ts` can
-   `NextResponse.rewrite()` to an absolute URL and inject request headers —
-   including `x-vercel-protection-bypass` (the *Protection Bypass for
-   Automation* secret, available on all plans, auto-injected as
-   `VERCEL_AUTOMATION_BYPASS_SECRET`). This is what makes the one-URL switch
-   possible while keeping candidate URLs access-protected.
-5. Because candidates are **production-target** deployments, they are built
-   with the **production env vars**. What is validated is configured exactly
-   like what will serve production — no preview-env drift.
+## 3. The building blocks (verified against Vercel/Supabase docs, Aug 2026)
 
-Note: Vercel's first-party versions of the fancy parts (Custom Environments,
-Skew Protection, Instant Rollback, Rolling Releases) are Pro/Enterprise
-features. This plan reproduces the promote/rollback workflow on Hobby with the
-primitives above; upgrading later would simplify, not conflict.
+All on the current Hobby plan.
 
-## 3. Architecture
+1. **Production branch ≠ main.** Vercel's production branch becomes `release`,
+   a branch only the release console fast-forwards. Pushes to `main` then
+   build ordinary **preview deployments** — with preview env vars, i.e. the
+   homolog schema — and `main`'s stable branch alias becomes the homolog URL.
+   The `release` branch doubles as the audit trail: its history IS the
+   promotion history.
+2. **Staged production deployments.** Project setting *Auto-assign Custom
+   Production Domains: off*. A push to `release` builds a production-env
+   deployment that does **not** take the domain until promoted — the console
+   flips it only after prod migrations have run.
+3. **Promote API** — `POST /v10/projects/{projectId}/promote/{deploymentId}`
+   assigns the domain to an existing deployment, no rebuild. First promotion
+   of a release targets the fresh `release` build; **rollback promotes any
+   older production deployment instantly** (it already exists, built with the
+   right env).
+4. **Protection Bypass for Automation** (all plans) lets the one-URL proxy
+   reach protected preview URLs by header.
+5. **postgres.js startup parameters** (`connection: { search_path }`) hold for
+   the whole session on Supabase's **session pooler** — which is what homolog
+   traffic uses (one validator; concurrency is trivial). Production keeps the
+   transaction pooler and never sets a search_path at all. (Whether Supavisor's
+   transaction mode honours `search_path` startup params: verify at
+   implementation; nothing depends on it.)
 
-Three independent pointers, one project:
+Why not decide the schema at runtime inside one deployment (by host header or
+a control table)? Because it reintroduces exactly the class of bug this design
+exists to kill: a warm instance with a stale decision writing homolog data
+into prod tables during the promote window. An env var is decided at deploy
+time, per deployment, forever — there is nothing to race.
+
+## 4. Three pointers, one project
 
 | Pointer | Meaning | Moved by |
 |---|---|---|
-| **Production** | which deployment `volleyball-eight.vercel.app` serves | *Promote* (console or Vercel dashboard) |
-| **Homologation** | which deployment the `homolog-…` alias serves | *Set as homolog* (console; default = newest `main` build) |
-| **Your browser** | which of the two YOU see at the one URL | the signed homolog cookie (console: *View homolog* / *Exit*) |
+| **Production** | which deployment `volleyball-eight.vercel.app` serves everyone (schema `public`) | *Promote* in the console |
+| **Homologation** | which preview build the homolog alias serves (schema `homolog`) | automatic: latest `main` push (manual override in console) |
+| **Your browser** | which of the two YOU see at the one URL | the signed homolog cookie — console: *View homolog* / *Exit* |
 
-Flow: push to `main` → Vercel builds a staged candidate → console (or a deploy
-hook) points the homolog alias at it → validator flips the cookie and walks the
-app at the normal URL, amber bar on → validator promotes → domain now serves
-that artifact → cookie cleared. Rollback = promote any earlier release from the
-history list.
+**Promote, in full (one button, the console orchestrates):**
+1. Guards: LIVE-match warning, migration preview (see §6), contract
+   acknowledgement if applicable, confirm.
+2. Full backup of all tenants (existing spec/23 machinery + all-tenants wrapper).
+3. Fast-forward `release` to the validated SHA (GitHub API) → Vercel builds
+   the production-env deployment, staged. Console polls until READY (~2 min).
+4. Apply the migration delta to `public` (if any).
+5. Promote API → the domain flips. `releases` row + platform audit entry;
+   the homolog cookie is cleared.
 
-Branch (non-main) pushes keep today's behaviour: ordinary preview deployments,
-untouched by any of this.
+Rollback: promote any earlier production deployment from the history —
+instant, no rebuild. (Only guaranteed clean if migrations since that release
+were expand-only — §6.)
 
-## 4. Release console — `/admin/releases` (global admin only)
+The promoted build is the same commit, not the same artifact, as what was
+validated — necessarily, since the schema env var must differ. Same code, same
+lockfile, config identical except `DB_SCHEMA`/`DATABASE_URL`; the honest
+residual risk is a build-environment difference, accepted.
 
-A page in the existing platform console (spec/23), talking to the Vercel API
-server-side with a stored `VERCEL_TOKEN`.
+## 5. One database, two schemas — mechanics
 
-**Shows**
-- Recent `main` deployments: SHA + commit title, age, build state, and chips:
-  `IN PRODUCTION` / `IN HOMOLOG` / `CONTRACT MIGRATION` (see §7).
-- Current production release and how long it has been serving.
-- Migration state: repo journal vs `drizzle.__drizzle_migrations` — is the
-  candidate expecting schema the DB doesn't have yet, or vice versa.
-- Release history from the `releases` table (below), with re-promote buttons.
+- **`DB_SCHEMA`** env: `public` in Production env, `homolog` in Preview env
+  (and in `.env.local` — see §10). `src/db/index.ts` passes it as
+  `connection: { search_path }`; homolog connections use the session pooler
+  URL, production keeps today's transaction-pooler URL untouched.
+- **No query changes.** Drizzle emits unqualified names; `search_path`
+  resolves them. Nothing in `src/` knows which schema it is on.
+- **Migration journals split.** Drizzle's migrator takes
+  `migrationsTable`/`migrationsSchema`: `public` keeps today's journal;
+  `homolog` gets its own (`drizzle.__drizzle_migrations_homolog`).
+  `db:migrate` gains a `--env homolog|prod` flag choosing connection + journal.
+- **Clone script** `scripts/clone-prod-to-homolog.ts` (console button
+  *Refresh homolog data*): drop & recreate schema `homolog`; for each `public`
+  table `CREATE TABLE homolog.t (LIKE public.t INCLUDING ALL)` + copy rows +
+  re-create FKs from `pg_get_constraintdef` (LIKE excludes them); copy the
+  prod migration journal into the homolog journal so a candidate's
+  `db:migrate --env homolog` applies exactly the delta. No sequences to fix —
+  every PK is a text cuid. Minutes of work for a DB this size, runs in-database.
+- **Email scrub on clone (decide: default on).** The clone contains real
+  member addresses; homolog testing of anything that emails would otherwise
+  mail real people. The script rewrites emails to `x+<id>@homolog.invalid`
+  except allow-listed admin addresses.
+- **Auth is shared on purpose.** Supabase `auth` schema is global; our
+  `users`/roles tables are cloned, so the same logins work in both
+  environments with whatever roles they had at clone time.
+- Small print: RLS enablement isn't copied by LIKE (irrelevant — the app
+  connects as owner and realtime-RLS is off); advisory-lock keys are
+  DB-global, so the lock helper mixes `DB_SCHEMA` into the key; realtime
+  channels get an env prefix (`hml:match:{id}`) since cloned match ids equal
+  prod ids; Supabase Studio shows both schemas side by side, which is a nice
+  free inspection UI.
 
-**Actions**
-- *Set as homolog* — move the homolog alias to any listed deployment.
-- *View homolog* — set the signed cookie; the same URL now serves the
-  candidate; banner appears. *Exit homolog* clears it.
-- *Promote to production* — calls the promote API. Guarded by:
-  - a **LIVE-match check** ("2 matches are LIVE right now — promoting swaps
-    the app under their scorers"; see §9),
-  - a **pending-migration check** (candidate's journal ahead of the DB ⇒ apply
-    migrations first),
-  - a **contract-migration acknowledgement** when the candidate contains one,
-  - an explicit confirm.
-  Every promote/rollback writes a platform-level `audit_log` row (tenantId
-  null, the spec/26 convention) and a `releases` row.
-- *Rollback* — the same promote call on a previous release.
+## 6. What this does to migrations (the big win)
 
-**New table `releases`** (expand-only migration, fittingly):
-`id, deployment_id, sha, message, promoted_at, promoted_by, previous_deployment_id, note`.
-Powers the history, rollback targets, and the banner's "am I promoted?" check.
+- **During validation: freedom.** A candidate's migrations — including drops
+  and renames — run against `homolog` only. Production tables and production
+  code are untouched for the whole validation period, however long it lasts.
+  The class of incident from 2026-08-11 (a migration dropping columns the
+  promoted code still read) becomes structurally impossible *during
+  validation*.
+- **At promote: a short overlap.** `public` is migrated seconds-to-minutes
+  before the domain flips, while the outgoing release still serves stragglers.
+  Destructive changes therefore still want the expand/contract split — but as
+  a **promote-window rule**, not a development-time straitjacket.
+- **Rollback defines the real policy.** Rolling back re-serves old code
+  against the new schema. So: migrations since the previous release must be
+  expand-only **if you want one-click rollback**; a release carrying a
+  contract migration downgrades its rollback path to "restore from the
+  pre-promote backup". The console makes this legible: a red `CONTRACT`
+  chip (CI lint flags `DROP`/`RENAME`/`SET NOT NULL`/`ALTER TYPE` without a
+  `-- contract-ok:` marker) and a promote dialog that says which rollback
+  story this release has.
+- The `MIGRATION_JOURNAL_IDX` / restore-map bump discipline stays as is
+  (test-enforced), and step 2 of every promote is a full backup regardless.
 
-## 5. The homologation banner
+## 7. Release console — `/admin/releases` (global admin)
 
-- A slim amber bar fixed to the top of **every** surface — including the scorer
-  console and tablets, because validating scoring in homolog must be visibly
-  homolog. Content: `HOMOLOGATION · <sha7> <commit title> — this is not
-  production`, plus *Exit* when in cookie mode.
-- Detection is server-side, no client JS:
-  - the homolog cookie is present (one-URL proxy mode), **or**
-  - the request host ≠ `NEXT_PUBLIC_APP_URL`'s host (direct alias access), **or**
-  - `VERCEL_DEPLOYMENT_ID` ≠ the latest `releases.deployment_id` (belt and
-    braces for a staged deployment reached any other way).
-- The promoted deployment at the canonical domain never renders it.
-- Amber, not red — red stays reserved for destructive actions.
+Shows: recent `main` builds (SHA, title, age, chips `IN HOMOLOG` /
+`CONTRACT`), the current production release (SHA, serving since), both
+schemas' journal state (what `public` has vs what the candidate expects), and
+the release history with rollback buttons.
 
-## 6. The one-URL switch (mechanics)
+Actions: *Refresh homolog data* (clone), *Set as homolog* (alias override),
+*View homolog* / *Exit* (signed cookie), *Promote* (the §4 sequence),
+*Rollback*. Everything audit-logged (platform-level rows, spec/26 convention).
 
-- **Cookie**: `hml=<HMAC(secret, expiry)>`, httpOnly, `maxAge` ≈ 4 h, set and
-  cleared only by the console's server actions (global admin). If it ever
-  leaks, the holder sees the candidate build instead of prod — same app, same
-  auth gates, same DB — so exposure is low; HMAC + TTL contain it anyway.
-- **proxy.ts** gains a first branch: cookie valid → rewrite the request to
-  `https://homolog-….vercel.app<path>` injecting the protection-bypass header.
-  Bodies stream through, so Server Actions and API posts work.
-- **Matcher widening**: the proxy must now also match `_next/static`, images
-  and `/api/*` so those proxy too. To keep today's hot-path discipline (the
-  matcher deliberately excludes them from auth work), the handler short-cuts:
-  no cookie + newly-matched path → `NextResponse.next()` immediately. The
-  scoring path gains one near-zero middleware hop; revisit only if Hobby's
-  middleware quota ever matters.
-- **Origin checks**: through the proxy, the candidate sees Host = alias host
-  but Origin/`x-forwarded-host` = canonical host. Add the canonical host to
-  `serverActions.allowedOrigins` in `next.config.ts` and allow it in our own
-  `sameOriginOk`. (Both ship in the candidate build — same repo.)
-- **Auth**: Supabase cookies are host-scoped to the canonical domain and flow
-  through the proxy both ways, so the validator stays signed in seamlessly.
-- **Candidate URL protection**: keep Vercel Authentication ON for
-  non-promoted URLs. The proxy authenticates itself with the bypass header;
-  a human opening the alias directly gets a Vercel SSO prompt (fine — that
-  path is for admins). Turning protection off is also defensible (the app has
-  its own login and the public surfaces are meant to be public) — decide at
-  implementation.
-- After a promote, *Exit homolog* is triggered automatically — the cookie
-  would otherwise keep proxying to the alias, which is harmless (it points at
-  the same, now-promoted build) but confusing.
+New table `releases`: `id, deployment_id, sha, message, promoted_at,
+promoted_by, previous_deployment_id, migration_state, note`.
 
-## 7. One database: the rules that make it safe
+## 8. The banner and the one-URL switch
 
-The single-DB constraint is the real engineering content of this plan. The
-candidate and production run **concurrently against the same schema and
-data** — which is precisely what makes homolog validation honest, and
-precisely what makes migrations dangerous. We already paid for this lesson:
-on 2026-08-11 a branch migration dropped `players` name columns while the
-promoted code still selected them, breaking every match page.
-
-**Expand/contract becomes law:**
-
-- **Expand (any release):** additive only — new tables, nullable columns (or
-  defaulted), new indexes, backfills. Never drop, rename, retype or
-  `SET NOT NULL` anything the currently-promoted code still touches.
-- **Contract (a later release):** drops/renames ship only after the release
-  that stopped using the object is **in production**. The August incident was
-  exactly an expand and contract fused into one release.
-- Event-log payloads and realtime message shapes count as schema: additive
-  only, since the promoted replayer must tolerate what a candidate writes.
-
-**Enforcement, not just policy:**
-
-- A CI lint over new migration files flags `DROP`, `RENAME`,
-  `SET NOT NULL`, `ALTER TYPE`; such a migration fails CI unless annotated
-  `-- contract-ok: <why prod no longer touches this>`.
-- The console shows a red `CONTRACT MIGRATION` chip on candidates carrying the
-  marker; promote requires acknowledging it.
-- Runbook: migrations are applied when a candidate enters homolog (manual
-  `db:migrate`, as today — a console button can come later). **A full backup
-  of all tenants runs first**, using the existing spec/23 machinery (add an
-  "all tenants" wrapper). The `MIGRATION_JOURNAL_IDX` / restore-map bump
-  discipline stays test-enforced as it already is.
-
-**Residual honesty:** a second database (or Supabase branching) is the
-textbook answer for genuinely risky schema work, and this plan deliberately
-doesn't buy it. Expand/contract + pre-migration backups + tenancy isolation
-are the compensating controls. If a migration ever feels too hot for the
-shared DB, that is the moment to revisit — not to bend the policy.
-
-## 8. Homolog data — tenancy is the isolation
-
-- Validation happens in a dedicated **homolog tenant** (either repurpose
-  `second-empty-tenant` or provision a fresh `homolog` slug). App-level
-  tenancy already isolates every query, so poking at the candidate never
-  touches VBC Cheseaux or the demo tenant. Only global admins see it in the
-  switcher.
-- Side effects are real (candidates run production env): emails go wherever
-  the homolog tenant's members point (use our own addresses); the VSR feed
-  only fires when `matches.vis_id` is set — leave it unset on homolog matches;
-  Stripe is inert.
-- **Crons run only against the promoted production deployment** (Vercel
-  behaviour), so candidates never double-run reseeds or backups.
+- **Banner detection is now trivial and unspoofable:** preview deployments
+  have `VERCEL_ENV=preview` → render the amber bar (SHA + "this is not
+  production" + *Exit* in cookie mode) on every surface including the scorer
+  console. Production builds never render it. No cookies, hosts or DB reads
+  involved in the decision.
+- **One-URL switch** (unchanged from v1): the production deployment's
+  `proxy.ts` gains a first branch — a valid signed `hml` cookie (set only by
+  the console, ~4 h TTL) rewrites the request to the homolog alias with the
+  protection-bypass header. Matcher widens to `_next/static`, images and
+  `/api/*` with an immediate `NextResponse.next()` for non-cookie traffic so
+  today's hot-path discipline is preserved. Canonical origin goes into
+  `serverActions.allowedOrigins` and our `sameOriginOk`. Auth cookies are
+  host-scoped to the one domain and flow through both ways. Bonus of v2: a
+  proxied validator session reads and writes **homolog tables** by
+  construction — the target deployment's env decides, nothing to get wrong.
 
 ## 9. Promote-time skew
 
-Promoting swaps the code under any open browser; the old build's hashed
-`/_next/static/*` assets stop resolving at the domain (Skew Protection is a
-paid feature). Mitigations:
+Unchanged: promoting swaps code under open browsers and old hashed assets stop
+resolving (Skew Protection is a paid feature). The LIVE-match guard is the
+main mitigation; the optional version beacon ("new version — reload") remains
+a Phase-4 nicety.
 
-- The console's LIVE-match warning: promote between matches, not mid-set.
-- Optional (Phase 3): a version beacon — layouts poll a tiny `/api/version`;
-  when the deployment id changes, show a "new version — reload when
-  convenient" toast. The scorer console already survives a reload (state is
-  server-side; offline queue persists).
+## 10. Two free wins outside the pipeline
 
-## 10. Inventory of changes
+- **Local dev stops touching production tables.** `.env.local` points
+  `DB_SCHEMA=homolog` (session pooler). The standing shared-DB hazard — dev
+  work writing to prod, the root of two incidents — largely disappears;
+  touching `public` locally becomes a deliberate act (`--env prod`).
+- **Feature-branch previews become harmless.** Today every PR preview runs
+  against production tables; under v2 they inherit preview env → homolog.
 
-**Vercel settings (no code):** Auto-assign Custom Production Domains → off;
-create a Protection Bypass secret.
+## 11. Inventory of changes
 
-**Env (Production + Preview, minding the `vercel env add --value` truncation
-gotcha):** `VERCEL_TOKEN` (new, sensitive), `VERCEL_PROJECT_ID`,
-`VERCEL_TEAM_ID`, `HOMOLOG_COOKIE_SECRET`.
+**Vercel:** production branch → `release`; auto-assign production domains →
+off; Protection Bypass secret. **Env:** `DB_SCHEMA` (prod=`public`,
+preview=`homolog`), preview `DATABASE_URL` → session pooler, `VERCEL_TOKEN`,
+`VERCEL_PROJECT_ID`, `GITHUB_TOKEN` (ff the `release` ref),
+`HOMOLOG_COOKIE_SECRET` — minding the `vercel env add --value` truncation
+gotcha. **Repo:** `db/index.ts` search_path plumbing; `migrate.ts --env` +
+homolog journal; `scripts/clone-prod-to-homolog.ts` (+ email scrub);
+`releases` migration; `/admin/releases` + `src/lib/releases.ts` (Vercel +
+GitHub API clients); proxy.ts homolog branch; banner; migration CI lint;
+all-tenants backup wrapper; advisory-lock env salt; realtime channel prefix.
 
-**Repo:** `releases` migration; `/admin/releases` page +
-`src/lib/releases.ts` (Vercel API client: list deployments, promote, alias);
-the proxy.ts homolog branch + widened matcher; the banner in the root, tenant
-and console layouts; `serverActions.allowedOrigins`; migration CI lint;
-backup-all wrapper; homolog-tenant provisioning script.
+**Unchanged:** production's connection string, all queries, scorers, tablets,
+boards, PDFs, crons (production deployment only → `public` by construction).
 
-**Unchanged:** scorers, tablets, public boards, PDFs, all tenant-facing
-behaviour. Only global admins ever see any of this.
+## 12. Rollout
 
-## 11. Rollout
+- **Phase 0 — settings (minutes).** `release` branch + both toggles. Pushes
+  to `main` stop reaching production that moment. Interim promote: push
+  `release` + dashboard Promote button.
+- **Phase 1 — schema split (~1 day).** `DB_SCHEMA` plumbing, clone script,
+  dual journals, banner, `.env.local` → homolog. Validate by cloning and
+  driving the app on a preview URL end-to-end (spec/27 QA pattern).
+- **Phase 2 — release console (~1 day).** `releases` table, promote
+  orchestration (backup → ff → poll → migrate → flip), rollback, guards,
+  audit.
+- **Phase 3 — one-URL switch (~½–1 day).** Cookie + proxy + origins; browser
+  pass in both modes, including scoring a match in homolog through the proxy.
+- **Phase 4 — optional.** Migration CI lint, version beacon.
 
-- **Phase 0 — flip the toggle (minutes, no code).** Pushes to `main` stop
-  reaching production immediately; promotion happens via the Vercel
-  dashboard's Promote button; candidates are reachable at their unique URLs.
-  The core ask ("main ≠ prod") is delivered on day one.
-- **Phase 1 — release console (~1 day).** `releases` table, `/admin/releases`
-  with promote/rollback/set-homolog, the homolog alias, the amber banner
-  (host-based detection), audit entries, LIVE-match + migration guards.
-- **Phase 2 — one-URL switch (~1 day).** Cookie + proxy branch + origin
-  allow-listing + *View homolog*/*Exit* buttons; banner gains cookie
-  detection; end-to-end browser pass (the spec/27 QA pattern) across both
-  modes, including scoring a match in homolog through the proxy.
-- **Phase 3 — optional hardening (~½–1 day).** Migration CI lint,
-  automatic backup-before-migrate, version beacon.
+## 13. Alternatives considered
 
-## 12. Alternatives considered
+- **v1 of this spec (shared tables + homolog tenant):** simpler plumbing, but
+  every migration was a loaded gun pointed at prod for the entire validation
+  period, and test writes needed tenant discipline. Superseded.
+- **Runtime schema switching in one deployment** (host- or control-table
+  based): race-prone at exactly the promote moment; rejected above (§3).
+- **Second database / Supabase branching:** the textbook answer; rejected
+  against the one-DB constraint, and the schema split now captures most of its
+  value (isolation of writes and of migrations) at none of its cost.
+- **Exact-artifact promotion** (v1's staged-main flow): incompatible with
+  per-environment env vars; traded for same-commit promotion, with instant
+  exact-artifact **rollback** retained.
 
-- **Two Vercel projects / two domains / second Supabase project** — cleaner
-  isolation, rejected against the explicit one-URL/one-DB constraint; also
-  doubles env drift and costs the "validate against real data" property.
-- **Vercel Custom Environments / Rolling Releases** — Pro/Enterprise; this
-  plan reproduces the workflow on Hobby and upgrades gracefully.
-- **Feature flags instead of environments** — complementary (ship dark code),
-  not a substitute for validating a whole build.
+## 14. Decisions to take at implementation
 
-## 13. Decisions to take at implementation time
-
-1. Homolog tenant: repurpose `second-empty-tenant` or provision `homolog`?
-2. Vercel Authentication on candidate URLs: keep on (bypass via proxy) or off?
-3. Promote ceremony: plain confirm, or type the SHA suffix?
-4. Homolog cookie TTL (proposal: 4 h).
-5. Should *Set as homolog* auto-follow every push (deploy hook), or stay a
-   manual console action? (Proposal: auto-follow latest, manual override.)
+1. Email scrub in the clone: default **on** (recommended) — confirm.
+2. Clone cadence: manual button only, or auto-clone on every new candidate?
+   (Proposal: manual; validating mid-flow reseeds are disruptive.)
+3. Keep Vercel Authentication on preview URLs (proxy bypasses it) — recommended — or off?
+4. Promote ceremony: plain confirm vs typing the SHA suffix.
+5. Local dev default `DB_SCHEMA=homolog`: adopt immediately in Phase 1?
+   (Strongly recommended.)
