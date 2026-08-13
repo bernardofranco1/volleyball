@@ -21,10 +21,14 @@ export function TenantSwitcher({
   current,
   tenants,
   showManage,
+  sidebar = false,
 }: {
   current: { label: string; logoUrl: string | null; dashboardHref: string };
   tenants: SwitcherTenant[];
   showManage: boolean;
+  /** In the collapsed icon rail (md–xl) only the logo fits; the name and the
+   *  disclosure chevron come back with the full-width sidebar at xl. */
+  sidebar?: boolean;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -48,20 +52,32 @@ export function TenantSwitcher({
   }, [open]);
 
   return (
-    <div ref={rootRef} className="relative flex items-center gap-1">
-      <Link href={current.dashboardHref} className="flex items-center gap-3">
+    <div
+      ref={rootRef}
+      className={`relative flex items-center gap-1 ${
+        sidebar ? "max-xl:justify-center" : ""
+      }`}
+    >
+      <Link
+        href={current.dashboardHref}
+        className={`flex items-center gap-3 ${sidebar ? "min-w-0" : ""}`}
+      >
         {current.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={current.logoUrl} alt="" className="h-7 w-auto" />
         ) : (
           <span
-            className="grid h-7 w-7 place-items-center rounded-md bg-primary text-xs font-bold text-primary-fg"
+            className="grid h-7 w-7 flex-none place-items-center rounded-md bg-primary text-xs font-bold text-primary-fg"
             aria-hidden
           >
             {current.label.charAt(0)}
           </span>
         )}
-        <span className="font-semibold">{current.label}</span>
+        <span
+          className={`truncate font-semibold ${sidebar ? "max-xl:sr-only" : ""}`}
+        >
+          {current.label}
+        </span>
       </Link>
 
       <button
@@ -70,7 +86,9 @@ export function TenantSwitcher({
         aria-expanded={open}
         aria-label={t("tenantSwitcher.switch")}
         onClick={() => setOpen((v) => !v)}
-        className="rounded-md px-1 py-1 text-score-dim transition-colors hover:bg-surface-raised hover:text-foreground"
+        className={`rounded-md px-1 py-1 text-score-dim transition-colors hover:bg-surface-raised hover:text-foreground ${
+          sidebar ? "max-xl:hidden" : ""
+        }`}
       >
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
           <path

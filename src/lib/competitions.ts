@@ -10,11 +10,13 @@ import {
   eq,
   ilike,
   inArray,
+  max,
   sql,
 } from "drizzle-orm";
 import { db } from "@/db";
 import {
   competitions,
+  events,
   matches,
   people,
   players,
@@ -233,9 +235,150 @@ export interface TenantMatchRow {
   winner: "A" | "B" | null;
   courtNumber: number | null;
   scheduledAt: Date | null;
+  roundName: string | null;
+  matchNumber: number | null;
 }
 
 export const MATCHES_PAGE_SIZE = 50;
+
+export type MatchStatusFilter = "scheduled" | "live" | "pending" | "finished";
+
+export interface TenantMatchFilters {
+  discipline?: string;
+  competitionId?: string;
+  /** Free text over both team names, the competition name and the round. */
+  q?: string;
+  status?: MatchStatusFilter;
+}
+
+/**
+ * Filter predicates for the match centre, shared by the page query, the chip
+ * counts and the CSV export so the three can never disagree about what "live"
+ * or "pending" means.
+ */
+function tenantMatchConditions(
+  tenantId: string,
+  f: TenantMatchFilters,
+  teamA: typeof teams,
+  teamB: typeof teams,
+) {
+  const conds = [eq(matches.tenantId, tenantId)];
+  const disciplines = matches.discipline.enumValues as readonly string[];
+  if (f.discipline && disciplines.includes(f.discipline))
+    conds.push(
+      eq(
+        matches.discipline,
+        f.discipline as (typeof matches.discipline.enumValues)[number],
+      ),
+    );
+  if (f.competitionId)
+    conds.push(eq(matches.competitionId, f.competitionId));
+  const q = f.q?.trim();
+  if (q) {
+    const like = `%${q}%`;
+    const or = sql`(${teamA.displayName} ilike ${like} or ${teamB.displayName} ilike ${like} or ${competitions.name} ilike ${like} or coalesce(${matches.roundName}, '') ilike ${like})`;
+    conds.push(or);
+  }
+  const s = statusCondition(f.status);
+  if (s) conds.push(s);
+  return conds;
+}
+
+/**
+ * "finished" deliberately means every status that has a result to look at, not
+ * just FINISHED: a match awaiting confirmation, abandoned or forfeited used to
+ * fall out of all filter buckets and was reachable only from the unfiltered
+ * list — which is exactly where someone goes looking for its report
+ * (spec/24 §3.4). PENDING_CONFIRMATION additionally gets its own chip, because
+ * "what still needs signing off" is a daily question.
+ */
+function statusCondition(status: MatchStatusFilter | undefined) {
+  switch (status) {
+    case "live":
+      return eq(matches.status, "LIVE");
+    case "pending":
+      return eq(matches.status, "PENDING_CONFIRMATION");
+    case "finished":
+      return inArray(matches.status, [
+        "PENDING_CONFIRMATION",
+        "FINISHED",
+        "ABANDONED",
+      ]);
+    case "scheduled":
+      return inArray(matches.status, ["SCHEDULED", "WARMUP", "COIN_TOSS"]);
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * How many matches sit in each status bucket under the current non-status
+ * filters — the numbers on the filter chips. One grouped query rather than four
+ * counts, then folded into buckets in JS.
+ */
+export async function matchStatusCounts(
+  tenantId: string,
+  filters: Omit<TenantMatchFilters, "status">,
+): Promise<Record<MatchStatusFilter | "all", number>> {
+  const teamA = aliasedTable(teams, "team_a");
+  const teamB = aliasedTable(teams, "team_b");
+  const rows = await db
+    .select({ status: matches.status, n: count() })
+    .from(matches)
+    .innerJoin(teamA, eq(teamA.id, matches.teamAId))
+    .innerJoin(teamB, eq(teamB.id, matches.teamBId))
+    .innerJoin(competitions, eq(competitions.id, matches.competitionId))
+    .where(and(...tenantMatchConditions(tenantId, filters, teamA, teamB)))
+    .groupBy(matches.status);
+
+  const out = { all: 0, scheduled: 0, live: 0, pending: 0, finished: 0 };
+  for (const r of rows) {
+    out.all += r.n;
+    if (r.status === "LIVE") out.live += r.n;
+    else if (r.status === "PENDING_CONFIRMATION") {
+      out.pending += r.n;
+      out.finished += r.n;
+    } else if (r.status === "FINISHED" || r.status === "ABANDONED")
+      out.finished += r.n;
+    else out.scheduled += r.n;
+  }
+  return out;
+}
+
+/**
+ * Final score of every set of the given matches, so the match centre can show
+ * "25-16 · 25-12 · 25-19" instead of just the set tally.
+ *
+ * Per-set MAX over the denormalised event scores — the same aggregate the
+ * standings use (≤ matches × sets rows, no replay). A point removed by an
+ * UNDO at the very end of a set can leave the max one ahead of the true final
+ * score; the authoritative renderings (scoresheet, reports) replay the log.
+ */
+export async function loadSetScores(
+  matchIds: string[],
+): Promise<Map<string, { a: number; b: number }[]>> {
+  const byMatch = new Map<string, { a: number; b: number }[]>();
+  if (matchIds.length === 0) return byMatch;
+  const rows = await db
+    .select({
+      matchId: events.matchId,
+      setNumber: events.setNumber,
+      a: max(events.scoreAfterA),
+      b: max(events.scoreAfterB),
+    })
+    .from(events)
+    .where(
+      and(inArray(events.matchId, matchIds), sql`${events.setNumber} is not null`),
+    )
+    .groupBy(events.matchId, events.setNumber)
+    .orderBy(asc(events.matchId), asc(events.setNumber));
+  for (const r of rows) {
+    const list = byMatch.get(r.matchId) ?? [];
+    list.push({ a: r.a ?? 0, b: r.b ?? 0 });
+    byMatch.set(r.matchId, list);
+  }
+  return byMatch;
+}
 
 /**
  * All matches across a tenant's competitions, with optional discipline/status
@@ -246,38 +389,20 @@ export const MATCHES_PAGE_SIZE = 50;
  */
 export async function listTenantMatches(
   tenantId: string,
-  opts: {
-    discipline?: string;
-    status?: "scheduled" | "live" | "finished";
+  opts: TenantMatchFilters & {
     order?: "asc" | "desc";
     page?: number;
+    /** Pass false for the CSV export, which wants every matching row. */
+    paginate?: boolean;
   } = {},
 ): Promise<{ rows: TenantMatchRow[]; hasMore: boolean }> {
   const teamA = aliasedTable(teams, "team_a");
   const teamB = aliasedTable(teams, "team_b");
-  const conds = [eq(matches.tenantId, tenantId)];
-  const disciplines = matches.discipline.enumValues as readonly string[];
-  if (opts.discipline && disciplines.includes(opts.discipline))
-    conds.push(
-      eq(
-        matches.discipline,
-        opts.discipline as (typeof matches.discipline.enumValues)[number],
-      ),
-    );
-  if (opts.status === "live") conds.push(eq(matches.status, "LIVE"));
-  else if (opts.status === "finished")
-    // Every status that has a result to look at, not just FINISHED. A match
-    // awaiting confirmation, or abandoned/forfeited, used to fall out of all
-    // three filter buckets and was reachable only from the unfiltered list —
-    // which is exactly where someone goes looking for its report (spec/24 §3.4).
-    conds.push(
-      inArray(matches.status, ["PENDING_CONFIRMATION", "FINISHED", "ABANDONED"]),
-    );
-  else if (opts.status === "scheduled")
-    conds.push(inArray(matches.status, ["SCHEDULED", "WARMUP", "COIN_TOSS"]));
+  const conds = tenantMatchConditions(tenantId, opts, teamA, teamB);
   const dir = opts.order === "desc" ? desc : asc;
   const page = Math.max(0, opts.page ?? 0);
-  const rows = await db
+  const paginate = opts.paginate !== false;
+  const q = db
     .select({
       id: matches.id,
       competitionId: matches.competitionId,
@@ -292,6 +417,8 @@ export async function listTenantMatches(
       winner: matches.winner,
       courtNumber: matches.courtNumber,
       scheduledAt: matches.scheduledAt,
+      roundName: matches.roundName,
+      matchNumber: matches.matchNumber,
     })
     .from(matches)
     .innerJoin(teamA, eq(teamA.id, matches.teamAId))
@@ -299,11 +426,13 @@ export async function listTenantMatches(
     .innerJoin(competitions, eq(competitions.id, matches.competitionId))
     .where(and(...conds))
     .orderBy(dir(matches.scheduledAt))
-    .limit(MATCHES_PAGE_SIZE + 1)
-    .offset(page * MATCHES_PAGE_SIZE);
+    .$dynamic();
+  const rows = paginate
+    ? await q.limit(MATCHES_PAGE_SIZE + 1).offset(page * MATCHES_PAGE_SIZE)
+    : await q;
   return {
-    rows: rows.slice(0, MATCHES_PAGE_SIZE),
-    hasMore: rows.length > MATCHES_PAGE_SIZE,
+    rows: paginate ? rows.slice(0, MATCHES_PAGE_SIZE) : rows,
+    hasMore: paginate && rows.length > MATCHES_PAGE_SIZE,
   };
 }
 

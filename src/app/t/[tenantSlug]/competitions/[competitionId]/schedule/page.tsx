@@ -10,7 +10,8 @@ import {
 import {
   deleteMatch,
   generateRoundRobin,
-  updateMatchSlot,
+  updateMatchRound,
+  updateMatchSlots,
 } from "@/lib/schedule-actions";
 import { importSchedule } from "@/lib/csv-actions";
 import { getT } from "@/lib/i18n/server";
@@ -20,7 +21,12 @@ import { AddMatchForm } from "@/components/admin/AddMatchForm";
 import { CompetitionHeader } from "@/components/admin/CompetitionHeader";
 import { CsvImport } from "@/components/admin/CsvImport";
 import { SubmitButton } from "@/components/admin/SubmitButton";
-import { LocalTime } from "@/components/LocalTime";
+import { DataTable, type Column } from "@/components/ui/DataTable";
+import { Drawer } from "@/components/ui/Drawer";
+import { LocalDateTimeInput } from "@/components/ui/LocalDateTimeInput";
+import { Page } from "@/components/ui/Page";
+import { BatchEditForm } from "@/components/ui/SaveBar";
+import { Toolbar, ToolbarSpacer } from "@/components/ui/Toolbar";
 import { matchStatusLabel, statusBadgeClass, ui } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
@@ -53,18 +59,108 @@ export default async function SchedulePage({
   if (!competition) notFound();
   const base = `/t/${tenantSlug}/competitions/${competitionId}`;
 
-  // Group by round so a full-season schedule doesn't render as one endless
-  // list; fully-finished rounds start collapsed.
+  // Group by round: a league season is read a round at a time, and the round is
+  // the unit people reschedule.
   const groups = new Map<string, MatchRow[]>();
   for (const m of matchList) {
     const key = m.roundName ?? t("schedule.unassignedRound");
-    const list = groups.get(key) ?? [];
-    list.push(m);
-    groups.set(key, list);
+    groups.set(key, [...(groups.get(key) ?? []), m]);
   }
+  const roundNames = [...groups.keys()];
+
+  const inputCls =
+    "rounded-md border border-border-strong bg-surface px-2 py-1 text-sm outline-none focus:border-primary";
+
+  const columns: Column<MatchRow>[] = [
+    {
+      key: "num",
+      header: "#",
+      width: "w-10",
+      className: "font-mono tabular-nums text-xs text-score-dim",
+      cell: (m) => m.matchNumber ?? "–",
+    },
+    {
+      key: "match",
+      header: t("nav.matches"),
+      cell: (m) => (
+        <Link href={`${base}/matches/${m.id}`} className="font-medium">
+          {m.teamAName} <span className="text-score-dim">–</span> {m.teamBName}
+        </Link>
+      ),
+    },
+    {
+      key: "court",
+      header: t("common.court"),
+      width: "w-20",
+      cell: (m) => (
+        <input
+          type="number"
+          min={1}
+          name={`court:${m.id}`}
+          defaultValue={m.courtNumber ?? ""}
+          data-row={m.id}
+          data-field="court"
+          aria-label={`${t("common.court")} — ${m.teamAName} / ${m.teamBName}`}
+          className={`${inputCls} w-14`}
+        />
+      ),
+    },
+    {
+      key: "time",
+      header: t("schedule.localTime"),
+      width: "w-52",
+      cell: (m) => (
+        <LocalDateTimeInput
+          name={`time:${m.id}`}
+          utcValue={toUtcInputValue(m.scheduledAt)}
+          row={m.id}
+          ariaLabel={`${t("schedule.localTime")} — ${m.teamAName} / ${m.teamBName}`}
+          className={`${inputCls} w-48`}
+        />
+      ),
+    },
+    {
+      key: "result",
+      header: t("common.result"),
+      align: "right",
+      width: "w-16",
+      className: "font-mono tabular-nums",
+      cell: (m) =>
+        m.setsWonA > 0 || m.setsWonB > 0 ? (
+          <>
+            {m.setsWonA}–{m.setsWonB}
+          </>
+        ) : (
+          <span className="text-score-dim">—</span>
+        ),
+    },
+    {
+      key: "status",
+      header: t("common.status"),
+      width: "w-24",
+      cell: (m) => (
+        <span className={statusBadgeClass(m.status)}>
+          {matchStatusLabel(m.status, t("match.pendingBadge"))}
+        </span>
+      ),
+    },
+    {
+      key: "row-actions",
+      header: "",
+      align: "right",
+      width: "w-24",
+      cell: (m) => (
+        <span className="flex justify-end gap-2 text-xs text-score-dim">
+          <Link href={`${base}/matches/${m.id}`} className="hover:text-foreground">
+            {t("schedule.details")}
+          </Link>
+        </span>
+      ),
+    },
+  ];
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-10">
+    <Page>
       <CompetitionHeader
         tenantSlug={tenantSlug}
         competition={competition}
@@ -72,214 +168,179 @@ export default async function SchedulePage({
         subtitle={` · ${t("comp.matchesCount", { count: matchList.length })}`}
       />
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
-        <section className={matchList.length === 0 ? "order-last lg:order-none" : ""}>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-medium">
-              {matchList.length === 1
-                ? t("schedule.oneMatch")
-                : t("comp.matchesCount", { count: matchList.length })}
-            </h2>
-            {teams.length >= 2 && (
-              <ActionForm
-                action={generateRoundRobin}
-                confirm={t("schedule.generateConfirm")}
+      <div className="mb-3">
+        <Toolbar>
+          <span className="text-sm text-score-dim">
+            {matchList.length === 1
+              ? t("schedule.oneMatch")
+              : t("comp.matchesCount", { count: matchList.length })}
+          </span>
+          <ToolbarSpacer />
+          {/* Create surfaces open on demand — the permanent 320px rail these
+              replace was in use for a few seconds a week. */}
+          <Drawer label={t("schedule.addMatch")} variant="primary">
+            <AddMatchForm
+              tenantSlug={tenantSlug}
+              competitionId={competitionId}
+              teams={teams.map((tm) => ({
+                id: tm.id,
+                displayName: tm.displayName,
+              }))}
+            />
+          </Drawer>
+          {teams.length >= 2 && (
+            <ActionForm
+              action={generateRoundRobin}
+              confirm={t("schedule.generateConfirm")}
+            >
+              <input type="hidden" name="tenantSlug" value={tenantSlug} />
+              <input type="hidden" name="competitionId" value={competitionId} />
+              <SubmitButton
+                variant="secondary"
+                pendingLabel={t("common.generating")}
               >
-                <input type="hidden" name="tenantSlug" value={tenantSlug} />
-                <input
-                  type="hidden"
-                  name="competitionId"
-                  value={competitionId}
-                />
-                <SubmitButton variant="secondary" pendingLabel={t("common.generating")}>
-                  {t("schedule.generate")}
-                </SubmitButton>
-              </ActionForm>
-            )}
-          </div>
-
-          {matchList.length === 0 ? (
-            <div className={`${ui.card} text-sm text-score-dim`}>
-              {t("schedule.empty")}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {[...groups.entries()].map(([roundName, ms]) => {
-                const allFinished = ms.every((m) => m.status === "FINISHED");
-                return (
-                  <details key={roundName} open={!allFinished}>
-                    <summary className="mb-2 cursor-pointer text-sm font-medium text-score-dim">
-                      {roundName}{" "}
-                      <span className="font-normal">
-                        · {ms.length === 1
-                          ? t("schedule.oneMatch")
-                          : t("comp.matchesCount", { count: ms.length })}
-                        {allFinished ? t("schedule.finishedSuffix") : ""}
-                      </span>
-                    </summary>
-                    <ul className="space-y-3">
-                      {ms.map((m) => (
-                        <li key={m.id} className={ui.card}>
-                          {/* Header is the link to the match page; the edit forms
-                              below stay interactive. */}
-                          <Link
-                            href={`${base}/matches/${m.id}`}
-                            className="-m-1 flex items-center justify-between gap-3 rounded-lg p-1 transition-colors hover:bg-surface"
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-xs text-score-dim">
-                                #{m.matchNumber ?? "–"}
-                              </span>
-                              <span className="font-medium">
-                                {m.teamAName} vs {m.teamBName}
-                              </span>
-                              <span className={statusBadgeClass(m.status)}>
-                                {matchStatusLabel(m.status, t("match.pendingBadge"))}
-                              </span>
-                              {(m.setsWonA > 0 || m.setsWonB > 0) && (
-                                <span className="text-sm text-score-dim">
-                                  {m.setsWonA}–{m.setsWonB}
-                                </span>
-                              )}
-                              {m.scheduledAt && (
-                                <span className="text-xs text-score-dim">
-                                  <LocalTime date={m.scheduledAt} />
-                                </span>
-                              )}
-                            </div>
-                            <span className="flex-none text-sm text-primary">
-                              {t("schedule.details")}
-                            </span>
-                          </Link>
-
-                          <ActionForm
-                            action={updateMatchSlot}
-                            className="mt-3 flex flex-wrap items-end gap-2"
-                          >
-                            <input
-                              type="hidden"
-                              name="tenantSlug"
-                              value={tenantSlug}
-                            />
-                            <input
-                              type="hidden"
-                              name="competitionId"
-                              value={competitionId}
-                            />
-                            <input type="hidden" name="matchId" value={m.id} />
-                            <div>
-                              <label
-                                className={ui.label}
-                                htmlFor={`court-${m.id}`}
-                              >
-                                {t("common.court")}
-                              </label>
-                              <input
-                                id={`court-${m.id}`}
-                                name="courtNumber"
-                                type="number"
-                                min={1}
-                                defaultValue={m.courtNumber ?? ""}
-                                className={`${ui.input} w-20`}
-                              />
-                            </div>
-                            <div>
-                              <label
-                                className={ui.label}
-                                htmlFor={`round-${m.id}`}
-                              >
-                                {t("common.round")}
-                              </label>
-                              <input
-                                id={`round-${m.id}`}
-                                name="roundName"
-                                defaultValue={m.roundName ?? ""}
-                                className={`${ui.input} w-28`}
-                              />
-                            </div>
-                            <div>
-                              <label
-                                className={ui.label}
-                                htmlFor={`time-${m.id}`}
-                              >
-                                {t("schedule.timeUtc")}
-                              </label>
-                              <input
-                                id={`time-${m.id}`}
-                                name="scheduledAt"
-                                type="datetime-local"
-                                defaultValue={toUtcInputValue(m.scheduledAt)}
-                                className={ui.input}
-                              />
-                            </div>
-                            <SubmitButton variant="secondary" pendingLabel="…">
-                              {t("common.save")}
-                            </SubmitButton>
-                          </ActionForm>
-
-                          {m.status === "SCHEDULED" && (
-                            <ActionForm
-                              action={deleteMatch}
-                              confirm={t("schedule.deleteConfirm", {
-                                number: m.matchNumber ?? "",
-                                teamA: m.teamAName,
-                                teamB: m.teamBName,
-                              })}
-                              className="mt-2"
-                            >
-                              <input
-                                type="hidden"
-                                name="tenantSlug"
-                                value={tenantSlug}
-                              />
-                              <input
-                                type="hidden"
-                                name="competitionId"
-                                value={competitionId}
-                              />
-                              <input
-                                type="hidden"
-                                name="matchId"
-                                value={m.id}
-                              />
-                              <button
-                                type="submit"
-                                className="text-xs text-score-dim hover:text-red-400"
-                              >
-                                {t("schedule.deleteMatch")}
-                              </button>
-                            </ActionForm>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                );
-              })}
-            </div>
+                {t("schedule.generate")}
+              </SubmitButton>
+            </ActionForm>
           )}
-        </section>
+          <Drawer label={t("schedule.importTitle")} width="lg">
+            <CsvImport
+              tenantSlug={tenantSlug}
+              competitionId={competitionId}
+              title={t("schedule.importTitle")}
+              hint="Match number,Team A,Team B,Court number,Group,Phase number,Phase name,Match day,Match time (local)"
+              action={importSchedule}
+              templateHref={SCHEDULE_TEMPLATE}
+              templateName="schedule-template.csv"
+            />
+          </Drawer>
+        </Toolbar>
+      </div>
 
-        <aside className="order-first space-y-6 lg:order-none">
-          <AddMatchForm
-            tenantSlug={tenantSlug}
-            competitionId={competitionId}
-            teams={teams.map((t) => ({
-              id: t.id,
-              displayName: t.displayName,
+      {matchList.length === 0 ? (
+        <div className={`${ui.card} text-sm text-score-dim`}>
+          {t("schedule.empty")}
+        </div>
+      ) : (
+        <BatchEditForm
+          action={updateMatchSlots}
+          labelFor={(row, field) => {
+            const m = matchList.find((x) => x.id === row);
+            const label = m ? `#${m.matchNumber ?? "–"}` : row;
+            return `${label} ${
+              field === "court" ? t("common.court") : t("schedule.localTime")
+            }`.toLowerCase();
+          }}
+          strings={{
+            unsaved: (n) => t("schedule.unsaved", { count: n }),
+            save: t("schedule.saveAll"),
+            saving: t("common.saving"),
+            discard: t("common.discard"),
+            saved: t("common.saved"),
+          }}
+        >
+          <input type="hidden" name="tenantSlug" value={tenantSlug} />
+          <input type="hidden" name="competitionId" value={competitionId} />
+          <DataTable
+            columns={columns}
+            rowKey={(m) => m.id}
+            density="compact"
+            groups={[...groups.entries()].map(([roundName, ms]) => ({
+              key: roundName,
+              label: (
+                <span>
+                  {roundName}
+                  <span className="ml-2 font-normal normal-case tracking-normal opacity-70">
+                    {ms.length === 1
+                      ? t("schedule.oneMatch")
+                      : t("comp.matchesCount", { count: ms.length })}
+                    {ms.every((m) => m.status === "FINISHED")
+                      ? t("schedule.finishedSuffix")
+                      : ""}
+                  </span>
+                </span>
+              ),
+              rows: ms,
             }))}
           />
-          <CsvImport
-            tenantSlug={tenantSlug}
-            competitionId={competitionId}
-            title={t("schedule.importTitle")}
-            hint="Match number,Team A,Team B,Court number,Group,Phase number,Phase name,Match day,Match time (local)"
-            action={importSchedule}
-            templateHref={SCHEDULE_TEMPLATE}
-            templateName="schedule-template.csv"
-          />
-        </aside>
-      </div>
-    </main>
+        </BatchEditForm>
+      )}
+
+      {/* Round membership and deletion are rare, destructive-ish edits, so they
+          sit outside the batch table rather than adding two more columns. */}
+      {matchList.length > 0 && (
+        <details className="mt-4 rounded-xl border border-border bg-surface-raised p-4">
+          <summary className="cursor-pointer text-sm font-medium text-score-dim">
+            {t("schedule.moreEdits")}
+          </summary>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {matchList.map((m) => (
+              <div
+                key={m.id}
+                className="flex flex-wrap items-end gap-2 rounded-lg border border-border p-2.5"
+              >
+                <span className="min-w-0 flex-1 text-sm">
+                  <span className="text-xs text-score-dim">
+                    #{m.matchNumber ?? "–"}{" "}
+                  </span>
+                  {m.teamAName} – {m.teamBName}
+                </span>
+                <ActionForm
+                  action={updateMatchRound}
+                  className="flex items-end gap-1.5"
+                >
+                  <input type="hidden" name="tenantSlug" value={tenantSlug} />
+                  <input
+                    type="hidden"
+                    name="competitionId"
+                    value={competitionId}
+                  />
+                  <input type="hidden" name="matchId" value={m.id} />
+                  <input
+                    name="roundName"
+                    list="round-names"
+                    defaultValue={m.roundName ?? ""}
+                    aria-label={t("common.round")}
+                    className={`${inputCls} w-32`}
+                  />
+                  <SubmitButton variant="secondary" pendingLabel="…">
+                    {t("common.save")}
+                  </SubmitButton>
+                </ActionForm>
+                {m.status === "SCHEDULED" && (
+                  <ActionForm
+                    action={deleteMatch}
+                    confirm={t("schedule.deleteConfirm", {
+                      number: m.matchNumber ?? "",
+                      teamA: m.teamAName,
+                      teamB: m.teamBName,
+                    })}
+                  >
+                    <input type="hidden" name="tenantSlug" value={tenantSlug} />
+                    <input
+                      type="hidden"
+                      name="competitionId"
+                      value={competitionId}
+                    />
+                    <input type="hidden" name="matchId" value={m.id} />
+                    <button
+                      type="submit"
+                      className="px-1 text-xs text-score-dim hover:text-danger"
+                    >
+                      {t("schedule.deleteMatch")}
+                    </button>
+                  </ActionForm>
+                )}
+              </div>
+            ))}
+          </div>
+          <datalist id="round-names">
+            {roundNames.map((r) => (
+              <option key={r} value={r} />
+            ))}
+          </datalist>
+        </details>
+      )}
+    </Page>
   );
 }

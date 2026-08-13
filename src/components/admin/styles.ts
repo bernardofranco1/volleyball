@@ -19,21 +19,26 @@ export const ui = {
   td: "px-3 py-2 text-sm",
 } as const;
 
+// Status badges read from the semantic tokens (--success/--warning/--danger)
+// rather than Tailwind's palette literals, so the same three meanings tint
+// consistently and follow the light/dark theme. Tinted fill instead of a
+// coloured hairline: at 10px a border alone was doing all the work of telling
+// LIVE from SCHEDULED across a 50-row table.
 const STATUS_STYLES: Record<string, string> = {
-  DRAFT: "border-border text-score-dim",
-  ACTIVE: "border-green-500/40 text-green-400",
-  FINISHED: "border-primary/40 text-primary",
-  SCHEDULED: "border-border text-score-dim",
-  WARMUP: "border-amber-500/40 text-amber-400",
-  COIN_TOSS: "border-amber-500/40 text-amber-400",
-  LIVE: "border-green-500/40 text-green-400",
-  PENDING_CONFIRMATION: "border-amber-500/40 text-amber-400",
-  ABANDONED: "border-red-500/40 text-red-400",
+  DRAFT: "bg-surface-3 text-score-dim",
+  ACTIVE: "bg-success-soft text-success",
+  FINISHED: "bg-primary/15 text-primary",
+  SCHEDULED: "bg-surface-3 text-score-dim",
+  WARMUP: "bg-warning-soft text-warning",
+  COIN_TOSS: "bg-warning-soft text-warning",
+  LIVE: "bg-success-soft text-success",
+  PENDING_CONFIRMATION: "bg-warning-soft text-warning",
+  ABANDONED: "bg-danger-soft text-danger",
 };
 
 export function statusBadgeClass(status: string): string {
-  return `inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
-    STATUS_STYLES[status] ?? "border-border text-score-dim"
+  return `inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+    STATUS_STYLES[status] ?? "bg-surface-3 text-score-dim"
   }`;
 }
 

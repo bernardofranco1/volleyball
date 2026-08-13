@@ -15,7 +15,31 @@
   /* Shell surfaces (dark default) */
   --surface: #0d0d0d;
   --surface-raised: #1a1a1a;
+  /* Third level — sits above `raised`. Table headers, group rows, the chrome
+     inside an already-raised card. Without it, a header inside a raised panel
+     had to borrow the page background and read as a hole. */
+  --surface-3: #24262a;
+  /* Interaction states, expressed as translucent overlays so they compose over
+     whichever surface level they land on. */
+  --surface-hover: rgba(255, 255, 255, 0.035);
+  --surface-selected: rgba(255, 255, 255, 0.07);
   --border: rgba(255, 255, 255, 0.1);
+  /* A second, stronger rule for controls (inputs, chips) that must read as
+     interactive against a raised surface. */
+  --border-strong: rgba(255, 255, 255, 0.18);
+
+  /*
+   * Semantic status colours. These replace the scattered green-400 /
+   * amber-500 / red-400 literals: the same three meanings were previously
+   * spelled a dozen ways across the admin surfaces, so a theme change could
+   * not reach them. `-soft` is the tint used behind a badge of that meaning.
+   */
+  --success: #3fc383;
+  --success-soft: rgba(63, 195, 131, 0.13);
+  --warning: #e0a63e;
+  --warning-soft: rgba(224, 166, 62, 0.13);
+  --danger: #e06055;
+  --danger-soft: rgba(224, 96, 85, 0.13);
 
   /* Score display */
   --score-active: #ffffff;
@@ -43,7 +67,17 @@
   --color-primary-fg: var(--primary-fg);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
+  --color-surface-3: var(--surface-3);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-selected: var(--surface-selected);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
   --color-score-active: var(--score-active);
   --color-score-dim: var(--score-dim);
   --color-background: var(--background);
@@ -66,10 +100,38 @@ body {
 [data-theme="light"] {
   --surface: #ffffff;
   --surface-raised: #f3f4f6;
+  --surface-3: #e5e7eb;
+  --surface-hover: rgba(0, 0, 0, 0.035);
+  --surface-selected: rgba(0, 0, 0, 0.06);
   --border: rgba(0, 0, 0, 0.12);
+  --border-strong: rgba(0, 0, 0, 0.22);
   --score-active: #0a0a0a;
   --score-dim: rgba(0, 0, 0, 0.5);
   --foreground: #18181b;
+
+  /* Darker on white: the dark-theme values are tuned for a #0d0d0d ground and
+     fall below 4.5:1 as text on a white one. */
+  --success: #14814f;
+  --success-soft: rgba(20, 129, 79, 0.11);
+  --warning: #8a5d09;
+  --warning-soft: rgba(138, 93, 9, 0.11);
+  --danger: #b3382c;
+  --danger-soft: rgba(179, 56, 44, 0.1);
+}
+
+/*
+ * Density scale (design proposal §"what it takes"). One attribute on a table
+ * wrapper drives every row's padding, so a user preference — or a page that
+ * knows it renders 50 rows — changes row height without a second class set.
+ */
+[data-density="compact"] {
+  --row-py: 0.3rem;
+}
+[data-density="cozy"] {
+  --row-py: 0.5rem;
+}
+[data-density="comfortable"] {
+  --row-py: 0.75rem;
 }
 
 /* Theme-toggle icon visibility (CSS-driven — no JS state, no hydration flash). */

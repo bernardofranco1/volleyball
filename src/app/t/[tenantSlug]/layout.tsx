@@ -23,27 +23,55 @@ import { LocaleProvider } from "@/lib/i18n/client";
 import { MobileNav } from "@/components/MobileNav";
 import { TenantNav } from "@/components/TenantNav";
 import { TenantSwitcher, type SwitcherTenant } from "@/components/TenantSwitcher";
+import { AppShell } from "@/components/ui/AppShell";
+import { AppSidebar, type IconKey, type SidebarGroup } from "@/components/ui/AppSidebar";
 
 // Tenant pages are user- and DB-specific, so never prerender at build time.
 export const dynamic = "force-dynamic";
 
-// Top-nav destinations (brief §1.2). Shared by the desktop bar and the mobile
-// nav row so phones aren't stranded on the dashboard.
+// Console destinations, in two sidebar groups: the day-to-day surfaces, then
+// the organisation ones. Access and Audit are here rather than buried behind
+// Settings, which is where they lived and where nobody found them.
 //
 // `roles` gates each entry (spec/24 §8). Previously every entry rendered for
 // everyone, so a VIEWER was shown Competitions and Settings and got a 404 on
 // click — each page gates itself with notFound(), which is correct but made the
 // menu a list of dead ends. null = no role requirement.
-const NAV_LINKS: {
-  key: string;
-  path: string;
-  roles: Role[] | null;
+const NAV_GROUPS: {
+  labelKey?: string;
+  links: { key: string; path: string; icon: IconKey; roles: Role[] | null }[];
 }[] = [
-  { key: "nav.dashboard", path: "dashboard", roles: null },
-  { key: "nav.competitions", path: "competitions", roles: ADMIN_ROLES },
-  { key: "nav.matches", path: "matches", roles: VIEW_ROLES },
-  { key: "nav.people", path: "people", roles: ADMIN_ROLES },
-  { key: "nav.settings", path: "settings", roles: ["TENANT_ADMIN"] },
+  {
+    links: [
+      { key: "nav.dashboard", path: "dashboard", icon: "home", roles: null },
+      {
+        key: "nav.competitions",
+        path: "competitions",
+        icon: "trophy",
+        roles: ADMIN_ROLES,
+      },
+      { key: "nav.matches", path: "matches", icon: "grid", roles: VIEW_ROLES },
+      { key: "nav.people", path: "people", icon: "users", roles: ADMIN_ROLES },
+    ],
+  },
+  {
+    labelKey: "nav.organisation",
+    links: [
+      {
+        key: "nav.settings",
+        path: "settings",
+        icon: "gear",
+        roles: ["TENANT_ADMIN"],
+      },
+      {
+        key: "nav.access",
+        path: "access",
+        icon: "key",
+        roles: ["TENANT_ADMIN"],
+      },
+      { key: "nav.audit", path: "audit", icon: "list", roles: ["TENANT_ADMIN"] },
+    ],
+  },
 ];
 
 /** Browser-tab title = the tenant's product name (spec/23 §5.1). */
@@ -152,9 +180,24 @@ export default async function TenantLayout({
   const title = tenantTitle(tenant);
 
   // Only offer what this user can actually open (spec/24 §8).
-  const navLinks = NAV_LINKS.filter(
-    (l) => l.roles === null || (navRoles !== null && hasRole(navRoles, l.roles)),
-  ).map((l) => ({ href: `/t/${tenantSlug}/${l.path}`, label: t(l.key) }));
+  const navGroups: SidebarGroup[] = NAV_GROUPS.map((g) => ({
+    label: g.labelKey ? t(g.labelKey) : undefined,
+    links: g.links
+      .filter(
+        (l) =>
+          l.roles === null || (navRoles !== null && hasRole(navRoles, l.roles)),
+      )
+      .map((l) => ({
+        href: `/t/${tenantSlug}/${l.path}`,
+        label: t(l.key),
+        icon: l.icon,
+      })),
+  })).filter((g) => g.links.length > 0);
+  // Flat list for the mobile ☰ panel and the console top bar, which have no
+  // room for section captions.
+  const navLinks = navGroups.flatMap((g) =>
+    g.links.map((l) => ({ href: l.href, label: l.label })),
+  );
 
   // Inject brand tokens: colours, optional font, and any court-colour overrides.
   // These cascade over the base tokens in globals.css, so `*-primary` and
@@ -171,70 +214,104 @@ export default async function TenantLayout({
       : {}),
   };
 
+  // The brand block is shared by both chromes; only its density differs.
+  const brand = (sidebar: boolean) =>
+    switcher ? (
+      <TenantSwitcher
+        current={{
+          label: title,
+          logoUrl: tenant.branding.logoUrl,
+          dashboardHref: `/t/${tenantSlug}/dashboard`,
+        }}
+        tenants={switcher.tenants}
+        showManage={switcher.showManage}
+        sidebar={sidebar}
+      />
+    ) : (
+      <Link
+        href={`/t/${tenantSlug}/dashboard`}
+        className={`flex items-center gap-3 ${sidebar ? "max-xl:justify-center" : ""}`}
+      >
+        {tenant.branding.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={tenant.branding.logoUrl}
+            alt={`${tenant.name} logo`}
+            className="h-7 w-auto"
+          />
+        ) : (
+          <span
+            className="grid h-7 w-7 flex-none place-items-center rounded-md bg-primary text-xs font-bold text-primary-fg"
+            aria-hidden
+          >
+            {title.charAt(0)}
+          </span>
+        )}
+        <span
+          className={`truncate font-semibold ${sidebar ? "max-xl:sr-only" : ""}`}
+        >
+          {title}
+        </span>
+      </Link>
+    );
+
+  const signOut = (
+    <form action={logout}>
+      <button
+        type="submit"
+        className="rounded-lg border border-border px-3 py-1.5 text-sm text-score-dim transition-colors hover:text-foreground"
+      >
+        {t("nav.signOut")}
+      </button>
+    </form>
+  );
+
   return (
     <LocaleProvider locale={locale} messages={messages}>
-      <div
-        style={style}
-        data-tenant={tenant.slug}
-        className="flex min-h-dvh flex-col"
-      >
-        <header className="relative flex items-center justify-between border-b border-border px-4 py-2 md:px-6 md:py-4">
-          <div className="flex items-center gap-3 md:gap-6">
-            {/* Mobile: ☰ collapses the nav (saves a UI row). Desktop: hidden. */}
-            <MobileNav menuLabel={t("nav.menu")} links={navLinks} />
-            {switcher ? (
-              <TenantSwitcher
-                current={{
-                  label: title,
-                  logoUrl: tenant.branding.logoUrl,
-                  dashboardHref: `/t/${tenantSlug}/dashboard`,
-                }}
-                tenants={switcher.tenants}
-                showManage={switcher.showManage}
-              />
-            ) : (
-              <Link
-                href={`/t/${tenantSlug}/dashboard`}
-                className="flex items-center gap-3"
-              >
-                {tenant.branding.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={tenant.branding.logoUrl}
-                    alt={`${tenant.name} logo`}
-                    className="h-7 w-auto"
-                  />
-                ) : (
-                  <span
-                    className="grid h-7 w-7 place-items-center rounded-md bg-primary text-xs font-bold text-primary-fg"
-                    aria-hidden
-                  >
-                    {title.charAt(0)}
-                  </span>
-                )}
-                <span className="font-semibold">{title}</span>
-              </Link>
-            )}
-            {/* Top navigation menu (brief §1.2), role-filtered above. */}
-            <TenantNav links={navLinks} />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <form action={logout}>
-              <button
-                type="submit"
-                className="rounded-lg border border-border px-3 py-1.5 text-sm text-score-dim transition-colors hover:text-foreground"
-              >
-                {t("nav.signOut")}
-              </button>
-            </form>
-          </div>
-        </header>
-
-        {/* Flex column + min-h-0 so a full-height child (the scoring shell) can
-            fill the viewport below the header; normal pages just flow/scroll. */}
-        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+      <div style={style} data-tenant={tenant.slug} className="min-h-dvh">
+        <AppShell
+          sidebar={
+            <AppSidebar
+              brand={brand(true)}
+              groups={navGroups}
+              footer={
+                <div className="flex items-center gap-1.5 max-xl:flex-col">
+                  <ThemeToggle />
+                  {signOut}
+                </div>
+              }
+            />
+          }
+          // Below md the sidebar is gone entirely and the ☰ panel carries the
+          // same links — management pages stay usable on a phone even though
+          // they are not optimised for one.
+          mobileBar={
+            <header className="relative flex items-center justify-between gap-3 border-b border-border px-4 py-2 md:hidden">
+              <div className="flex min-w-0 items-center gap-3">
+                <MobileNav menuLabel={t("nav.menu")} links={navLinks} />
+                {brand(false)}
+              </div>
+              <ThemeToggle />
+            </header>
+          }
+          // The scorer console, tablets and public boards keep the original
+          // top bar untouched (see AppShell.isConsoleRoute).
+          consoleHeader={
+            <header className="relative flex items-center justify-between border-b border-border px-4 py-2 md:px-6 md:py-4">
+              <div className="flex items-center gap-3 md:gap-6">
+                <MobileNav menuLabel={t("nav.menu")} links={navLinks} />
+                {brand(false)}
+                <TenantNav links={navLinks} />
+              </div>
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                {signOut}
+              </div>
+            </header>
+          }
+        >
+          {children}
+        </AppShell>
       </div>
     </LocaleProvider>
   );

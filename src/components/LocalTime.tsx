@@ -21,7 +21,8 @@ export function LocalTime({
   mode = "datetime",
 }: {
   date: Date | string | null;
-  mode?: "datetime" | "time";
+  /** `date` drops the clock — for day headers over a grouped schedule. */
+  mode?: "datetime" | "time" | "date";
 }) {
   const hydrated = useHydrated();
   const d = typeof date === "string" ? new Date(date) : date;
@@ -30,12 +31,15 @@ export function LocalTime({
   const utc =
     mode === "datetime"
       ? `${d.toISOString().slice(0, 10)} ${d.toISOString().slice(11, 16)} UTC`
-      : `${d.toISOString().slice(11, 16)} UTC`;
+      : mode === "date"
+        ? d.toISOString().slice(0, 10)
+        : `${d.toISOString().slice(11, 16)} UTC`;
   const local = hydrated
     ? new Intl.DateTimeFormat(undefined, {
         ...(mode === "datetime" ? { day: "numeric", month: "short" } : {}),
-        hour: "2-digit",
-        minute: "2-digit",
+        ...(mode === "date"
+          ? { weekday: "long", day: "numeric", month: "long", year: "numeric" }
+          : { hour: "2-digit", minute: "2-digit" }),
       }).format(d)
     : null;
 

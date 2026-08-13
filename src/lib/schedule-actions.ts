@@ -87,6 +87,76 @@ export async function updateMatchSlot(
   return ok("Saved.");
 }
 
+/**
+ * Commit every inline edit made on the schedule table in one go.
+ *
+ * The per-row form this replaces meant 28 round trips and 28 audit entries to
+ * reschedule a league round. `dirtyIds` is written by the batch bar and lists
+ * only the rows whose court or time actually changed, so a save still writes
+ * the minimum; ids are re-scoped to the competition in the WHERE clause, so a
+ * forged id from another competition updates nothing.
+ */
+export async function updateMatchSlots(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
+
+  const ids = str(fd, "dirtyIds")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (ids.length === 0) return ok("Nothing to save.");
+
+  await dbTx.transaction(async (tx) => {
+    for (const id of ids) {
+      await tx
+        .update(matches)
+        .set({
+          courtNumber: intOrNull(fd, `court:${id}`),
+          scheduledAt: dateTimeOrNull(fd, `time:${id}`),
+        })
+        .where(
+          and(eq(matches.id, id), eq(matches.competitionId, g.competitionId)),
+        );
+    }
+  });
+
+  await recordAudit({
+    tenantId: g.tenantId,
+    actor: g.actor,
+    action: "schedule.update_slots",
+    entityType: "competition",
+    entityId: g.competitionId,
+    summary: `Updated court/time on ${ids.length} match(es)`,
+    metadata: { matchIds: ids },
+  });
+  revalidatePath(schedulePath(g.tenantSlug, g.competitionId));
+  return ok(`Saved ${ids.length} change(s).`);
+}
+
+/** Move a match to another round — a rare edit, so it lives in a row menu. */
+export async function updateMatchRound(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await gateCompetition(fd);
+  if (!g) return fail("Competition not found.");
+  const matchId = str(fd, "matchId");
+  if (!matchId) return fail("Missing match.");
+
+  await db
+    .update(matches)
+    .set({ roundName: str(fd, "roundName") || null })
+    .where(
+      and(eq(matches.id, matchId), eq(matches.competitionId, g.competitionId)),
+    );
+
+  revalidatePath(schedulePath(g.tenantSlug, g.competitionId));
+  return ok("Saved.");
+}
+
 export async function deleteMatch(
   _prev: FormState,
   fd: FormData,
