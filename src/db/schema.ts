@@ -900,3 +900,40 @@ export const tenantBilling = pgTable("tenant_billing", {
   currentPeriodEnd: timestamp("current_period_end"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }).enableRLS();
+
+// ── Release history (spec/28 §7) ─────────────────────────────────────────────
+// One row per promotion, written by the release console. Platform-level, not
+// tenant-scoped: a release is the whole deployment, not one organisation's data.
+//
+// This is the promotion log AND the rollback menu: every row names a Vercel
+// deployment that was built with production configuration and served the domain,
+// so promoting it again is a rollback with no rebuild.
+
+export const releases = pgTable(
+  "releases",
+  {
+    id: text("id").primaryKey(),
+    /** The Vercel deployment that took the domain. */
+    deploymentId: text("deployment_id").notNull(),
+    sha: text("sha").notNull(),
+    /** First line of the commit message, for reading the history at a glance. */
+    message: text("message"),
+    branch: text("branch"),
+    /** What it replaced — the natural rollback target for this release. */
+    previousDeploymentId: text("previous_deployment_id"),
+    /**
+     * How the schema stood when this shipped: how many migrations the repo had
+     * versus how many production had applied. A release that ran migrations is
+     * the one whose rollback needs thought (spec/28 §6).
+     */
+    migrationsInRepo: integer("migrations_in_repo"),
+    migrationsApplied: integer("migrations_applied"),
+    action: text("action", { enum: ["PROMOTE", "ROLLBACK"] })
+      .default("PROMOTE")
+      .notNull(),
+    promotedBy: text("promoted_by"),
+    note: text("note"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("releases_created_idx").on(t.createdAt)],
+).enableRLS();

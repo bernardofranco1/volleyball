@@ -44,6 +44,12 @@ export default async function AdminLayout({
               People
             </Link>
             <Link
+              href="/admin/releases"
+              className="rounded-lg px-3 py-1.5 text-sm text-score-dim transition-colors hover:bg-surface-raised hover:text-foreground"
+            >
+              Releases
+            </Link>
+            <Link
               href="/admin/backups"
               className="rounded-lg px-3 py-1.5 text-sm text-score-dim transition-colors hover:bg-surface-raised hover:text-foreground"
             >

@@ -1,8 +1,9 @@
 # spec/28 — Homologation → Production releases (one URL, one DB, one project)
 
-**Status: PHASES 0 + 1 SHIPPED 2026-08-13** — the database split and the
-deployment pipeline are both live and verified end to end. Phases 2/3 (release
-console, one-URL switch) remain planned; §12 tracks what is done.
+**Status: PHASES 0 + 1 + 2 SHIPPED 2026-08-13** — the database split, the
+deployment pipeline and the release console are live and verified end to end.
+Only Phase 3 (the one-URL switch) remains, and it is blocked on a Vercel plan
+limit (see §12). §12 tracks what is done.
 
 **The pipeline as it stands today:** a push to `main` builds a PREVIEW
 deployment on the `homolog` tables, reachable at
@@ -259,6 +260,30 @@ all-tenants backup wrapper; advisory-lock env salt; realtime channel prefix.
 boards, PDFs, crons (production deployment only → `public` by construction).
 
 ## 12. Rollout
+
+- **Phase 2 — release console. ✅ DONE 2026-08-13.** `/admin/releases`
+  (global admins only), `releases` table (migration 0018), `src/lib/vercel.ts`
+  (hand-rolled API client), `src/lib/releases.ts` (history + guards),
+  `src/lib/release-actions.ts`.
+
+  Promotion is **two explicit steps**, because building takes ~2 minutes and a
+  Server Action that waited would hit the function timeout: *Prepare release*
+  starts the production build of a validated commit and returns; *Promote* backs
+  up every tenant, flips the domain, writes a `releases` row and a
+  platform-level audit entry. Rollback is the same call on an older production
+  build and is recorded as `ROLLBACK`.
+
+  Guards that actually fired in testing: a **live-match warning** naming the
+  matches being scored (7 at the time), and a **hard block** when production is
+  behind the repo on migrations — promoting then would serve code against a
+  schema without its columns.
+
+  Verified end to end through the UI: promoted `28686b6`, production moved;
+  three tenant backups recorded OK *before* the domain moved; rolled back to
+  `cd1d068`; the history distinguishes PROMOTE from ROLLBACK. Config lives in
+  `RELEASE_TOKEN` / `RELEASE_TEAM_ID` / `HOMOLOG_ALIAS` — deliberately NOT
+  `VERCEL_*`, since Vercel injects `VERCEL_PROJECT_ID` and `VERCEL_GIT_REPO_ID`
+  itself and a same-named user variable would shadow them.
 
 - **Phase 1 — schema split. ✅ DONE 2026-08-13.** Shipped as described in §0.
   Local development now defaults to `DB_SCHEMA=homolog`.
