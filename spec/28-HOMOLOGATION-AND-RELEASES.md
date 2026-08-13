@@ -1,9 +1,8 @@
-# spec/28 — Homologation → Production releases (one URL, one DB, one project)
+# spec/28 — Homologation → Production releases (own URL, one DB, one project)
 
-**Status: PHASES 0 + 1 + 2 SHIPPED 2026-08-13** — the database split, the
-deployment pipeline and the release console are live and verified end to end.
-Only Phase 3 (the one-URL switch) remains, and it is blocked on a Vercel plan
-limit (see §12). §12 tracks what is done.
+**Status: COMPLETE 2026-08-13.** Phases 0, 1 and 2 are live and verified end
+to end. **Phase 3 (the one-URL switch) is DROPPED by decision** — homologation
+keeps its own hostname. Nothing in the plan is outstanding.
 
 **The pipeline as it stands today:** a push to `main` builds a PREVIEW
 deployment on the `homolog` tables, reachable at
@@ -60,8 +59,9 @@ banner and reads production data.
   Supabase project — and production tables are untouched by testing.
 - Once validated, the version is **promoted to production from a UI** that
   shows which version sits where; the same UI does rollback.
-- **One URL**: the validator can switch the canonical address between the two
-  versions, with an amber bar whenever they are looking at Homologation.
+- **Homologation has its own hostname** (`volleyball-homolog.vercel.app`),
+  with an amber bar on every one of its surfaces. Decided 2026-08-13 in
+  preference to serving both versions from the canonical address — see §8.
 
 ## 2. The shape in one paragraph
 
@@ -97,8 +97,9 @@ All on the current Hobby plan.
    of a release targets the fresh `release` build; **rollback promotes any
    older production deployment instantly** (it already exists, built with the
    right env).
-4. **Protection Bypass for Automation** (all plans) lets the one-URL proxy
-   reach protected preview URLs by header.
+4. ~~Protection Bypass for Automation for the one-URL proxy.~~ Not needed —
+   Phase 3 was dropped (§8), and it turned out not to be offered on this plan
+   anyway.
 5. **postgres.js startup parameters** (`connection: { search_path }`) hold for
    the whole session on Supabase's **session pooler** — which is what homolog
    traffic uses (one validator; concurrency is trivial). Production keeps the
@@ -112,23 +113,37 @@ exists to kill: a warm instance with a stale decision writing homolog data
 into prod tables during the promote window. An env var is decided at deploy
 time, per deployment, forever — there is nothing to race.
 
-## 4. Three pointers, one project
+## 4. Two pointers, one project
 
 | Pointer | Meaning | Moved by |
 |---|---|---|
 | **Production** | which deployment `volleyball-eight.vercel.app` serves everyone (schema `public`) | *Promote* in the console |
-| **Homologation** | which preview build the homolog alias serves (schema `homolog`) | automatic: latest `main` push (manual override in console) |
-| **Your browser** | which of the two YOU see at the one URL | the signed homolog cookie — console: *View homolog* / *Exit* |
+| **Homologation** | which candidate `volleyball-homolog.vercel.app` serves (schema `homolog`) | *Set as homolog* in the console |
 
-**Promote, in full (one button, the console orchestrates):**
-1. Guards: LIVE-match warning, migration preview (see §6), contract
-   acknowledgement if applicable, confirm.
-2. Full backup of all tenants (existing spec/23 machinery + all-tenants wrapper).
-3. Fast-forward `release` to the validated SHA (GitHub API) → Vercel builds
-   the production-env deployment, staged. Console polls until READY (~2 min).
-4. Apply the migration delta to `public` (if any).
-5. Promote API → the domain flips. `releases` row + platform audit entry;
-   the homolog cookie is cleared.
+(A third pointer — a per-browser cookie choosing which version the canonical
+address served — was the dropped Phase 3. See §8.)
+
+**Promote, as built — TWO console steps, not one button.** A single action
+would have to wait ~2 minutes for the build and would hit the Server Action
+timeout, so the flow is split (and is clearer for it — you watch the artifact
+go green before anything points users at it):
+
+*Prepare release* (on a validated candidate)
+1. `POST /v13/deployments` with `target: production` and the candidate's SHA →
+   Vercel builds the production flavour of that commit, staged. Returns
+   immediately; the page auto-refreshes while it builds.
+
+*Promote* (once that build is READY)
+2. Guards: LIVE-match warning; **hard block** if `public` is behind the repo on
+   migrations (the operator runs `npm run db:migrate:prod` — deliberately a
+   separate, human act, never automated inside a promotion); confirm.
+3. Full backup of every tenant.
+4. Promote API → the domain flips. `releases` row + platform audit entry.
+
+Note what is NOT here: no GitHub token and no `release`-branch fast-forward.
+Building straight from a SHA needs one credential instead of two. The `release`
+branch still exists as Vercel's nominal production branch (that is what makes
+`main` pushes build as previews), it just no longer has to move.
 
 Rollback: promote any earlier production deployment from the history —
 instant, no rebuild. (Only guaranteed clean if migrations since that release
@@ -202,30 +217,53 @@ Shows: recent `main` builds (SHA, title, age, chips `IN HOMOLOG` /
 schemas' journal state (what `public` has vs what the candidate expects), and
 the release history with rollback buttons.
 
-Actions: *Refresh homolog data* (clone), *Set as homolog* (alias override),
-*View homolog* / *Exit* (signed cookie), *Promote* (the §4 sequence),
-*Rollback*. Everything audit-logged (platform-level rows, spec/26 convention).
+Actions as built: *Set as homolog* (moves the alias onto a candidate),
+*Prepare release*, *Promote*, *Roll back to this*. Everything audit-logged
+(platform-level rows, spec/26 convention). Refreshing the homologation data is
+a CLI command rather than a button — `npm run db:clone:homolog -- --execute` —
+because it drops and rebuilds a schema and deserves a shell, not a click.
 
 New table `releases`: `id, deployment_id, sha, message, promoted_at,
 promoted_by, previous_deployment_id, migration_state, note`.
 
-## 8. The banner and the one-URL switch
+## 8. Two hostnames, and the banner
 
-- **Banner detection is now trivial and unspoofable:** preview deployments
-  have `VERCEL_ENV=preview` → render the amber bar (SHA + "this is not
-  production" + *Exit* in cookie mode) on every surface including the scorer
-  console. Production builds never render it. No cookies, hosts or DB reads
-  involved in the decision.
-- **One-URL switch** (unchanged from v1): the production deployment's
-  `proxy.ts` gains a first branch — a valid signed `hml` cookie (set only by
-  the console, ~4 h TTL) rewrites the request to the homolog alias with the
-  protection-bypass header. Matcher widens to `_next/static`, images and
-  `/api/*` with an immediate `NextResponse.next()` for non-cookie traffic so
-  today's hot-path discipline is preserved. Canonical origin goes into
-  `serverActions.allowedOrigins` and our `sameOriginOk`. Auth cookies are
-  host-scoped to the one domain and flow through both ways. Bonus of v2: a
-  proxied validator session reads and writes **homolog tables** by
-  construction — the target deployment's env decides, nothing to get wrong.
+Homologation lives at its own address:
+
+| | |
+|---|---|
+| Production | `volleyball-eight.vercel.app` — schema `public` |
+| Homologation | `volleyball-homolog.vercel.app` — schema `homolog`, amber bar |
+
+**Banner detection is trivial and unspoofable:** the build either was made with
+`DB_SCHEMA=homolog` or it was not. A production build cannot render the bar and
+a homologation build cannot hide it. No cookies, hosts or database reads are
+involved, and it covers every surface including the scorer console and tablets.
+
+### Why not one URL (decision, 2026-08-13)
+
+The original plan served both versions from the canonical address, switched by
+a signed cookie that made `proxy.ts` rewrite to the candidate. **Dropped**, and
+the reasons are worth keeping because they argue against rebuilding it later:
+
+- **It was the only piece needing a Vercel plan upgrade.** The proxy has to
+  authenticate itself to the protected candidate with a Protection Bypass for
+  Automation secret, which this plan does not offer.
+- **It put a rewrite branch on the hot path.** The proxy matcher would have had
+  to widen to `_next/static`, images and `/api/*` — the very paths spec/17
+  deliberately excluded from proxy work — to proxy a candidate's assets.
+- **Two addresses are clearer, not worse.** "Which version am I on" is
+  answered by the address bar before the page even renders, and a stale tab
+  cannot silently be the wrong environment. The amber bar remains as the
+  in-page confirmation.
+- **The thing it was really solving** — validating against realistic data — is
+  solved by the schema clone, not by the URL.
+
+What is lost: you cannot hand someone a single link that shows them "the same
+page, but the new version", and homologation URLs are Vercel-SSO protected, so
+only people on the Vercel team can open them. If a non-Vercel colleague ever
+needs to validate, the options are to add them to the team or to turn off
+`ssoProtection` for preview deployments (the app has its own login regardless).
 
 ## 9. Promote-time skew
 
@@ -304,22 +342,23 @@ boards, PDFs, crons (production deployment only → `public` by construction).
     and is what was used. Unsupported by Vercel — if it ever breaks, the same
     change is one click in Settings → Git.
   - **Protection Bypass for Automation is not available on this plan** —
-    every documented endpoint shape returns `not_found`. Consequence:
-    candidate URLs are reachable in a browser (Vercel SSO) but not by scripts,
-    so automated smoke tests of a candidate are blocked until either the
-    project moves to Pro, or `ssoProtection` is turned off for previews. This
-    is also the prerequisite for the Phase-3 one-URL switch, whose proxy
-    authenticates itself with exactly that secret. Decision §14.3 is therefore
-    now load-bearing rather than a preference.
+    every documented endpoint shape returns `not_found`. With Phase 3 dropped
+    this costs one thing only: candidate URLs are reachable in a browser by
+    Vercel-team members but not by scripts, so a candidate cannot be
+    smoke-tested automatically the way production can. Validation of a
+    candidate is therefore a human opening the homologation URL.
 - **Phase 1 — schema split (~1 day).** `DB_SCHEMA` plumbing, clone script,
   dual journals, banner, `.env.local` → homolog. Validate by cloning and
   driving the app on a preview URL end-to-end (spec/27 QA pattern).
 - **Phase 2 — release console (~1 day).** `releases` table, promote
   orchestration (backup → ff → poll → migrate → flip), rollback, guards,
   audit.
-- **Phase 3 — one-URL switch (~½–1 day).** Cookie + proxy + origins; browser
-  pass in both modes, including scoring a match in homolog through the proxy.
-- **Phase 4 — optional.** Migration CI lint, version beacon.
+- **Phase 3 — one-URL switch. ❌ DROPPED 2026-08-13** by decision (§8):
+  homologation keeps its own hostname. No code was written for it.
+- **Phase 4 — optional, not done.** Migration CI lint (flag
+  `DROP`/`RENAME`/`SET NOT NULL` without a `-- contract-ok:` marker) and the
+  "new version — reload" beacon for promote-time skew. Both remain worthwhile;
+  neither blocks anything.
 
 ## 13. Alternatives considered
 
@@ -334,13 +373,17 @@ boards, PDFs, crons (production deployment only → `public` by construction).
 - **Exact-artifact promotion** (v1's staged-main flow): incompatible with
   per-environment env vars; traded for same-commit promotion, with instant
   exact-artifact **rollback** retained.
+- **One URL for both versions** (v1/v2 Phase 3): dropped 2026-08-13 — see §8
+  for the reasoning. Homologation keeps its own hostname.
 
 ## 14. Decisions to take at implementation
 
 1. Email scrub in the clone: default **on** (recommended) — confirm.
 2. Clone cadence: manual button only, or auto-clone on every new candidate?
    (Proposal: manual; validating mid-flow reseeds are disruptive.)
-3. Keep Vercel Authentication on preview URLs (proxy bypasses it) — recommended — or off?
+3. ~~Keep Vercel Authentication on preview URLs?~~ **Settled**: kept ON. With
+   Phase 3 dropped nothing needs to bypass it, so homologation stays private to
+   the Vercel team. Revisit only if someone outside the team must validate.
 4. Promote ceremony: plain confirm vs typing the SHA suffix.
 5. Local dev default `DB_SCHEMA=homolog`: adopt immediately in Phase 1?
    (Strongly recommended.)
