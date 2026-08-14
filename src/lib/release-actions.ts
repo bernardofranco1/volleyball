@@ -16,6 +16,7 @@
  */
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
+import { DB_SCHEMA, IS_PROD_SCHEMA } from "@/db/env";
 import { releases } from "@/db/schema";
 import { requireGlobalAdmin } from "@/lib/authz";
 import { recordAudit } from "@/lib/audit";
@@ -134,6 +135,20 @@ export async function promoteRelease(
 ): Promise<FormState> {
   const g = await gate();
   if (!g.ok) return fail(g.error);
+
+  // liveMatches() is qualified `public.` on purpose, but nothing else here is:
+  // allTenantIds(), runBackup(), the `releases` insert and recordAudit() all
+  // resolve through this process's search_path. On the homologation host that
+  // is `homolog`, so promoting from there would back up CLONE tenants, flip the
+  // PRODUCTION domain anyway, and file the release row and audit entry into
+  // homolog.* where the production console cannot see them — leaving production
+  // promoted with no backup at all. The page header links to homologation, so
+  // this is one wrong tab away rather than hypothetical.
+  if (!IS_PROD_SCHEMA)
+    return fail(
+      `This console is serving the \`${DB_SCHEMA}\` tables. Promote from the production console — from here the backups and the release history would be written to the wrong schema.`,
+    );
+
   const deploymentId = str(fd, "deploymentId");
   const action = str(fd, "action") === "ROLLBACK" ? "ROLLBACK" : "PROMOTE";
   const note = str(fd, "note") || null;
@@ -168,7 +183,14 @@ export async function promoteRelease(
       runBackup({ tenantId, kind: "FULL", trigger: "MANUAL" }),
     ),
   );
-  const failedBackups = backups.filter((b) => b.status === "rejected").length;
+  // runBackup is documented "Never throws — the caller inspects `ok`", so a
+  // rejected-only count is structurally always 0: every tenant backup could
+  // fail and the operator would still be told the promote was covered, with
+  // `backedUpTenants` recording the full count in the audit row. Inspect `ok`,
+  // the way the nightly cron already does.
+  const failedBackups = backups.filter(
+    (b) => b.status === "rejected" || !b.value.ok,
+  ).length;
 
   await promoteDeployment(g.cfg, deploymentId);
 
