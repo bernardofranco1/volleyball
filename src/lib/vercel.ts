@@ -163,6 +163,56 @@ export async function currentProduction(
   return prod ? normalise(prod) : null;
 }
 
+/** What a deployment reports about itself at /api/version. */
+export interface DeployedVersion {
+  commit: string | null;
+  schema: string | null;
+  environment: string | null;
+  /** Migrations that build expects to exist, or null if it predates the field. */
+  migrations: number | null;
+}
+
+/**
+ * Ask a deployment what it is, over its own URL.
+ *
+ * The console cannot read a candidate's migration count out of its own bundle:
+ * it is routinely the OLDER build, which is precisely the case where the two
+ * numbers differ and the answer matters. So each deployment self-reports.
+ *
+ * Deployment URLs sit behind Vercel SSO (the project runs `ssoProtection:
+ * all_except_custom_domains`), so a server-side fetch needs the automation
+ * bypass secret. Vercel injects VERCEL_AUTOMATION_BYPASS_SECRET into every
+ * deployment once "Protection Bypass for Automation" is on. Without it — or if
+ * the build predates /api/version reporting migrations — this returns null,
+ * and the caller decides whether not knowing is fatal for what it is doing.
+ */
+export async function fetchDeployedVersion(
+  d: Deployment,
+): Promise<DeployedVersion | null> {
+  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  try {
+    const res = await fetch(`https://${d.url}/api/version`, {
+      headers: bypass ? { "x-vercel-protection-bypass": bypass } : undefined,
+      cache: "no-store",
+      // A candidate that cannot answer promptly is treated as unknown rather
+      // than holding a Server Action open until the function times out.
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as Record<string, unknown>;
+    const m = j.migrations;
+    return {
+      commit: typeof j.commit === "string" ? j.commit : null,
+      schema: typeof j.schema === "string" ? j.schema : null,
+      environment: typeof j.environment === "string" ? j.environment : null,
+      migrations: typeof m === "number" && Number.isInteger(m) ? m : null,
+    };
+  } catch {
+    // Unreachable, DNS failure, SSO wall, timeout, non-JSON body.
+    return null;
+  }
+}
+
 /**
  * Build the PRODUCTION flavour of a commit that was validated as a candidate.
  *

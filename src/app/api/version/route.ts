@@ -9,6 +9,7 @@
 // page. No connection strings, no configuration, no database access — so it
 // stays cheap enough to poll and carries nothing worth protecting.
 import { DB_SCHEMA, IS_PROD_SCHEMA } from "@/db/env";
+import { MIGRATIONS_IN_REPO } from "@/lib/migrations-manifest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,12 @@ export function GET() {
       // disagree, the env vars are wrong.
       target: process.env.VERCEL_ENV ?? "development",
       deploymentId: process.env.VERCEL_DEPLOYMENT_ID ?? null,
+      // How many migrations THIS build expects to exist. The release console
+      // asks a candidate for this before promoting it, because the console's
+      // own bundled count is its own build's, which is routinely older than the
+      // one being shipped. A static integer: no database access, and nothing
+      // worth protecting.
+      migrations: MIGRATIONS_IN_REPO,
     },
     { headers: { "cache-control": "no-store" } },
   );

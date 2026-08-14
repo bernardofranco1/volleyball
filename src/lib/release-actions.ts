@@ -27,10 +27,12 @@ import { str } from "@/lib/form-data";
 import {
   allTenantIds,
   migrationState,
+  migrationVerdict,
 } from "@/lib/releases";
 import {
   createProductionBuild,
   currentProduction,
+  fetchDeployedVersion,
   getDeployment,
   promoteDeployment,
   setHomologAlias,
@@ -161,20 +163,32 @@ export async function promoteRelease(
     );
   if (dep.state !== "READY") return fail(`That build is ${dep.state}, not READY.`);
 
-  const [previous, migrations] = await Promise.all([
+  const [previous, migrations, candidate] = await Promise.all([
     currentProduction(g.cfg),
     migrationState(),
+    // Ask the build being promoted what IT needs. See below.
+    fetchDeployedVersion(dep),
   ]);
   if (previous?.id === deploymentId)
     return fail("That build is already serving production.");
 
   // Refuse to ship code that expects a schema production does not have yet:
-  // the app would be querying columns that are not there. The operator's
-  // recourse is `npm run db:migrate:prod`, deliberately a separate act.
-  if (migrations.pendingProd > 0)
-    return fail(
-      `Production is ${migrations.pendingProd} migration(s) behind the repo. Run \`npm run db:migrate:prod\` first — promoting now would serve code against a schema that lacks its columns.`,
-    );
+  // the app would be querying columns that are not there.
+  //
+  // The question is what the CANDIDATE requires, not what this console carries.
+  // Comparing the console's own bundled journal against production returned
+  // "0 pending" in exactly the situation the guard exists for — production on
+  // commit A, promoting commit B which adds a migration, console still built
+  // from A. It only ever fired when the console already had the newer journal.
+  //
+  // Asking the candidate also makes rollback fall out correctly rather than
+  // needing a special case: an older build requires fewer migrations than
+  // production has applied, so it passes the same test.
+  const required = candidate?.migrations ?? null;
+  const applied = migrations.appliedProd;
+  const verdict = migrationVerdict({ required, applied, action });
+  if (!verdict.ok) return fail(verdict.error);
+  const migrationWarning = verdict.warning ? ` (warning: ${verdict.warning})` : "";
 
   // Belt and braces before the domain moves.
   const tenantIds = await allTenantIds();
@@ -201,8 +215,11 @@ export async function promoteRelease(
     message: dep.message,
     branch: dep.branch,
     previousDeploymentId: previous?.id ?? null,
-    migrationsInRepo: migrations.inRepo,
-    migrationsApplied: migrations.appliedProd,
+    // What the RELEASED build carries and what production had run — the two
+    // numbers the guard actually compared. Null when either was unknown, which
+    // only a rollback can reach; recording a guess would make the history lie.
+    migrationsInRepo: required,
+    migrationsApplied: applied,
     action,
     promotedBy: g.ctx.user.email,
     note,
@@ -227,9 +244,9 @@ export async function promoteRelease(
 
   revalidatePath(PATH);
   const suffix =
-    failedBackups > 0
+    (failedBackups > 0
       ? ` (warning: ${failedBackups} tenant backup(s) failed — check Backups)`
-      : "";
+      : "") + migrationWarning;
   return ok(
     action === "ROLLBACK"
       ? `Rolled back to ${dep.shortSha}.${suffix}`

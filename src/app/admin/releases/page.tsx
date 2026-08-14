@@ -145,13 +145,19 @@ export default async function ReleasesPage() {
         />
         <StatTile
           label="Migrations"
-          value={`${migrations.appliedProd}/${migrations.inRepo}`}
+          value={`${migrations.appliedProd ?? "?"}/${migrations.inRepo}`}
           hint={
-            migrations.pendingProd > 0
-              ? `${migrations.pendingProd} pending on production`
-              : "production is up to date"
+            migrations.appliedProd === null
+              ? "could not read production's count"
+              : (migrations.pendingProd ?? 0) > 0
+                ? `${migrations.pendingProd} pending vs this console's build`
+                : "production is up to date"
           }
-          tone={migrations.pendingProd > 0 ? "warning" : "default"}
+          tone={
+            migrations.appliedProd === null || (migrations.pendingProd ?? 0) > 0
+              ? "warning"
+              : "default"
+          }
         />
         <StatTile
           label="Live matches"
@@ -180,16 +186,33 @@ export default async function ReleasesPage() {
         </div>
       )}
 
-      {migrations.pendingProd > 0 && (
+      {migrations.appliedProd === null && (
         <div className="mb-4 rounded-xl border border-warning bg-warning-soft px-4 py-3 text-sm">
           <b className="text-warning">
-            Production is {migrations.pendingProd} migration(s) behind the repo.
+            Production&rsquo;s applied-migration count could not be read.
           </b>{" "}
           <span className="text-score-dim">
-            Promotion is blocked until you run{" "}
-            <code className="rounded bg-surface px-1">npm run db:migrate:prod</code>{" "}
-            — shipping first would serve code against a schema without its
-            columns. Homologation is at {migrations.appliedHomolog ?? "?"}.
+            Promotion is refused while this is unknown. Rollback is still
+            allowed — it is the recovery path — and will say on the receipt that
+            it shipped unverified.
+          </span>
+        </div>
+      )}
+
+      {(migrations.pendingProd ?? 0) > 0 && (
+        <div className="mb-4 rounded-xl border border-warning bg-warning-soft px-4 py-3 text-sm">
+          <b className="text-warning">
+            Production is {migrations.pendingProd} migration(s) behind this
+            console&rsquo;s build.
+          </b>{" "}
+          <span className="text-score-dim">
+            Run{" "}
+            <code className="rounded bg-surface px-1">npm run db:migrate:prod</code>
+            . This figure is indicative — it compares against whatever build is
+            serving this console. Each promotion is gated on what the candidate
+            itself reports needing, so a build requiring these migrations is
+            refused until they are applied. Homologation is at{" "}
+            {migrations.appliedHomolog ?? "?"}.
           </span>
         </div>
       )}
