@@ -139,6 +139,38 @@ export async function setGlobalAdminFlag(
   return ok(enable ? "Global access granted." : "Global access revoked.");
 }
 
+const LAST_ADMIN =
+  "This is the tenant's last admin — promote someone else first.";
+
+/**
+ * True when dropping this user's TENANT_ADMIN row would leave the tenant with
+ * no admin at all — a state its own Access page cannot recover from, since
+ * nobody left there can hand the role back.
+ *
+ * Shared by revoke and grant: setSingleRole deletes a user's existing rows for
+ * the tenant before inserting the new one, so changing a role is a demotion
+ * too, and both paths can orphan a tenant the same way.
+ */
+async function wouldOrphanTenant(
+  tenantId: string,
+  userId: string,
+): Promise<boolean> {
+  const isAdmin = (
+    await db
+      .select({ id: userTenantRoles.id })
+      .from(userTenantRoles)
+      .where(
+        and(
+          eq(userTenantRoles.tenantId, tenantId),
+          eq(userTenantRoles.userId, userId),
+          eq(userTenantRoles.role, "TENANT_ADMIN"),
+        ),
+      )
+      .limit(1)
+  ).length;
+  return isAdmin > 0 && (await adminCount(tenantId)) <= 1;
+}
+
 /** Grant / change a user's role in a tenant (platform console). */
 export async function grantTenantRole(
   _prev: FormState,
@@ -152,6 +184,12 @@ export async function grantTenantRole(
   if (!ASSIGNABLE.includes(role)) return fail("Choose a role.");
   const tenant = await getTenantById(tenantId);
   if (!tenant) return fail("Unknown tenant.");
+
+  // Promoting TO admin can never orphan the tenant; anything else is a
+  // demotion of this user, so it has to clear the same bar as an outright
+  // revoke. The tenant-scoped Access page guards this already.
+  if (role !== "TENANT_ADMIN" && (await wouldOrphanTenant(tenantId, userId)))
+    return fail(LAST_ADMIN);
 
   await setSingleRole(tenantId, userId, role);
   await recordAudit({
@@ -176,21 +214,7 @@ export async function revokeTenantRole(
   const tenantId = str(fd, "tenantId");
   if (!userId || !tenantId) return fail("Missing user or tenant.");
 
-  const isAdmin = (
-    await db
-      .select({ id: userTenantRoles.id })
-      .from(userTenantRoles)
-      .where(
-        and(
-          eq(userTenantRoles.tenantId, tenantId),
-          eq(userTenantRoles.userId, userId),
-          eq(userTenantRoles.role, "TENANT_ADMIN"),
-        ),
-      )
-      .limit(1)
-  ).length;
-  if (isAdmin && (await adminCount(tenantId)) <= 1)
-    return fail("This is the tenant's last admin — promote someone else first.");
+  if (await wouldOrphanTenant(tenantId, userId)) return fail(LAST_ADMIN);
 
   await db
     .delete(userTenantRoles)
