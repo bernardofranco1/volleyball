@@ -2,11 +2,10 @@ import Link from "next/link";
 import {
   ADMIN_ROLES,
   SCORING_ROLES,
-  getAuthContext,
-  getCurrentUser,
+  VIEW_ROLES,
   hasRole,
+  requireRole,
 } from "@/lib/authz";
-import { getTenantBySlug } from "@/lib/tenant";
 import { listAudit } from "@/lib/audit";
 import { loadDashboard, type DashboardMatch } from "@/lib/dashboard";
 import { matchBase, matchHref } from "@/lib/match-links";
@@ -16,7 +15,6 @@ import { LocalTime } from "@/components/LocalTime";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Page, PageHeader, Panel, StatRow, StatTile } from "@/components/ui/Page";
 import { matchStatusLabel, statusBadgeClass, ui } from "@/components/admin/styles";
-import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -32,16 +30,20 @@ export default async function DashboardPage({
 }) {
   const { tenantSlug } = await params;
   const { t } = await getT();
-  const tenant = await getTenantBySlug(tenantSlug);
-  if (!tenant) notFound();
-
-  const [user, ctx] = await Promise.all([
-    // getCurrentUser, not supabase.auth.getUser(): this must show the EFFECTIVE
-    // user so "Signed in as" is honest while impersonating (spec/26 §10).
-    getCurrentUser(),
-    getAuthContext(tenantSlug),
-  ]);
-  const roles = ctx?.roles ?? [];
+  // Membership gate. Without it a non-member reached this tenant's live
+  // matches, today's schedule and season progress straight from the URL:
+  // getAuthContext returns null for a non-member, `roles` fell back to [], and
+  // nothing refused the request. Every other console page under /t/ gates the
+  // same way. ctx.user is the EFFECTIVE user (getAuthContext resolves it
+  // through getCurrentUser), so "Signed in as" stays honest while
+  // impersonating (spec/26 §10).
+  const ctx = await requireRole(
+    tenantSlug,
+    VIEW_ROLES,
+    `/t/${tenantSlug}/dashboard`,
+  );
+  const { tenant, user } = ctx;
+  const roles = ctx.roles;
   const canManage = hasRole(roles, ADMIN_ROLES);
   const canScore = hasRole(roles, SCORING_ROLES);
 
