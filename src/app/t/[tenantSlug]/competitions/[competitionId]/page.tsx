@@ -330,6 +330,7 @@ export default async function CompetitionOverviewPage({
                   city: competition.city,
                   country: competition.country,
                   hall: competition.hall,
+                  timezone: competition.timezone,
                   category: competition.category,
                   startDate: competition.startDate,
                   endDate: competition.endDate,

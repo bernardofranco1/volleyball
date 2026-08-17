@@ -149,6 +149,12 @@ export const competitions = pgTable(
     city: text("city"),
     country: text("country"),
     hall: text("hall"),
+    // IANA zone of the VENUE (spec/29 F5), e.g. "Europe/Zurich". Every time on
+    // the official sheet is printed in it; null keeps today's behaviour, which
+    // is UTC. Not derived from the server or the reader's browser: the sheet is
+    // a document about a place, and a match at 20:00 local must not print as
+    // 18:00 because it was generated elsewhere.
+    timezone: text("timezone"),
     category: text("category", {
       enum: ["SENIOR", "JUNIOR", "YOUTH", "KID"],
     }),

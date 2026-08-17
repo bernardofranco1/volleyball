@@ -189,18 +189,61 @@ export function vLadder(
 
 // ── formatting helpers ───────────────────────────────────────────────────────
 
-export function hhmm(d: Date | string | null): string {
+/**
+ * Wall-clock time as printed on the sheet.
+ *
+ * `zone` is the VENUE's IANA zone (spec/29 F5). Without one this stays exactly
+ * what it always was — UTC — so every existing sheet renders unchanged. With
+ * one, the sheet reads in the time the people in the hall actually saw, which
+ * is the only time that means anything on a match document.
+ *
+ * An unknown/invalid zone falls back to UTC rather than throwing: a typo in a
+ * competition setting must not be able to stop a scoresheet printing.
+ */
+export function hhmm(d: Date | string | null, zone?: string | null): string {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
   if (Number.isNaN(date.getTime())) return "";
+  if (zone) {
+    try {
+      return new Intl.DateTimeFormat("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: zone,
+      }).format(date);
+    } catch {
+      // fall through to UTC
+    }
+  }
   return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
 }
 
-export function hhmmss(d: Date | string | null): string {
+/** Calendar date at the venue (spec/29 F5); UTC when no zone is configured. */
+export function isoDate(d: Date | string | null, zone?: string | null): string {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
   if (Number.isNaN(date.getTime())) return "";
-  return `${hhmm(date)}:${String(date.getUTCSeconds()).padStart(2, "0")}`;
+  if (zone) {
+    try {
+      return new Intl.DateTimeFormat("en-CA", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        timeZone: zone,
+      }).format(date);
+    } catch {
+      // fall through to UTC
+    }
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+export function hhmmss(d: Date | string | null, zone?: string | null): string {
+  if (!d) return "";
+  const date = typeof d === "string" ? new Date(d) : d;
+  if (Number.isNaN(date.getTime())) return "";
+  return `${hhmm(date, zone)}:${String(date.getUTCSeconds()).padStart(2, "0")}`;
 }
 
 /** Whole minutes between two instants, or null. Spans over 10 hours are

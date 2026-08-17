@@ -19,6 +19,7 @@ import {
   Sheet,
   durationMin,
   hhmmss,
+  isoDate,
   registerSheetFonts,
   teamCode,
   hLadder,
@@ -71,7 +72,7 @@ export function renderBeachOfficialPdf(
     teamsBlock(g, 12, by, 462, 92, report, sheet);
     resultsBlock(g, 12, by + 95, 462, 86, report, sheet);
     approvalBlock(g, 12, by + 184, 462, bottomH - 184, report);
-    remarksAndToss(g, 480, by, 350, bottomH, report, sheet);
+    remarksAndToss(g, 480, by, 350, bottomH, report, sheet, config);
     g.footer(footerText(report, "2/2"));
 
     doc.end();
@@ -81,7 +82,7 @@ export function renderBeachOfficialPdf(
 function footerText(report: MatchReportData, page: string): string {
   return (
     `Official scoresheet · ${report.competitionName} · match ${report.matchNumber ?? report.matchId} · ` +
-    `generated from the event log · times UTC · ${
+    `generated from the event log · times ${report.timezone ?? "UTC"} · ${
       report.approval.confirmedVia
         ? `result confirmed via ${report.approval.confirmedVia}`
         : "result not yet confirmed"
@@ -111,7 +112,7 @@ function headerBlock(g: Sheet, r: MatchReportData, bestOf: number, small: boolea
     ["Site:", (r.city ?? "").slice(0, 18), 90],
     ["Beach:", (r.hall ?? r.venue ?? "").slice(0, 24), 190],
     ["Court:", r.courtNumber != null ? String(r.courtNumber) : "", 310],
-    ["Date:", r.scheduledAt ? r.scheduledAt.toISOString().slice(0, 10) : "", 365],
+    ["Date:", isoDate(r.scheduledAt, r.timezone), 365],
     ["Gender:", r.gender === "MEN" ? "M" : r.gender === "WOMEN" ? "F" : r.gender === "MIXED" ? "X" : "", 450],
     ["Phase:", (r.phaseName ?? "").slice(0, 18), 510],
     ["Round:", (r.roundName ?? "").slice(0, 24), 620],
@@ -211,7 +212,7 @@ function setPanel(
   g.rect(cx0 + cw / 2 - 30, y + 2, 60, 13);
   g.ctext(`Set ${setNumber}`, cx0 + cw / 2, y + 8.5, { size: 7.5, bold: true });
   if (set?.startedAt)
-    g.text(`Start time: ${hhmmss(set.startedAt)}`, cx0 + cw - 110, y + 5, { size: 6.5, bold: true, color: INK });
+    g.text(`Start time: ${hhmmss(set.startedAt, report.timezone)}`, cx0 + cw - 110, y + 5, { size: 6.5, bold: true, color: INK });
 
   const topTeam: TeamId = set?.firstServer ?? "A";
   const botTeam: TeamId = topTeam === "A" ? "B" : "A";
@@ -232,7 +233,7 @@ function setPanel(
   serviceRow(g, cx0, y + 194, cw, 14, bot?.rows[1] ?? []);
   teamLeftBlock(g, x + 3, y + 123, leftW, bot, true, coachOf(botTeam));
   if (set?.endedAt)
-    g.text(`End time: ${hhmmss(set.endedAt)}`, cx0 + cw - 110, y + h - 14, { size: 6.5, bold: true, color: INK });
+    g.text(`End time: ${hhmmss(set.endedAt, report.timezone)}`, cx0 + cw - 110, y + h - 14, { size: 6.5, bold: true, color: INK });
 
   // Court-switch rail: A:B at every switch, TTO flagged, unused rows crossed.
   const rx = x + w - railW - 4;
@@ -685,6 +686,7 @@ function remarksAndToss(
   h: number,
   report: MatchReportData,
   sheet: OfficialSheetData,
+  config: TournamentConfig,
 ) {
   const remH = h - 30;
   g.rect(x, y, w, remH, { lw: 0.9 });
@@ -694,7 +696,13 @@ function remarksAndToss(
     .map((s) => `${s.role}: ${s.remarks}`);
   const forfeitNote = sheet.forfeit
     ? [
-        `${sheet.forfeit.reason === "RETIREMENT" ? "Retirement" : "Forfeit"}: team ${sheet.forfeit.team}`,
+        `${sheet.forfeit.reason === "RETIREMENT" ? "Retirement" : "Forfeit"}: team ${sheet.forfeit.team}` +
+          // FIVB 6.4.2 (spec/29 F8): a no-show loses by the convention score.
+          (sheet.forfeit.noShow
+            ? ` — no show, 2 × ${config.setScore}:0 to team ${
+                sheet.forfeit.team === "A" ? "B" : "A"
+              }`
+            : ""),
       ]
     : [];
   // Video-challenge time adjustment (spec/21 G9 / reference sheet remark):

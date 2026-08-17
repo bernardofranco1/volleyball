@@ -104,7 +104,13 @@ export interface OfficialSheetData {
   }[];
   /** Pre-match coin toss (COIN_TOSS event). */
   tossWinnerSet1: TeamId | null;
-  forfeit: { team: TeamId; reason: string } | null;
+  /**
+   * Match ended early (FIVB 6.4). `noShow` is the 6.4.2 default: the team
+   * never played, so the sheet prints the convention scoreline (0-25 per set
+   * indoor, 0-21 beach) rather than a blank ladder (spec/29 F8). A 6.4.3
+   * retirement is NOT a no-show — points already played are kept.
+   */
+  forfeit: { team: TeamId; reason: string; noShow: boolean } | null;
   remarks: string[];
 }
 
@@ -191,7 +197,7 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
   const improperRequests: { team: TeamId; setNumber: number }[] = [];
   const protests: OfficialSheetData["protests"] = [];
   let tossWinnerSet1: TeamId | null = null;
-  let forfeit: { team: TeamId; reason: string } | null = null;
+  let forfeit: OfficialSheetData["forfeit"] = null;
   const remarks: string[] = [];
   // Recoveries per player, so the remark can say "#2 for this player" (F11).
   const recoveryCount = new Map<string, number>();
@@ -264,11 +270,37 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
     serverSlot = { A: null, B: null };
   };
 
+  // Running score, COUNTED from the surviving rallies rather than read off each
+  // row's denormalized `scoreAfter*` columns.
+  //
+  // Those columns are a cache written when the event was appended, and a
+  // targeted mid-log cancellation (spec/29 F13 — undoing the points a team
+  // scored while at fault) leaves every later surviving rally carrying a score
+  // that counted the cancelled ones. Reading them would print a ladder that
+  // disagrees with the result. Counting keeps the sheet what it claims to be:
+  // a deterministic rendering of the SURVIVING log.
+  //
+  // The denormalized value is still the fallback for events that are not
+  // rallies in a set with no rally events at all — imported/synthetic matches,
+  // where SET_END's declared score is all there is.
+  let running = { a: 0, b: 0 };
+  let ralliesSeen = 0;
+
   for (const ev of events) {
     const p = (ev.payload ?? {}) as Record<string, unknown> & { type?: string };
     const type = p.type ?? ev.eventType;
     const team = (p.team === "A" || p.team === "B" ? p.team : null) as TeamId | null;
-    const evScore = { a: num(ev.scoreAfterA), b: num(ev.scoreAfterB) };
+    if (type === "SET_START") {
+      running = { a: 0, b: 0 };
+      ralliesSeen = 0;
+    }
+    if (type === "RALLY_WON_A") running = { a: running.a + 1, b: running.b };
+    if (type === "RALLY_WON_B") running = { a: running.a, b: running.b + 1 };
+    if (type === "RALLY_WON_A" || type === "RALLY_WON_B") ralliesSeen += 1;
+    const evScore =
+      ralliesSeen > 0
+        ? { a: running.a, b: running.b }
+        : { a: num(ev.scoreAfterA), b: num(ev.scoreAfterB) };
 
     switch (type) {
       case "COIN_TOSS": {
@@ -540,7 +572,13 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
       case "FORFEIT": {
         if (team) {
           const reason = typeof p.reason === "string" ? p.reason : "FORFEIT";
-          forfeit = { team, reason };
+          // A no-show is a FORFEIT with nothing played: no set has a score and
+          // none was won. A retirement, or a forfeit after play began, keeps
+          // the real ladder.
+          const nothingPlayed =
+            sets.length === 0 ||
+            sets.every((st) => st.scoreA === 0 && st.scoreB === 0);
+          forfeit = { team, reason, noShow: reason === "FORFEIT" && nothingPlayed };
           // The RESULTS block prints the outcome; the remark says when it
           // happened and at what score (spec/29 F8).
           remarks.push(remark.forfeit(ctxOf(ev, { team }), reason));

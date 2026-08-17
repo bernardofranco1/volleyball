@@ -51,6 +51,7 @@ function report(events: ReportEvent[]): MatchReportData {
     phaseName: null,
     venue: null,
     city: null,
+    timezone: null,
     country: null,
     hall: null,
     category: null,

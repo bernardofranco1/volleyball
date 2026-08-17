@@ -46,6 +46,7 @@ const DATA: MatchReportData = {
   phaseName: "Main Draw",
   venue: "Centre Court",
   city: "Rome",
+  timezone: null,
   country: "Italy",
   hall: "Foro Italico",
   category: "SENIOR",

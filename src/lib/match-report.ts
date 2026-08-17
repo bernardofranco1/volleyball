@@ -95,6 +95,8 @@ export interface MatchReportData {
   venue: string | null;
   /** Official scoresheet header (spec/21): venue split + age category. */
   city: string | null;
+  /** IANA zone of the venue (spec/29 F5); null → sheets print UTC as before. */
+  timezone: string | null;
   country: string | null;
   hall: string | null;
   category: string | null;
@@ -147,6 +149,7 @@ export async function loadMatchReport(
       phaseName: matches.phaseName,
       venue: competitions.venue,
       city: competitions.city,
+      timezone: competitions.timezone,
       country: competitions.country,
       hall: competitions.hall,
       category: competitions.category,
@@ -270,6 +273,7 @@ export async function loadMatchReport(
     phaseName: m.phaseName,
     venue: m.venue,
     city: m.city,
+    timezone: m.timezone,
     country: m.country,
     hall: m.hall,
     category: m.category,

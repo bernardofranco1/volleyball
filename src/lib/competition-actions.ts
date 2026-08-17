@@ -124,6 +124,8 @@ export async function updateCompetition(
       city: str(fd, "city") || null,
       country: str(fd, "country") || null,
       hall: str(fd, "hall") || null,
+      // Venue zone for printed times (spec/29 F5); blank ⇒ UTC.
+      timezone: str(fd, "timezone").trim() || null,
       category: categoryRaw ? (categoryRaw as Category) : null,
       startDate: dateOrNull(fd, "startDate"),
       endDate: dateOrNull(fd, "endDate"),

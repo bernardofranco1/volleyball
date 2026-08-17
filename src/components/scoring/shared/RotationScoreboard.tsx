@@ -9,6 +9,12 @@ import { activeSet, type Side, type TeamId } from "@/engine/types";
 import type { PlayerLite } from "@/lib/match-provider";
 import { useT } from "@/lib/i18n/client";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
+import { SanctionsControl } from "@/components/scoring/shared/SanctionsControl";
+import { ProtestControl } from "@/components/scoring/shared/ProtestControl";
+import {
+  FaultCorrection,
+  type FaultDispatch,
+} from "@/components/scoring/shared/FaultCorrection";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
@@ -32,6 +38,14 @@ export interface RotationSet {
   lastRotB: number | null;
 }
 
+type SanctionPayload = Parameters<
+  React.ComponentProps<typeof SanctionsControl>["dispatch"]
+>[0];
+type ProtestPayload = Parameters<
+  React.ComponentProps<typeof ProtestControl>["dispatch"]
+>[0];
+type FaultPayload = Parameters<FaultDispatch>[0];
+
 export interface RotationMatchState {
   status: string;
   rallyPhase: string;
@@ -41,6 +55,9 @@ export interface RotationMatchState {
   sets: RotationSet[];
   /** Lineup declared before the next set exists (spec/21 flow fix). */
   pendingLineup?: { teamAPlayerIds: string[]; teamBPlayerIds: string[] } | null;
+  /** Cards held, for the sanctions escalation warning (spec/29 F6). */
+  misconductA?: { type: string; playerId: string }[];
+  misconductB?: { type: string; playerId: string }[];
 }
 
 export interface RotationCourtProps {
@@ -79,6 +96,15 @@ export function RotationScoreboard({
     teamBColor: string | null;
     online: boolean;
     pending: boolean;
+    /**
+     * Officiating events — sanctions, positional faults, protests (spec/29
+     * F6). Typed as the union of what the three shared controls emit; the
+     * grass and light providers accept their own discipline payloads, which
+     * are supersets of these.
+     */
+    dispatch: (
+      payload: SanctionPayload | ProtestPayload | FaultPayload,
+    ) => void;
     error: string | null;
     queuedCount: number;
     serveClockDeadline: number | null;
@@ -100,6 +126,7 @@ export function RotationScoreboard({
     teamBColor,
     online,
     pending,
+    dispatch,
     error,
     queuedCount,
     serveClockDeadline,
@@ -203,6 +230,43 @@ export function RotationScoreboard({
             <ServeClockWidget deadline={serveClockDeadline} totalSecs={config.serveClockSecs} />
           ) : null}
           {actionBar}
+          {/* Capture parity (spec/29 F6): grass and light had no way to record
+              a sanction, a positional fault or a protest — the events existed
+              in the shared chassis, only the consoles never offered them.
+              Their own sheets stay out of scope; the LOG is what matters. */}
+          <SanctionsControl
+            status={state.status}
+            teamAName={teamAName}
+            teamBName={teamBName}
+            rosterA={rosterA}
+            rosterB={rosterB}
+            dispatch={dispatch}
+            pending={pending}
+            autoPoint={config.sanctionAutoPoint}
+            misconductA={state.misconductA ?? []}
+            misconductB={state.misconductB ?? []}
+          />
+          <ProtestControl
+            status={state.status}
+            teamAName={teamAName}
+            teamBName={teamBName}
+            rosterA={rosterA}
+            rosterB={rosterB}
+            dispatch={dispatch}
+            pending={pending}
+          />
+          {set ? (
+            <FaultCorrection
+              matchId={matchId}
+              status={state.status}
+              rotationEnabled={config.rotationEnabled}
+              setNumber={set.setNumber}
+              teamAName={teamAName}
+              teamBName={teamBName}
+              dispatch={dispatch}
+              pending={pending}
+            />
+          ) : null}
         </div>
       }
       overlay={

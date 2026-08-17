@@ -58,6 +58,7 @@ function baseReport(discipline: string, events: ReportEvent[]): MatchReportData 
     phaseName: "Main Draw",
     venue: "Centre Court",
     city: "Lausanne",
+    timezone: null,
     country: "Switzerland",
     hall: "Malley",
     category: "SENIOR",
