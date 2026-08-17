@@ -151,6 +151,21 @@ export type CommonEventPayload =
   // discipline name.
   | { type: "ROTATION_FAULT"; team: TeamId; note?: string }
   | { type: "SERVICE_ORDER_FAULT"; team: TeamId; note?: string }
+  // In-match protest (spec/29 F12): the captain contests a referee decision
+  // and the fact is recorded at the score it happened, to be resolved by the
+  // protest protocol afterwards. A MARKER — it changes nothing about play.
+  //
+  // Distinct from the result-stage PROTEST signature intent (spec/20), which
+  // is a captain refusing to accept the FINAL result. Both can occur in one
+  // match, and the sheet must not conflate them.
+  | {
+      type: "PROTEST_LODGED";
+      team: TeamId;
+      /** Roster-row id of the captain or member lodging it, when identified. */
+      playerId?: string;
+      /** The scorer's short summary, as dictated. */
+      text?: string;
+    }
   // `scope` is a request-time hint only (never persisted): "point" asks the
   // server to sweep set-start bookkeeping and undo the last real action in one
   // batch; absent/"single" keeps the one-event-at-a-time behaviour.
@@ -191,6 +206,7 @@ const COMMON_EVENT_TYPES: ReadonlySet<string> = new Set<
   "IMPROPER_REQUEST",
   "ROTATION_FAULT",
   "SERVICE_ORDER_FAULT",
+  "PROTEST_LODGED",
   "UNDO",
   "NOTE",
 ]);
@@ -378,6 +394,7 @@ export function reduceCommon<Phase extends string>(
     // Markers: recorded in the log, printed on the sheet, no state effect.
     case "ROTATION_FAULT":
     case "SERVICE_ORDER_FAULT":
+    case "PROTEST_LODGED":
     case "UNDO":
     case "NOTE":
       return;

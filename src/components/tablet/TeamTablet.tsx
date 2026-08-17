@@ -165,12 +165,20 @@ export function TeamTablet({
       // ordinary one the engine would then reject as over the limit.
       isExceptional?: boolean;
     },
+    /** Free-text detail for request types that carry one (protest). */
+    note?: string,
   ) => {
     setMsg(null);
     const res = await fetch(`/api/matches/${matchId}/interrupt-requests`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, team, requestType, ...extra }),
+      body: JSON.stringify({
+        token,
+        team,
+        requestType,
+        ...extra,
+        ...(note ? { note } : {}),
+      }),
     });
     if (res.ok) {
       setMsg(`${requestType} request sent`);
@@ -267,6 +275,19 @@ export function TeamTablet({
       label: "Medical",
       disabled: false,
       onClick: () => void sendRequest("MEDICAL"),
+    },
+    {
+      // In-match protest (spec/29 F12). Unquota-ed: whether it stands is for
+      // the protest protocol, not this button. The scorer's approval records
+      // the PROTEST_LODGED marker at the score of the moment.
+      type: "PROTEST",
+      label: "Protest",
+      disabled: false,
+      onClick: () => {
+        const note = window.prompt("What is contested? (short)");
+        if (note === null) return;
+        void sendRequest("PROTEST", undefined, note.slice(0, 280));
+      },
     },
   ];
 

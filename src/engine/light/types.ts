@@ -88,6 +88,9 @@ export type LightEventPayload =
   // award is an ordinary rally event with `causedBy`.
   | { type: "ROTATION_FAULT"; team: TeamId; note?: string }
   | { type: "SERVICE_ORDER_FAULT"; team: TeamId; note?: string }
+  // In-match protest (spec/29 F12) — a marker; distinct from the result-stage
+  // PROTEST signature intent.
+  | { type: "PROTEST_LODGED"; team: TeamId; playerId?: string; text?: string }
   | { type: "DELAY_WARNING"; team: TeamId }
   | { type: "DELAY_PENALTY"; team: TeamId }
   // `playerId` (spec/29 F11): who is treated — printed on the sheet.

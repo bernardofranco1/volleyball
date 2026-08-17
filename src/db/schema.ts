@@ -620,7 +620,8 @@ export const interruptRequests = pgTable(
       .references(() => tenants.id),
     team: text("team", { enum: ["A", "B"] }).notNull(),
     requestType: text("request_type", {
-      enum: ["TIMEOUT", "SUBSTITUTION", "CHALLENGE", "MEDICAL"],
+      // TS-only enum (no DB constraint) — PROTEST added by spec/29 F12.
+      enum: ["TIMEOUT", "SUBSTITUTION", "CHALLENGE", "MEDICAL", "PROTEST"],
     }).notNull(),
     payload: jsonb("payload"),
     status: text("status", { enum: ["PENDING", "APPROVED", "DENIED"] })

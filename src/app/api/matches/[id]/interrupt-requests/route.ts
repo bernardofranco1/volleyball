@@ -23,7 +23,16 @@ import { newId } from "@/lib/id";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const TYPES = ["TIMEOUT", "SUBSTITUTION", "CHALLENGE", "MEDICAL"] as const;
+// PROTEST (spec/29 F12): the team lodges an in-match protest from its tablet;
+// the scorer's approval records the PROTEST_LODGED marker. Unquota-ed — the
+// protest protocol, not this endpoint, decides whether it stands.
+const TYPES = [
+  "TIMEOUT",
+  "SUBSTITUTION",
+  "CHALLENGE",
+  "MEDICAL",
+  "PROTEST",
+] as const;
 type ReqType = (typeof TYPES)[number];
 
 // The current-set fields the quota backstop reads (indoor set state; tablets are
@@ -47,7 +56,7 @@ async function remainingFor(
   team: "A" | "B",
   type: ReqType,
 ): Promise<number | null> {
-  if (type === "MEDICAL") return null;
+  if (type === "MEDICAL" || type === "PROTEST") return null;
   try {
     const { state, config } = await loadMatchState(matchId);
     const s = state as unknown as {

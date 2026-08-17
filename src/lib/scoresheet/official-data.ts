@@ -92,6 +92,16 @@ export interface OfficialSheetData {
   sets: SheetSetData[];
   sanctions: SheetSanction[];
   improperRequests: { team: TeamId; setNumber: number }[];
+  /**
+   * In-match protests (spec/29 F12), in order. Separate from the APPROVAL
+   * block's PROTEST signature intent, which contests the FINAL result.
+   */
+  protests: {
+    team: TeamId;
+    setNumber: number;
+    score: { a: number; b: number };
+    text: string | null;
+  }[];
   /** Pre-match coin toss (COIN_TOSS event). */
   tossWinnerSet1: TeamId | null;
   forfeit: { team: TeamId; reason: string } | null;
@@ -179,6 +189,7 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
   const sets: SheetSetData[] = [];
   const sanctions: SheetSanction[] = [];
   const improperRequests: { team: TeamId; setNumber: number }[] = [];
+  const protests: OfficialSheetData["protests"] = [];
   let tossWinnerSet1: TeamId | null = null;
   let forfeit: { team: TeamId; reason: string } | null = null;
   const remarks: string[] = [];
@@ -551,6 +562,27 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
         break;
       }
 
+      case "PROTEST_LODGED": {
+        // Printed through the composer (spec/29 F12). Kept separate from the
+        // APPROVAL block's PROTEST intent, which is about the final result.
+        if (team) {
+          const pid = typeof p.playerId === "string" ? p.playerId : undefined;
+          protests.push({
+            team,
+            setNumber: ev.setNumber ?? cur?.setNumber ?? sets.length,
+            score: evScore,
+            text: typeof p.text === "string" ? p.text.trim() || null : null,
+          });
+          remarks.push(
+            remark.protest(
+              ctxOf(ev, { team, playerId: pid }),
+              typeof p.text === "string" ? p.text : null,
+            ),
+          );
+        }
+        break;
+      }
+
       case "SET_DEFAULT": {
         // A defaulted set has no ladder of its own to explain it, so it goes to
         // REMARKS with the set and the score at the moment (spec/29 F14). The
@@ -571,7 +603,15 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
     }
   }
 
-  return { sets, sanctions, improperRequests, tossWinnerSet1, forfeit, remarks };
+  return {
+    sets,
+    sanctions,
+    improperRequests,
+    protests,
+    tossWinnerSet1,
+    forfeit,
+    remarks,
+  };
 }
 
 export type { ReportPlayer };

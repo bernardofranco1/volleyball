@@ -15,6 +15,7 @@ import { useResultSignOff } from "@/components/scoring/shared/ResultSignOff";
 import { usePrematchSignOff } from "@/components/scoring/shared/PrematchSignOff";
 import { SanctionsControl } from "@/components/scoring/shared/SanctionsControl";
 import { FaultCorrection } from "@/components/scoring/shared/FaultCorrection";
+import { ProtestControl } from "@/components/scoring/shared/ProtestControl";
 import { IndoorLineupEntry } from "@/components/scoring/IndoorLineupEntry";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
@@ -179,6 +180,15 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
               autoPoint={config.sanctionAutoPoint}
               misconductA={state.misconductA}
               misconductB={state.misconductB}
+            />
+            <ProtestControl
+              status={state.status}
+              teamAName={teamAName}
+              teamBName={teamBName}
+              rosterA={rosterA}
+              rosterB={rosterB}
+              dispatch={dispatch}
+              pending={pending}
             />
             {set ? (
               <FaultCorrection

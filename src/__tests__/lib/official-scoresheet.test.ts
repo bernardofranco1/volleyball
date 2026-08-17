@@ -432,3 +432,45 @@ describe("remarks composed from the log", () => {
     expect(sheet.remarks).toContain("Net height re-measured at 2.43 m");
   });
 });
+
+// ── Phase 5: in-match protest (spec/29 F12) ─────────────────────────────────
+
+describe("in-match protest", () => {
+  it("records the team, set, score and text — separately from the result-stage PROTEST", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("RALLY_WON_A", {}, [1, 0]),
+      ev(
+        "PROTEST_LODGED",
+        { team: "B", playerId: "b1", text: "ball in / out call" },
+        [1, 0],
+      ),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    expect(sheet.protests).toEqual([
+      { team: "B", setNumber: 1, score: { a: 1, b: 0 }, text: "ball in / out call" },
+    ]);
+    // And it reads in REMARKS with who lodged it.
+    const line = sheet.remarks.find((r) => r.includes("protest lodged"));
+    expect(line).toContain("Kristen Nuss");
+    expect(line).toContain("ball in / out call");
+  });
+
+  it("does not touch the score", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("RALLY_WON_A", {}, [1, 0]),
+      ev("PROTEST_LODGED", { team: "B" }, [1, 0]),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    expect(sheet.sets[0].scoreA).toBe(1);
+    expect(sheet.sets[0].scoreB).toBe(0);
+  });
+
+  it("is empty for a match with none", () => {
+    const sheet = buildOfficialSheetData(baseReport("BEACH", beachEvents()));
+    expect(sheet.protests).toEqual([]);
+  });
+});
