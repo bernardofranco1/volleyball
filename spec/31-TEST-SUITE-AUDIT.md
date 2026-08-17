@@ -1,6 +1,7 @@
 # 31 — Test-suite audit: number, depth, and what "attested on build" actually means
 
-**Status: AUDITED 2026-08-17; first installment of fixes shipped the same day.**
+**Status: AUDITED 2026-08-17. Backlog items 1, 2, 3 and 5 IMPLEMENTED the same
+day (611 → 711 tests); items 4 and the §1 decision remain with the owner.**
 Requested as: can the number and depth of the unit tests be optimised so every
 functionality is attested to work at build time? Short answer: the suite is
 fast and its engine core is genuinely deep, so "number" was never the problem —
@@ -139,3 +140,84 @@ In value order, with the pattern to use:
   to a whole-product attestation, and both recent stale-cache bugs were caught
   by exactly this layer.
 - Suite speed. 23 s is not a problem worth a single line of churn.
+
+
+---
+
+## 7. Backlog implementation — 2026-08-17
+
+611 → **711 tests**, 62 → 68 files, ~26 s. Three defects found in the writing.
+
+### Item 1 — server actions (the mutation layer)
+
+Four modules, chosen for blast radius, all previously dark:
+
+| Module | Tests | What is now pinned |
+|---|---|---|
+| `release-actions` | 13 | backup **before** the domain flip (asserted on call ORDER, not just occurrence); the schema guard; target/state gates; the migration gate keyed to the CANDIDATE; rollback recorded as ROLLBACK; the honest failed-backup count |
+| `match-admin-actions` | 12 | rewind + fault-correction gate chains — authorization, then the signed-scoresheet lock, then validation; the deliberate asymmetry that a fault correction demands a reason and a rewind does not |
+| `team-actions` | 10 | spec/29 F1's rule that a bench official occupies no playing spot, whatever the form submitted; jersey uniqueness; conversion both ways |
+| `csv-actions` | 12 | the refusals that stop a bad file becoming permanent data — duplicate jerseys (in-file and against saved), one person on two teams, missing team/name, the template's own example row; and teams→people→players insert order |
+
+**Defect found: the jersey-uniqueness check ran before the staff decision**, so
+a stale number left in the form's number field could refuse a coach for a clash
+that cannot apply to them (a bench official carries no number). Fixed in both
+`createPlayer` and `updatePlayer` by deciding the roster kind first.
+
+### Item 2 — grass/light validator parity
+
+One script, run against both engines: 44 tests, mostly refusals, taking both
+from ~30% to **72%** — parity with indoor/beach. Notable case: reaching grass's
+substitution cap requires slot-legal *returns*, because it allows more
+substitutions (4) than it has players on court (3); a naive loop cannot get
+there, which is exactly the sort of thing a test written from the config rather
+than the rulebook gets wrong.
+
+### Item 3 — `liveMatches`
+
+5 tests. Pins the window-function count (the sample is capped at 10; the count
+must be the real total — it once reported 10 for 40 live matches) and the
+`public.` qualification that makes a homolog console ask about PRODUCTION.
+
+### Item 5 — coverage, and why the headline went DOWN
+
+`npm run test:coverage` shipped with the audit. The numbers need reading with
+care:
+
+```
+files measured   92 → 97      (+5 pulled out of the dark)
+statements COVERED  4091 → 4482   (+391)
+statements TOTAL    5679 → 6305   (+626)
+headline %         72.03 → 71.08  (DOWN)
+```
+
+Nothing regressed. The percentage is a ratio over files the tests *import*, so
+testing a previously-untested module adds its whole statement count to the
+denominator and the ratio falls even as verified behaviour rises. Per module:
+
+| Module | Before | After |
+|---|---|---|
+| `grass/validator` | 31% | **72%** |
+| `light/validator` | 29% | **72%** |
+| `csv-actions` | untested | **68%** |
+| `release-actions` | untested | **60%** |
+| `releases` | 25% | **46%** |
+| `offline-queue`, `interrupt-quota` | new | **100%** |
+
+**This is the concrete reason not to add coverage thresholds yet** — the
+recommendation in §5 item 5, now demonstrated rather than argued. A threshold
+set today would be tripped by the next honest attempt to test a dark module.
+Thresholds become safe once the mutation layer is broadly covered and the
+denominator stops moving; the metric to watch until then is
+`statements.covered`, which only rises.
+
+### Still open
+
+- **Item 4 / §1 — the owner's calls.** Wiring `E2E_*` secrets (so the
+  scorer/tablet specs stop silently skipping), and choosing between branch
+  protection and CI status in the release console. Neither is a code change I
+  can make correctly without the decision.
+- `match-admin-actions` and `team-actions` sit at 24% / 30% because each file
+  holds several other actions (officials, sessions, team CRUD). The *gates*
+  are covered; the remaining statements are sibling actions, and they are the
+  natural next slice.

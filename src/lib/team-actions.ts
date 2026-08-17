@@ -253,7 +253,12 @@ export async function createPlayer(
       `${fullName} is already on a roster in this competition. One person can only play for one team — remove the other entry first.`,
     );
 
-  const jerseyNumber = intOrNull(fd, "jerseyNumber");
+  // Decide the kind FIRST: a bench official carries no jersey number, so the
+  // uniqueness check below must not run for them. It used to, which meant a
+  // stale value left in the form's number field could refuse a coach for a
+  // clash that cannot apply to them (found by the spec/31 action tests).
+  const kind = rosterKind(fd);
+  const jerseyNumber = kind.role === "STAFF" ? null : intOrNull(fd, "jerseyNumber");
   if (jerseyNumber != null) {
     const dup = await db
       .select({ id: players.id })
@@ -265,15 +270,13 @@ export async function createPlayer(
     if (dup.length > 0)
       return fail(`Jersey number ${jerseyNumber} is already used on this team.`);
   }
-
-  const kind = rosterKind(fd);
   await db.insert(players).values({
     id: newId("plyr"),
     teamId,
     tenantId: g.tenantId,
     personId: picked.id,
     // A bench official occupies no playing spot: no number, no C/L flags.
-    jerseyNumber: kind.role === "STAFF" ? null : jerseyNumber,
+    jerseyNumber,
     isCaptain: kind.role !== "STAFF" && fd.get("isCaptain") != null,
     isLibero: kind.role !== "STAFF" && fd.get("isLibero") != null,
     role: kind.role,
@@ -325,7 +328,10 @@ export async function updatePlayer(
   // belongs to the person (spec/24 §2.3) — editing it here would have changed
   // only this competition's copy, which is the duplication the registry removes.
   // The roster row links to the person editor instead.
-  const jerseyNumber = intOrNull(fd, "jerseyNumber");
+  // Kind first — see createPlayer: staff carry no number, so the uniqueness
+  // check must not run for them.
+  const kind = rosterKind(fd);
+  const jerseyNumber = kind.role === "STAFF" ? null : intOrNull(fd, "jerseyNumber");
   if (jerseyNumber != null) {
     const dup = await db
       .select({ id: players.id })
@@ -340,12 +346,10 @@ export async function updatePlayer(
     if (dup.length > 0 && dup[0].id !== playerId)
       return fail(`Jersey number ${jerseyNumber} is already used on this team.`);
   }
-
-  const kind = rosterKind(fd);
   await db
     .update(players)
     .set({
-      jerseyNumber: kind.role === "STAFF" ? null : jerseyNumber,
+      jerseyNumber,
       isCaptain: kind.role !== "STAFF" && fd.get("isCaptain") != null,
       isLibero: kind.role !== "STAFF" && fd.get("isLibero") != null,
       role: kind.role,
