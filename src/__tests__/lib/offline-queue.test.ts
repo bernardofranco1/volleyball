@@ -32,10 +32,11 @@ function restore(
 ): { action: "flush"; items: { type: string }[] } | { action: "drop" } | { action: "none" } {
   if (!raw) return { action: "none" };
   const parsed = JSON.parse(raw) as Persisted | { type: string }[];
-  const items = Array.isArray(parsed) ? parsed : (parsed.items ?? []);
+  const items = Array.isArray(parsed) ? [] : (parsed.items ?? []);
   const savedAt = Array.isArray(parsed) ? null : (parsed.savedAt ?? null);
   if (!Array.isArray(items) || items.length === 0) return { action: "none" };
-  if (savedAt != null && now - savedAt > QUEUE_MAX_AGE_MS) return { action: "drop" };
+  // Undatable counts as too old — see the legacy-migration tests below.
+  if (savedAt == null || now - savedAt > QUEUE_MAX_AGE_MS) return { action: "drop" };
   return { action: "flush", items };
 }
 
@@ -70,14 +71,75 @@ describe("queue age-out", () => {
 });
 
 describe("queue restore tolerance", () => {
-  it("still reads the pre-stamp shape written by an older build", () => {
-    // A deploy must not throw away events a scorer queued minutes earlier.
-    const r = restore(JSON.stringify([{ type: "RALLY_WON_B" }]), now);
-    expect(r).toEqual({ action: "flush", items: [{ type: "RALLY_WON_B" }] });
-  });
-
   it("does nothing for an absent or empty queue", () => {
     expect(restore(null, now).action).toBe("none");
     expect(restore(stamped(0, []), now).action).toBe("none");
+  });
+
+  it("never flushes an unstamped value found in sessionStorage", () => {
+    // sessionStorage was introduced together with the stamp, so a bare array
+    // there is not history from an older build — it is a corrupt value, and
+    // replaying an undatable queue is exactly what the age-out forbids.
+    // Whether it reads as "nothing usable" or "too old", the one outcome that
+    // must never happen is a flush.
+    const r = restore(JSON.stringify([{ type: "RALLY_WON_B" }]), now);
+    expect(r.action).not.toBe("flush");
+  });
+});
+
+/**
+ * Legacy `localStorage` migration (spec/30 Phase E).
+ *
+ * The queue moved to sessionStorage in spec/29 Phase 7 and nothing migrated
+ * it, leaving old keys on every scoring device.
+ *
+ * They are cleared and NOT replayed, which deserves justification: the legacy
+ * shape carries no timestamp, so its age cannot be bounded, and the age-out
+ * exists precisely because replaying old rallies corrupts the record. The loss
+ * is largely theoretical — an OFFLINE scorer cannot load a new build, so for
+ * the new code to meet a fresh legacy queue the device must have been online,
+ * by which time the old code had already drained it. What is left on devices
+ * is old keys from finished sessions: exactly what must not be replayed.
+ */
+function migrateLegacy(legacyRaw: string | null): {
+  cleared: boolean;
+  notifiedCount: number;
+} {
+  if (!legacyRaw) return { cleared: false, notifiedCount: 0 };
+  try {
+    const items = JSON.parse(legacyRaw) as unknown;
+    return {
+      cleared: true,
+      notifiedCount: Array.isArray(items) ? items.length : 0,
+    };
+  } catch {
+    return { cleared: true, notifiedCount: 0 };
+  }
+}
+
+describe("legacy queue migration", () => {
+  it("clears the legacy key and tells the scorer how much was dropped", () => {
+    const r = migrateLegacy(
+      JSON.stringify([{ type: "RALLY_WON_A" }, { type: "RALLY_WON_B" }]),
+    );
+    expect(r.cleared).toBe(true);
+    expect(r.notifiedCount).toBe(2);
+  });
+
+  it("clears an unreadable legacy value without a message", () => {
+    // Nothing useful to tell the scorer, and the key must still go.
+    const r = migrateLegacy("{not json");
+    expect(r).toEqual({ cleared: true, notifiedCount: 0 });
+  });
+
+  it("clears an empty legacy queue silently", () => {
+    expect(migrateLegacy(JSON.stringify([]))).toEqual({
+      cleared: true,
+      notifiedCount: 0,
+    });
+  });
+
+  it("does nothing when there is no legacy key", () => {
+    expect(migrateLegacy(null)).toEqual({ cleared: false, notifiedCount: 0 });
   });
 });

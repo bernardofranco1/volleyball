@@ -324,22 +324,59 @@ export function createMatchProvider<
     // Restore any queue persisted before a reload and try to drain it.
     useEffect(() => {
       try {
+        // The queue moved from localStorage to sessionStorage (spec/29 Phase
+        // 7). Nothing migrated it, so a scorer with events queued under the
+        // OLD build who reloaded onto the NEW one lost them silently, and the
+        // legacy keys sat on every scoring device forever (spec/30 R3).
+        //
+        // A legacy queue is CLEARED and its contents are NOT replayed. That
+        // looks harsh, so the reasoning matters:
+        //
+        //   • The legacy shape is a bare array with no timestamp, so its age
+        //     cannot be bounded — and the age-out below exists precisely
+        //     because replaying old rallies into a match that has since been
+        //     scored, corrected or signed corrupts the official record.
+        //   • The loss it risks is small and largely theoretical. A scorer who
+        //     is OFFLINE cannot load a new build; they keep running the old
+        //     one, which flushes its own queue on reconnect. For the new code
+        //     to meet a fresh legacy queue, the device must have been online —
+        //     in which case the queue had already drained.
+        //   • What remains on devices is therefore mostly old keys from
+        //     sessions long over: exactly what must not be replayed.
+        //
+        // So: clear it, say so, and let the scorer check the court. Clearing
+        // also ends the cross-tab hazard that moving to sessionStorage was
+        // meant to close, and stops the keys accumulating forever.
+        const legacy = localStorage.getItem(storageKey);
+        if (legacy) {
+          localStorage.removeItem(storageKey);
+          try {
+            const items = JSON.parse(legacy) as unknown;
+            if (Array.isArray(items) && items.length > 0) {
+              setError(
+                `${items.length} unsent action(s) from an earlier session could not be dated and were not replayed. Check the score against the court.`,
+              );
+            }
+          } catch {
+            /* unreadable legacy value — dropping it silently is right */
+          }
+        }
+
         const raw = sessionStorage.getItem(storageKey);
         if (!raw) return;
-        const parsed = JSON.parse(raw) as
-          | { savedAt?: number; items?: P[] }
-          | P[];
-        // Tolerate the pre-stamp shape (a bare array) so a queue written by the
-        // previous build is not thrown away on the deploy that adds the stamp.
-        const items = Array.isArray(parsed) ? parsed : (parsed.items ?? []);
+        // Only ever the stamped shape here: sessionStorage was introduced
+        // together with the stamp, so an unstamped value in it is corruption,
+        // not history — and it is treated as such (dropped, below).
+        const parsed = JSON.parse(raw) as { savedAt?: number; items?: P[] };
+        const items = Array.isArray(parsed) ? [] : (parsed.items ?? []);
         const savedAt = Array.isArray(parsed) ? null : (parsed.savedAt ?? null);
         if (!Array.isArray(items) || items.length === 0) return;
 
         // Age-out (spec/29 Phase 7 audit). Replaying rallies from hours ago
         // into a match that has since been scored, corrected or signed would
         // corrupt the official record, and the scorer has no way to see it
-        // coming. Old queues are dropped and SAID SO, never silently flushed.
-        if (savedAt != null && Date.now() - savedAt > QUEUE_MAX_AGE_MS) {
+        // coming. An undatable queue counts as too old for the same reason.
+        if (savedAt == null || Date.now() - savedAt > QUEUE_MAX_AGE_MS) {
           sessionStorage.removeItem(storageKey);
           setError(
             "Unsent actions from an earlier session were too old to send and have been discarded. Check the score against the court.",
