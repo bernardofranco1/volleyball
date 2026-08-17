@@ -70,6 +70,9 @@ export async function GET(
 
   const rows = await db
     .select({
+      // `id` is what an UNDO's `targetEventId` points at — without it the log
+      // overlay cannot tell which rows were cancelled (spec/30 Phase D).
+      id: eventsTable.id,
       sequence: eventsTable.sequence,
       eventType: eventsTable.eventType,
       setNumber: eventsTable.setNumber,

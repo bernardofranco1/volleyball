@@ -1,6 +1,11 @@
 # 30 — spec/29 follow-ups: the stale-cache blast radius, the deferred register, and the rollout
 
-**Status: PLANNED 2026-08-17. Plan only — no code.** Authored immediately after
+**Status: PHASES A–E + G IMPLEMENTED 2026-08-17** on
+`feat/spec-29-pro-scoring` (A, B) and `feat/spec-30-followups` (C, D, E, G),
+586 tests passing. **F, H and R remain open** — each on a gate this spec put in
+front of it, and all three gates are the product owner's. See §6.
+
+*(Originally: PLANNED 2026-08-17, plan only — no code.)* Authored immediately after
 spec/29 shipped (branch `feat/spec-29-pro-scoring`, `f05ae22`, unpushed), from
 three inputs: the three defects spec/29's implementation *found and fixed*, the
 residuals each of those fixes left behind (verified in code during this
@@ -195,7 +200,16 @@ Two tiers, deliberately separated because they have different failure modes:
 - Acceptance: Tier 1 snapshot tests green on both goldens + both extra
   fixtures; Tier 2 parity report checked in with any accepted gaps annotated.
 
-### Phase H — tablet pre-match signing (M; **gated on a product-owner security decision**)
+### Phase H — tablet pre-match signing — ❌ **DROPPED 2026-08-17 by decision**
+
+The product owner chose **console-only**: coaches and captains keep signing on
+the scorer device as spec/29 Phase 1 shipped, and G7's tablet capture stays
+unbuilt. Nothing is lost that the sheet needs — the signatures are collected,
+printed and retained; only the device differs. The design below is kept because
+it is the thing that would be built if the decision is ever revisited, and
+because writing it down is what made the decision answerable.
+
+*(Original plan, not implemented:)*
 
 The design, so the decision has something concrete to approve:
 
@@ -281,3 +295,113 @@ gate.** Phase B's acceptance extends the same fixtures *first*.
 4. **Phase R timing:** the promote also delivers the 2026-08-14 security
    guards; if spec/29 QA drags, consider promoting the already-built `24abc2e`
    production artifact first so those guards stop waiting on feature work.
+
+
+---
+
+## 6. Implementation notes — 2026-08-17
+
+### What shipped
+
+| Phase | Branch | Outcome |
+|---|---|---|
+| A — tablet exceptional sub | `feat/spec-29-pro-scoring` | done, **plus R4 below** |
+| B — shared counted-score walk | `feat/spec-29-pro-scoring` | done |
+| C — standings off the raw MAX | `feat/spec-30-followups` | done |
+| D — audit views mark cancellations | `feat/spec-30-followups` | done |
+| E — legacy queue migration | `feat/spec-30-followups` | done, **decision changed — see below** |
+| G — golden PDF text extraction | `feat/spec-30-followups` | done, both tiers |
+| F — medical limits | `feat/spec-30-followups` | **done** — F-0 passed on the supplied rulebook |
+| H — tablet signing | — | **dropped** by decision (console-only) |
+| R — rollout | — | **homolog only**, by decision |
+
+### R4 — the engine was not ready for the exceptional substitution either
+
+Phase A assumed the engine "already accepts the flag past the per-set cap" and
+that only the two request-path gates needed opening. It waived the COUNT only.
+Rule 15.7 puts an exceptional substitution "beyond the limits of Rule 15.6" —
+and 15.6 is the whole substitution rule, slot machinery included. The player
+who cannot continue is very often a substitute already on court, whom the slot
+rules let only their own starter replace, so the exact scenario the rule exists
+for was still refused after both gates opened. All three validators (indoor
+`isExceptional`, grass/light `isEmergency`) now waive the slot rules while
+keeping every physical check, and a test pins that the shortcut is not a hole.
+
+### Phase E — the decision changed on contact
+
+The plan said adopt the legacy queue, age it out, delete the key. Adopting
+turned out to be wrong: the legacy shape is a bare array with NO timestamp, so
+its age cannot be bounded — and the age-out exists precisely because replaying
+old rallies corrupts the record. Weighing the two harms decided it:
+
+- an OFFLINE scorer cannot load a new build, so the old code keeps running and
+  drains its own queue on reconnect. For the new code to meet a FRESH legacy
+  queue the device must have been online, by which point the queue had gone;
+- what actually remains on devices is old keys from finished sessions — exactly
+  what must not be replayed.
+
+So legacy keys are cleared with a message naming how many actions were dropped,
+and never replayed. This also let the bare-array tolerance go: sessionStorage
+was introduced together with the stamp, so an unstamped value there is
+corruption, not history, and an undatable queue now counts as too old.
+
+### Phase D — one site needed nothing
+
+`renderLogPdf` already struck, named and greyed cancelled rows. Checked before
+changing it; the report PDF's audit tables reuse its `removedByCorrections`
+helper rather than the new `cancelledEventIds`, because it also names WHICH
+correction removed each row. Bonus fix found while there: the fault-correction
+picker was offering rallies a previous correction had already cancelled, so the
+count shown above the two-tap confirm overstated what the action would do.
+
+### F-0 — failed first, then passed on the supplied rulebook
+
+**Resolved 2026-08-17.** The product owner supplied the Official Volleyball
+Rules 2025-2028 (39th FIVB World Congress 2024). **Rule 17.1.2** gives an
+injured player a 3-minute recovery "but not more than once for the same player
+in the match", and if they do not recover "his/her team is declared incomplete"
+(→ 6.4.3, 7.3.1 — which is spec/29 F14's SET_DEFAULT; the rulebook's own
+cross-reference and our model agree). Indoor is therefore capped at 1 with the
+citation in the config; beach/grass/light stay uncapped because the beach rules
+are a separate document that was not supplied and grass/light have no selected
+authority.
+
+Rule 15.7 in the same document independently confirms **R4**: an exceptional
+substitution is "beyond the limits of Rule 15.6" — the whole rule, not just the
+count — which is exactly the waiver Phase A had to add.
+
+*(The original F-0 finding, before the rulebook was supplied:)*
+
+Searched before concluding. There is no FIVB 2025–2028 rulebook in this repo or
+on this machine; the only rulebook present is **Light Volleyball 2022–2025**,
+which is the wrong discipline AND the wrong edition. The reference scoresheets
+in `spec/reference/` mention recovery/medical/injury **zero** times — they are
+blank forms, not rules.
+
+Corroborating, the sibling repo's governance register
+(`volleyball-codex/spec/20-RULE-SOURCE-REGISTER.md`, last verified 2026-07-14)
+records the indoor and beach 2025–2028 rulebooks as *"Official source located;
+detailed conformance audit required"* — located, not stored, and never audited.
+Its own rule is that **no preset may be labeled "official" until the register
+identifies its source and edition.** Guessing a recovery limit here would break
+that governance rule as well as spec/29's reasoning.
+
+**Phase F therefore stays where spec/29 left it**: recorded, tallied, repeats
+flagged on the sheet, no cap enforced, and the enforcement point marked in
+`baseReducer.ts`. Unblocking it needs one thing — the rulebook PDFs (§5.2).
+
+### Still open, and why
+
+- **F** — needs the rulebooks (§5.2). Everything else about the phase is ready.
+- **H** — needs the security decision (§5.1). The design is written; nothing
+  should be built until the model is chosen.
+- **R** — needs authorization. It merges to `main`, pushes, migrates production
+  and promotes; the branches are still local and unpushed.
+
+### Sequencing, confirmed again
+
+The Phase B acceptance extended the fault-correction fixture BEFORE touching
+the VSR feed and the timings export, and Phase G's extraction immediately made
+two spec/29 features (F4 court, F5 venue time zone) assertable for the first
+time — both had shipped provable only as "the renderer did not throw". The
+standing rule holds: fixtures land before the features they gate.

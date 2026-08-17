@@ -1,11 +1,13 @@
 // On-the-fly standings computation (spec/10 §"Pool play"). Aggregated from the
-// denormalised matches columns (sets) plus a per-set SQL aggregate over the
-// events log (points per set — computed in the database, not by shipping every
-// event row over the wire). No stored standings table — recomputed per request,
-// which is fine at the scale of a single competition.
-import { and, eq, inArray, max, sql } from "drizzle-orm";
+// denormalised matches columns (sets) plus per-match point totals read from
+// each finished match's replayed snapshot (spec/30 Phase C — a MAX over raw
+// event rows counted points that UNDO/REWIND had already removed). No stored
+// standings table — recomputed per request, which is fine at the scale of a
+// single competition.
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { events, matches, pools, teams } from "@/db/schema";
+import { loadMatchPointTotals } from "@/lib/match-scores";
+import { matches, pools, teams } from "@/db/schema";
 
 export interface StandingRow {
   teamId: string;
@@ -200,35 +202,18 @@ export async function computeStandings(
   ]);
   if (teamRows.length === 0) return [];
 
-  // Points per match per team: per-set final scores aggregated in SQL —
-  // ≤ (matches × sets) rows instead of the full event log.
-  const pointsByMatch = new Map<string, { a: number; b: number }>();
-  if (finished.length > 0) {
-    const perSet = await db
-      .select({
-        matchId: events.matchId,
-        setNumber: events.setNumber,
-        a: max(events.scoreAfterA),
-        b: max(events.scoreAfterB),
-      })
-      .from(events)
-      .where(
-        and(
-          inArray(
-            events.matchId,
-            finished.map((m) => m.id),
-          ),
-          sql`${events.setNumber} is not null`,
-        ),
-      )
-      .groupBy(events.matchId, events.setNumber);
-    for (const s of perSet) {
-      const cur = pointsByMatch.get(s.matchId) ?? { a: 0, b: 0 };
-      cur.a += s.a ?? 0;
-      cur.b += s.b ?? 0;
-      pointsByMatch.set(s.matchId, cur);
-    }
-  }
+  // Points per match per team, for the points ratio that breaks ranking ties.
+  //
+  // Read from the replayed snapshot, NOT from a MAX over raw event rows
+  // (spec/30 Phase C). UNDO and REWIND are resolved by replay rather than by
+  // deleting rows, so an undone rally still contributes to a MAX — and F13's
+  // fault correction cancels several points mid-set, so the old error is no
+  // longer the bounded "one ahead" the comment used to promise. A wrong points
+  // ratio is a wrong ranking.
+  const pointsByMatch =
+    finished.length > 0
+      ? await loadMatchPointTotals(finished.map((m) => m.id))
+      : new Map<string, { a: number; b: number }>();
 
   const poolName = new Map(poolRows.map((p) => [p.id, p.name]));
   return buildStandings(teamRows, finished, pointsByMatch, poolName);

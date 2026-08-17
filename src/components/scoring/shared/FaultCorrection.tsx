@@ -21,6 +21,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import type { TeamId } from "@/engine/types";
 import { cancelFaultPointsAction } from "@/lib/match-admin-actions";
+import { cancelledEventIds } from "@/lib/event-survival";
 import { OK } from "@/lib/action-state";
 import { useT } from "@/lib/i18n/client";
 import { ScoringModal } from "@/components/scoring/ScoringModal";
@@ -77,7 +78,7 @@ export function FaultCorrection({
   // panel is closed.
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
+    let aborted = false;
     void (async () => {
       try {
         const res = await fetch(`/api/matches/${matchId}/events`, {
@@ -86,19 +87,28 @@ export function FaultCorrection({
         if (!res.ok) return;
         const json = (await res.json()) as {
           events?: {
+            id: string;
             sequence: number;
             eventType: string;
             setNumber: number | null;
             scoreAfterA: number | null;
             scoreAfterB: number | null;
+            payload?: unknown;
           }[];
         };
-        if (cancelled) return;
-        const points = (json.events ?? [])
+        if (aborted) return;
+        const all = json.events ?? [];
+        // Rallies already cancelled by an earlier correction are not offered:
+        // the server excludes them from what it cancels, so listing them here
+        // would show the scorer a count larger than what actually happens
+        // (spec/30 Phase D).
+        const gone = cancelledEventIds(all);
+        const points = all
           .filter(
             (e) =>
               (e.eventType === "RALLY_WON_A" || e.eventType === "RALLY_WON_B") &&
-              e.setNumber === setNumber,
+              e.setNumber === setNumber &&
+              !gone.has(e.id),
           )
           .map((e) => ({
             sequence: e.sequence,
@@ -112,7 +122,7 @@ export function FaultCorrection({
       }
     })();
     return () => {
-      cancelled = true;
+      aborted = true;
     };
   }, [open, matchId, setNumber]);
 

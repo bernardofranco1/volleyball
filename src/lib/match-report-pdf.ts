@@ -39,6 +39,9 @@ function duration(data: MatchReportData): string {
 
 /** Exported for the render tests (no DB, fabricated data). */
 export function renderPdf(data: MatchReportData): Promise<Buffer> {
+  // Audit tables below print as-recorded scores and mark rows a later
+  // correction removed (spec/30 Phase D).
+  const suffix = cancelSuffixFor(data.events);
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: PAGE.margin });
     const chunks: Buffer[] = [];
@@ -150,7 +153,11 @@ export function renderPdf(data: MatchReportData): Promise<Buffer> {
           e.scoreAfterA != null && e.scoreAfterB != null
             ? `${e.scoreAfterA}–${e.scoreAfterB}`
             : "—",
-          e.eventType,
+          // As-recorded values, marked when later cancelled (spec/30 Phase D):
+          // this is an audit table, so the row stays and states both facts —
+          // and names WHICH correction removed it, so an auditor need not
+          // chase ids.
+          e.eventType + suffix(e),
           new Date(e.timestamp).toUTCString().slice(17, 25),
         ]);
       }
@@ -176,7 +183,7 @@ export function renderPdf(data: MatchReportData): Promise<Buffer> {
         ensureSpace(doc, 16);
         tableRow(doc, left, width, cols, [
           String(e.sequence),
-          e.eventType,
+          e.eventType + suffix(e),
           e.setNumber != null ? String(e.setNumber) : "—",
           e.scoreAfterA != null && e.scoreAfterB != null
             ? `${e.scoreAfterA}–${e.scoreAfterB}`
@@ -369,6 +376,21 @@ export function removedByCorrections(events: ReportEvent[]): Map<string, string>
     survivors.push(e);
   }
   return removedBy;
+}
+
+/**
+ * "" or " ✕ cancelled (undo #14)" — the audit-view marking (spec/30 Phase D).
+ *
+ * Built from `removedByCorrections`, which already resolves UNDO/REWIND and
+ * names the correction responsible. Recomputed per block rather than threaded
+ * through: these renderers are called once per document and the log is small.
+ */
+function cancelSuffixFor(events: ReportEvent[]): (e: ReportEvent) => string {
+  const removedBy = removedByCorrections(events);
+  return (e) => {
+    const by = removedBy.get(e.id);
+    return by ? ` ✕ cancelled (${by})` : "";
+  };
 }
 
 function describeLogEvent(

@@ -11,6 +11,7 @@ import { useT } from "@/lib/i18n/client";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { SanctionsControl } from "@/components/scoring/shared/SanctionsControl";
 import { ProtestControl } from "@/components/scoring/shared/ProtestControl";
+import { RecoveryControl } from "@/components/scoring/shared/RecoveryControl";
 import {
   FaultCorrection,
   type FaultDispatch,
@@ -44,6 +45,9 @@ type SanctionPayload = Parameters<
 type ProtestPayload = Parameters<
   React.ComponentProps<typeof ProtestControl>["dispatch"]
 >[0];
+type RecoveryPayload = Parameters<
+  React.ComponentProps<typeof RecoveryControl>["dispatch"]
+>[0];
 type FaultPayload = Parameters<FaultDispatch>[0];
 
 export interface RotationMatchState {
@@ -58,6 +62,8 @@ export interface RotationMatchState {
   /** Cards held, for the sanctions escalation warning (spec/29 F6). */
   misconductA?: { type: string; playerId: string }[];
   misconductB?: { type: string; playerId: string }[];
+  /** Recoveries taken per roster-row id (Rule 17.1.2, spec/30 Phase F). */
+  recoveriesByPlayer?: Record<string, number>;
 }
 
 export interface RotationCourtProps {
@@ -103,7 +109,7 @@ export function RotationScoreboard({
      * are supersets of these.
      */
     dispatch: (
-      payload: SanctionPayload | ProtestPayload | FaultPayload,
+      payload: SanctionPayload | ProtestPayload | FaultPayload | RecoveryPayload,
     ) => void;
     error: string | null;
     queuedCount: number;
@@ -245,6 +251,18 @@ export function RotationScoreboard({
             autoPoint={config.sanctionAutoPoint}
             misconductA={state.misconductA ?? []}
             misconductB={state.misconductB ?? []}
+          />
+          <RecoveryControl
+            status={state.status}
+            rallyPhase={state.rallyPhase}
+            teamAName={teamAName}
+            teamBName={teamBName}
+            rosterA={rosterA}
+            rosterB={rosterB}
+            dispatch={dispatch}
+            pending={pending}
+            recoveryLimit={config.recoveriesPerPlayerPerMatch}
+            recoveriesByPlayer={state.recoveriesByPlayer}
           />
           <ProtestControl
             status={state.status}
