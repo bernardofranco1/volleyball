@@ -1,3 +1,4 @@
+import { DB_SCHEMA, IS_PROD_SCHEMA } from "@/db/env";
 import { requireGlobalAdmin } from "@/lib/authz";
 import {
   latestRelease,
@@ -26,6 +27,19 @@ import { ui } from "@/components/admin/styles";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Where the production release console lives.
+ *
+ * `NEXT_PUBLIC_APP_URL` is deliberately NOT set on the Preview environment —
+ * on a homologation build it would make provisioning emails link to production
+ * (`appOrigin` falls back to the request headers there, which is correct). So
+ * this build cannot read the production origin from its own environment, and
+ * the canonical address from spec/28 §8 is the fallback.
+ */
+const PRODUCTION_ORIGIN =
+  process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ??
+  "https://volleyball-eight.vercel.app";
+
 /** State → badge, so a building candidate reads at a glance. */
 function stateBadge(state: Deployment["state"]) {
   const tone =
@@ -45,6 +59,46 @@ function stateBadge(state: Deployment["state"]) {
 
 export default async function ReleasesPage() {
   await requireGlobalAdmin("/admin/releases");
+
+  // The release console is PRODUCTION-ONLY, and says so here rather than
+  // letting the "not configured" notice below imply a misconfiguration.
+  //
+  // Promoting from a homologation build would back up CLONE tenants, write the
+  // `releases` row and the audit entry into `homolog.*` where the production
+  // console cannot see them, and flip the production domain anyway — leaving
+  // production promoted with no backup. `promoteRelease` refuses outright for
+  // that reason; this page has to give the same answer, because an operator
+  // who reads "needs RELEASE_TOKEN…" will reasonably go and add it.
+  if (!IS_PROD_SCHEMA) {
+    return (
+      <Page width="narrow">
+        <PageHeader title="Releases" />
+        <Panel title="Production console only">
+          <p className="text-sm text-score-dim">
+            This build serves the
+            <code className="mx-1 rounded bg-surface px-1">{DB_SCHEMA}</code>
+            tables, so it deliberately cannot promote. Backups, the release
+            history and the audit trail would all be written to the wrong
+            schema, while the production domain moved anyway.
+          </p>
+          <p className="mt-3 text-sm text-score-dim">
+            Promote from the production console:{" "}
+            <a
+              className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+              href={`${PRODUCTION_ORIGIN}/admin/releases`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {PRODUCTION_ORIGIN}/admin/releases
+            </a>
+            . Everything else on this build is here to be validated — see
+            spec/28 §7.
+          </p>
+        </Panel>
+      </Page>
+    );
+  }
+
   const cfg = vercelConfig();
 
   if (!cfg) {
