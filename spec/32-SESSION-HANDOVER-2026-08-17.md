@@ -107,12 +107,12 @@ closed, but not a match that cannot be scored at all.
 2. **spec/31 §5 remainder** — `match-admin-actions` (24%) and `team-actions`
    (30%) hold several untested sibling actions (officials, sessions, team
    CRUD). The *gates* are covered; the siblings are the natural next slice.
-4. **Coverage thresholds** — deliberately NOT set. The headline % falls when a
+3. **Coverage thresholds** — deliberately NOT set. The headline % falls when a
    dark module is first tested (denominator grows faster than coverage), so a
    threshold today would be tripped by the next honest attempt. Watch
    `statements.covered` instead; revisit once the mutation layer is broadly
    covered. See spec/31 §7.
-5. **Grass/light rules authority** — neither discipline has a selected
+4. **Grass/light rules authority** — neither discipline has a selected
    rulebook (`volleyball-codex` spec/20). Their recovery limits and several
    validator rules are house rules by necessity.
 
