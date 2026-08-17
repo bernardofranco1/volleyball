@@ -2,6 +2,10 @@
 // NO runtime dependencies (no db, no storage, no zlib). Split from backup.ts
 // so tests and other callers can import the policy without dragging in the
 // postgres/supabase graph. backup.ts re-exports everything here.
+//
+// `scopedStoragePath` is the one import, and it is dependency-free too: it
+// reads DB_SCHEMA and returns a string.
+import { scopedStoragePath } from "@/db/env";
 
 export const BACKUP_BUCKET = "backups";
 
@@ -54,8 +58,26 @@ export const EXPORTED_TABLES = [
 export type BackupKind = "FULL" | "INCREMENTAL";
 export type BackupTrigger = "CRON" | "EVENT" | "MANUAL";
 
-/** Storage key for a run's object: daily-named fulls, ms-timestamped incrementals. */
+/**
+ * Storage key for a run's object: daily-named fulls, ms-timestamped incrementals.
+ *
+ * Prefixed with the environment (spec/28): the `backups` bucket is global to the
+ * Supabase project and the clone shares production's tenant ids, so without this
+ * a homologation FULL would upsert straight onto production's backup for that
+ * tenant and day — destroying the recovery point a promotion had just taken.
+ * The prefix is empty in production, so existing keys are unchanged.
+ */
 export function objectPathFor(
+  tenantId: string,
+  kind: BackupKind,
+  scope?: { competitionId: string },
+  now: Date = new Date(),
+): string {
+  return scopedStoragePath(tenantFolder(tenantId, kind, scope, now));
+}
+
+/** The un-prefixed part — also the listing path used by retention. */
+function tenantFolder(
   tenantId: string,
   kind: BackupKind,
   scope?: { competitionId: string },
@@ -67,6 +89,17 @@ export function objectPathFor(
   // Millisecond timestamp keeps paths unique; colon is not storage-key safe.
   const ts = now.toISOString().replace(/[:.]/g, "-");
   return `${tenantId}/incremental/${ts}-${scope?.competitionId ?? "unknown"}.json.gz`;
+}
+
+/**
+ * Prefix for one tenant's objects of a kind — what retention lists and deletes.
+ * Same namespacing as `objectPathFor`, so pruning in homologation can never
+ * reach production's objects.
+ */
+export function backupFolderFor(tenantId: string, kind: BackupKind): string {
+  return scopedStoragePath(
+    `${tenantId}/${kind === "FULL" ? "full" : "incremental"}`,
+  );
 }
 
 /** Debounce window for event-triggered incrementals (a set ending fires bursts). */

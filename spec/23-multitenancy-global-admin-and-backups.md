@@ -217,7 +217,7 @@ Retention, enforced at the end of the daily cron: keep the newest **30 fulls** p
 
 ### 7.5 Restore & console
 
-- `scripts/restore-backup.mts` (repo script, run manually — **restores are never triggered from the production app**): reads a backup file, verifies `migrationJournalIdx` compatibility, upserts in FK order into a target `DATABASE_URL`; `--dry-run` prints row counts. Serves three cases: single-tenant disaster restore, tenant portability, and staging-from-prod.
+- `scripts/restore-backup.mts` (repo script, run manually — **restores are never triggered from the production app**): reads a backup file, verifies `migrationJournalIdx` compatibility, upserts in FK order into a target `DATABASE_URL`; `--dry-run` prints row counts. Since spec/28 it also **requires `--schema prod|homolog`** — one database now holds both sets of tables, so the connection string alone no longer says where the rows land. Serves three cases: single-tenant disaster restore, tenant portability, and staging-from-prod.
 - `/admin/backups`: run history (tenant, kind, trigger, status, size, duration), per-tenant **Back up now**, signed-URL download. Failure of a cron full also goes to Sentry (`observability.ts`).
 
 ## 8. Test tenant

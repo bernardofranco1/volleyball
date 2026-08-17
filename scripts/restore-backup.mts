@@ -6,7 +6,15 @@
  * porting a tenant between projects, staging-from-prod.
  *
  * Usage:
- *   DATABASE_URL=postgres://… npx tsx scripts/restore-backup.mts <file.json.gz> [--dry-run]
+ *   DATABASE_URL=postgres://… npx tsx scripts/restore-backup.mts <file.json.gz> \
+ *     --schema prod|homolog [--dry-run]
+ *
+ * `--schema` is REQUIRED and has no default (same reasoning as db:migrate,
+ * spec/28): production and homologation are two schemas in ONE database, so
+ * naming the database no longer says where the rows land. Guessing has two
+ * failure modes and both are bad — clone data upserted over production, or a
+ * production restore that quietly went into the clone while the operator
+ * believed the outage was over.
  *
  * Rows are upserted (INSERT … ON CONFLICT (pk) DO UPDATE) in FK-safe order,
  * id-preserving, inside one transaction. Refuses files written against a NEWER
@@ -62,13 +70,33 @@ function snake(key: string): string {
 
 const [, , file, ...flags] = process.argv;
 if (!file) {
-  console.error("Usage: npx tsx scripts/restore-backup.mts <file.json.gz> [--dry-run]");
+  console.error(
+    "Usage: npx tsx scripts/restore-backup.mts <file.json.gz> --schema prod|homolog [--dry-run]",
+  );
   process.exit(1);
 }
 const dryRun = flags.includes("--dry-run");
 const url = process.env.DATABASE_URL;
 if (!url) {
   console.error("Set DATABASE_URL to the TARGET database (direct connection).");
+  process.exit(1);
+}
+
+/** Which set of tables receives the rows. Explicit or nothing (spec/28). */
+const schemaArg = flags[flags.indexOf("--schema") + 1];
+const targetSchema =
+  flags.includes("--schema") &&
+  (schemaArg === "prod" || schemaArg === "public"
+    ? "public"
+    : schemaArg === "homolog"
+      ? "homolog"
+      : null);
+if (!targetSchema) {
+  console.error(
+    "Refusing to guess which tables to restore into.\n" +
+      "  --schema homolog   → the homologation clone\n" +
+      "  --schema prod      → PRODUCTION tables",
+  );
   process.exit(1);
 }
 
@@ -91,6 +119,7 @@ if (doc.migrationJournalIdx > KNOWN_JOURNAL_IDX) {
 
 console.log(
   `Restoring ${doc.kind} backup of tenant ${doc.tenantId} (exported ${doc.exportedAt})` +
+    ` into schema "${targetSchema}"${targetSchema === "public" ? " — PRODUCTION" : ""}` +
     (doc.scope?.competitionId ? ` scope competition ${doc.scope.competitionId}` : "") +
     (dryRun ? " [dry-run]" : ""),
 );
@@ -103,8 +132,21 @@ for (const t of order) {
 
 if (dryRun) process.exit(0);
 
-const sql = postgres(url, { max: 1 });
+// One entry, no `public` fallback — a table missing from the target must error
+// rather than resolve against production data (spec/28 §0).
+const sql = postgres(url, {
+  max: 1,
+  connection: { search_path: `${targetSchema}, extensions` },
+});
 try {
+  // Prove the connection really landed where we asked before writing a row: the
+  // whole safety of this rests on one startup parameter being honoured.
+  const [{ cs }] = await sql<{ cs: string | null }[]>`select current_schema() as cs`;
+  if (cs !== targetSchema) {
+    throw new Error(
+      `Refusing to restore: asked for schema "${targetSchema}" but the connection resolves to "${cs ?? "nothing"}".`,
+    );
+  }
   await sql.begin(async (tx) => {
     for (const table of order) {
       const rows: Record<string, unknown>[] = doc.tables[table] ?? [];

@@ -19,8 +19,14 @@ export async function register() {
   // pinned to its own schema (spec/28). If the pooler ever stopped forwarding
   // the search_path startup parameter, this deployment would be reading and
   // writing PRODUCTION tables; better to refuse to boot. Production skips the
-  // check entirely (there is nothing to get wrong) and never pays for it.
-  if (process.env.NEXT_RUNTIME === "nodejs" && process.env.DB_SCHEMA) {
+  // round trip (there is nothing to get wrong) and never pays for it.
+  //
+  // NOT conditional on `process.env.DB_SCHEMA` any more: keying the check off
+  // the variable meant a deployment that LOST that variable — the one case
+  // where a preview silently falls back to the production tables — was also
+  // the one case that skipped the check. Importing `@/db` runs `db/env.ts`,
+  // whose Vercel-environment cross-check throws on exactly that.
+  if (process.env.NEXT_RUNTIME === "nodejs") {
     const { assertDbSchema } = await import("@/db");
     await assertDbSchema();
   }

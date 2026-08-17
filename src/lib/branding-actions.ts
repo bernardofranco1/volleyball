@@ -8,7 +8,11 @@ import { tenantBranding } from "@/db/schema";
 import { requireRole } from "@/lib/authz";
 import { COURT_VARS } from "@/lib/branding";
 import { normalizeHex } from "@/lib/colors";
-import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import {
+  createSupabaseAdminClient,
+  ownsStoragePath,
+  scopedStoragePath,
+} from "@/lib/supabase-admin";
 import { recordAudit } from "@/lib/audit";
 import { fail, ok, type FormState } from "@/lib/action-state";
 import { str } from "@/lib/form-data";
@@ -104,7 +108,9 @@ export async function updateBranding(
         "Logo must be a PNG, JPEG or WebP image. For SVG, host it elsewhere and use the URL field.",
       );
     const hash = createHash("sha256").update(buf).digest("hex").slice(0, 8);
-    uploadedPath = `${ctx.tenant.id}/logo-${hash}.${kind.ext}`;
+    // Environment-scoped (spec/28): the `branding` bucket is shared with
+    // production and cloned tenant ids are identical.
+    uploadedPath = scopedStoragePath(`${ctx.tenant.id}/logo-${hash}.${kind.ext}`);
     const admin = createSupabaseAdminClient();
     const { error } = await admin.storage
       .from(BRANDING_BUCKET)
@@ -175,7 +181,15 @@ export async function updateBranding(
     });
 
   const stalePath = uploadedLogoPath(prev?.logoUrl ?? null);
-  if (stalePath && stalePath !== uploadedPath && logoUrl !== prev?.logoUrl) {
+  if (
+    stalePath &&
+    stalePath !== uploadedPath &&
+    logoUrl !== prev?.logoUrl &&
+    // A cloned branding row points at PRODUCTION's logo object (spec/28): the
+    // row was copied, the object was not. Deleting it from homologation would
+    // break the logo on the live site. Only ever remove our own objects.
+    ownsStoragePath(stalePath)
+  ) {
     // Best-effort cleanup; a stray object is harmless.
     const admin = createSupabaseAdminClient();
     await admin.storage.from(BRANDING_BUCKET).remove([stalePath]);

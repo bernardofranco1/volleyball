@@ -34,6 +34,15 @@ database:
 - A **fail-closed boot check** (`assertDbSchema`, called from
   `instrumentation.register`) refuses to start a non-production deployment
   whose connection does not actually resolve to its schema.
+- A **Vercel-environment cross-check** (`db/env.ts`, added 2026-08-17) requires
+  `VERCEL_ENV === "production"` ⟺ `DB_SCHEMA === "public"`, and refuses to boot
+  otherwise. This closes the design's one fail-OPEN path: "unset means public"
+  is a deliberate default, but it meant that deleting one dashboard row — or
+  adding an environment that never had it — would give a preview deployment
+  production data with no `search_path`, no banner, and no boot check, since
+  the check was itself keyed off the variable that went missing. Gated on
+  `VERCEL === "1"` so local shells keep working, `DB_SCHEMA=public npx tsx …`
+  included.
 - `scripts/clone-prod-to-homolog.ts` rebuilds the clone in ~6s (25 tables,
   9.8k rows, 44 foreign keys re-pointed inside `homolog`, RLS parity, journal
   seeded, emails scrubbed to `@homolog.invalid` outside an allow-list).
@@ -97,9 +106,15 @@ All on the current Hobby plan.
    of a release targets the fresh `release` build; **rollback promotes any
    older production deployment instantly** (it already exists, built with the
    right env).
-4. ~~Protection Bypass for Automation for the one-URL proxy.~~ Not needed —
-   Phase 3 was dropped (§8), and it turned out not to be offered on this plan
-   anyway.
+4. ~~Protection Bypass for Automation for the one-URL proxy.~~ Not needed for
+   that — Phase 3 was dropped (§8). **It is, however, enabled and working**
+   (corrected 2026-08-17): the project carries a `scope: automation-bypass`
+   secret, injected as `VERCEL_AUTOMATION_BYPASS_SECRET`. Verified against live
+   deployment URLs — bare requests 302 to the SSO wall, requests carrying
+   `x-vercel-protection-bypass` return 200. The promote guard depends on this:
+   `fetchDeployedVersion` reads the candidate's `/api/version` through it, and
+   without it every promotion would hard-block on "the candidate did not report
+   how many migrations it needs".
 5. **postgres.js startup parameters** (`connection: { search_path }`) hold for
    the whole session on Supabase's **session pooler** — which is what homolog
    traffic uses (one validator; concurrency is trivial). Production keeps the
@@ -158,14 +173,18 @@ residual risk is a build-environment difference, accepted.
 
 - **`DB_SCHEMA`** env: `public` in Production env, `homolog` in Preview env
   (and in `.env.local` — see §10). `src/db/index.ts` passes it as
-  `connection: { search_path }`; homolog connections use the session pooler
-  URL, production keeps today's transaction-pooler URL untouched.
+  `connection: { search_path }`. *(As built: §0 supersedes the sentence this
+  bullet used to carry about homolog needing the session pooler — the startup
+  parameter survives the transaction pooler too, so homologation runs on the
+  same kind of connection string as production.)*
 - **No query changes.** Drizzle emits unqualified names; `search_path`
   resolves them. Nothing in `src/` knows which schema it is on.
 - **Migration journals split.** Drizzle's migrator takes
-  `migrationsTable`/`migrationsSchema`: `public` keeps today's journal;
-  `homolog` gets its own (`drizzle.__drizzle_migrations_homolog`).
-  `db:migrate` gains a `--env homolog|prod` flag choosing connection + journal.
+  `migrationsTable`/`migrationsSchema`: `public` keeps today's journal
+  (`drizzle.__drizzle_migrations`); `homolog` gets its own,
+  **`drizzle_homolog.__drizzle_migrations`** — a separate journal *schema*, not
+  a suffixed table, matching §0 and `src/db/migrate.ts`. `db:migrate` gains a
+  `--env homolog|prod` flag choosing connection + journal.
 - **Clone script** `scripts/clone-prod-to-homolog.ts` (console button
   *Refresh homolog data*): drop & recreate schema `homolog`; for each `public`
   table `CREATE TABLE homolog.t (LIKE public.t INCLUDING ALL)` + copy rows +
@@ -177,9 +196,36 @@ residual risk is a build-environment difference, accepted.
   member addresses; homolog testing of anything that emails would otherwise
   mail real people. The script rewrites emails to `x+<id>@homolog.invalid`
   except allow-listed admin addresses.
-- **Auth is shared on purpose.** Supabase `auth` schema is global; our
-  `users`/roles tables are cloned, so the same logins work in both
+- **Auth is shared on purpose — for READING it.** Supabase `auth` schema is
+  global; our `users`/roles tables are cloned, so the same logins work in both
   environments with whatever roles they had at clone time.
+
+  **Writing it is refused outside `public` (added 2026-08-17).** The clone
+  copies `users` with identical ids, so an account mutation issued from the
+  homologation host lands on a real production login:
+  `auth.admin.deleteUser(id)` destroys it, `updateUserById(id, {password})`
+  rewrites its credential, and `generateLink`/`resetPasswordForEmail` mint a
+  working recovery token for it. None of it is undone by re-cloning — the clone
+  rebuilds tables, and the account lives in a schema the clone does not own.
+  `authWriteBlockedReason()` in `src/lib/supabase-admin.ts` is the single gate;
+  every account-mutating call site asks it first and surfaces the refusal as
+  ordinary form feedback. **Accepted cost:** provisioning, password reset and
+  account deletion cannot be exercised in homologation. Granting and revoking
+  roles for already-cloned people still works, which is the common case.
+
+- **Storage is shared too, and is namespaced rather than refused.** The
+  `backups` and `branding` buckets are project-global and object keys start
+  with a tenant id the clone copies verbatim. Backups upload with
+  `upsert: true`, so an unprefixed homologation FULL replaced production's
+  backup of the same tenant on the same day — silently destroying the recovery
+  point `promoteRelease` takes before every promotion — and `pruneBackups`
+  deleted production's objects. Keys are now prefixed `homolog/`
+  (`scopedStoragePath`, empty in production so no existing object moved), and
+  anything deleting a path that came out of a database row checks
+  `ownsStoragePath` first, because a cloned branding row points at
+  production's logo. Namespacing rather than refusing keeps backup **and
+  restore** rehearsable in homologation, which is where that deserves to be
+  rehearsed.
 - Small print: RLS enablement isn't copied by LIKE (irrelevant — the app
   connects as owner and realtime-RLS is off); advisory-lock keys are
   DB-global, so the lock helper mixes `DB_SCHEMA` into the key; realtime
@@ -283,16 +329,27 @@ a Phase-4 nicety.
 
 ## 11. Inventory of changes
 
-**Vercel:** production branch → `release`; auto-assign production domains →
-off; Protection Bypass secret. **Env:** `DB_SCHEMA` (prod=`public`,
-preview=`homolog`), preview `DATABASE_URL` → session pooler, `VERCEL_TOKEN`,
-`VERCEL_PROJECT_ID`, `GITHUB_TOKEN` (ff the `release` ref),
-`HOMOLOG_COOKIE_SECRET` — minding the `vercel env add --value` truncation
-gotcha. **Repo:** `db/index.ts` search_path plumbing; `migrate.ts --env` +
-homolog journal; `scripts/clone-prod-to-homolog.ts` (+ email scrub);
-`releases` migration; `/admin/releases` + `src/lib/releases.ts` (Vercel +
-GitHub API clients); proxy.ts homolog branch; banner; migration CI lint;
-all-tenants backup wrapper; advisory-lock env salt; realtime channel prefix.
+*(Rewritten 2026-08-17 to list what was actually built. The original mixed in
+Phase-3 and Phase-4 items — `HOMOLOG_COOKIE_SECRET`, `GITHUB_TOKEN`, a proxy
+homolog branch, the migration CI lint — none of which exist.)*
+
+**Vercel:** production branch → `release` (via the undocumented
+`PATCH /v9/projects/{id}/branch`); auto-assign production domains → off;
+Protection Bypass for Automation enabled. **Env:** `DB_SCHEMA` +
+`NEXT_PUBLIC_DB_SCHEMA` on Preview only, `RELEASE_TOKEN`, `RELEASE_TEAM_ID`,
+`HOMOLOG_ALIAS` (deliberately not `VERCEL_*`, which Vercel injects itself) —
+minding the `vercel env add --value` truncation gotcha. **Repo:**
+`db/env.ts` (schema resolution, Vercel cross-check, `envKey`, storage
+namespacing); `db/index.ts` search_path plumbing + `assertDbSchema`;
+`migrate.ts --env` + homolog journal; `restore-backup.mts --schema`;
+`scripts/clone-prod-to-homolog.ts` (+ email scrub); `releases` migration
+(0018); `/admin/releases` + `src/lib/releases.ts` + `vercel.ts` +
+`release-actions.ts`; `EnvironmentBanner`; all-tenants backup inside promote;
+advisory-lock env salt; realtime channel prefix; the shared-auth write gate.
+
+**Not built:** proxy homolog branch and `HOMOLOG_COOKIE_SECRET` (Phase 3,
+dropped); `GITHUB_TOKEN` and the `release` fast-forward (promotion builds from
+a SHA instead — §4); migration CI lint and the reload beacon (Phase 4).
 
 **Unchanged:** production's connection string, all queries, scorers, tablets,
 boards, PDFs, crons (production deployment only → `public` by construction).
@@ -341,12 +398,13 @@ boards, PDFs, crons (production deployment only → `public` by construction).
     `PATCH /v9/projects/{id}/branch` with `{"branch":"release"}`, which works
     and is what was used. Unsupported by Vercel — if it ever breaks, the same
     change is one click in Settings → Git.
-  - **Protection Bypass for Automation is not available on this plan** —
-    every documented endpoint shape returns `not_found`. With Phase 3 dropped
-    this costs one thing only: candidate URLs are reachable in a browser by
-    Vercel-team members but not by scripts, so a candidate cannot be
-    smoke-tested automatically the way production can. Validation of a
-    candidate is therefore a human opening the homologation URL.
+  - ~~**Protection Bypass for Automation is not available on this plan** —
+    every documented endpoint shape returns `not_found`.~~ **Wrong, corrected
+    2026-08-17.** The API shapes tried at the time failed, but the bypass is
+    enabled on the project and works (see §3.4). Two consequences: the promote
+    guard's read of a candidate's `/api/version` genuinely functions, and
+    candidates **can** be smoke-tested by script after all — the claim that
+    validation must be a human opening the URL no longer holds.
 - **Phase 1 — schema split (~1 day).** `DB_SCHEMA` plumbing, clone script,
   dual journals, banner, `.env.local` → homolog. Validate by cloning and
   driving the app on a preview URL end-to-end (spec/27 QA pattern).

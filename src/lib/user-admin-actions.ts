@@ -23,7 +23,10 @@ import {
   sendPasswordSetupEmail,
   setSingleRole,
 } from "@/lib/user-provisioning";
-import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import {
+  authWriteBlockedReason,
+  createSupabaseAdminClient,
+} from "@/lib/supabase-admin";
 import { recordAudit } from "@/lib/audit";
 import { fail, ok, type FormState } from "@/lib/action-state";
 import { str } from "@/lib/form-data";
@@ -252,6 +255,13 @@ export async function deleteUserAccount(
   if (userId === actor.id)
     return fail("You can't delete your own account from here.");
 
+  // Before ANY row is removed. The clone shares production's user ids and its
+  // auth project (spec/28 §5), so running this in homologation would delete a
+  // real person's sign-in account — and refusing halfway would still have
+  // stripped their roles from the clone.
+  const blocked = authWriteBlockedReason("delete a sign-in account");
+  if (blocked) return fail(blocked);
+
   const row = (
     await db
       .select({ email: users.email })
@@ -263,7 +273,9 @@ export async function deleteUserAccount(
 
   await db.delete(userTenantRoles).where(eq(userTenantRoles.userId, userId));
   await db.delete(users).where(eq(users.id, userId));
-  const admin = createSupabaseAdminClient();
+  const admin = createSupabaseAdminClient({
+    authWrite: "delete a sign-in account",
+  });
   const { error } = await admin.auth.admin.deleteUser(userId);
   if (error && !/not found/i.test(error.message)) {
     // The app rows are gone but the auth account lingers — surface it rather

@@ -161,16 +161,24 @@ export async function liveMatches(): Promise<LiveMatchWarning> {
       : sql`public.matches`;
   const teamTable =
     DB_SCHEMA === "public" ? sql`teams` : sql`public.teams`;
-  const r = await db.execute<{ label: string }>(sql`
-    select coalesce(a.display_name, '?') || ' – ' || coalesce(b.display_name, '?') as label
+  // The COUNT is over every live match; only the sample list is capped. Taking
+  // `rows.length` from a `limit 10` query made the warning say "10 matches" on
+  // a busy evening with 40 — understating the blast radius in exactly the
+  // situation where the operator most needs the real number.
+  const r = await db.execute<{ label: string; total: string }>(sql`
+    select coalesce(a.display_name, '?') || ' – ' || coalesce(b.display_name, '?') as label,
+           count(*) over ()::text as total
     from ${table} m
     left join ${teamTable} a on a.id = m.team_a_id
     left join ${teamTable} b on b.id = m.team_b_id
     where m.status = 'LIVE'
     limit 10`);
   const rows = ((Array.isArray(r) ? r : (r as { rows?: unknown[] }).rows) ??
-    []) as { label: string }[];
-  return { count: rows.length, samples: rows.map((x) => x.label) };
+    []) as { label: string; total: string }[];
+  return {
+    count: rows.length > 0 ? Number(rows[0].total) : 0,
+    samples: rows.map((x) => x.label),
+  };
 }
 
 /** Tenants a promotion should back up first — i.e. all of them. */
