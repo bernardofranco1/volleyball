@@ -4,7 +4,16 @@ Written before a machine shutdown. **Everything below is committed and pushed
 to `origin/main`** — nothing of value lives only on this machine. This document
 exists so the next session can resume without re-deriving any of it.
 
-Head at time of writing: **`9b9939f`** on `main`.
+Head at time of writing: **`7c065d3`** on `main`.
+
+> **Correction, added after the fact.** The first version of this document said
+> "nothing of value lives only on this machine". That was WRONG:
+> `.gitignore` still carried `/.github/workflows/` — held back long ago "until
+> the gh token has 'workflow' scope", a blocker that had since been removed —
+> so **the CI workflow had never been pushed, and GitHub had zero registered
+> workflows and zero runs.** CI had never executed on any commit, and the e2e
+> safety work from the same session existed only in an untracked local file
+> hours before shutdown. Published in `64440bf`; CI now runs and is green.
 
 ---
 
@@ -12,16 +21,14 @@ Head at time of writing: **`9b9939f`** on `main`.
 
 | Environment | Commit | Schema | Migrations |
 |---|---|---|---|
-| **Production** — https://volleyball-eight.vercel.app | `b09d4e5` | `public` | 23 |
+| **Production** — https://volleyball-eight.vercel.app | `10f1d6f` | `public` | 23 |
 | **Homologation** — https://volleyball-homolog.vercel.app | `10f1d6f` | `homolog` | 23 |
-| `origin/main` | `9b9939f` | — | 23 |
+| `origin/main` | `7c065d3` | — | 23 |
 
-Production is **three commits behind main**: `b2daf26` (beach rulebook
-citation, docs+tests only), `10f1d6f` (the release-console notice fix),
-`7323dbb` / `dd62920` / `e5c7812` / `9b9939f` (tests and CI only). **None of
-them changes runtime behaviour on production and none adds a migration**, so
-there is no urgency — but the release-console fix (§4) is worth shipping on the
-next promote.
+Production was promoted to `10f1d6f` during the session, so the
+release-console notice fix IS live. Everything on `main` after it is **tests,
+CI and docs only** — no runtime change, no migration — so there is no pressure
+to promote again.
 
 Promoting is the two-step console flow (spec/28 §4). The gate now works
 correctly because production runs the post-`24abc2e` console.
@@ -88,18 +95,16 @@ closed, but not a match that cannot be scored at all.
 
 ## 4. Open items, in priority order
 
-1. **§1 of spec/31 — CI is advisory to deployment.** The Vercel build does not
-   wait for CI; a failing push still produces the homolog preview. Two options,
-   both needing an owner decision: GitHub branch protection requiring the CI
-   check (ends direct pushes to `main`, which is the current workflow), or
-   surfacing candidate CI status in the release console (needs a
-   `GITHUB_TOKEN`, which spec/28 deliberately avoided). **This is the single
-   biggest remaining gap in "attested on build".**
-2. **Promote main to production** when convenient — carries the
-   release-console notice fix (`10f1d6f`), which currently tells anyone opening
-   `/admin/releases` on homologation to go and add three environment variables
-   they must not add.
-3. **spec/31 §5 remainder** — `match-admin-actions` (24%) and `team-actions`
+1. **Make CI gate `main` — now that CI exists.** It runs and is green (lint,
+   typecheck, 711 unit tests, 6 e2e including both authenticated flows), but
+   nothing *requires* it: the Vercel build does not wait for it, and `main`
+   takes direct pushes. One owner decision: enable branch protection requiring
+   the CI check (which ends the direct-push workflow used all session), or
+   surface candidate CI status in the release console (needs a `GITHUB_TOKEN`,
+   which spec/28 deliberately avoided). **This is the last remaining gap in
+   "attested on build" — and it is now one setting away rather than a missing
+   system.**
+2. **spec/31 §5 remainder** — `match-admin-actions` (24%) and `team-actions`
    (30%) hold several untested sibling actions (officials, sessions, team
    CRUD). The *gates* are covered; the siblings are the natural next slice.
 4. **Coverage thresholds** — deliberately NOT set. The headline % falls when a
