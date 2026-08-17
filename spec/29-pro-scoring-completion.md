@@ -1,6 +1,6 @@
 # 29 — Pro-scoring completion: remaining FIVB-fidelity corrections
 
-Status: **planned** (2026-08-17). No code yet. Consolidates the gap analysis of
+Status: **planned, Phase 0 verification done** (2026-08-17). No code yet. Consolidates the gap analysis of
 2026-08-17 (run against origin/main as of 2026-08-14) with spec/21's own
 "Remaining" list into one phased plan. Scope excludes, per product owner:
 **anything Video Challenge (VCS) related** and **anything serve-clock related**
@@ -27,7 +27,7 @@ Every remaining correction, the sheet zone it unblocks, and its phase:
 
 | # | Correction | Sheet zone / rule | Phase |
 |---|---|---|---|
-| F1 | Staff entities + FIVB function codes (`personId`; `C1, A1–A3, D1, T, P…`) | TEAMS bench-officials rows (blank today) | 1 |
+| F1 | Staff function codes (`C1, A1–A3, D1, T, P…`) on roster staff rows — the person registry itself already shipped (spec/24/25: `people`, `players.personId`, `role: PLAYER\|BENCH\|STAFF`) | TEAMS bench-officials rows (blank today) | 1 |
 | F2 | Coach-targetable sanctions | Sanctions grid **C** marks, both sheets | 1 |
 | F3 | Coach pre-match signatures (`TEAM_A/B_COACH_PREMATCH`; G7 planned, Phase D shipped captains only) | Beach TEAMS p2 coach signature box | 1 |
 | F4 | Per-match court label (`matches.courtLabel`) | Beach header "Court", indoor hall line (G1 tail) | 6 |
@@ -54,9 +54,9 @@ Every remaining correction, the sheet zone it unblocks, and its phase:
   scorer client beyond the monotonic resync guard.
 - Output: tick-list appended here; anything already done gets struck.
 
-### Phase 1 — Staff entities & coach-targetable sanctions (M) — F1, F2, F3
-- DB: staff rows (`players.role = STAFF`) + `staffFunction`; migration
-  (manual DDL per spec/17); bench-officials roster UI.
+### Phase 1 — Staff function codes & coach-targetable sanctions (S-M) — F1, F2, F3
+- DB: one `players.staffFunction` column (role enum + person registry already
+  exist); migration (manual DDL per spec/17); bench-officials roster UI.
 - Engine: misconduct target widens `playerId` → `personId` +
   `target: PLAYER|STAFF`, nullable/optional so old logs replay unchanged.
 - UI: SanctionsControl gains a Bench tab; team tablet pre-match coach
@@ -126,14 +126,15 @@ score cannot drift from the sanction:
 - **Exit gate for phases 1–5**: both reference sheets + both extra fixtures
   render clean.
 
-### Phase 7 — Offline resilience (M-L, audit first)
-- Audit what the monotonic resync guard covers; then client event queue
-  (IndexedDB), optimistic local reduce, sequence-based reconciliation on
-  reconnect, conflict = server wins + toast. Scope after the audit.
+### Phase 7 — Offline resilience hardening (S, audit) — mostly built
+Phase 0 found the offline queue already shipped in `match-provider.tsx`
+(localStorage `vbqueue_{matchId}`, `queuedCount`, monotonic resync guard).
+Remaining: audit edge cases only — multi-tab on one match, queue TTL/replay
+after long disconnects, scoresheet download while queued events exist.
 
 ## Sequencing
 
-0 → 1 → 2 (needs 1's person model) → 3 → 4 → 5/6 in parallel → 7.
+0 → 1 → 2 (needs 1's staff targets) → 3 → 4 → 5/6 in parallel → 7.
 F7 goldens gate everything above them.
 
 ## Deferred register (excluded by product owner, kept for completeness)
@@ -146,3 +147,29 @@ F7 goldens gate everything above them.
   action.
 - Knowingly blank cells that stay blank: 2nd/3rd referee and line-judge
   signatures (name-only, per the paper sheets).
+
+## Phase 0 verification — done 2026-08-17
+
+Run against a fresh clone (`~/dev/volleyball`, HEAD `ba73c28`) and the Vercel
+deployment list. Result: **the plan is consistent with main and with prod**,
+with two items smaller than planned (F1, Phase 7 — amended above).
+
+Confirmed still open, in code:
+- F2 — misconduct payloads are `playerId: string` only (`engine/core/baseReducer.ts:102-105`); `SanctionsControl` picks roster players only.
+- F3 — no `*_COACH_PREMATCH` roles in `match-signatures.ts` / `PrematchSignOff`.
+- F4/F5 — no `courtLabel`, no timezone field in `db/schema.ts`.
+- F6 — `SanctionsControl` mounted in `LiveScoreboard` (beach) + `IndoorScoreboard` only.
+- F7 — `official-scoresheet.test.ts` covers data layer + renderers structurally; no reference-match golden fixtures.
+- F9 — `isExceptional` exists in the engine only; no UI writer.
+- F10 — libero panel offers positions 5/6 only (`IndoorActionBar.tsx:253`); `LIBERO_REDESIGNATION` appears only in `ScoringLog` (display), no writer.
+- F11 — no per-player medical counters in `baseReducer`.
+- F12/F13/F14 — `PROTEST_LODGED`, `ROTATION_FAULT`, `SERVICE_ORDER_FAULT`, `causedBy`: zero hits in `src/`.
+
+Found already built (plan amended):
+- Person registry + roster `role: PLAYER|BENCH|STAFF` (spec/24/25) → F1 reduced to the `staffFunction` column + surfacing.
+- Offline queue + resync guard in `match-provider.tsx` → Phase 7 reduced to an audit.
+- Engines share `engine/core/baseReducer.ts` → F12/F13/F14 events land once in core, all four disciplines inherit.
+- Admin `RewindToHere` exists → Phase 3 builds on it as assumed.
+
+Prod consistency (Vercel, project `volleyball`):
+- Production = deployment `24abc2e` ("review findings" merge, 2026-08-14), promoted via the spec/28 release console — identical to the code this plan was verified against. The only later commit on main is this spec (`ba73c28`, docs-only, built as candidate, not promoted). Nothing in prod contradicts the plan; nothing in the plan assumes code prod lacks.
