@@ -18,10 +18,14 @@
  * exactly the SET_DEFAULT event spec/29 F14 introduced — the rulebook's
  * cross-reference and our model agree.
  *
- * BEACH, GRASS and LIGHT stay unenforced: the beach rules are a separate
- * document that has not been supplied, and grass/light have no selected
- * authority (volleyball-codex spec/20). Their tests below pin that "no verified
- * limit" means "record without capping", not "cap at some default".
+ * BEACH is uncapped by RULE, not for want of a source. Official Beach
+ * Volleyball Rules 2025-2028, Rule 17.1.2 gives "a maximum of 5 minutes
+ * recovery time" and — unlike indoor — states no per-match count. spec/29
+ * planned to cap beach at one per player, which would have refused a legal
+ * second recovery; the rulebook is why we know otherwise.
+ *
+ * GRASS and LIGHT stay uncapped with no selected authority at all
+ * (volleyball-codex spec/20).
  */
 import { describe, expect, it } from "vitest";
 import { DISCIPLINE_DEFAULTS } from "@/engine/config";
@@ -124,14 +128,22 @@ describe("indoor — Rule 17.1.2, once per player per match", () => {
   });
 });
 
-describe("beach — recorded, not capped", () => {
-  it("has no configured limit, because none has been verified", () => {
-    // Beach rules are a separate document that was not supplied. spec/29 and
-    // spec/30 both hold that a guessed limit is worse than none.
+describe("beach — uncapped by rule, and 5 minutes long", () => {
+  it("caps the DURATION at the rulebook's 5 minutes", () => {
+    // Rule 17.1.2 (beach): "a maximum of 5 minutes recovery time".
+    expect(BEACH.medicalTimeoutSecs).toBe(300);
+  });
+
+  it("sets NO per-match count, because the beach rule states none", () => {
+    // Not an absent source — a verified absence. Indoor spells the count limit
+    // out ("not more than once for the same player in the match"); beach does
+    // not, and that difference is structural: beach teams are two players with
+    // no substitutions, so capping the count would force an incomplete team
+    // rather than offer an alternative. spec/29 planned to cap this at 1.
     expect(BEACH.recoveriesPerPlayerPerMatch).toBeNull();
   });
 
-  it("accepts repeated recoveries for the same player", () => {
+  it("accepts a SECOND recovery for the same player — which spec/29 would have refused", () => {
     let seq = 0;
     let state = initialBeachState("b1");
     const send = (payload: Parameters<typeof appendBeachEvent>[1]) => {

@@ -370,6 +370,23 @@ Rule 15.7 in the same document independently confirms **R4**: an exceptional
 substitution is "beyond the limits of Rule 15.6" — the whole rule, not just the
 count — which is exactly the waiver Phase A had to add.
 
+**The beach rulebook then overturned a spec/29 assumption (2026-08-17).**
+Official Beach Volleyball Rules 2025-2028, Rule 17.1.2: "An injured/ill player
+is given a maximum of 5 minutes recovery time. […] If the player does not
+recover or return to the playing area at the conclusion of the recovery time,
+his/her team is declared incomplete." It caps the DURATION — our beach
+`medicalTimeoutSecs: 300` was already exactly right — and states **no count
+limit at all**, where indoor spells one out. spec/29's plan had assumed "beach
+one per player per match"; enforcing that would have refused a legal second
+recovery. The difference is structural rather than an oversight: beach teams
+are two players with no substitutions, so indoor's precondition ("cannot be
+substituted legally or exceptionally") has no analogue, and capping the count
+would force an incomplete team instead of offering an alternative.
+
+That is twice now that reading the source contradicted the plan — once in our
+favour (R4, the slot waiver we were missing) and once against a limit we were
+about to invent. The "verify, never guess" rule earned its keep both ways.
+
 *(The original F-0 finding, before the rulebook was supplied:)*
 
 Searched before concluding. There is no FIVB 2025–2028 rulebook in this repo or

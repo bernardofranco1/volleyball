@@ -107,11 +107,24 @@ export interface TournamentConfig {
    * If the player does not recover the team is declared incomplete (17.1.2 →
    * 6.4.3, 7.3.1) — which is the SET_DEFAULT event spec/29 F14 added.
    *
-   * BEACH / GRASS / LIGHT — null. The beach rules are a SEPARATE document that
-   * has not been supplied, and grass/light have no selected authority at all
-   * (see volleyball-codex spec/20, the rule-source register). spec/29 and
-   * spec/30 both hold that enforcing a guessed limit is worse than enforcing
-   * none, so these record and print without capping.
+   * BEACH — null, and this is a VERIFIED absence rather than a missing source.
+   * Official Beach Volleyball Rules 2025-2028, **Rule 17.1.2**: "An injured/ill
+   * player is given a maximum of 5 minutes recovery time. […] If the player
+   * does not recover or return to the playing area at the conclusion of the
+   * recovery time, his/her team is declared incomplete." It caps the DURATION
+   * (hence `medicalTimeoutSecs: 300`) and says nothing about how many times —
+   * unlike indoor, which spells the count limit out. That difference is
+   * structural, not an oversight: beach teams are two players with no
+   * substitutions, so the indoor precondition "cannot be substituted legally
+   * or exceptionally" has no analogue, and capping the count would force an
+   * incomplete team rather than offer an alternative.
+   *
+   * spec/29 planned to cap beach at one per player per match. That would have
+   * been WRONG — it would have refused a legal second recovery. The rulebook
+   * is why we know.
+   *
+   * GRASS / LIGHT — null, source genuinely unselected (volleyball-codex
+   * spec/20, the rule-source register). Record and print without capping.
    */
   recoveriesPerPlayerPerMatch: number | null;
 
@@ -205,7 +218,7 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     blockCountsAsTeamHit: true,
 
     medicalTimeoutSecs: 300,
-    // No verified source for this discipline — record, do not cap.
+    // Beach Rule 17.1.2 caps the DURATION (5 min), not the count.
     recoveriesPerPlayerPerMatch: null,
 
     teamTabletEnabled: false,
