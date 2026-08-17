@@ -101,6 +101,10 @@ export function validateGrassEvent(
       if (court.includes(payload.inPlayerId))
         return fail("Incoming player is already on court");
 
+      // Emergency substitution waives the slot rules as well as the count —
+      // same reasoning as indoor's Rule 15.7 (spec/30 R4).
+      if (payload.isEmergency) return OK;
+
       const outIsStarter = lineup.includes(payload.outPlayerId);
       if (outIsStarter && slots[payload.outPlayerId] === undefined) {
         if (lineup.includes(payload.inPlayerId))

@@ -124,6 +124,15 @@ export function validateIndoorEvent(
       )
         return fail("Use a libero replacement, not a substitution, for the libero");
 
+      // Rule 15.7 waives the limits of Rule 15.6 — ALL of them, not just the
+      // count (spec/30 R4). The scenario the exceptional substitution exists
+      // for is a player who cannot continue when no legal substitution
+      // remains, and that player is very often a substitute already on court:
+      // under the slot rules only their own starter may replace them, so
+      // waiving the count alone still refused the case. The physical checks
+      // above stand — on court, not already on court, not the libero.
+      if (payload.isExceptional) return OK;
+
       const outIsStarter = lineup.includes(payload.outPlayerId);
       const slotOpenedFor = outIsStarter ? slots[payload.outPlayerId] : undefined;
       // Case A: a starter (with no open slot) leaves for a fresh substitute.

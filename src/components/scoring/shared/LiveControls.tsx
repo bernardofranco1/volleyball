@@ -205,7 +205,11 @@ export function SubPanel({
         </label>
       ) : null}
       <PanelConfirm
-        disabled={!outId || !inId}
+        // At the cap the ONLY legal move is the exceptional substitution, so
+        // the ordinary confirm is refused here rather than sent and bounced by
+        // the engine (spec/30 Phase A) — the scorer sees the reason on the
+        // checkbox above instead of a rejection after the fact.
+        disabled={!outId || !inId || (legalSubsGone && !exceptional)}
         onClick={() => {
           onSubstitute(outId, inId, exceptional ? { isExceptional: true } : undefined);
           onClose();

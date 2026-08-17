@@ -256,8 +256,16 @@ export function TeamTablet({
     },
     {
       type: "SUBSTITUTION",
-      label: remLabel("Substitution", subsLeft),
-      disabled: subsLeft != null && subsLeft <= 0,
+      // At zero the button STAYS enabled and says why (spec/30 Phase A): the
+      // panel's only remaining option there is the exceptional substitution
+      // (Rule 15.7), which is exactly what a team needs when its legal subs
+      // are gone and a player cannot continue. Disabling it here was the
+      // second of the two gates that made that flow unreachable.
+      label:
+        subsLeft != null && subsLeft <= 0
+          ? "Substitution — exceptional only"
+          : remLabel("Substitution", subsLeft),
+      disabled: false,
       onClick: () => setSubOpen(true),
     },
     ...(vcsOn

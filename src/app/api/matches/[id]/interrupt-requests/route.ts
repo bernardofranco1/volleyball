@@ -129,8 +129,18 @@ export async function POST(
 
   // Quota backstop: a stale tablet must not be able to queue a request the team
   // has no allowance for (the buttons grey out client-side, but don't trust it).
+  //
+  // An EXCEPTIONAL substitution (Rule 15.7, spec/29 F9) is the one thing this
+  // must let through at zero: it exists precisely because the legal
+  // substitutions are gone, so "no allowance remaining" is its precondition,
+  // not its disqualification. Refusing it here made the tablet flow dead on
+  // arrival — spec/29 fixed the approval path, which the request never reached
+  // (spec/30 R2). The engine validator remains the real gate: it accepts the
+  // flag past the per-set cap and still rejects an illegal player choice.
+  const exceptionalSub =
+    body.requestType === "SUBSTITUTION" && body.isExceptional === true;
   const remaining = await remainingFor(id, body.team, body.requestType);
-  if (remaining != null && remaining <= 0)
+  if (!exceptionalSub && remaining != null && remaining <= 0)
     return Response.json(
       { error: "No allowance remaining for this request" },
       { status: 409 },
