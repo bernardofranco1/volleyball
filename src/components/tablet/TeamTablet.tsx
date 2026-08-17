@@ -13,6 +13,7 @@ import {
 } from "@/components/scoring/shared/CountdownOverlay";
 import { SubPanel } from "@/components/scoring/shared/LiveControls";
 import { matchTopic } from "@/lib/realtime-topics";
+import { courtRoster } from "@/lib/roster";
 
 interface InterruptRow {
   id: string;
@@ -403,7 +404,10 @@ function LineupForm({
   liberoEnabled: boolean;
   onResult: (msg: string) => void;
 }) {
-  const nonLibero = useMemo(() => roster.filter((p) => !p.isLibero), [roster]);
+  // Bench officials ride along on the roster (spec/29 F1) but are never
+  // court-eligible — filter before the lineup and libero pickers see them.
+  const onCourt = useMemo(() => courtRoster(roster), [roster]);
+  const nonLibero = useMemo(() => onCourt.filter((p) => !p.isLibero), [onCourt]);
   const [lineup, setLineup] = useState<string[]>(
     Array.from({ length: size }, (_, i) => nonLibero[i]?.id ?? ""),
   );
@@ -482,7 +486,7 @@ function LineupForm({
               className="flex-1 rounded-lg border border-border bg-surface px-2 py-2"
             >
               <option value="">— none —</option>
-              {roster.map((p) => (
+              {onCourt.map((p) => (
                 <option key={p.id} value={p.id}>
                   {label(p.id)}
                 </option>

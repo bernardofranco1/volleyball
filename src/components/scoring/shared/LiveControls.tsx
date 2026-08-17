@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n/client";
 import type { Side, TeamId } from "@/engine/types";
 import { ScoringModal } from "@/components/scoring/ScoringModal";
 import type { PlayerLite } from "@/lib/match-provider";
+import { courtRoster } from "@/lib/roster";
 import { PanelConfirm, ScoreButton, SecondaryButton, SelectRow } from "./buttons";
 import type { Armed } from "./useArmedConfirm";
 
@@ -161,7 +162,9 @@ export function SubPanel({
 }) {
   const t = useT();
   const onCourt = court.filter((id) => !excludeIds.includes(id));
-  const bench = roster.filter(
+  // courtEligible: rosters carry bench officials now (spec/29 F1), and a coach
+  // is not a substitute.
+  const bench = courtRoster(roster).filter(
     (p) => !court.includes(p.id) && !excludeIds.includes(p.id),
   );
   const [outId, setOutId] = useState(onCourt[0] ?? "");

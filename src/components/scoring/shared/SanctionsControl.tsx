@@ -16,6 +16,7 @@ import { useState } from "react";
 import type { TeamId } from "@/engine/types";
 import { useT } from "@/lib/i18n/client";
 import type { PlayerLite } from "@/lib/match-provider";
+import { courtRoster, staffRoster } from "@/lib/roster";
 import { ScoringModal } from "@/components/scoring/ScoringModal";
 import { SecondaryButton } from "./buttons";
 import { useArmedConfirm } from "./useArmedConfirm";
@@ -83,6 +84,11 @@ export function SanctionsControl({
 
   const name = (id: TeamId) => (id === "A" ? teamAName : teamBName);
   const roster = team === "A" ? rosterA : team === "B" ? rosterB : [];
+  // Split, not filtered: misconduct reaches both, and `playerId` carries either
+  // — a bench official's roster-row id IS a players.id, so the event payload
+  // needed no widening (spec/29 §Revalidation §2).
+  const players = courtRoster(roster);
+  const staff = staffRoster(roster);
   const needsPlayer = kind != null && MISCONDUCT.includes(kind);
 
   const close = () => {
@@ -182,8 +188,13 @@ export function SanctionsControl({
                 <p className="mb-1.5 text-xs uppercase tracking-wide text-score-dim">
                   {t("sanctions.playerLabel")}
                 </p>
+                {/* Players and bench officials are both sanctionable (FIVB 21.3
+                    — a coach takes cards like anyone else), and the sheet's
+                    sanctions grid has a column for each. Two groups rather than
+                    one list: a coach has no jersey number, so mixed into the
+                    numbered chips they read as an unnumbered player. */}
                 <div className="flex flex-wrap gap-2">
-                  {roster.map((p) => (
+                  {players.map((p) => (
                     <button
                       key={p.id}
                       type="button"
@@ -198,6 +209,26 @@ export function SanctionsControl({
                     <span className="text-xs text-red-300">{t("signoff.noRoster")}</span>
                   ) : null}
                 </div>
+                {staff.length > 0 ? (
+                  <>
+                    <p className="mb-1.5 mt-3 text-xs uppercase tracking-wide text-score-dim">
+                      {t("sanctions.benchLabel")}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {staff.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className={choice(playerId === p.id)}
+                          onClick={() => setPlayerId(p.id)}
+                        >
+                          {p.staffFunction ? `${p.staffFunction} ` : ""}
+                          {p.jerseyName}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
               </div>
             ) : null}
 

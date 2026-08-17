@@ -14,6 +14,7 @@ import {
 import type { PlayerLite } from "@/lib/match-provider";
 import { useT } from "@/lib/i18n/client";
 import { pairDisplayName } from "@/lib/player-name";
+import { courtRoster } from "@/lib/roster";
 import { BeachCourt, type BeachCourtPlayer } from "@/components/court/BeachCourt";
 import { BeachActionBar } from "@/components/scoring/BeachActionBar";
 import { useResultSignOff } from "@/components/scoring/shared/ResultSignOff";
@@ -88,9 +89,16 @@ export function LiveScoreboard({
         ? `Set ${set.setNumber}${set.ttoFired ? " · TTO done" : ""}`
         : "Match not started";
 
-  const rosterOf = (team: TeamId) => (team === "A" ? rosterA : rosterB);
-  const orderedA = pairInServiceOrder(rosterA, set, "A");
-  const orderedB = pairInServiceOrder(rosterB, set, "B");
+  // Court-eligible rows only (spec/29 F1). Beach logic keys off "the roster is
+  // exactly 2" — a bench official on the roster would make that 3 and silently
+  // switch off the service-order prompt and the serve indicator. The FULL
+  // rosters still go to the sanctions and signature panels below, which need
+  // the staff rows.
+  const courtA = useMemo(() => courtRoster(rosterA), [rosterA]);
+  const courtB = useMemo(() => courtRoster(rosterB), [rosterB]);
+  const rosterOf = (team: TeamId) => (team === "A" ? courtA : courtB);
+  const orderedA = pairInServiceOrder(courtA, set, "A");
+  const orderedB = pairInServiceOrder(courtB, set, "B");
   // The pair as displayed, in service order. Until the order is declared the
   // roster order stands in (slot 1 = first roster player) so the referees
   // ALWAYS see a serve indication — the one-tap prompt below confirms or

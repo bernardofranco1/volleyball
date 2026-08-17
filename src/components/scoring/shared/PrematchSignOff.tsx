@@ -1,16 +1,21 @@
 "use client";
 
 /**
- * Pre-match captain signatures (spec/21 Phase D). On the paper sheet both
- * captains sign the TEAMS block before play to attest to the roster/lineup;
- * here they sign on the scorer device, any time between the coin toss and the
- * final rally. The panel replaces the court zone, like the post-match sign-off.
- * Signing is plain ACCEPT — protest/refusal are post-match concepts.
+ * Pre-match captain AND coach signatures (spec/21 Phase D, spec/29 F3). On the
+ * paper sheet both captains sign the TEAMS block before play to attest to the
+ * roster/lineup, and the beach sheet's p2 box adds the coaches; here they sign
+ * on the scorer device, any time between the coin toss and the final rally. The
+ * panel replaces the court zone, like the post-match sign-off. Signing is plain
+ * ACCEPT — protest/refusal are post-match concepts.
+ *
+ * Coach rows appear only when the team actually rostered a bench official, so
+ * a competition that never registers staff sees exactly the old two-row panel.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "@/lib/i18n/client";
 import type { PlayerLite } from "@/lib/match-provider";
+import { courtRoster, staffRoster } from "@/lib/roster";
 import type {
   PrematchSignatureRole,
   SignatureStrokes,
@@ -22,7 +27,15 @@ import type { ResultSignaturePolicy } from "@/engine/config";
 const PREMATCH_ROLES: PrematchSignatureRole[] = [
   "TEAM_A_CAPTAIN_PREMATCH",
   "TEAM_B_CAPTAIN_PREMATCH",
+  "TEAM_A_COACH_PREMATCH",
+  "TEAM_B_COACH_PREMATCH",
 ];
+
+/** Team A or team B, from the role name. */
+const teamOf = (role: PrematchSignatureRole) =>
+  role.startsWith("TEAM_A_") ? "A" : "B";
+/** A coach row signs from the bench officials, a captain row from the players. */
+const isCoachRole = (role: PrematchSignatureRole) => role.endsWith("_COACH_PREMATCH");
 
 interface SignatureView {
   role: string;
@@ -71,17 +84,29 @@ export function PrematchSignOff({
     return () => clearTimeout(first);
   }, [load]);
 
-  const rosterFor = (role: PrematchSignatureRole) =>
-    role === "TEAM_A_CAPTAIN_PREMATCH" ? rosterA : rosterB;
+  const fullRosterFor = (role: PrematchSignatureRole) =>
+    teamOf(role) === "A" ? rosterA : rosterB;
+  /** Who may sign THIS row: the bench for a coach row, the players otherwise. */
+  const rosterFor = (role: PrematchSignatureRole) => {
+    const roster = fullRosterFor(role);
+    return isCoachRole(role) ? staffRoster(roster) : courtRoster(roster);
+  };
   const teamNameFor = (role: PrematchSignatureRole) =>
-    role === "TEAM_A_CAPTAIN_PREMATCH" ? teamAName : teamBName;
+    teamOf(role) === "A" ? teamAName : teamBName;
+  /** A coach row is pointless — and unsignable — with no bench official. */
+  const visibleRoles = PREMATCH_ROLES.filter(
+    (role) => !isCoachRole(role) || rosterFor(role).length > 0,
+  );
 
   const openFor = (role: PrematchSignatureRole) => {
     const roster = rosterFor(role);
     const existing = signatures?.find((s) => s.role === role);
-    const captain = roster.find((p) => p.isCaptain) ?? roster[0];
+    // Coach rows pre-select the head coach (C1); captain rows the captain.
+    const preferred = isCoachRole(role)
+      ? (roster.find((p) => p.staffFunction === "C1") ?? roster[0])
+      : (roster.find((p) => p.isCaptain) ?? roster[0]);
     setOpenRole(role);
-    setSignerId(existing?.signerPlayerId ?? captain?.id ?? null);
+    setSignerId(existing?.signerPlayerId ?? preferred?.id ?? null);
     setStrokes(null);
     setError(null);
   };
@@ -133,7 +158,7 @@ export function PrematchSignOff({
       ) : null}
 
       <ul className="flex flex-col gap-2">
-        {PREMATCH_ROLES.map((role) => {
+        {visibleRoles.map((role) => {
           const sig = signatures?.find((s) => s.role === role);
           const isOpen = openRole === role;
           return (
@@ -141,7 +166,9 @@ export function PrematchSignOff({
               <div className="flex items-center justify-between gap-2 px-3 py-2">
                 <span className="text-sm">
                   <span className="font-medium">
-                    {t("signoff.captainOf", { team: teamNameFor(role) })}
+                    {isCoachRole(role)
+                      ? t("prematch.coachOf", { team: teamNameFor(role) })
+                      : t("signoff.captainOf", { team: teamNameFor(role) })}
                   </span>
                   {sig ? (
                     <span className="ml-2 text-xs text-score-dim">{sig.signerName}</span>
@@ -173,9 +200,15 @@ export function PrematchSignOff({
                               : "border-border text-score-dim"
                           }`}
                         >
-                          {p.jerseyNumber != null ? `${p.jerseyNumber} ` : ""}
+                          {isCoachRole(role)
+                            ? p.staffFunction
+                              ? `${p.staffFunction} `
+                              : ""
+                            : p.jerseyNumber != null
+                              ? `${p.jerseyNumber} `
+                              : ""}
                           {p.jerseyName}
-                          {p.isCaptain ? " (C)" : ""}
+                          {!isCoachRole(role) && p.isCaptain ? " (C)" : ""}
                         </button>
                       ))}
                     </div>

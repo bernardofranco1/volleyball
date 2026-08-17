@@ -22,6 +22,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
 import type { TournamentConfig } from "@/engine/config";
 import { matchTopic } from "@/lib/realtime-topics";
+import type { StaffFunction } from "@/lib/roster";
 
 export interface PlayerLite {
   id: string;
@@ -35,6 +36,19 @@ export interface PlayerLite {
   isLibero: boolean;
   /** Team captain per the roster — pre-selects the signer on the sign-off panel. */
   isCaptain?: boolean;
+  /**
+   * What kind of roster row this is (spec/29 F1). Rosters now carry bench
+   * officials as well as players, so anything choosing a body for the COURT
+   * must filter with `courtEligible` from @/lib/roster — otherwise the coach
+   * appears in lineup entry and the substitution panel.
+   *
+   * Optional for the same reason as `isCaptain`: surfaces that were built
+   * before staff existed keep compiling, and a row without a role is treated
+   * as a player.
+   */
+  role?: "PLAYER" | "BENCH" | "STAFF";
+  /** Scoresheet letter for a bench official: C1, A1-A3, D1, T, P. */
+  staffFunction?: StaffFunction | null;
 }
 
 interface ClientState {

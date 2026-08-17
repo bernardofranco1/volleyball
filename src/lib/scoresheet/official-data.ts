@@ -52,6 +52,13 @@ export interface SheetSanction {
     | "MISCONDUCT_DISQUALIFICATION";
   team: TeamId;
   jersey: number | null; // null = team-level (delay) sanction
+  /**
+   * What goes in the grid's "player" column (FIVB sanction grid): the jersey
+   * number for a player, the function letter for a bench official (spec/29
+   * F1/F2 — a coach takes cards too, and has no number), and null for a
+   * team-level delay sanction.
+   */
+  member: string | null;
   setNumber: number;
   score: { a: number; b: number };
 }
@@ -129,6 +136,21 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
     jerseyOf.set(p.id, p.jerseyNumber);
   const jersey = (id: unknown): number | null =>
     typeof id === "string" ? (jerseyOf.get(id) ?? null) : null;
+
+  // Bench officials are roster rows (spec/29 F1), so a misconduct payload's
+  // `playerId` may be one of them — same id space, no payload change needed.
+  // They print their function letter (C1, A1, …) where a player prints a number.
+  const staffMark = new Map<string, string>();
+  for (const p of [...report.rosterA, ...report.rosterB]) {
+    if (p.role === "STAFF") staffMark.set(p.id, p.staffFunction ?? "C");
+  }
+  const memberMark = (id: unknown): string | null => {
+    if (typeof id !== "string") return null;
+    const staff = staffMark.get(id);
+    if (staff) return staff;
+    const n = jerseyOf.get(id);
+    return n == null ? null : String(n);
+  };
 
   const events = survivingEvents(report.events);
   const isBeach = report.discipline === "BEACH";
@@ -410,6 +432,7 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
             kind: type,
             team,
             jersey: null,
+            member: null,
             setNumber: ev.setNumber ?? cur?.setNumber ?? sets.length,
             score: evScore,
           });
@@ -425,6 +448,7 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
             kind: type,
             team,
             jersey: jersey(p.playerId),
+            member: memberMark(p.playerId),
             setNumber: ev.setNumber ?? cur?.setNumber ?? sets.length,
             score: evScore,
           });

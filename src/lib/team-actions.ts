@@ -8,6 +8,7 @@ import { matches, players, teams } from "@/db/schema";
 import { SCORING_ROLES, authorizeMatch } from "@/lib/authz";
 import { gateCompetition } from "@/lib/action-gate";
 import { normalizeHex } from "@/lib/colors";
+import { isStaffFunction, type StaffFunction } from "@/lib/roster";
 import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
 import { resolvePickedPerson } from "@/lib/people-actions";
@@ -265,18 +266,40 @@ export async function createPlayer(
       return fail(`Jersey number ${jerseyNumber} is already used on this team.`);
   }
 
+  const kind = rosterKind(fd);
   await db.insert(players).values({
     id: newId("plyr"),
     teamId,
     tenantId: g.tenantId,
     personId: picked.id,
-    jerseyNumber,
-    isCaptain: fd.get("isCaptain") != null,
-    isLibero: fd.get("isLibero") != null,
+    // A bench official occupies no playing spot: no number, no C/L flags.
+    jerseyNumber: kind.role === "STAFF" ? null : jerseyNumber,
+    isCaptain: kind.role !== "STAFF" && fd.get("isCaptain") != null,
+    isLibero: kind.role !== "STAFF" && fd.get("isLibero") != null,
+    role: kind.role,
+    staffFunction: kind.staffFunction,
   });
 
   revalidatePath(teamsPath(g.tenantSlug, g.competitionId));
   return ok(`Added ${fullName}.`);
+}
+
+/**
+ * Roster kind + scoresheet function from the form (spec/29 F1).
+ *
+ * A row is STAFF exactly when a function code was chosen; that keeps the form
+ * to one control instead of a role radio plus a code select that can disagree.
+ * A staff row can hold neither jersey number nor captain/libero flags — those
+ * are facts about a playing spot.
+ */
+function rosterKind(fd: FormData): {
+  role: "PLAYER" | "STAFF";
+  staffFunction: StaffFunction | null;
+} {
+  const raw = str(fd, "staffFunction");
+  return isStaffFunction(raw)
+    ? { role: "STAFF", staffFunction: raw }
+    : { role: "PLAYER", staffFunction: null };
 }
 
 /** Edit a player in place — fixes the delete-and-re-add-only roster flow. */
@@ -318,12 +341,15 @@ export async function updatePlayer(
       return fail(`Jersey number ${jerseyNumber} is already used on this team.`);
   }
 
+  const kind = rosterKind(fd);
   await db
     .update(players)
     .set({
-      jerseyNumber,
-      isCaptain: fd.get("isCaptain") != null,
-      isLibero: fd.get("isLibero") != null,
+      jerseyNumber: kind.role === "STAFF" ? null : jerseyNumber,
+      isCaptain: kind.role !== "STAFF" && fd.get("isCaptain") != null,
+      isLibero: kind.role !== "STAFF" && fd.get("isLibero") != null,
+      role: kind.role,
+      staffFunction: kind.staffFunction,
     })
     .where(eq(players.id, playerId));
 

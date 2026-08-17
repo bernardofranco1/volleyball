@@ -134,6 +134,13 @@
       "when": 1786623534848,
       "tag": "0018_moaning_earthquake",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786955835127,
+      "tag": "0019_eminent_klaw",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import PDFDocument from "pdfkit";
 import type { TournamentConfig } from "@/engine/config";
 import type { MatchReportData } from "@/lib/match-report";
 import { drawSignatureInBox } from "@/lib/scoresheet-pdf";
+import { staffRoster } from "@/lib/roster";
 import type { OfficialSheetData, SheetSetData } from "./official-data";
 import {
   DIM,
@@ -516,12 +517,23 @@ function teamsBlock(
   let yy = y + 11;
   const half = w / 2;
 
-  const fieldPlayers = (roster: MatchReportData["rosterA"]) => roster.filter((p) => !p.isLibero);
-  const liberos = (roster: MatchReportData["rosterA"]) => roster.filter((p) => p.isLibero);
+  // Bench officials share the roster with players (spec/29 F1), so they must be
+  // excluded here — otherwise the coach prints as an unnumbered player — and
+  // listed in their own block below, which is where the paper sheet puts them.
+  const fieldPlayers = (roster: MatchReportData["rosterA"]) =>
+    roster.filter((p) => !p.isLibero && p.role !== "STAFF");
+  const liberos = (roster: MatchReportData["rosterA"]) =>
+    roster.filter((p) => p.isLibero && p.role !== "STAFF");
   const listA = fieldPlayers(report.rosterA);
   const listB = fieldPlayers(report.rosterB);
   const libA = liberos(report.rosterA);
   const libB = liberos(report.rosterB);
+  const staffA = staffRoster(report.rosterA);
+  const staffB = staffRoster(report.rosterB);
+  // Zero staff ⇒ zero height: a competition that registers no bench officials
+  // gets exactly the sheet it got before this block existed.
+  const staffRows = Math.max(staffA.length, staffB.length);
+  const staffH = staffRows > 0 ? 8 + staffRows * 7 : 0;
 
   g.rect(x, yy, half, 8, { fill: HEAD });
   g.text("No.  Name of player", x + 3, yy + 2.4, { size: 4 });
@@ -534,7 +546,7 @@ function teamsBlock(
   const rosterRows = Math.max(listA.length, listB.length, 6);
   const rh = Math.min(
     9,
-    Math.max(6.4, (h - 11 - 8 - 8 - 8 - sigH - liberoRows * 8) / rosterRows),
+    Math.max(6.4, (h - 11 - 8 - 8 - 8 - sigH - liberoRows * 8 - staffH) / rosterRows),
   );
   for (let i = 0; i < rosterRows; i++) {
     for (const [side, roster] of [
@@ -576,9 +588,40 @@ function teamsBlock(
     yy += 8;
   }
 
-  // Pre-match signatures (spec/21 Phase D): captains sign on the console before
-  // play. The coach box now prints the assigned head coach's name (spec/24 §2.5
-  // gave coaches an entity); the coach's *signature* is still not captured.
+  // Pre-match signatures (spec/21 Phase D, spec/29 F3): captains AND coaches
+  // sign on the console before play. The coach box prints the assigned head
+  // coach's name (spec/24 §2.5 gave coaches an entity) and now their signature
+  // too, once the team rosters one.
+  // ── team officials (spec/29 F1) ────────────────────────────────────────────
+  // One row per registered bench official, printed with the FIVB function code
+  // in the column the players use for their jersey number.
+  if (staffRows > 0) {
+    g.rect(x, yy, w, 8, { fill: HEAD });
+    g.ctext("TEAM OFFICIALS", x + w / 2, yy + 4, { size: 4.4, bold: true });
+    yy += 8;
+    for (let i = 0; i < staffRows; i++) {
+      for (const [side, list] of [
+        [0, staffA],
+        [1, staffB],
+      ] as const) {
+        const rx = x + side * half;
+        g.rect(rx, yy, 13, 7);
+        g.rect(rx + 13, yy, half - 13, 7);
+        const p = list[i];
+        if (p) {
+          if (p.staffFunction)
+            g.ctext(p.staffFunction, rx + 6.5, yy + 3.5, {
+              size: 4.2,
+              bold: true,
+              color: INK,
+            });
+          g.text(p.jerseyName.slice(0, 30), rx + 15, yy + 1.4, { size: 4.2, color: INK });
+        }
+      }
+      yy += 7;
+    }
+  }
+
   g.rect(x, yy, w, 8, { fill: HEAD });
   g.ctext("SIGNATURES (pre-match)", x + w / 2, yy + 4, { size: 4.4, bold: true });
   yy += 8;
@@ -598,18 +641,22 @@ function teamsBlock(
             color: INK,
           });
       }
-      if (i === 0) {
-        const sig = sigByRole.get(
-          side === 0 ? "TEAM_A_CAPTAIN_PREMATCH" : "TEAM_B_CAPTAIN_PREMATCH",
-        );
-        if (sig?.strokes)
-          drawSignatureInBox(g.d, sig.strokes, {
-            x: rx + 4,
-            y: cy + 5,
-            w: half - 8,
-            h: sh / 2 - 7,
-          });
-      }
+      const sig = sigByRole.get(
+        i === 0
+          ? side === 0
+            ? "TEAM_A_CAPTAIN_PREMATCH"
+            : "TEAM_B_CAPTAIN_PREMATCH"
+          : side === 0
+            ? "TEAM_A_COACH_PREMATCH"
+            : "TEAM_B_COACH_PREMATCH",
+      );
+      if (sig?.strokes)
+        drawSignatureInBox(g.d, sig.strokes, {
+          x: rx + 4,
+          y: cy + 5,
+          w: half - 8,
+          h: sh / 2 - 7,
+        });
     }
   }
 }
@@ -654,8 +701,18 @@ function sanctionsBlock(
     const s = sheet.sanctions[r];
     if (s) {
       const col = SANCTION_COL[s.kind] ?? 0;
-      const mark = s.jersey != null ? String(s.jersey) : s.kind.startsWith("DELAY") ? "D" : "•";
-      g.ctext(mark, x + col * cw + cw / 2, yy + r * rh + rh / 2, { size: 4.8, bold: true, color: INK });
+      // `member` is the jersey number for a player and the function letter for
+      // a bench official (spec/29 F1) — a coach's card must not print as a
+      // blank dot in the grid the way it did when only numbers were carried.
+      const mark =
+        s.member ?? (s.kind.startsWith("DELAY") ? "D" : "•");
+      // Two-character marks (C1, A1, 12) need a slightly smaller face to stay
+      // inside the cell at this column width.
+      g.ctext(mark, x + col * cw + cw / 2, yy + r * rh + rh / 2, {
+        size: mark.length > 2 ? 4.0 : 4.8,
+        bold: true,
+        color: INK,
+      });
       g.ctext(s.team, x + 4 * cw + cw / 2, yy + r * rh + rh / 2, { size: 4.8, color: INK });
       g.ctext(s.setNumber, x + 5 * cw + cw / 2, yy + r * rh + rh / 2, { size: 4.8, color: INK });
       g.ctext(`${s.score.a}:${s.score.b}`, x + 6 * cw + cw / 2, yy + r * rh + rh / 2, { size: 4.2, color: INK });

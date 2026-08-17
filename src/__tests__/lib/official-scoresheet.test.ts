@@ -199,8 +199,17 @@ describe("official scoresheet data layer", () => {
     expect(s.switches).toEqual([{ score: { a: 4, b: 1 }, tto: true }]);
 
     // Sanction resolved to a jersey; improper request recorded; toss winner kept.
+    // `member` is the grid mark — the jersey number for a player, a function
+    // letter for a bench official (spec/29 F1).
     expect(sheet.sanctions).toEqual([
-      { kind: "MISCONDUCT_WARNING", team: "A", jersey: 1, setNumber: 1, score: { a: 4, b: 1 } },
+      {
+        kind: "MISCONDUCT_WARNING",
+        team: "A",
+        jersey: 1,
+        member: "1",
+        setNumber: 1,
+        score: { a: 4, b: 1 },
+      },
     ]);
     expect(sheet.improperRequests).toEqual([{ team: "B", setNumber: 1 }]);
     expect(sheet.tossWinnerSet1).toBe("B");
@@ -255,5 +264,97 @@ describe("official scoresheet renderers", () => {
     const pdf = await renderIndoorOfficialPdf(report, sheet, resolveConfig("INDOOR", {}));
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(20000);
+  });
+});
+
+// ── bench officials on the sheet (spec/29 F1/F2/F3) ─────────────────────────
+//
+// Staff are roster rows, which is what let the misconduct payload stay
+// `playerId`-shaped (§Revalidation §2). The sheet has to tell the two apart:
+// a coach prints their function letter where a player prints a number, and a
+// coach must never be listed among the players.
+
+function withStaff(report: MatchReportData): MatchReportData {
+  return {
+    ...report,
+    rosterA: [
+      ...report.rosterA,
+      {
+        id: "aC",
+        jerseyName: "Coach A",
+        jerseyNumber: null,
+        isCaptain: false,
+        isLibero: false,
+        role: "STAFF",
+        staffFunction: "C1",
+      },
+      {
+        id: "aD",
+        jerseyName: "Doc A",
+        jerseyNumber: null,
+        isCaptain: false,
+        isLibero: false,
+        role: "STAFF",
+        staffFunction: "D1",
+      },
+    ],
+  };
+}
+
+describe("bench officials", () => {
+  it("marks a coach's card with the function letter, not a blank", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("RALLY_WON_A", {}, [1, 0]),
+      // The coach is targeted by roster-row id, exactly like a player.
+      ev("MISCONDUCT_PENALTY", { team: "A", playerId: "aC" }, [1, 0]),
+      ev("MISCONDUCT_WARNING", { team: "A", playerId: "a1" }, [1, 0]),
+    ];
+    const sheet = buildOfficialSheetData(withStaff(baseReport("INDOOR", evs)));
+    const coachCard = sheet.sanctions.find((s) => s.kind === "MISCONDUCT_PENALTY");
+    const playerCard = sheet.sanctions.find((s) => s.kind === "MISCONDUCT_WARNING");
+    expect(coachCard?.member).toBe("C1");
+    // A coach has no jersey number — the old `jersey`-only grid printed "•".
+    expect(coachCard?.jersey).toBeNull();
+    expect(playerCard?.member).toBe("1");
+  });
+
+  it("keeps a team-level delay sanction unattributed", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("DELAY_WARNING", { team: "B" }, [0, 0]),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    expect(sheet.sanctions[0].member).toBeNull();
+    expect(sheet.sanctions[0].jersey).toBeNull();
+  });
+
+  it("renders both sheets with staff rostered and a coach signature", async () => {
+    const base = baseReport("BEACH", beachEvents());
+    const report: MatchReportData = {
+      ...withStaff(base),
+      approval: {
+        ...base.approval,
+        signatures: [
+          ...base.approval.signatures,
+          {
+            ...base.approval.signatures[0],
+            role: "TEAM_A_COACH_PREMATCH",
+            signerName: "Coach A",
+          },
+        ],
+      },
+    };
+    const sheet = buildOfficialSheetData(report);
+    const beach = await renderBeachOfficialPdf(report, sheet, resolveConfig("BEACH", {}));
+    expect(beach.subarray(0, 5).toString()).toBe("%PDF-");
+    const indoor = await renderIndoorOfficialPdf(
+      { ...report, discipline: "INDOOR" },
+      sheet,
+      resolveConfig("INDOOR", {}),
+    );
+    expect(indoor.subarray(0, 5).toString()).toBe("%PDF-");
   });
 });
