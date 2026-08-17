@@ -19,7 +19,8 @@
     "db:clone:homolog": "tsx --env-file=.env.local scripts/clone-prod-to-homolog.ts",
     "db:seed": "tsx --env-file=.env.local src/db/seed.ts",
     "db:seed:demo": "tsx --env-file=.env.local src/scripts/seed.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@paralleldrive/cuid2": "^3.3.0",
@@ -47,6 +48,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-v8": "^4.1.10",
     "@vitest/ui": "^4.1.9",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",

@@ -23,17 +23,10 @@ import { channelConfig, ensureRealtimeAuth } from "@/lib/realtime-client";
 import type { TournamentConfig } from "@/engine/config";
 import { matchTopic } from "@/lib/realtime-topics";
 import type { StaffFunction } from "@/lib/roster";
-
-/**
- * How stale an unsent queue may be before it is discarded instead of replayed
- * (spec/29 Phase 7 audit).
- *
- * Long enough to cover a real venue outage and a scorer walking back into
- * range — a set, a change of ends, a device sleeping through half-time. Short
- * enough that it can never reach the NEXT match on the same device, which is
- * the case that would put someone else's rallies into this scoresheet.
- */
-export const QUEUE_MAX_AGE_MS = 3 * 60 * 60 * 1000; // 3 hours
+import {
+  decideQueueRestore,
+  describeLegacyQueue,
+} from "@/lib/offline-queue";
 
 export interface PlayerLite {
   id: string;
@@ -347,44 +340,29 @@ export function createMatchProvider<
         // So: clear it, say so, and let the scorer check the court. Clearing
         // also ends the cross-tab hazard that moving to sessionStorage was
         // meant to close, and stops the keys accumulating forever.
-        const legacy = localStorage.getItem(storageKey);
-        if (legacy) {
-          localStorage.removeItem(storageKey);
-          try {
-            const items = JSON.parse(legacy) as unknown;
-            if (Array.isArray(items) && items.length > 0) {
-              setError(
-                `${items.length} unsent action(s) from an earlier session could not be dated and were not replayed. Check the score against the court.`,
-              );
-            }
-          } catch {
-            /* unreadable legacy value — dropping it silently is right */
-          }
+        const legacy = describeLegacyQueue(localStorage.getItem(storageKey));
+        if (legacy.cleared) localStorage.removeItem(storageKey);
+        if (legacy.droppedCount > 0) {
+          setError(
+            `${legacy.droppedCount} unsent action(s) from an earlier session could not be dated and were not replayed. Check the score against the court.`,
+          );
         }
 
         const raw = sessionStorage.getItem(storageKey);
         if (!raw) return;
-        // Only ever the stamped shape here: sessionStorage was introduced
-        // together with the stamp, so an unstamped value in it is corruption,
-        // not history — and it is treated as such (dropped, below).
-        const parsed = JSON.parse(raw) as { savedAt?: number; items?: P[] };
-        const items = Array.isArray(parsed) ? [] : (parsed.items ?? []);
-        const savedAt = Array.isArray(parsed) ? null : (parsed.savedAt ?? null);
-        if (!Array.isArray(items) || items.length === 0) return;
-
-        // Age-out (spec/29 Phase 7 audit). Replaying rallies from hours ago
-        // into a match that has since been scored, corrected or signed would
-        // corrupt the official record, and the scorer has no way to see it
-        // coming. An undatable queue counts as too old for the same reason.
-        if (savedAt == null || Date.now() - savedAt > QUEUE_MAX_AGE_MS) {
+        // Rules live in @/lib/offline-queue, shared with the tests — see the
+        // module note there for why the split matters.
+        const decision = decideQueueRestore<P>(raw, Date.now());
+        if (decision.action === "drop") {
           sessionStorage.removeItem(storageKey);
           setError(
             "Unsent actions from an earlier session were too old to send and have been discarded. Check the score against the court.",
           );
           return;
         }
+        if (decision.action !== "flush") return;
 
-        queue.current.push(...items);
+        queue.current.push(...decision.items);
         setQueuedCount(queue.current.length);
         void flush();
       } catch {

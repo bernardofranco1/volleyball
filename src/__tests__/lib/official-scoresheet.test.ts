@@ -250,24 +250,9 @@ describe("official scoresheet data layer", () => {
   });
 });
 
-describe("official scoresheet renderers", () => {
-  it("renders a beach official sheet PDF", async () => {
-    const report = baseReport("BEACH", beachEvents());
-    const sheet = buildOfficialSheetData(report);
-    const pdf = await renderBeachOfficialPdf(report, sheet, resolveConfig("BEACH", {}));
-    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
-    expect(pdf.length).toBeGreaterThan(20000);
-  });
-
-  it("renders an indoor official sheet PDF", async () => {
-    const report = baseReport("INDOOR", beachEvents());
-    const sheet = buildOfficialSheetData(report);
-    const pdf = await renderIndoorOfficialPdf(report, sheet, resolveConfig("INDOOR", {}));
-    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
-    expect(pdf.length).toBeGreaterThan(20000);
-  });
-});
-
+// The plain "renders a PDF" smokes that used to live here were removed by the
+// spec/31 test-suite audit: golden-pdf-text.test.ts renders the same shapes and
+// asserts the extracted CONTENT, which strictly subsumes a %PDF- byte check.
 // ── bench officials on the sheet (spec/29 F1/F2/F3) ─────────────────────────
 //
 // Staff are roster rows, which is what let the misconduct payload stay

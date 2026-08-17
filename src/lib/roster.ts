@@ -97,3 +97,22 @@ export function staffRoster<T extends RosterRole & { staffFunction?: StaffFuncti
     .filter(isStaff)
     .sort((a, b) => rank(a.staffFunction) - rank(b.staffFunction));
 }
+
+/**
+ * May the substitution panel's confirm fire? (spec/30 Phase A)
+ *
+ * At the per-set cap the ONLY legal move is the exceptional substitution, so
+ * an ordinary confirm is refused in the panel — the scorer sees the reason on
+ * the checkbox instead of an engine rejection after the fact. Shared between
+ * the SubPanel and its tests so the gate cannot drift from what is asserted.
+ */
+export function canConfirmSubstitution(opts: {
+  outId: string;
+  inId: string;
+  legalSubsGone: boolean;
+  exceptional: boolean;
+}): boolean {
+  return Boolean(
+    opts.outId && opts.inId && !(opts.legalSubsGone && !opts.exceptional),
+  );
+}

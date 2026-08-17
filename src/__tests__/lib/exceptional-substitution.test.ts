@@ -12,12 +12,13 @@
  * the exceptional sub exists for, and the tablet's own button was disabled
  * there too. Three gates, all shut at the same moment.
  *
- * These tests pin the DECISIONS at each gate. The route and the React
- * components are exercised in the browser QA pass (spec/27 pattern); what is
- * worth locking down here is the logic that decides "let this through", which
- * is where the bug lived and where a future tidy-up would put it back.
+ * These tests pin the DECISIONS at each gate, importing the REAL functions
+ * the route and the panel call (spec/31 audit removed the private copies this
+ * file used to assert against — a mirror stays green while the code drifts).
  */
 import { describe, expect, it } from "vitest";
+import { quotaBypassAllowed } from "@/lib/interrupt-quota";
+import { canConfirmSubstitution } from "@/lib/roster";
 import { DISCIPLINE_DEFAULTS } from "@/engine/config";
 import { appendIndoorEvent } from "@/engine/indoor/reducer";
 import { validateIndoorEvent } from "@/engine/indoor/validator";
@@ -31,20 +32,15 @@ const INDOOR = DISCIPLINE_DEFAULTS.INDOOR;
 const TS = "2026-08-17T10:00:00.000Z";
 
 /**
- * The quota backstop's decision (interrupt-requests route).
- *
- * Mirrors the route: a request is refused when the team has no allowance —
- * UNLESS it is an exceptional substitution, whose whole premise is that the
- * allowance is gone.
+ * The quota backstop's decision, composed exactly as the route composes it:
+ * refuse at zero allowance unless `quotaBypassAllowed` — the real function.
  */
 function backstopAllows(opts: {
   requestType: string;
   remaining: number | null;
   isExceptional?: boolean;
 }): boolean {
-  const exceptionalSub =
-    opts.requestType === "SUBSTITUTION" && opts.isExceptional === true;
-  if (exceptionalSub) return true;
+  if (quotaBypassAllowed(opts)) return true;
   return !(opts.remaining != null && opts.remaining <= 0);
 }
 
@@ -95,20 +91,8 @@ describe("quota backstop", () => {
   });
 });
 
-/**
- * The SubPanel's confirm gate: at the cap, the ordinary confirm is refused in
- * the panel rather than sent and bounced by the engine.
- */
-function confirmEnabled(opts: {
-  outId: string;
-  inId: string;
-  legalSubsGone: boolean;
-  exceptional: boolean;
-}): boolean {
-  return Boolean(
-    opts.outId && opts.inId && !(opts.legalSubsGone && !opts.exceptional),
-  );
-}
+// The SubPanel's confirm gate — the REAL one the panel renders with.
+const confirmEnabled = canConfirmSubstitution;
 
 describe("substitution panel confirm", () => {
   it("refuses an ordinary substitution once the legal subs are gone", () => {
@@ -279,5 +263,107 @@ describe("engine acceptance past the cap", () => {
       isExceptional: true,
     });
     expect(h.state.sets[0].subsUsedA).toBe(0);
+  });
+});
+
+
+// ── the same waiver on the other two slot-rule engines ──────────────────────
+//
+// Phase A extended the Rule 15.7 slot waiver to grass and light (payload key
+// `isEmergency`) — and shipped it without a test, which is exactly how the
+// indoor half of this bug survived spec/29. Pinned here for both.
+
+import { DISCIPLINE_DEFAULTS as DD } from "@/engine/config";
+import { validateGrassEvent } from "@/engine/grass/validator";
+import { appendGrassEvent } from "@/engine/grass/reducer";
+import { initialGrassState, type GrassEventPayload, type GrassMatchState } from "@/engine/grass/types";
+import { validateLightEvent } from "@/engine/light/validator";
+import { appendLightEvent } from "@/engine/light/reducer";
+import { initialLightState, type LightEventPayload, type LightMatchState } from "@/engine/light/types";
+
+function rotationHarness<S, P>(opts: {
+  initial: (id: string) => S;
+  append: (s: S, p: P, c: never, o: never) => { ok: boolean; reason?: string; newEvents?: { sequence: number }[]; state?: S };
+  config: unknown;
+  players: number;
+}) {
+  let seq = 0;
+  let state = opts.initial("m9");
+  const send = (payload: P) => {
+    const r = (opts.append as CallableFunction)(state, payload, opts.config, {
+      nextSequence: seq + 1,
+      timestamp: TS,
+      makeId: (s: number) => `g${s}`,
+    });
+    if (!r.ok) throw new Error(`rejected: ${r.reason}`);
+    seq = r.newEvents[r.newEvents.length - 1].sequence;
+    state = r.state;
+  };
+  send({ type: "MATCH_CREATED", matchId: "m9" } as P);
+  send({ type: "COIN_TOSS", firstServer: "A", teamAStartSide: "LEFT" } as P);
+  send({ type: "MATCH_START" } as P);
+  send({ type: "SET_START", setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" } as P);
+  const ids = Array.from({ length: opts.players }, (_, i) => `A${i + 1}`);
+  const idsB = Array.from({ length: opts.players }, (_, i) => `B${i + 1}`);
+  send({ type: "LINEUP_CONFIRMED", setNumber: 1, teamAPlayerIds: ids, teamBPlayerIds: idsB } as P);
+  return { send, get state() { return state; } };
+}
+
+describe("emergency substitution waives the slot rules — grass and light", () => {
+  it("grass: a substitute already on court can be replaced in an emergency", () => {
+    const h = rotationHarness<GrassMatchState, GrassEventPayload>({
+      initial: initialGrassState,
+      append: appendGrassEvent as never,
+      config: DD.GRASS as never,
+      players: DD.GRASS.playersPerSide,
+    });
+    h.send({ type: "SUBSTITUTION", team: "A", outPlayerId: "A1", inPlayerId: "Asub" });
+    // Ordinary: only A1 may replace Asub under the slot rules.
+    expect(
+      validateGrassEvent(
+        { type: "SUBSTITUTION", team: "A", outPlayerId: "Asub", inPlayerId: "Aspare" },
+        h.state,
+        DD.GRASS,
+      ).ok,
+    ).toBe(false);
+    // Emergency: allowed — and the physical checks still hold.
+    expect(
+      validateGrassEvent(
+        { type: "SUBSTITUTION", team: "A", outPlayerId: "Asub", inPlayerId: "Aspare", isEmergency: true },
+        h.state,
+        DD.GRASS,
+      ).ok,
+    ).toBe(true);
+    expect(
+      validateGrassEvent(
+        { type: "SUBSTITUTION", team: "A", outPlayerId: "A2", inPlayerId: "A3", isEmergency: true },
+        h.state,
+        DD.GRASS,
+      ).ok,
+    ).toBe(false); // incoming already on court — waiving 15.6 does not waive reality
+  });
+
+  it("light: same waiver, same physical limits", () => {
+    const h = rotationHarness<LightMatchState, LightEventPayload>({
+      initial: initialLightState,
+      append: appendLightEvent as never,
+      config: DD.LIGHT as never,
+      players: DD.LIGHT.playersPerSide,
+    });
+    h.send({ type: "SUBSTITUTION", team: "A", outPlayerId: "A1", inPlayerId: "Asub" });
+    expect(
+      validateLightEvent(
+        { type: "SUBSTITUTION", team: "A", outPlayerId: "Asub", inPlayerId: "Aspare" },
+        h.state,
+        DD.LIGHT,
+      ).ok,
+    ).toBe(false);
+    expect(
+      validateLightEvent(
+        { type: "SUBSTITUTION", team: "A", outPlayerId: "Asub", inPlayerId: "Aspare", isEmergency: true },
+        h.state,
+        DD.LIGHT,
+      ).ok,
+    ).toBe(true);
   });
 });

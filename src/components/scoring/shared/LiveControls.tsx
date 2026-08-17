@@ -7,7 +7,7 @@ import { useT } from "@/lib/i18n/client";
 import type { Side, TeamId } from "@/engine/types";
 import { ScoringModal } from "@/components/scoring/ScoringModal";
 import type { PlayerLite } from "@/lib/match-provider";
-import { courtRoster } from "@/lib/roster";
+import { canConfirmSubstitution, courtRoster } from "@/lib/roster";
 import { PanelConfirm, ScoreButton, SecondaryButton, SelectRow } from "./buttons";
 import type { Armed } from "./useArmedConfirm";
 
@@ -205,11 +205,10 @@ export function SubPanel({
         </label>
       ) : null}
       <PanelConfirm
-        // At the cap the ONLY legal move is the exceptional substitution, so
-        // the ordinary confirm is refused here rather than sent and bounced by
-        // the engine (spec/30 Phase A) — the scorer sees the reason on the
-        // checkbox above instead of a rejection after the fact.
-        disabled={!outId || !inId || (legalSubsGone && !exceptional)}
+        // Gate shared with the tests via @/lib/roster (spec/31 audit): at the
+        // cap the ONLY legal move is the exceptional substitution, refused
+        // here rather than sent and bounced by the engine.
+        disabled={!canConfirmSubstitution({ outId, inId, legalSubsGone, exceptional })}
         onClick={() => {
           onSubstitute(outId, inId, exceptional ? { isExceptional: true } : undefined);
           onClose();

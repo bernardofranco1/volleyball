@@ -13,6 +13,7 @@ import {
   writerNote,
 } from "@/lib/authz";
 import { sameOriginOk } from "@/lib/http";
+import { quotaBypassAllowed } from "@/lib/interrupt-quota";
 import { rateLimit } from "@/lib/ratelimit";
 import { validateTabletToken } from "@/lib/match-session";
 import { appendMatchEvent, loadMatchState } from "@/lib/match-engine";
@@ -137,8 +138,10 @@ export async function POST(
   // arrival — spec/29 fixed the approval path, which the request never reached
   // (spec/30 R2). The engine validator remains the real gate: it accepts the
   // flag past the per-set cap and still rejects an illegal player choice.
-  const exceptionalSub =
-    body.requestType === "SUBSTITUTION" && body.isExceptional === true;
+  const exceptionalSub = quotaBypassAllowed({
+    requestType: body.requestType,
+    isExceptional: body.isExceptional,
+  });
   const remaining = await remainingFor(id, body.team, body.requestType);
   if (!exceptionalSub && remaining != null && remaining <= 0)
     return Response.json(

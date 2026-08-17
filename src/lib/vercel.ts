@@ -32,20 +32,28 @@ export function vercelConfig(): VercelConfig | null {
   // injects VERCEL_PROJECT_ID and VERCEL_GIT_REPO_ID as system variables, and
   // setting our own copies under those names would shadow them. The RELEASE_*
   // overrides exist for local development, where no system vars are present.
-  const token = process.env.RELEASE_TOKEN ?? process.env.VERCEL_TOKEN;
-  const projectId =
-    process.env.RELEASE_PROJECT_ID ?? process.env.VERCEL_PROJECT_ID;
-  const teamId = process.env.RELEASE_TEAM_ID;
-  const repoId = Number(
-    process.env.RELEASE_REPO_ID ?? process.env.VERCEL_GIT_REPO_ID ?? "",
-  );
-  if (!token || !projectId || !teamId || !Number.isFinite(repoId)) return null;
+  // Blanks count as absent throughout: clearing a value in the Vercel
+  // dashboard leaves an EMPTY string, not an unset variable (the same gotcha
+  // db/env.ts documents for DB_SCHEMA). `??` does not treat "" as missing, so
+  // before the spec/31 audit a blanked RELEASE_REPO_ID coalesced to
+  // Number("") === 0 — a "configured" console that would try to deploy repo 0.
+  const env = (name: string): string | null => {
+    const v = process.env[name]?.trim();
+    return v ? v : null;
+  };
+  const token = env("RELEASE_TOKEN") ?? env("VERCEL_TOKEN");
+  const projectId = env("RELEASE_PROJECT_ID") ?? env("VERCEL_PROJECT_ID");
+  const teamId = env("RELEASE_TEAM_ID");
+  const rawRepo = env("RELEASE_REPO_ID") ?? env("VERCEL_GIT_REPO_ID");
+  const repoId = rawRepo == null ? NaN : Number(rawRepo);
+  if (!token || !projectId || !teamId || !Number.isFinite(repoId) || repoId <= 0)
+    return null;
   return {
     token,
     projectId,
     teamId,
     repoId,
-    homologAlias: process.env.HOMOLOG_ALIAS ?? null,
+    homologAlias: env("HOMOLOG_ALIAS"),
   };
 }
 
@@ -286,3 +294,11 @@ export async function homologDeploymentId(
     return null;
   }
 }
+
+/**
+ * Exported for tests only (spec/31 audit). `normalise` reconciles the two row
+ * shapes Vercel's list and detail endpoints return, and `vercelConfig` decides
+ * whether the release console exists at all — both feed the promote path, and
+ * neither had a test.
+ */
+export const __testing = { normalise };
