@@ -5,7 +5,7 @@
 // VSR feed and the scoresheets.
 
 import type { MatchReportData, ReportEvent } from "@/lib/match-report";
-import { survivingEvents } from "@/lib/scoresheet/official-data";
+import { scoredSurvivingEvents } from "@/lib/scoresheet/official-data";
 
 export interface RallyTiming {
   setNumber: number;
@@ -67,7 +67,10 @@ const ms = (a: string | null, b: string | null): number | null =>
   a && b ? new Date(b).getTime() - new Date(a).getTime() : null;
 
 export function computeMatchTimings(report: MatchReportData): MatchTimings {
-  const events = survivingEvents(report.events);
+  // Counted scores, not the per-row cache (spec/30 Phase B) — a rally's
+  // `scoreAfter` in the timings export must agree with the scoresheet built
+  // from the same log, including after an F13 fault correction.
+  const scored = scoredSurvivingEvents(report.events);
   const sets: SetTiming[] = [];
   const rallies: RallyTiming[] = [];
   const breaks: BreakTiming[] = [];
@@ -87,7 +90,7 @@ export function computeMatchTimings(report: MatchReportData): MatchTimings {
     delete open[kind];
   };
 
-  for (const ev of events) {
+  for (const { event: ev, score: evScore } of scored) {
     const p = (ev.payload ?? {}) as Record<string, unknown> & { type?: string };
     const type = p.type ?? ev.eventType;
     const ts = iso(ev.timestamp);
@@ -133,7 +136,7 @@ export function computeMatchTimings(report: MatchReportData): MatchTimings {
         rallies.push({
           setNumber: cur.setNumber,
           winner: type === "RALLY_WON_A" ? "A" : "B",
-          scoreAfter: { a: ev.scoreAfterA ?? 0, b: ev.scoreAfterB ?? 0 },
+          scoreAfter: { a: evScore.a, b: evScore.b },
           startedAt: startTs,
           endedAt: ts,
           durationMs: duration,

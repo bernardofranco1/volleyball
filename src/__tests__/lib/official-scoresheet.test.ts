@@ -58,6 +58,7 @@ function baseReport(discipline: string, events: ReportEvent[]): MatchReportData 
     phaseName: "Main Draw",
     venue: "Centre Court",
     city: "Lausanne",
+    timezone: null,
     country: "Switzerland",
     hall: "Malley",
     category: "SENIOR",
@@ -199,8 +200,17 @@ describe("official scoresheet data layer", () => {
     expect(s.switches).toEqual([{ score: { a: 4, b: 1 }, tto: true }]);
 
     // Sanction resolved to a jersey; improper request recorded; toss winner kept.
+    // `member` is the grid mark — the jersey number for a player, a function
+    // letter for a bench official (spec/29 F1).
     expect(sheet.sanctions).toEqual([
-      { kind: "MISCONDUCT_WARNING", team: "A", jersey: 1, setNumber: 1, score: { a: 4, b: 1 } },
+      {
+        kind: "MISCONDUCT_WARNING",
+        team: "A",
+        jersey: 1,
+        member: "1",
+        setNumber: 1,
+        score: { a: 4, b: 1 },
+      },
     ]);
     expect(sheet.improperRequests).toEqual([{ team: "B", setNumber: 1 }]);
     expect(sheet.tossWinnerSet1).toBe("B");
@@ -255,5 +265,213 @@ describe("official scoresheet renderers", () => {
     const pdf = await renderIndoorOfficialPdf(report, sheet, resolveConfig("INDOOR", {}));
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(20000);
+  });
+});
+
+// ── bench officials on the sheet (spec/29 F1/F2/F3) ─────────────────────────
+//
+// Staff are roster rows, which is what let the misconduct payload stay
+// `playerId`-shaped (§Revalidation §2). The sheet has to tell the two apart:
+// a coach prints their function letter where a player prints a number, and a
+// coach must never be listed among the players.
+
+function withStaff(report: MatchReportData): MatchReportData {
+  return {
+    ...report,
+    rosterA: [
+      ...report.rosterA,
+      {
+        id: "aC",
+        jerseyName: "Coach A",
+        jerseyNumber: null,
+        isCaptain: false,
+        isLibero: false,
+        role: "STAFF",
+        staffFunction: "C1",
+      },
+      {
+        id: "aD",
+        jerseyName: "Doc A",
+        jerseyNumber: null,
+        isCaptain: false,
+        isLibero: false,
+        role: "STAFF",
+        staffFunction: "D1",
+      },
+    ],
+  };
+}
+
+describe("bench officials", () => {
+  it("marks a coach's card with the function letter, not a blank", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("RALLY_WON_A", {}, [1, 0]),
+      // The coach is targeted by roster-row id, exactly like a player.
+      ev("MISCONDUCT_PENALTY", { team: "A", playerId: "aC" }, [1, 0]),
+      ev("MISCONDUCT_WARNING", { team: "A", playerId: "a1" }, [1, 0]),
+    ];
+    const sheet = buildOfficialSheetData(withStaff(baseReport("INDOOR", evs)));
+    const coachCard = sheet.sanctions.find((s) => s.kind === "MISCONDUCT_PENALTY");
+    const playerCard = sheet.sanctions.find((s) => s.kind === "MISCONDUCT_WARNING");
+    expect(coachCard?.member).toBe("C1");
+    // A coach has no jersey number — the old `jersey`-only grid printed "•".
+    expect(coachCard?.jersey).toBeNull();
+    expect(playerCard?.member).toBe("1");
+  });
+
+  it("keeps a team-level delay sanction unattributed", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("DELAY_WARNING", { team: "B" }, [0, 0]),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    expect(sheet.sanctions[0].member).toBeNull();
+    expect(sheet.sanctions[0].jersey).toBeNull();
+  });
+
+  it("renders both sheets with staff rostered and a coach signature", async () => {
+    const base = baseReport("BEACH", beachEvents());
+    const report: MatchReportData = {
+      ...withStaff(base),
+      approval: {
+        ...base.approval,
+        signatures: [
+          ...base.approval.signatures,
+          {
+            ...base.approval.signatures[0],
+            role: "TEAM_A_COACH_PREMATCH",
+            signerName: "Coach A",
+          },
+        ],
+      },
+    };
+    const sheet = buildOfficialSheetData(report);
+    const beach = await renderBeachOfficialPdf(report, sheet, resolveConfig("BEACH", {}));
+    expect(beach.subarray(0, 5).toString()).toBe("%PDF-");
+    const indoor = await renderIndoorOfficialPdf(
+      { ...report, discipline: "INDOOR" },
+      sheet,
+      resolveConfig("INDOOR", {}),
+    );
+    expect(indoor.subarray(0, 5).toString()).toBe("%PDF-");
+  });
+});
+
+// ── Phase 4: injury, libero and recovery completeness (spec/29 F9/F10/F11) ──
+
+describe("remarks composed from the log", () => {
+  it("records an exceptional substitution — the sub boxes can't show it", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("LINEUP_CONFIRMED", { team: "A", setNumber: 1, playerIds: ["a1", "a2"] }, [0, 0]),
+      ev("RALLY_WON_A", {}, [1, 0]),
+      ev(
+        "SUBSTITUTION",
+        { team: "A", outPlayerId: "a1", inPlayerId: "a2", isExceptional: true },
+        [1, 0],
+      ),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    const line = sheet.remarks.find((r) => r.includes("exceptional substitution"));
+    expect(line).toBeDefined();
+    expect(line).toContain("Set 1");
+    expect(line).toContain("1:0");
+  });
+
+  it("leaves an ordinary substitution out of REMARKS", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("SUBSTITUTION", { team: "A", outPlayerId: "a1", inPlayerId: "a2" }, [0, 0]),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    expect(sheet.remarks.some((r) => r.includes("substitution"))).toBe(false);
+  });
+
+  it("prints a recovery with the player and the score, counting repeats", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("RALLY_WON_A", {}, [1, 0]),
+      ev("MEDICAL_TIMEOUT", { team: "A", playerId: "a1" }, [1, 0]),
+      ev("MEDICAL_TIMEOUT_END", {}, [1, 0]),
+      ev("RALLY_WON_B", {}, [1, 1]),
+      ev("MEDICAL_TIMEOUT", { team: "A", playerId: "a1" }, [1, 1]),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    const recoveries = sheet.remarks.filter((r) => r.includes("medical recovery"));
+    expect(recoveries).toHaveLength(2);
+    expect(recoveries[0]).toContain("1 Duda Lisboa");
+    // The second one for the same player is flagged as such — the per-player
+    // limits differ by discipline and the sheet must make repeats visible.
+    expect(recoveries[1]).toContain("#2 for this player");
+  });
+
+  it("records a libero re-designation with the incoming libero", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("LIBERO_REDESIGNATION", { team: "A", newLiberoId: "a2" }, [0, 0]),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    const line = sheet.remarks.find((r) => r.includes("libero re-designated"));
+    expect(line).toBeDefined();
+    expect(line).toContain("Ana Patricia");
+  });
+
+  it("keeps the scorer's free-text notes in their own words", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("NOTE", { text: "Net height re-measured at 2.43 m" }, [0, 0]),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    expect(sheet.remarks).toContain("Net height re-measured at 2.43 m");
+  });
+});
+
+// ── Phase 5: in-match protest (spec/29 F12) ─────────────────────────────────
+
+describe("in-match protest", () => {
+  it("records the team, set, score and text — separately from the result-stage PROTEST", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("RALLY_WON_A", {}, [1, 0]),
+      ev(
+        "PROTEST_LODGED",
+        { team: "B", playerId: "b1", text: "ball in / out call" },
+        [1, 0],
+      ),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    expect(sheet.protests).toEqual([
+      { team: "B", setNumber: 1, score: { a: 1, b: 0 }, text: "ball in / out call" },
+    ]);
+    // And it reads in REMARKS with who lodged it.
+    const line = sheet.remarks.find((r) => r.includes("protest lodged"));
+    expect(line).toContain("Kristen Nuss");
+    expect(line).toContain("ball in / out call");
+  });
+
+  it("does not touch the score", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("RALLY_WON_A", {}, [1, 0]),
+      ev("PROTEST_LODGED", { team: "B" }, [1, 0]),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    expect(sheet.sets[0].scoreA).toBe(1);
+    expect(sheet.sets[0].scoreB).toBe(0);
+  });
+
+  it("is empty for a match with none", () => {
+    const sheet = buildOfficialSheetData(baseReport("BEACH", beachEvents()));
+    expect(sheet.protests).toEqual([]);
   });
 });

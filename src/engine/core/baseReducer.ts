@@ -71,6 +71,12 @@ export interface CommonMatchState<Phase extends string = CommonRallyPhase> {
   matchStartedAt: string | null;
   misconductA: MisconductRecord[];
   misconductB: MisconductRecord[];
+  /**
+   * How many medical recoveries each player has taken this match (spec/29
+   * F11), keyed by roster-row id. Optional: snapshots written before this
+   * existed simply have none, and replay rebuilds it.
+   */
+  recoveriesByPlayer?: Record<string, number>;
 }
 
 // ── the event payloads every discipline handles identically ─────────────────
@@ -95,7 +101,30 @@ export type CommonEventPayload =
   // `team` forfeits/retires; the opponent wins the match (FIVB rule 6.4).
   // FORFEIT = default (no-show / refusal); RETIREMENT = unable to continue.
   | { type: "FORFEIT"; team: TeamId; reason: ForfeitReason }
-  | { type: "MEDICAL_TIMEOUT"; team: TeamId }
+  // `team` loses the CURRENT SET only (spec/29 F14): an expelled member leaves
+  // them unable to field a complete team for the rest of it (FIVB 7.3.1 —
+  // "incomplete team"), so the set is awarded to the opponent and the MATCH
+  // continues into the next one. Distinct from FORFEIT, which ends the match.
+  //
+  // Deliberately NOT modelled as a client-submitted SET_END: that event is
+  // auto-emitted only, and accepting it from a client would let one fabricate
+  // results (spec/14 §A2). SET_DEFAULT instead adjusts the score the way the
+  // rulebook does — the opponent to exactly the score they needed, the
+  // defaulting team keeping the points they had — and the ordinary auto-emit
+  // pipeline closes the set (and the match, if that was the deciding one)
+  // exactly as it would for a set won on court.
+  | { type: "SET_DEFAULT"; team: TeamId; reason: SetDefaultReason }
+  // `playerId` (spec/29 F11): WHO is being treated. Optional — old logs have
+  // none, and a recovery can be called before the player is identified — but
+  // the official sheet prints the recovery with the player and the score, and
+  // the per-player recovery counts below need it.
+  //
+  // NOTE (deliberate, spec/29 Phase 4): the counts are recorded and printed,
+  // but no LIMIT is enforced here. The per-discipline caps differ (beach: one
+  // recovery per player per match; indoor: a 3-minute recovery only when no
+  // legal substitution exists) and spec/29 requires them verified against the
+  // 2025-2028 rulebooks rather than assumed. Recording first is the safe half.
+  | { type: "MEDICAL_TIMEOUT"; team: TeamId; playerId?: string }
   | { type: "MEDICAL_TIMEOUT_END" }
   | { type: "DELAY_WARNING"; team: TeamId }
   | { type: "DELAY_PENALTY"; team: TeamId }
@@ -108,6 +137,35 @@ export type CommonEventPayload =
   // the scoresheet only (max one per team per match — UI-enforced). No state
   // effect; the official sheet reads it straight from the log (spec/21).
   | { type: "IMPROPER_REQUEST"; team: TeamId }
+  // Positional faults (spec/29 F13). Both are MARKERS: they record what was
+  // whistled and where, and score nothing by themselves — the point the fault
+  // awards is dispatched as an ordinary rally event carrying `causedBy`, the
+  // same pattern as a penalty point (F14). Keeping them scoreless is what lets
+  // late discovery work: cancelling the points scored while a team was at
+  // fault is a batch of targeted UNDOs over ordinary rallies, with nothing
+  // bespoke to unwind.
+  //
+  // ROTATION_FAULT is the rotation disciplines' (indoor/grass/light) wrong
+  // position at service; SERVICE_ORDER_FAULT is beach's wrong server. The
+  // validators gate each on `config.rotationEnabled` rather than on the
+  // discipline name.
+  | { type: "ROTATION_FAULT"; team: TeamId; note?: string }
+  | { type: "SERVICE_ORDER_FAULT"; team: TeamId; note?: string }
+  // In-match protest (spec/29 F12): the captain contests a referee decision
+  // and the fact is recorded at the score it happened, to be resolved by the
+  // protest protocol afterwards. A MARKER — it changes nothing about play.
+  //
+  // Distinct from the result-stage PROTEST signature intent (spec/20), which
+  // is a captain refusing to accept the FINAL result. Both can occur in one
+  // match, and the sheet must not conflate them.
+  | {
+      type: "PROTEST_LODGED";
+      team: TeamId;
+      /** Roster-row id of the captain or member lodging it, when identified. */
+      playerId?: string;
+      /** The scorer's short summary, as dictated. */
+      text?: string;
+    }
   // `scope` is a request-time hint only (never persisted): "point" asks the
   // server to sweep set-start bookkeeping and undo the last real action in one
   // batch; absent/"single" keeps the one-event-at-a-time behaviour.
@@ -119,6 +177,9 @@ export type UndoScope = "single" | "point";
 
 /** Why a team's match ended early (FIVB 6.4.2 default / 6.4.3 retirement). */
 export type ForfeitReason = "FORFEIT" | "RETIREMENT";
+
+/** Why a team lost one set without playing it out (spec/29 F14). */
+export type SetDefaultReason = "INCOMPLETE_TEAM" | "OTHER";
 
 const COMMON_EVENT_TYPES: ReadonlySet<string> = new Set<
   CommonEventPayload["type"]
@@ -132,6 +193,7 @@ const COMMON_EVENT_TYPES: ReadonlySet<string> = new Set<
   "SET_END",
   "MATCH_END",
   "FORFEIT",
+  "SET_DEFAULT",
   "MEDICAL_TIMEOUT",
   "MEDICAL_TIMEOUT_END",
   "DELAY_WARNING",
@@ -142,6 +204,9 @@ const COMMON_EVENT_TYPES: ReadonlySet<string> = new Set<
   "MISCONDUCT_DISQUALIFICATION",
   "SERVE_CLOCK_EXPIRE",
   "IMPROPER_REQUEST",
+  "ROTATION_FAULT",
+  "SERVICE_ORDER_FAULT",
+  "PROTEST_LODGED",
   "UNDO",
   "NOTE",
 ]);
@@ -255,9 +320,37 @@ export function reduceCommon<Phase extends string>(
       return;
     }
 
+    case "SET_DEFAULT": {
+      // Award the open set to the opponent, then get out of the way: the
+      // caller's auto-emit pass sees a set with a winning score and emits the
+      // usual SET_END (+ MATCH_END when it was the deciding set), so set
+      // tallies, phases, snapshots and backups all behave normally.
+      if (!set || set.winner) return;
+      const winner: TeamId = p.team === "A" ? "B" : "A";
+      const target = setWinTarget(set.setNumber, config);
+      const lead = config.twoPointLead ? 2 : 1;
+      if (winner === "A")
+        set.scoreA = Math.max(set.scoreA, target, set.scoreB + lead);
+      else set.scoreB = Math.max(set.scoreB, target, set.scoreA + lead);
+      // Any interruption the default landed in is over.
+      s.activeTimeoutTeam = null;
+      s.activeTimeoutStartedAt = null;
+      s.medicalTimeoutTeam = null;
+      return;
+    }
+
     case "MEDICAL_TIMEOUT":
       s.medicalTimeoutTeam = p.team;
       s.rallyPhase = "MEDICAL_TIMEOUT_ACTIVE";
+      // Per-player recovery tally (spec/29 F11), for the console to show and
+      // the sheet to print. Optional on the state shape so old snapshots (which
+      // have no such field) keep replaying.
+      if (p.playerId && s.recoveriesByPlayer) {
+        s.recoveriesByPlayer[p.playerId] =
+          (s.recoveriesByPlayer[p.playerId] ?? 0) + 1;
+      } else if (p.playerId) {
+        s.recoveriesByPlayer = { [p.playerId]: 1 };
+      }
       return;
 
     case "MEDICAL_TIMEOUT_END":
@@ -298,6 +391,10 @@ export function reduceCommon<Phase extends string>(
 
     case "SERVE_CLOCK_EXPIRE":
     case "IMPROPER_REQUEST":
+    // Markers: recorded in the log, printed on the sheet, no state effect.
+    case "ROTATION_FAULT":
+    case "SERVICE_ORDER_FAULT":
+    case "PROTEST_LODGED":
     case "UNDO":
     case "NOTE":
       return;

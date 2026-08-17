@@ -134,6 +134,27 @@
       "when": 1786623534848,
       "tag": "0018_moaning_earthquake",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786955835127,
+      "tag": "0019_eminent_klaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786956814936,
+      "tag": "0020_typical_young_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786958519192,
+      "tag": "0021_heavy_kingpin",
+      "breakpoints": true
     }
   ]
 }

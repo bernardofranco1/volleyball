@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n/client";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { ui } from "@/components/admin/styles";
+import { TIMEZONE_SUGGESTIONS } from "@/lib/timezones";
 
 export function EditCompetitionForm({
   tenantSlug,
@@ -20,6 +21,8 @@ export function EditCompetitionForm({
     city: string | null;
     country: string | null;
     hall: string | null;
+    /** IANA venue zone (spec/29 F5); null ⇒ sheets print UTC. */
+    timezone: string | null;
     category: string | null;
     startDate: string | null;
     endDate: string | null;
@@ -95,6 +98,28 @@ export function EditCompetitionForm({
             defaultValue={competition.hall ?? ""}
             className={ui.input}
           />
+        </div>
+        <div>
+          <label className={ui.label} htmlFor="e-timezone">
+            {t("common.timezone")}
+          </label>
+          {/* IANA zone of the VENUE (spec/29 F5). Every time on the official
+              sheet prints in it; blank keeps UTC, which is what sheets did
+              before. A datalist rather than a select: the full IANA list is
+              hundreds of entries, and typing "Europe/" is faster than hunting. */}
+          <input
+            id="e-timezone"
+            name="timezone"
+            list="tz-suggestions"
+            placeholder="UTC"
+            defaultValue={competition.timezone ?? ""}
+            className={ui.input}
+          />
+          <datalist id="tz-suggestions">
+            {TIMEZONE_SUGGESTIONS.map((tz) => (
+              <option key={tz} value={tz} />
+            ))}
+          </datalist>
         </div>
         <div>
           <label className={ui.label} htmlFor="e-category">

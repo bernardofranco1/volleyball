@@ -6,7 +6,10 @@
 import type { TournamentConfig } from "@/engine/config";
 import type { MatchReportData, ReportPlayer } from "@/lib/match-report";
 import type { SignatureStrokes } from "@/lib/match-signatures";
-import { survivingEvents } from "@/lib/scoresheet/official-data";
+import {
+  scoredSurvivingEvents,
+  survivingEvents,
+} from "@/lib/scoresheet/official-data";
 
 type TeamKey = "home" | "away";
 type Json = Record<string, unknown>;
@@ -250,7 +253,12 @@ function buildScout(report: MatchReportData, beach: boolean): Json {
   const jersey = (id: unknown): number | null =>
     typeof id === "string" ? (jerseyOf.get(id) ?? null) : null;
 
-  const events = survivingEvents(report.events);
+  // Counted scores, not the per-row denormalized cache (spec/30 Phase B): the
+  // VSR feed states the CURRENT score of a live match, and after an F13 fault
+  // correction the cache on every later surviving row still counts the
+  // cancelled points. The feed would have contradicted the scoresheet built
+  // from the same log.
+  const scored = scoredSurvivingEvents(report.events);
   const sets: VsrSet[] = [];
   let cur: VsrSet | null = null;
   let prevTs: string | null = null;
@@ -268,11 +276,11 @@ function buildScout(report: MatchReportData, beach: boolean): Json {
 
   const num = (v: unknown): number => (typeof v === "number" ? v : 0);
 
-  for (const ev of events) {
+  for (const { event: ev, score } of scored) {
     const p = (ev.payload ?? {}) as Json & { type?: string };
     const type = (p.type as string | undefined) ?? ev.eventType;
     const ts = iso(ev.timestamp);
-    const scoreNow = { home: num(ev.scoreAfterA), away: num(ev.scoreAfterB) };
+    const scoreNow = { home: score.a, away: score.b };
 
     switch (type) {
       case "COIN_TOSS": {

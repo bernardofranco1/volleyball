@@ -7,6 +7,7 @@ import {
 } from "@/lib/indoor-match-context";
 import type { TeamId } from "@/engine/indoor/types";
 import { CancelSetStart } from "@/components/scoring/shared/CancelSetStart";
+import { courtRoster } from "@/lib/roster";
 
 // Shown during LINEUP_PENDING (set already started, old flow) and — the paper
 // flow (spec/21 flow fix) — BEFORE the set exists: pre-match (READY) and during
@@ -101,7 +102,10 @@ function TeamLineupForm({
   const { dispatch, pending } = useIndoorMatch();
   // A pre-declared lineup is re-submittable (it only overwrites the stash).
   const [editing, setEditing] = useState(false);
-  const nonLibero = useMemo(() => roster.filter((p) => !p.isLibero), [roster]);
+  // Bench officials are on the roster now (spec/29 F1) and can never be in a
+  // lineup — filter them out before anything else picks a default six.
+  const onCourt = useMemo(() => courtRoster(roster), [roster]);
+  const nonLibero = useMemo(() => onCourt.filter((p) => !p.isLibero), [onCourt]);
   const defaultLineup = useMemo(
     () => Array.from({ length: size }, (_, i) => nonLibero[i]?.id ?? ""),
     [nonLibero, size],
@@ -185,7 +189,7 @@ function TeamLineupForm({
               className="flex-1 rounded-lg border border-border bg-surface px-2 py-1.5"
             >
               <option value="">— none —</option>
-              {roster.map((p) => (
+              {onCourt.map((p) => (
                 <option key={p.id} value={p.id}>
                   {label(p.id)}
                 </option>

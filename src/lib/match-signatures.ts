@@ -32,12 +32,20 @@ export const SIGNATURE_ROLES = [
 ] as const;
 export type SignatureRole = (typeof SIGNATURE_ROLES)[number];
 
-/** Pre-match captain signatures (spec/21 Phase D) — attest to the roster and
- *  lineup before play; they never gate result confirmation and never go stale
- *  when the score moves. */
+/** Pre-match captain AND coach signatures (spec/21 Phase D + spec/29 F3) —
+ *  attest to the roster and lineup before play; they never gate result
+ *  confirmation and never go stale when the score moves.
+ *
+ *  The coach roles complete the beach TEAMS p2 signature box. They are signed
+ *  on the SCORER console like the captains': the team tablet has no signature
+ *  capture, and this API is gated on an authenticated tenant session + the
+ *  match's scorer PIN, which a token-authed tablet does not have (spec/29
+ *  §Revalidation §3). */
 export const PREMATCH_SIGNATURE_ROLES = [
   "TEAM_A_CAPTAIN_PREMATCH",
   "TEAM_B_CAPTAIN_PREMATCH",
+  "TEAM_A_COACH_PREMATCH",
+  "TEAM_B_COACH_PREMATCH",
 ] as const;
 export type PrematchSignatureRole = (typeof PREMATCH_SIGNATURE_ROLES)[number];
 
@@ -321,6 +329,10 @@ export function signatureRoleLabel(role: AnySignatureRole): string {
       return "First referee";
     case "TEAM_A_CAPTAIN_PREMATCH":
       return "Team A captain (pre-match)";
+    case "TEAM_A_COACH_PREMATCH":
+      return "Team A coach (pre-match)";
+    case "TEAM_B_COACH_PREMATCH":
+      return "Team B coach (pre-match)";
     case "TEAM_B_CAPTAIN_PREMATCH":
       return "Team B captain (pre-match)";
     case "SCORER":

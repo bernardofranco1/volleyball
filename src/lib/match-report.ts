@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { loadMatchState } from "@/lib/match-engine";
 import { headCoachName } from "@/lib/people";
+import type { StaffFunction } from "@/lib/roster";
 import {
   loadOfficials,
   loadSignatures,
@@ -33,6 +34,8 @@ export interface ReportPlayer {
   firstName?: string | null;
   lastName?: string | null;
   role?: string | null;
+  /** Bench officials only (spec/29 F1): the TEAMS-block letter C1/A1-A3/D1/T/P. */
+  staffFunction?: StaffFunction | null;
 }
 
 export interface ReportSet {
@@ -92,6 +95,8 @@ export interface MatchReportData {
   venue: string | null;
   /** Official scoresheet header (spec/21): venue split + age category. */
   city: string | null;
+  /** IANA zone of the venue (spec/29 F5); null → sheets print UTC as before. */
+  timezone: string | null;
   country: string | null;
   hall: string | null;
   category: string | null;
@@ -144,6 +149,7 @@ export async function loadMatchReport(
       phaseName: matches.phaseName,
       venue: competitions.venue,
       city: competitions.city,
+      timezone: competitions.timezone,
       country: competitions.country,
       hall: competitions.hall,
       category: competitions.category,
@@ -197,6 +203,7 @@ export async function loadMatchReport(
       firstName: people.firstName,
       lastName: people.lastName,
       role: players.role,
+      staffFunction: players.staffFunction,
       jerseyNumber: players.jerseyNumber,
       isCaptain: players.isCaptain,
       isLibero: players.isLibero,
@@ -214,6 +221,7 @@ export async function loadMatchReport(
         firstName: r.firstName,
         lastName: r.lastName,
         role: r.role,
+        staffFunction: r.staffFunction,
         jerseyNumber: r.jerseyNumber,
         isCaptain: r.isCaptain,
         isLibero: r.isLibero,
@@ -265,6 +273,7 @@ export async function loadMatchReport(
     phaseName: m.phaseName,
     venue: m.venue,
     city: m.city,
+    timezone: m.timezone,
     country: m.country,
     hall: m.hall,
     category: m.category,
@@ -287,9 +296,20 @@ export async function loadMatchReport(
     },
     rosterA,
     rosterB,
-    coachA,
-    coachB,
+    // The head coach is a roster row with staffFunction C1 as of spec/29 F1;
+    // `headCoachName` (team_staff) stays as the fallback for teams populated
+    // through the people pages, which are the only writer of that table.
+    coachA: rosterCoach(rosterA) ?? coachA,
+    coachB: rosterCoach(rosterB) ?? coachB,
   };
+}
+
+/** The rostered head coach's name, or null when none is registered. */
+function rosterCoach(roster: ReportPlayer[]): string | null {
+  const c1 = roster.find(
+    (p) => p.role === "STAFF" && p.staffFunction === "C1",
+  );
+  return c1?.jerseyName ?? null;
 }
 
 // Event types that count as game interruptions / sanctions for the report log.

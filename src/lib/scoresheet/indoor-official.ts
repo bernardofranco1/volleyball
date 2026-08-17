@@ -8,6 +8,7 @@ import PDFDocument from "pdfkit";
 import type { TournamentConfig } from "@/engine/config";
 import type { MatchReportData } from "@/lib/match-report";
 import { drawSignatureInBox } from "@/lib/scoresheet-pdf";
+import { staffRoster } from "@/lib/roster";
 import type { OfficialSheetData, SheetSetData } from "./official-data";
 import {
   DIM,
@@ -21,6 +22,7 @@ import {
   durationMin,
   fetchSheetLogo,
   hhmm,
+  isoDate,
   registerSheetFonts,
   teamCode,
   vLadder,
@@ -80,6 +82,7 @@ export async function renderIndoorOfficialPdf(
         codeA,
         codeB,
         ladderMax,
+        zone: report.timezone,
       });
     }
     // Deciding set panel: bottom-left slot (bestOf 5) or the slot after the
@@ -92,17 +95,18 @@ export async function renderIndoorOfficialPdf(
       codeB,
       ladderMax: deciderMax,
       decider: true,
+      zone: report.timezone,
     });
 
     // ── bottom blocks (fixed slots, as on the paper sheet) ──────────────────
-    resultsBlock(g, 424, 320, 200, 263, report, sheet, codeA, codeB);
+    resultsBlock(g, 424, 320, 200, 263, report, sheet, codeA, codeB, config);
     teamsBlock(g, 632, 320, 198, 263, report, codeA, codeB);
     sanctionsBlock(g, 12, 446, 130, 137, report, sheet);
     remarksAndApproval(g, report, sheet);
 
     g.footer(
       `Official scoresheet · ${report.competitionName} · match ${report.matchNumber ?? report.matchId} · ` +
-        `generated from the event log · times UTC · ${
+        `generated from the event log · times ${report.timezone ?? "UTC"} · ${
           report.approval.confirmedVia
             ? `result confirmed via ${report.approval.confirmedVia}`
             : "result not yet confirmed"
@@ -149,11 +153,20 @@ function header(g: Sheet, r: MatchReportData, sheetLogo: Buffer | null) {
   g.text("Match No.:", 280, 29, { size: 5 });
   g.text(r.matchNumber != null ? String(r.matchNumber) : "", 308, 28.4, { size: 5.6, bold: true, color: INK });
   g.text("Date:", 345, 29, { size: 5 });
-  g.text(r.scheduledAt ? r.scheduledAt.toISOString().slice(0, 10) : "", 360, 28.4, { size: 5.6, bold: true, color: INK });
+  g.text(isoDate(r.scheduledAt, r.timezone), 360, 28.4, { size: 5.6, bold: true, color: INK });
   g.text("Time:", 430, 29, { size: 5 });
-  g.text(hhmm(r.scheduledAt), 446, 28.4, { size: 5.6, bold: true, color: INK });
+  g.text(hhmm(r.scheduledAt, r.timezone), 446, 28.4, { size: 5.6, bold: true, color: INK });
   g.text("Hall:", 490, 29, { size: 5 });
   g.text(r.hall ?? r.venue ?? "", 503, 28.4, { size: 5.6, bold: true, color: INK });
+  // Court (spec/29 F4). No new column was needed: matches.courtNumber has
+  // always existed and is fed by the schedule UI, CSV import and VIS import —
+  // the beach sheet prints it already, the indoor one simply never did.
+  g.text("Court:", 640, 29, { size: 5 });
+  g.text(r.courtNumber != null ? String(r.courtNumber) : "", 658, 28.4, {
+    size: 5.6,
+    bold: true,
+    color: INK,
+  });
   g.line(12, 38, 740, 38);
 
   g.text("Division:", 16, 43, { size: 5 });
@@ -203,7 +216,14 @@ function setPanel(
   h: number,
   setNumber: number,
   set: SheetSetData | null,
-  opts: { codeA: string; codeB: string; ladderMax: number; decider?: boolean },
+  opts: {
+    codeA: string;
+    codeB: string;
+    ladderMax: number;
+    decider?: boolean;
+    /** Venue zone for printed times (spec/29 F5). */
+    zone?: string | null;
+  },
 ) {
   g.rect(x, y, w, h, { lw: 0.9 });
   g.fillRect(x, y, 11, h, HEAD);
@@ -245,8 +265,8 @@ function setPanel(
         }
       : null;
 
-  teamBlock(g, bx, y + 1, bw, h - 2, panelFor(leftTeam, "L"), true, opts.ladderMax, set);
-  teamBlock(g, bx + bw + 2, y + 1, bw, h - 2, panelFor(rightTeam, "R"), false, opts.ladderMax, set);
+  teamBlock(g, bx, y + 1, bw, h - 2, panelFor(leftTeam, "L"), true, opts.ladderMax, set, opts.zone);
+  teamBlock(g, bx + bw + 2, y + 1, bw, h - 2, panelFor(rightTeam, "R"), false, opts.ladderMax, set, opts.zone);
 
   if (opts.decider && set && set.switches.length > 0) {
     const sw = set.switches[0];
@@ -269,6 +289,8 @@ function teamBlock(
   showStart: boolean,
   ladderMax: number,
   set: SheetSetData | null,
+  /** Venue zone for printed times (spec/29 F5); undefined ⇒ UTC. */
+  zone?: string | null,
 ) {
   const gridW = 120;
   const colW = 20;
@@ -279,7 +301,7 @@ function teamBlock(
   g.rect(x, y, 36, hh);
   g.text(showStart ? "START" : "END", x + 1.5, y + 1.2, { size: 3.4 });
   g.text("time", x + 1.5, y + 5, { size: 3.4 });
-  g.text(showStart ? hhmm(set?.startedAt ?? null) : hhmm(set?.endedAt ?? null), x + 13, y + 3.6, {
+  g.text(showStart ? hhmm(set?.startedAt ?? null, zone) : hhmm(set?.endedAt ?? null, zone), x + 13, y + 3.6, {
     size: 6,
     bold: true,
     color: INK,
@@ -374,6 +396,11 @@ function teamBlock(
 
 // ── results ──────────────────────────────────────────────────────────────────
 
+/** Sets the winner takes in a no-show (bestOf 5 → 3, bestOf 3 → 2). */
+function sheetsWonBy(config: TournamentConfig): number {
+  return Math.floor((config.bestOf ?? 5) / 2) + 1;
+}
+
 function resultsBlock(
   g: Sheet,
   x: number,
@@ -384,6 +411,7 @@ function resultsBlock(
   sheet: OfficialSheetData,
   codeA: string,
   codeB: string,
+  config: TournamentConfig,
 ) {
   g.rect(x, y, w, h, { lw: 0.9 });
   g.fillRect(x, y, w, 11, HEAD);
@@ -465,8 +493,8 @@ function resultsBlock(
 
   const thW = (w - 8) / 3;
   const times: [string, string][] = [
-    ["Match starting time", hhmm(report.startedAt)],
-    ["Match ending time", hhmm(report.finishedAt)],
+    ["Match starting time", hhmm(report.startedAt, report.timezone)],
+    ["Match ending time", hhmm(report.finishedAt, report.timezone)],
     ["Match total time", durationHhMm(report.startedAt, report.finishedAt)],
   ];
   times.forEach(([lab, val], i) => {
@@ -489,8 +517,18 @@ function resultsBlock(
   }
 
   if (sheet.forfeit) {
+    const f = sheet.forfeit;
     g.text(
-      `${sheet.forfeit.reason === "RETIREMENT" ? "Retirement" : "Forfeit"}: team ${sheet.forfeit.team}`,
+      `${f.reason === "RETIREMENT" ? "Retirement" : "Forfeit"}: team ${f.team}` +
+        // FIVB 6.4.2 (spec/29 F8): a team that does not appear loses the match
+        // by the convention score — every set to the set target, zero against.
+        // Printing a blank ladder instead left the sheet unable to say what the
+        // result WAS, which is the one thing a scoresheet must say.
+        (f.noShow
+          ? ` — no show, ${sheetsWonBy(config)} × ${config.setScore}:0 to team ${
+              f.team === "A" ? "B" : "A"
+            }`
+          : ""),
       x + 6,
       yy + 20,
       { size: 4.6, bold: true, color: INK },
@@ -516,12 +554,23 @@ function teamsBlock(
   let yy = y + 11;
   const half = w / 2;
 
-  const fieldPlayers = (roster: MatchReportData["rosterA"]) => roster.filter((p) => !p.isLibero);
-  const liberos = (roster: MatchReportData["rosterA"]) => roster.filter((p) => p.isLibero);
+  // Bench officials share the roster with players (spec/29 F1), so they must be
+  // excluded here — otherwise the coach prints as an unnumbered player — and
+  // listed in their own block below, which is where the paper sheet puts them.
+  const fieldPlayers = (roster: MatchReportData["rosterA"]) =>
+    roster.filter((p) => !p.isLibero && p.role !== "STAFF");
+  const liberos = (roster: MatchReportData["rosterA"]) =>
+    roster.filter((p) => p.isLibero && p.role !== "STAFF");
   const listA = fieldPlayers(report.rosterA);
   const listB = fieldPlayers(report.rosterB);
   const libA = liberos(report.rosterA);
   const libB = liberos(report.rosterB);
+  const staffA = staffRoster(report.rosterA);
+  const staffB = staffRoster(report.rosterB);
+  // Zero staff ⇒ zero height: a competition that registers no bench officials
+  // gets exactly the sheet it got before this block existed.
+  const staffRows = Math.max(staffA.length, staffB.length);
+  const staffH = staffRows > 0 ? 8 + staffRows * 7 : 0;
 
   g.rect(x, yy, half, 8, { fill: HEAD });
   g.text("No.  Name of player", x + 3, yy + 2.4, { size: 4 });
@@ -534,7 +583,7 @@ function teamsBlock(
   const rosterRows = Math.max(listA.length, listB.length, 6);
   const rh = Math.min(
     9,
-    Math.max(6.4, (h - 11 - 8 - 8 - 8 - sigH - liberoRows * 8) / rosterRows),
+    Math.max(6.4, (h - 11 - 8 - 8 - 8 - sigH - liberoRows * 8 - staffH) / rosterRows),
   );
   for (let i = 0; i < rosterRows; i++) {
     for (const [side, roster] of [
@@ -576,9 +625,40 @@ function teamsBlock(
     yy += 8;
   }
 
-  // Pre-match signatures (spec/21 Phase D): captains sign on the console before
-  // play. The coach box now prints the assigned head coach's name (spec/24 §2.5
-  // gave coaches an entity); the coach's *signature* is still not captured.
+  // Pre-match signatures (spec/21 Phase D, spec/29 F3): captains AND coaches
+  // sign on the console before play. The coach box prints the assigned head
+  // coach's name (spec/24 §2.5 gave coaches an entity) and now their signature
+  // too, once the team rosters one.
+  // ── team officials (spec/29 F1) ────────────────────────────────────────────
+  // One row per registered bench official, printed with the FIVB function code
+  // in the column the players use for their jersey number.
+  if (staffRows > 0) {
+    g.rect(x, yy, w, 8, { fill: HEAD });
+    g.ctext("TEAM OFFICIALS", x + w / 2, yy + 4, { size: 4.4, bold: true });
+    yy += 8;
+    for (let i = 0; i < staffRows; i++) {
+      for (const [side, list] of [
+        [0, staffA],
+        [1, staffB],
+      ] as const) {
+        const rx = x + side * half;
+        g.rect(rx, yy, 13, 7);
+        g.rect(rx + 13, yy, half - 13, 7);
+        const p = list[i];
+        if (p) {
+          if (p.staffFunction)
+            g.ctext(p.staffFunction, rx + 6.5, yy + 3.5, {
+              size: 4.2,
+              bold: true,
+              color: INK,
+            });
+          g.text(p.jerseyName.slice(0, 30), rx + 15, yy + 1.4, { size: 4.2, color: INK });
+        }
+      }
+      yy += 7;
+    }
+  }
+
   g.rect(x, yy, w, 8, { fill: HEAD });
   g.ctext("SIGNATURES (pre-match)", x + w / 2, yy + 4, { size: 4.4, bold: true });
   yy += 8;
@@ -598,18 +678,22 @@ function teamsBlock(
             color: INK,
           });
       }
-      if (i === 0) {
-        const sig = sigByRole.get(
-          side === 0 ? "TEAM_A_CAPTAIN_PREMATCH" : "TEAM_B_CAPTAIN_PREMATCH",
-        );
-        if (sig?.strokes)
-          drawSignatureInBox(g.d, sig.strokes, {
-            x: rx + 4,
-            y: cy + 5,
-            w: half - 8,
-            h: sh / 2 - 7,
-          });
-      }
+      const sig = sigByRole.get(
+        i === 0
+          ? side === 0
+            ? "TEAM_A_CAPTAIN_PREMATCH"
+            : "TEAM_B_CAPTAIN_PREMATCH"
+          : side === 0
+            ? "TEAM_A_COACH_PREMATCH"
+            : "TEAM_B_COACH_PREMATCH",
+      );
+      if (sig?.strokes)
+        drawSignatureInBox(g.d, sig.strokes, {
+          x: rx + 4,
+          y: cy + 5,
+          w: half - 8,
+          h: sh / 2 - 7,
+        });
     }
   }
 }
@@ -654,8 +738,18 @@ function sanctionsBlock(
     const s = sheet.sanctions[r];
     if (s) {
       const col = SANCTION_COL[s.kind] ?? 0;
-      const mark = s.jersey != null ? String(s.jersey) : s.kind.startsWith("DELAY") ? "D" : "•";
-      g.ctext(mark, x + col * cw + cw / 2, yy + r * rh + rh / 2, { size: 4.8, bold: true, color: INK });
+      // `member` is the jersey number for a player and the function letter for
+      // a bench official (spec/29 F1) — a coach's card must not print as a
+      // blank dot in the grid the way it did when only numbers were carried.
+      const mark =
+        s.member ?? (s.kind.startsWith("DELAY") ? "D" : "•");
+      // Two-character marks (C1, A1, 12) need a slightly smaller face to stay
+      // inside the cell at this column width.
+      g.ctext(mark, x + col * cw + cw / 2, yy + r * rh + rh / 2, {
+        size: mark.length > 2 ? 4.0 : 4.8,
+        bold: true,
+        color: INK,
+      });
       g.ctext(s.team, x + 4 * cw + cw / 2, yy + r * rh + rh / 2, { size: 4.8, color: INK });
       g.ctext(s.setNumber, x + 5 * cw + cw / 2, yy + r * rh + rh / 2, { size: 4.8, color: INK });
       g.ctext(`${s.score.a}:${s.score.b}`, x + 6 * cw + cw / 2, yy + r * rh + rh / 2, { size: 4.2, color: INK });

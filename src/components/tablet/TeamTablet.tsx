@@ -13,6 +13,7 @@ import {
 } from "@/components/scoring/shared/CountdownOverlay";
 import { SubPanel } from "@/components/scoring/shared/LiveControls";
 import { matchTopic } from "@/lib/realtime-topics";
+import { courtRoster } from "@/lib/roster";
 
 interface InterruptRow {
   id: string;
@@ -155,13 +156,29 @@ export function TeamTablet({
 
   const sendRequest = async (
     requestType: string,
-    extra?: { outPlayerId: string; inPlayerId: string },
+    extra?: {
+      outPlayerId: string;
+      inPlayerId: string;
+      // Rule 15.7 (spec/29 F9). Carried through the request so the scorer's
+      // approval applies the sub the team actually asked for; the route used
+      // to hardcode `false`, which silently turned an exceptional sub into an
+      // ordinary one the engine would then reject as over the limit.
+      isExceptional?: boolean;
+    },
+    /** Free-text detail for request types that carry one (protest). */
+    note?: string,
   ) => {
     setMsg(null);
     const res = await fetch(`/api/matches/${matchId}/interrupt-requests`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, team, requestType, ...extra }),
+      body: JSON.stringify({
+        token,
+        team,
+        requestType,
+        ...extra,
+        ...(note ? { note } : {}),
+      }),
     });
     if (res.ok) {
       setMsg(`${requestType} request sent`);
@@ -239,8 +256,16 @@ export function TeamTablet({
     },
     {
       type: "SUBSTITUTION",
-      label: remLabel("Substitution", subsLeft),
-      disabled: subsLeft != null && subsLeft <= 0,
+      // At zero the button STAYS enabled and says why (spec/30 Phase A): the
+      // panel's only remaining option there is the exceptional substitution
+      // (Rule 15.7), which is exactly what a team needs when its legal subs
+      // are gone and a player cannot continue. Disabling it here was the
+      // second of the two gates that made that flow unreachable.
+      label:
+        subsLeft != null && subsLeft <= 0
+          ? "Substitution — exceptional only"
+          : remLabel("Substitution", subsLeft),
+      disabled: false,
       onClick: () => setSubOpen(true),
     },
     ...(vcsOn
@@ -258,6 +283,19 @@ export function TeamTablet({
       label: "Medical",
       disabled: false,
       onClick: () => void sendRequest("MEDICAL"),
+    },
+    {
+      // In-match protest (spec/29 F12). Unquota-ed: whether it stands is for
+      // the protest protocol, not this button. The scorer's approval records
+      // the PROTEST_LODGED marker at the score of the moment.
+      type: "PROTEST",
+      label: "Protest",
+      disabled: false,
+      onClick: () => {
+        const note = window.prompt("What is contested? (short)");
+        if (note === null) return;
+        void sendRequest("PROTEST", undefined, note.slice(0, 280));
+      },
     },
   ];
 
@@ -320,9 +358,14 @@ export function TeamTablet({
           roster={roster}
           court={teamCourt}
           subsUsed={subsUsed}
+          maxSubs={config?.maxSubsPerSet}
           excludeIds={liberoIds}
-          onSubstitute={(outPlayerId, inPlayerId) =>
-            void sendRequest("SUBSTITUTION", { outPlayerId, inPlayerId })
+          onSubstitute={(outPlayerId, inPlayerId, opts) =>
+            void sendRequest("SUBSTITUTION", {
+              outPlayerId,
+              inPlayerId,
+              ...(opts?.isExceptional ? { isExceptional: true } : {}),
+            })
           }
           onClose={() => setSubOpen(false)}
         />
@@ -403,7 +446,10 @@ function LineupForm({
   liberoEnabled: boolean;
   onResult: (msg: string) => void;
 }) {
-  const nonLibero = useMemo(() => roster.filter((p) => !p.isLibero), [roster]);
+  // Bench officials ride along on the roster (spec/29 F1) but are never
+  // court-eligible — filter before the lineup and libero pickers see them.
+  const onCourt = useMemo(() => courtRoster(roster), [roster]);
+  const nonLibero = useMemo(() => onCourt.filter((p) => !p.isLibero), [onCourt]);
   const [lineup, setLineup] = useState<string[]>(
     Array.from({ length: size }, (_, i) => nonLibero[i]?.id ?? ""),
   );
@@ -482,7 +528,7 @@ function LineupForm({
               className="flex-1 rounded-lg border border-border bg-surface px-2 py-2"
             >
               <option value="">— none —</option>
-              {roster.map((p) => (
+              {onCourt.map((p) => (
                 <option key={p.id} value={p.id}>
                   {label(p.id)}
                 </option>

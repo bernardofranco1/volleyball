@@ -7,6 +7,7 @@ import { db, dbTx } from "@/db";
 import { matchOfficials, matches } from "@/db/schema";
 import {
   ADMIN_ROLES,
+  SCORING_ROLES,
   authorizeMatch,
   writerId,
   writerNote,
@@ -18,6 +19,8 @@ import {
   RewindRejectedError,
   UnsupportedDisciplineError,
   resolveMatchConfig,
+  cancelPointsForFault,
+  FaultCorrectionError,
   rewindMatch,
 } from "@/lib/match-engine";
 import {
@@ -31,6 +34,71 @@ import { fail, ok, type FormState } from "@/lib/action-state";
 import { intOrNull, str } from "@/lib/form-data";
 import { newId } from "@/lib/id";
 import { resolvePickedPerson } from "@/lib/people-actions";
+
+/**
+ * Correct a late-discovered positional fault (spec/29 F13): cancel the points
+ * the faulting team scored while it was at fault. The opponent keeps
+ * everything they scored in the same window, which is why this cannot be a
+ * rewind (§Revalidation §5).
+ *
+ * SCORING roles, not admin-only: unlike a rewind this is part of officiating a
+ * live match, and it is exactly as reversible as any other scoring action —
+ * the cancellations are ordinary UNDO rows in the append-only log.
+ */
+export async function cancelFaultPointsAction(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const matchId = str(fd, "matchId");
+  const authed = await authorizeMatch(matchId, SCORING_ROLES);
+  if (!authed.ok) return fail("You can't correct this match.");
+
+  const fromSequence = intOrNull(fd, "fromSequence");
+  if (fromSequence == null) return fail("Pick the moment the fault began.");
+  const team = str(fd, "team");
+  if (team !== "A" && team !== "B") return fail("Pick the team at fault.");
+
+  // Same reasoning as the rewind below: signatures attest to a result, and
+  // cancelling points underneath them would leave them attesting to a score
+  // nobody signed.
+  if (await resultLocked(matchId))
+    return fail(
+      "The scoresheet is signed. Reopen the match first — that invalidates the signatures.",
+    );
+
+  // Mandatory here (spec/29 Phase 3 guard rails): a correction that removes
+  // points from the official record has to say why.
+  const reason = str(fd, "reason").trim().slice(0, 200);
+  if (reason.length < 3)
+    return fail("Give a short reason — it is recorded on the scoresheet.");
+
+  try {
+    const { cancelled } = await cancelPointsForFault(matchId, {
+      team,
+      fromSequence,
+      reason,
+      actor: "SCORER",
+      actorUserId: writerId(authed.auth),
+      deviceInfo: writerNote(authed.auth),
+    });
+    await recordAudit({
+      tenantId: authed.auth.tenantId,
+      actor: { userId: authed.auth.user.id, email: authed.auth.user.email },
+      action: "match.fault_correction",
+      entityType: "match",
+      entityId: matchId,
+      summary: `Cancelled ${cancelled} point(s) for team ${team} from event #${fromSequence} — ${reason}`,
+      metadata: { team, fromSequence, cancelled, reason },
+    });
+    return ok(`Cancelled ${cancelled} point(s) scored by team ${team}.`);
+  } catch (err) {
+    if (err instanceof FaultCorrectionError) return fail(err.message);
+    if (err instanceof MatchNotFoundError) return fail("Match not found.");
+    if (err instanceof UnsupportedDisciplineError)
+      return fail("This discipline can't be corrected this way.");
+    throw err;
+  }
+}
 
 /**
  * Rewind a match to just before a chosen event and let scoring resume manually

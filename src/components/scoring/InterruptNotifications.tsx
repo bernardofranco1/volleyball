@@ -11,6 +11,8 @@ interface Pending {
   requestType: string;
   outPlayerId?: string;
   inPlayerId?: string;
+  /** Rule 15.7 (spec/30 Phase A) — the scorer must approve what was asked. */
+  isExceptional?: boolean;
 }
 
 export interface RosterEntry {
@@ -59,7 +61,11 @@ export function InterruptNotifications({
           id: string;
           team: "A" | "B";
           requestType: string;
-          payload?: { outPlayerId?: string; inPlayerId?: string } | null;
+          payload?: {
+            outPlayerId?: string;
+            inPlayerId?: string;
+            isExceptional?: boolean;
+          } | null;
         }[];
       };
       if (!Array.isArray(data.requests)) return;
@@ -71,6 +77,7 @@ export function InterruptNotifications({
           requestType: r.requestType,
           outPlayerId: r.payload?.outPlayerId,
           inPlayerId: r.payload?.inPlayerId,
+          isExceptional: r.payload?.isExceptional === true,
         }));
       setPending(fresh);
     } catch {
@@ -139,6 +146,15 @@ export function InterruptNotifications({
           {p.requestType === "SUBSTITUTION" && (p.outPlayerId || p.inPlayerId) ? (
             <div className="mt-0.5 text-xs text-score-dim">
               {player(p.outPlayerId)} → {player(p.inPlayerId)}
+            </div>
+          ) : null}
+          {p.isExceptional ? (
+            // Approving this one spends no substitution and is legal past the
+            // per-set cap — the scorer is agreeing to a different thing from an
+            // ordinary sub, so it must be visible before the tap, not implied.
+            <div className="mt-0.5 text-xs font-medium text-amber-300">
+              Exceptional substitution (Rule 15.7) — does not count toward the
+              per-set limit
             </div>
           ) : null}
           <div className="mt-2 flex gap-2">

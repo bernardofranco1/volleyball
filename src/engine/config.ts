@@ -100,6 +100,30 @@ export interface TournamentConfig {
   // ── Team tablets ──────────────────────────────────────────────────────────
   teamTabletEnabled: boolean;
   allowTeamTabletDirectEntry: boolean;
+
+  // ── Sanctions ────────────────────────────────────────────────────────────
+  /**
+   * What the console does about the POINT a penalty awards (spec/29 F14).
+   *
+   * Recording stays fact-only either way — the sanction event never scores by
+   * itself, exactly like the paper procedure. This only decides how much help
+   * the scorer gets in not forgetting the consequence:
+   *   PROMPT — offer a one-tap "award the point" straight after recording
+   *            (default: the score can't drift, and nothing happens unasked)
+   *   AUTO   — award it as part of recording
+   *   OFF    — say nothing; the scorer taps the point as an ordinary rally
+   */
+  sanctionAutoPoint: SanctionAutoPoint;
+}
+
+/** How the console handles the point a penalty awards (spec/29 F14). */
+export const SANCTION_AUTO_POINT = ["PROMPT", "AUTO", "OFF"] as const;
+export type SanctionAutoPoint = (typeof SANCTION_AUTO_POINT)[number];
+
+export function isSanctionAutoPoint(v: unknown): v is SanctionAutoPoint {
+  return (
+    typeof v === "string" && (SANCTION_AUTO_POINT as readonly string[]).includes(v)
+  );
 }
 
 /**
@@ -166,6 +190,8 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
 
     teamTabletEnabled: false,
     allowTeamTabletDirectEntry: false,
+
+    sanctionAutoPoint: "PROMPT",
   },
 
   INDOOR: {
@@ -221,6 +247,8 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
 
     teamTabletEnabled: true,
     allowTeamTabletDirectEntry: false,
+
+    sanctionAutoPoint: "PROMPT",
   },
 
   GRASS: {
@@ -276,6 +304,8 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
 
     teamTabletEnabled: false,
     allowTeamTabletDirectEntry: false,
+
+    sanctionAutoPoint: "PROMPT",
   },
 
   LIGHT: {
@@ -331,6 +361,8 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
 
     teamTabletEnabled: false,
     allowTeamTabletDirectEntry: false,
+
+    sanctionAutoPoint: "PROMPT",
   },
 };
 

@@ -50,8 +50,14 @@ export type GrassEventPayload =
   // start time for the VSR feed and timing exports (spec/22). Optional: a
   // rally scored without it falls back to approximated timing.
   | { type: "RALLY_START" }
-  | { type: "RALLY_WON_A" }
-  | { type: "RALLY_WON_B" }
+  // `causedBy` (spec/29 F14): the id of the sanction event this point came
+  // from, when the scorer awarded it through the guided flow. Optional and
+  // purely informational — the reducer ignores it, so old logs replay
+  // identically and nothing downstream has to know about it. It exists so the
+  // sheet can print a penalty and its point as one fact instead of two
+  // coincidental ones.
+  | { type: "RALLY_WON_A"; causedBy?: string }
+  | { type: "RALLY_WON_B"; causedBy?: string }
   | { type: "REPLAY_POINT" }
   | { type: "TIMEOUT_REQUEST"; team: TeamId }
   | { type: "TIMEOUT_END"; team: TeamId }
@@ -72,11 +78,22 @@ export type GrassEventPayload =
     }
   | { type: "MATCH_END"; winner: TeamId; setsA: number; setsB: number } // auto-emitted
   | { type: "FORFEIT"; team: TeamId; reason: "FORFEIT" | "RETIREMENT" }
+  // One set awarded to the opponent — incomplete team (spec/29 F14). The match
+  // continues; FORFEIT above ends it.
+  | { type: "SET_DEFAULT"; team: TeamId; reason: "INCOMPLETE_TEAM" | "OTHER" }
   | { type: "SERVE_CLOCK_EXPIRE" }
   | { type: "IMPROPER_REQUEST"; team: TeamId }
+  // Positional faults, recorded as markers (spec/29 F13) — the point they
+  // award is an ordinary rally event with `causedBy`.
+  | { type: "ROTATION_FAULT"; team: TeamId; note?: string }
+  | { type: "SERVICE_ORDER_FAULT"; team: TeamId; note?: string }
+  // In-match protest (spec/29 F12) — a marker; distinct from the result-stage
+  // PROTEST signature intent.
+  | { type: "PROTEST_LODGED"; team: TeamId; playerId?: string; text?: string }
   | { type: "DELAY_WARNING"; team: TeamId }
   | { type: "DELAY_PENALTY"; team: TeamId }
-  | { type: "MEDICAL_TIMEOUT"; team: TeamId }
+  // `playerId` (spec/29 F11): who is treated — printed on the sheet.
+  | { type: "MEDICAL_TIMEOUT"; team: TeamId; playerId?: string }
   | { type: "MEDICAL_TIMEOUT_END" }
   | { type: "MISCONDUCT_WARNING"; team: TeamId; playerId: string }
   | { type: "MISCONDUCT_PENALTY"; team: TeamId; playerId: string }
@@ -160,6 +177,8 @@ export interface GrassMatchState {
   totalMatchSubsB: number;
   misconductA: MisconductRecord[];
   misconductB: MisconductRecord[];
+  /** Medical recoveries per roster-row id (spec/29 F11); absent on old snapshots. */
+  recoveriesByPlayer?: Record<string, number>;
 }
 
 // ── Construction & helpers ─────────────────────────────────────────────────────

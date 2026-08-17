@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef } from "react";
 import { createPlayer } from "@/lib/team-actions";
 import { OK } from "@/lib/action-state";
 import { useT } from "@/lib/i18n/client";
+import { STAFF_FUNCTIONS, staffFunctionLabel } from "@/lib/roster";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { PersonPicker, type PickerPerson } from "@/components/admin/PersonPicker";
 import { ui } from "@/components/admin/styles";
@@ -55,6 +56,26 @@ export function AddPlayerForm({
       </label>
       <label className="flex items-center gap-1 text-xs text-score-dim">
         <input type="checkbox" name="isLibero" /> L
+      </label>
+      {/* Choosing a function makes this row a bench official rather than a
+          player (spec/29 F1): they print in the sheet's TEAM OFFICIALS block,
+          are sanctionable, and can sign pre-match — but never take the court,
+          so the number and C/L flags above are ignored for them. */}
+      <label className="flex items-center gap-1 text-xs text-score-dim">
+        <span className="sr-only">{t("teams.staffFunction")}</span>
+        <select
+          name="staffFunction"
+          defaultValue=""
+          className={`${ui.input} w-36`}
+          aria-label={t("teams.staffFunction")}
+        >
+          <option value="">{t("teams.rolePlayer")}</option>
+          {STAFF_FUNCTIONS.map((fn) => (
+            <option key={fn} value={fn}>
+              {staffFunctionLabel(fn)}
+            </option>
+          ))}
+        </select>
       </label>
       <SubmitButton variant="secondary" pendingLabel="…">
         {t("teams.addPlayer")}

@@ -101,6 +101,10 @@ export function validateLightEvent(
       if (court.includes(payload.inPlayerId))
         return fail("Incoming player is already on court");
 
+      // Emergency substitution waives the slot rules as well as the count —
+      // same reasoning as indoor's Rule 15.7 (spec/30 R4).
+      if (payload.isEmergency) return OK;
+
       const outIsStarter = lineup.includes(payload.outPlayerId);
       if (outIsStarter && slots[payload.outPlayerId] === undefined) {
         if (lineup.includes(payload.inPlayerId))
@@ -146,6 +150,32 @@ export function validateLightEvent(
         return fail("Match must be set up before a forfeit can be recorded");
       if (state.status === "FINISHED")
         return fail("Match is already finished");
+      return OK;
+
+    case "SET_DEFAULT": {
+      // Unlike a forfeit this awards ONE set, so it needs a set to award: it
+      // is meaningless before play and after the match is over (spec/29 F14).
+      if (state.status !== "LIVE")
+        return fail("A set can only be defaulted while the match is live");
+      const open = state.sets[state.currentSetNumber - 1];
+      if (!open || open.winner)
+        return fail("No set in progress to default");
+      return OK;
+    }
+
+    // Positional faults (spec/29 F13). Gated on the CONFIG, not the discipline
+    // name: a rotation fault is meaningless where there is no rotation, and a
+    // service-order fault is meaningless where there is one.
+    case "ROTATION_FAULT":
+      if (!config.rotationEnabled)
+        return fail("This discipline has no rotation order");
+      if (state.status !== "LIVE") return fail("Match is not live");
+      return OK;
+
+    case "SERVICE_ORDER_FAULT":
+      if (config.rotationEnabled)
+        return fail("Rotation disciplines record a rotation fault instead");
+      if (state.status !== "LIVE") return fail("Match is not live");
       return OK;
 
     case "RALLY_START":

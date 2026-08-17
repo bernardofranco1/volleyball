@@ -25,6 +25,7 @@ import {
   tournamentConfig,
 } from "@/db/schema";
 import { DISCIPLINES, isCompetitionStatus, isDiscipline } from "@/lib/domain";
+import type { StaffFunction } from "@/lib/roster";
 
 export type Competition = typeof competitions.$inferSelect;
 export type TournamentConfigRow = typeof tournamentConfig.$inferSelect;
@@ -50,6 +51,8 @@ export interface Player {
   isCaptain: boolean;
   isLibero: boolean;
   role: "PLAYER" | "BENCH" | "STAFF";
+  /** Scoresheet letter for a bench official (spec/29 F1); null for players. */
+  staffFunction: StaffFunction | null;
 }
 export type Pool = typeof pools.$inferSelect;
 
@@ -164,6 +167,7 @@ export async function listPlayersByTeam(
       isCaptain: players.isCaptain,
       isLibero: players.isLibero,
       role: players.role,
+      staffFunction: players.staffFunction,
     })
     .from(players)
     .innerJoin(people, eq(people.id, players.personId))
@@ -491,11 +495,20 @@ interface PlayerLiteRow {
   jerseyNumber: number | null;
   isLibero: boolean;
   isCaptain: boolean;
+  role: "PLAYER" | "BENCH" | "STAFF";
+  staffFunction: StaffFunction | null;
 }
 
 /**
- * Both teams' players (indoor scoreboard rotation, beach service order, and the
- * post-match signature panel — which pre-selects the captain).
+ * Both teams' roster rows — players AND bench officials (spec/29 F1), since
+ * sanctions and the pre-match coach signature target staff.
+ *
+ * `role` therefore has to travel with every row: consumers that pick someone to
+ * put ON COURT must filter to `PLAYER` (see `courtEligible`), or the coach
+ * turns up in lineup entry, the substitution panel and the libero picker.
+ *
+ * (Indoor scoreboard rotation, beach service order, the post-match signature
+ * panel — which pre-selects the captain — and the sanctions bench tab.)
  */
 export async function loadMatchRosters(matchId: string): Promise<{
   rosterA: PlayerLiteRow[];
@@ -517,6 +530,8 @@ export async function loadMatchRosters(matchId: string): Promise<{
       jerseyNumber: players.jerseyNumber,
       isLibero: players.isLibero,
       isCaptain: players.isCaptain,
+      role: players.role,
+      staffFunction: players.staffFunction,
     })
     .from(players)
     .innerJoin(people, eq(people.id, players.personId))
@@ -530,6 +545,8 @@ export async function loadMatchRosters(matchId: string): Promise<{
         jerseyNumber: r.jerseyNumber,
         isLibero: r.isLibero,
         isCaptain: r.isCaptain,
+        role: r.role,
+        staffFunction: r.staffFunction,
       }));
   return { rosterA: lite(m.teamAId), rosterB: lite(m.teamBId) };
 }

@@ -4,6 +4,7 @@
 // orders in a single LINEUP_CONFIRMED event (position 1 serves first).
 import { useMemo, useState } from "react";
 import type { PlayerLite } from "@/lib/match-provider";
+import { courtRoster } from "@/lib/roster";
 import { CancelSetStart } from "@/components/scoring/shared/CancelSetStart";
 
 export type LineupDispatch = (
@@ -143,7 +144,8 @@ function TeamColumn({
               className="flex-1 rounded-lg border border-border bg-surface px-2 py-1.5"
             >
               <option value="">— pick —</option>
-              {roster.map((p) => (
+              {/* Bench officials are roster rows now (spec/29 F1) — never a lineup slot. */}
+              {courtRoster(roster).map((p) => (
                 <option key={p.id} value={p.id}>
                   {label(p.id)}
                 </option>

@@ -124,6 +124,15 @@ export function validateIndoorEvent(
       )
         return fail("Use a libero replacement, not a substitution, for the libero");
 
+      // Rule 15.7 waives the limits of Rule 15.6 — ALL of them, not just the
+      // count (spec/30 R4). The scenario the exceptional substitution exists
+      // for is a player who cannot continue when no legal substitution
+      // remains, and that player is very often a substitute already on court:
+      // under the slot rules only their own starter may replace them, so
+      // waiving the count alone still refused the case. The physical checks
+      // above stand — on court, not already on court, not the libero.
+      if (payload.isExceptional) return OK;
+
       const outIsStarter = lineup.includes(payload.outPlayerId);
       const slotOpenedFor = outIsStarter ? slots[payload.outPlayerId] : undefined;
       // Case A: a starter (with no open slot) leaves for a fresh substitute.
@@ -163,10 +172,18 @@ export function validateIndoorEvent(
         if (onCourt) return fail("Libero is already on court");
         const idx = court.indexOf(payload.outPlayerId);
         if (idx < 0) return fail("Player being replaced is not on court");
-        // Back-row, non-server only (indices 4,5). Index 0 is back-row but is the
-        // server — the libero can't serve (Rule 19), so it can't replace there.
-        if (idx !== 4 && idx !== 5)
-          return fail("Libero may only replace a back-row player (not the server)");
+        // Back-row positions are 1, 5, 6 → indices 0, 4, 5 (Rule 7.4). The
+        // libero may replace ANY of them (Rule 19.3.2.1) — including position
+        // 1 — but may never SERVE (spec/29 F10). Position 1 is the serving
+        // position, so the replacement there is legal only while the other
+        // team holds the serve; once this team side-outs, the libero must come
+        // off before their serve.
+        if (idx !== 0 && idx !== 4 && idx !== 5)
+          return fail("Libero may only replace a back-row player");
+        if (idx === 0 && set.currentServer === payload.team)
+          return fail(
+            "The libero cannot serve — replace a different back-row player, or wait until the opponent serves",
+          );
         return OK;
       }
       // OUT: the replaced back-row player returns.
@@ -230,6 +247,32 @@ export function validateIndoorEvent(
         return fail("Match must be set up before a forfeit can be recorded");
       if (state.status === "FINISHED")
         return fail("Match is already finished");
+      return OK;
+
+    case "SET_DEFAULT": {
+      // Unlike a forfeit this awards ONE set, so it needs a set to award: it
+      // is meaningless before play and after the match is over (spec/29 F14).
+      if (state.status !== "LIVE")
+        return fail("A set can only be defaulted while the match is live");
+      const open = state.sets[state.currentSetNumber - 1];
+      if (!open || open.winner)
+        return fail("No set in progress to default");
+      return OK;
+    }
+
+    // Positional faults (spec/29 F13). Gated on the CONFIG, not the discipline
+    // name: a rotation fault is meaningless where there is no rotation, and a
+    // service-order fault is meaningless where there is one.
+    case "ROTATION_FAULT":
+      if (!config.rotationEnabled)
+        return fail("This discipline has no rotation order");
+      if (state.status !== "LIVE") return fail("Match is not live");
+      return OK;
+
+    case "SERVICE_ORDER_FAULT":
+      if (config.rotationEnabled)
+        return fail("Rotation disciplines record a rotation fault instead");
+      if (state.status !== "LIVE") return fail("Match is not live");
       return OK;
 
     case "RALLY_START":

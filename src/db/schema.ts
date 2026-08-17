@@ -149,6 +149,12 @@ export const competitions = pgTable(
     city: text("city"),
     country: text("country"),
     hall: text("hall"),
+    // IANA zone of the VENUE (spec/29 F5), e.g. "Europe/Zurich". Every time on
+    // the official sheet is printed in it; null keeps today's behaviour, which
+    // is UTC. Not derived from the server or the reader's browser: the sheet is
+    // a document about a place, and a match at 20:00 local must not print as
+    // 18:00 because it was generated elsewhere.
+    timezone: text("timezone"),
     category: text("category", {
       enum: ["SENIOR", "JUNIOR", "YOUTH", "KID"],
     }),
@@ -239,6 +245,13 @@ export const tournamentConfig = pgTable("tournament_config", {
   // Team tablets
   teamTabletEnabled: boolean("team_tablet_enabled"),
   allowTeamTabletDirectEntry: boolean("allow_team_tablet_direct_entry"),
+
+  // Sanctions: what the console does about the point a penalty awards
+  // (spec/29 F14). Nullable override like every column here; the per-discipline
+  // default is PROMPT.
+  sanctionAutoPoint: text("sanction_auto_point", {
+    enum: ["PROMPT", "AUTO", "OFF"],
+  }),
 }).enableRLS();
 
 // ── Teams & players ──────────────────────────────────────────────────────────
@@ -418,6 +431,19 @@ export const players = pgTable("players", {
   role: text("role", { enum: ["PLAYER", "BENCH", "STAFF"] })
     .default("PLAYER")
     .notNull(),
+  // The letter this bench official prints as on the official scoresheet's TEAMS
+  // block and in the sanctions grid (spec/29 F1): C1 coach, A1-A3 assistant
+  // coaches, D1 doctor, T therapist, P physiotherapist. Meaningful only when
+  // `role = 'STAFF'`; nullable everywhere else, and nullable for staff too —
+  // a bench official with no declared function still prints, without a code.
+  //
+  // Staff live HERE, on the roster, and not on `team_staff`: every match
+  // surface (scorer console, sanctions, sign-off, the VSR export) reads rosters
+  // through loadMatchRosters, and none of them read team_staff. See spec/29
+  // §Revalidation §1.
+  staffFunction: text("staff_function", {
+    enum: ["C1", "A1", "A2", "A3", "D1", "T", "P"],
+  }),
 }, (t) => [
   // One jersey number per team. NULLs are distinct in Postgres, so bench/staff
   // without a number are unaffected. Brief §2.1.
@@ -600,7 +626,8 @@ export const interruptRequests = pgTable(
       .references(() => tenants.id),
     team: text("team", { enum: ["A", "B"] }).notNull(),
     requestType: text("request_type", {
-      enum: ["TIMEOUT", "SUBSTITUTION", "CHALLENGE", "MEDICAL"],
+      // TS-only enum (no DB constraint) — PROTEST added by spec/29 F12.
+      enum: ["TIMEOUT", "SUBSTITUTION", "CHALLENGE", "MEDICAL", "PROTEST"],
     }).notNull(),
     payload: jsonb("payload"),
     status: text("status", { enum: ["PENDING", "APPROVED", "DENIED"] })
@@ -738,6 +765,9 @@ export const matchSignatures = pgTable(
         "FIRST_REFEREE",
         "TEAM_A_CAPTAIN_PREMATCH",
         "TEAM_B_CAPTAIN_PREMATCH",
+        // Pre-match coach signatures (spec/29 F3) — beach TEAMS p2 box.
+        "TEAM_A_COACH_PREMATCH",
+        "TEAM_B_COACH_PREMATCH",
         "SCORER",
         "ASSISTANT_SCORER",
       ],

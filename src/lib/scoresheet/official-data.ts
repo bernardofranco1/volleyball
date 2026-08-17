@@ -8,6 +8,7 @@
 // PDF; the renderers consume the result.
 
 import type { ReportEvent, MatchReportData, ReportPlayer } from "@/lib/match-report";
+import { remark, type RemarkContext } from "./remarks";
 
 type TeamId = "A" | "B";
 
@@ -52,6 +53,13 @@ export interface SheetSanction {
     | "MISCONDUCT_DISQUALIFICATION";
   team: TeamId;
   jersey: number | null; // null = team-level (delay) sanction
+  /**
+   * What goes in the grid's "player" column (FIVB sanction grid): the jersey
+   * number for a player, the function letter for a bench official (spec/29
+   * F1/F2 — a coach takes cards too, and has no number), and null for a
+   * team-level delay sanction.
+   */
+  member: string | null;
   setNumber: number;
   score: { a: number; b: number };
 }
@@ -84,9 +92,25 @@ export interface OfficialSheetData {
   sets: SheetSetData[];
   sanctions: SheetSanction[];
   improperRequests: { team: TeamId; setNumber: number }[];
+  /**
+   * In-match protests (spec/29 F12), in order. Separate from the APPROVAL
+   * block's PROTEST signature intent, which contests the FINAL result.
+   */
+  protests: {
+    team: TeamId;
+    setNumber: number;
+    score: { a: number; b: number };
+    text: string | null;
+  }[];
   /** Pre-match coin toss (COIN_TOSS event). */
   tossWinnerSet1: TeamId | null;
-  forfeit: { team: TeamId; reason: string } | null;
+  /**
+   * Match ended early (FIVB 6.4). `noShow` is the 6.4.2 default: the team
+   * never played, so the sheet prints the convention scoreline (0-25 per set
+   * indoor, 0-21 beach) rather than a blank ladder (spec/29 F8). A 6.4.3
+   * retirement is NOT a no-show — points already played are kept.
+   */
+  forfeit: { team: TeamId; reason: string; noShow: boolean } | null;
   remarks: string[];
 }
 
@@ -119,6 +143,70 @@ export function survivingEvents(events: ReportEvent[]): ReportEvent[] {
   return survivors;
 }
 
+/** A surviving event paired with the score as of that event (spec/30 Phase B). */
+export interface ScoredEvent {
+  event: ReportEvent;
+  /** Score after this event when it is a rally; the running score otherwise. */
+  score: { a: number; b: number };
+}
+
+/**
+ * Resolve UNDO/REWIND **and** re-count the score, in one pass.
+ *
+ * Every document that states a CURRENT score has to do this, and until spec/30
+ * each did its own thing: the sheet counted (spec/29 Phase 6), while the VSR
+ * feed and the timings export walked the same survivors but stamped scores from
+ * each row's denormalized `scoreAfter*` columns.
+ *
+ * Those columns are a cache written once at append time and never corrected.
+ * That is harmless while undo only ever removes events from the TAIL — which
+ * was true until F13's fault correction, whose entire purpose is undoing points
+ * in the MIDDLE of a set. After one, every surviving later row still carries a
+ * score that counted the cancelled points, so a consumer trusting the cache
+ * reports a match that never happened.
+ *
+ * One implementation, so the sheet, the feed and the timings can never
+ * disagree again. The cache remains the fallback while a set has no rally
+ * events at all — imported/synthetic matches, where a declared SET_END score is
+ * the only score there is.
+ *
+ * Audit views deliberately do NOT use this: showing what was recorded at the
+ * time, and marking what was later cancelled, is their job (spec/30 Phase D).
+ */
+export function scoredSurvivingEvents(events: ReportEvent[]): ScoredEvent[] {
+  const survivors = survivingEvents(events);
+  const out: ScoredEvent[] = [];
+  let running = { a: 0, b: 0 };
+  let ralliesSeen = 0;
+
+  for (const ev of survivors) {
+    const p = (ev.payload ?? {}) as { type?: string };
+    const type = p.type ?? ev.eventType;
+    if (type === "SET_START") {
+      running = { a: 0, b: 0 };
+      ralliesSeen = 0;
+    }
+    if (type === "RALLY_WON_A") {
+      running = { a: running.a + 1, b: running.b };
+      ralliesSeen += 1;
+    } else if (type === "RALLY_WON_B") {
+      running = { a: running.a, b: running.b + 1 };
+      ralliesSeen += 1;
+    }
+    out.push({
+      event: ev,
+      score:
+        ralliesSeen > 0
+          ? { a: running.a, b: running.b }
+          : {
+              a: typeof ev.scoreAfterA === "number" ? ev.scoreAfterA : 0,
+              b: typeof ev.scoreAfterB === "number" ? ev.scoreAfterB : 0,
+            },
+    });
+  }
+  return out;
+}
+
 // ── main computation ─────────────────────────────────────────────────────────
 
 const num = (v: unknown): number => (typeof v === "number" ? v : 0);
@@ -130,16 +218,53 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
   const jersey = (id: unknown): number | null =>
     typeof id === "string" ? (jerseyOf.get(id) ?? null) : null;
 
-  const events = survivingEvents(report.events);
+  // Bench officials are roster rows (spec/29 F1), so a misconduct payload's
+  // `playerId` may be one of them — same id space, no payload change needed.
+  // They print their function letter (C1, A1, …) where a player prints a number.
+  const staffMark = new Map<string, string>();
+  for (const p of [...report.rosterA, ...report.rosterB]) {
+    if (p.role === "STAFF") staffMark.set(p.id, p.staffFunction ?? "C");
+  }
+  // Standardized REMARKS lines are composed from typed events (spec/29 Phase
+  // 4) so the block stays a rendering of the log rather than a second place
+  // facts are entered. Free-text NOTE keeps the scorer's own voice.
+  const ctxOf = (
+    ev: ReportEvent,
+    extra?: { team?: TeamId; playerId?: unknown },
+  ): RemarkContext => ({
+    setNumber: ev.setNumber ?? cur?.setNumber ?? sets.length,
+    score: { a: num(ev.scoreAfterA), b: num(ev.scoreAfterB) },
+    team: extra?.team,
+    member: extra?.playerId != null ? memberMark(extra.playerId) : null,
+    name: nameOf(extra?.playerId),
+  });
+  const nameById = new Map<string, string>();
+  for (const p of [...report.rosterA, ...report.rosterB])
+    nameById.set(p.id, p.jerseyName);
+  const nameOf = (id: unknown): string | null =>
+    typeof id === "string" ? (nameById.get(id) ?? null) : null;
+
+  const memberMark = (id: unknown): string | null => {
+    if (typeof id !== "string") return null;
+    const staff = staffMark.get(id);
+    if (staff) return staff;
+    const n = jerseyOf.get(id);
+    return n == null ? null : String(n);
+  };
+
+  const scored = scoredSurvivingEvents(report.events);
   const isBeach = report.discipline === "BEACH";
   const positions = isBeach ? 2 : 6;
 
   const sets: SheetSetData[] = [];
   const sanctions: SheetSanction[] = [];
   const improperRequests: { team: TeamId; setNumber: number }[] = [];
+  const protests: OfficialSheetData["protests"] = [];
   let tossWinnerSet1: TeamId | null = null;
-  let forfeit: { team: TeamId; reason: string } | null = null;
+  let forfeit: OfficialSheetData["forfeit"] = null;
   const remarks: string[] = [];
+  // Recoveries per player, so the remark can say "#2 for this player" (F11).
+  const recoveryCount = new Map<string, number>();
 
   // Per-set walk state.
   let cur: SheetSetData | null = null;
@@ -209,11 +334,12 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
     serverSlot = { A: null, B: null };
   };
 
-  for (const ev of events) {
+  // Scores are COUNTED from the surviving rallies, never read off each row's
+  // denormalized cache — see scoredSurvivingEvents above for why.
+  for (const { event: ev, score: evScore } of scored) {
     const p = (ev.payload ?? {}) as Record<string, unknown> & { type?: string };
     const type = p.type ?? ev.eventType;
     const team = (p.team === "A" || p.team === "B" ? p.team : null) as TeamId | null;
-    const evScore = { a: num(ev.scoreAfterA), b: num(ev.scoreAfterB) };
 
     switch (type) {
       case "COIN_TOSS": {
@@ -372,6 +498,46 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
           open.set(inId, rec);
           if (col >= 0 && lineup[col]) slots[team].set(lineup[col], inId);
         }
+        // Rule 15.7 (spec/29 F9): an exceptional substitution has no cell of
+        // its own on the sheet — the sub boxes look like any other — so the
+        // REMARKS line is the only thing that says it did not count.
+        if (p.isExceptional === true || p.isEmergency === true) {
+          remarks.push(
+            remark.exceptionalSubstitution(
+              ctxOf(ev, { team, playerId: outId }),
+              [memberMark(inId), nameOf(inId)].filter(Boolean).join(" ") || null,
+            ),
+          );
+        }
+        break;
+      }
+
+      case "MEDICAL_TIMEOUT": {
+        // Recovery with the player and the score (spec/29 F11).
+        if (team) {
+          const pid = typeof p.playerId === "string" ? p.playerId : undefined;
+          if (pid) recoveryCount.set(pid, (recoveryCount.get(pid) ?? 0) + 1);
+          remarks.push(
+            remark.recovery(
+              ctxOf(ev, { team, playerId: pid }),
+              pid ? recoveryCount.get(pid) : undefined,
+            ),
+          );
+        }
+        break;
+      }
+
+      case "LIBERO_REDESIGNATION": {
+        // Rule 19.4.2 (spec/29 F10).
+        if (team) {
+          const nid = typeof p.newLiberoId === "string" ? p.newLiberoId : null;
+          remarks.push(
+            remark.liberoRedesignation(
+              ctxOf(ev, { team }),
+              nid ? [memberMark(nid), nameOf(nid)].filter(Boolean).join(" ") : null,
+            ),
+          );
+        }
         break;
       }
 
@@ -410,6 +576,7 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
             kind: type,
             team,
             jersey: null,
+            member: null,
             setNumber: ev.setNumber ?? cur?.setNumber ?? sets.length,
             score: evScore,
           });
@@ -425,6 +592,7 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
             kind: type,
             team,
             jersey: jersey(p.playerId),
+            member: memberMark(p.playerId),
             setNumber: ev.setNumber ?? cur?.setNumber ?? sets.length,
             score: evScore,
           });
@@ -441,11 +609,63 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
       }
 
       case "FORFEIT": {
+        if (team) {
+          const reason = typeof p.reason === "string" ? p.reason : "FORFEIT";
+          // A no-show is a FORFEIT with nothing played: no set has a score and
+          // none was won. A retirement, or a forfeit after play began, keeps
+          // the real ladder.
+          const nothingPlayed =
+            sets.length === 0 ||
+            sets.every((st) => st.scoreA === 0 && st.scoreB === 0);
+          forfeit = { team, reason, noShow: reason === "FORFEIT" && nothingPlayed };
+          // The RESULTS block prints the outcome; the remark says when it
+          // happened and at what score (spec/29 F8).
+          remarks.push(remark.forfeit(ctxOf(ev, { team }), reason));
+        }
+        break;
+      }
+
+      case "ROTATION_FAULT":
+      case "SERVICE_ORDER_FAULT": {
+        // Auto-composed remark (spec/29 F13). The point the fault awarded is an
+        // ordinary rally and shows in the ladder; this line says why.
         if (team)
-          forfeit = {
+          remarks.push(
+            remark.positionalFault(
+              ctxOf(ev, { team }),
+              type === "ROTATION_FAULT" ? "ROTATION" : "SERVICE_ORDER",
+            ),
+          );
+        break;
+      }
+
+      case "PROTEST_LODGED": {
+        // Printed through the composer (spec/29 F12). Kept separate from the
+        // APPROVAL block's PROTEST intent, which is about the final result.
+        if (team) {
+          const pid = typeof p.playerId === "string" ? p.playerId : undefined;
+          protests.push({
             team,
-            reason: typeof p.reason === "string" ? p.reason : "FORFEIT",
-          };
+            setNumber: ev.setNumber ?? cur?.setNumber ?? sets.length,
+            score: evScore,
+            text: typeof p.text === "string" ? p.text.trim() || null : null,
+          });
+          remarks.push(
+            remark.protest(
+              ctxOf(ev, { team, playerId: pid }),
+              typeof p.text === "string" ? p.text : null,
+            ),
+          );
+        }
+        break;
+      }
+
+      case "SET_DEFAULT": {
+        // A defaulted set has no ladder of its own to explain it, so it goes to
+        // REMARKS with the set and the score at the moment (spec/29 F14). The
+        // set itself closes through SET_END and prints in the RESULTS block
+        // like any other.
+        if (team) remarks.push(remark.setDefault(ctxOf(ev, { team })));
         break;
       }
 
@@ -460,7 +680,15 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
     }
   }
 
-  return { sets, sanctions, improperRequests, tossWinnerSet1, forfeit, remarks };
+  return {
+    sets,
+    sanctions,
+    improperRequests,
+    protests,
+    tossWinnerSet1,
+    forfeit,
+    remarks,
+  };
 }
 
 export type { ReportPlayer };

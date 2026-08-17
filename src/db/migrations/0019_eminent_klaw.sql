@@ -1,0 +1,1 @@
+ALTER TABLE "players" ADD COLUMN "staff_function" text;

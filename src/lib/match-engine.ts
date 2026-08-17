@@ -29,7 +29,7 @@ import type { BeachMatchState } from "@/engine/beach/types";
 import type { IndoorMatchState } from "@/engine/indoor/types";
 import type { GrassMatchState } from "@/engine/grass/types";
 import type { LightMatchState } from "@/engine/light/types";
-import type { Actor, Discipline } from "@/engine/types";
+import type { Actor, Discipline, TeamId } from "@/engine/types";
 import { newId } from "@/lib/id";
 import { scheduleIncrementalBackup } from "@/lib/backup";
 import { scheduleVsrDispatch, vsrDispatchEnabled } from "@/lib/vsr/dispatch";
@@ -713,6 +713,147 @@ async function undoLastEvent(
     newEvents: undoEvents,
     state: finalState,
     undone: targets.map((t) => t.payload.type),
+  };
+}
+
+/**
+ * Points scored by one team since a given sequence, still surviving in the log.
+ *
+ * Pure, and exported so the console can SHOW the scorer exactly what a fault
+ * correction is about to cancel before they commit to it (spec/29 F13).
+ */
+export function selectPointsToCancel(
+  log: EngineEvent[],
+  opts: { team: TeamId; fromSequence: number },
+): EngineEvent[] {
+  const undone = new Set<string>();
+  for (const ev of log) {
+    if (ev.payload.type === "UNDO")
+      undone.add(ev.payload.targetEventId as string);
+  }
+  const wanted = opts.team === "A" ? "RALLY_WON_A" : "RALLY_WON_B";
+  return log.filter(
+    (ev) =>
+      ev.sequence >= opts.fromSequence &&
+      ev.payload.type === wanted &&
+      !undone.has(ev.id),
+  );
+}
+
+export class FaultCorrectionError extends Error {}
+
+/**
+ * Late-discovered positional fault (spec/29 F13): cancel the points the
+ * faulting team scored while it was at fault, keeping everything the OPPONENT
+ * scored in the same window.
+ *
+ * Built on targeted UNDOs, deliberately NOT on REWIND. REWIND truncates the
+ * whole tail — it would erase the opponent's legitimate points too, and FIVB
+ * cancels only the offending team's (§Revalidation §5). A batch of UNDOs is
+ * exactly what the log already models: `undoLastEvent` writes multi-UNDO
+ * batches today, the replay survivors pass resolves an arbitrary set of them,
+ * and the sheet's own `survivingEvents` walk gives the service-round grid the
+ * same treatment for free — which is the acceptance criterion for this feature.
+ *
+ * System events auto-emitted after the earliest cancelled point (SET_END,
+ * MATCH_END, SIDE_SWITCH, TTO_START) go with them: they were consequences of a
+ * score that is being unwound.
+ */
+export async function cancelPointsForFault(
+  matchId: string,
+  opts: {
+    team: TeamId;
+    fromSequence: number;
+    reason?: string;
+    actor?: Actor;
+    deviceInfo?: string;
+    actorUserId?: string;
+  },
+): Promise<AppendOutcome & { cancelled: number }> {
+  const meta = await loadMatchMeta(matchId);
+  const log = await loadEvents(matchId);
+
+  const points = selectPointsToCancel(log, opts);
+  if (points.length === 0)
+    throw new FaultCorrectionError(
+      "No points by that team to cancel from that moment.",
+    );
+
+  const alreadyUndone = new Set<string>();
+  for (const ev of log) {
+    if (ev.payload.type === "UNDO")
+      alreadyUndone.add(ev.payload.targetEventId as string);
+  }
+  const minSeq = Math.min(...points.map((p) => p.sequence));
+  const followers = log.filter(
+    (ev) =>
+      ev.sequence > minSeq &&
+      SYSTEM_EVENTS.has(ev.payload.type) &&
+      !alreadyUndone.has(ev.id),
+  );
+  const targets = [...points, ...followers];
+
+  let nextSeq = (log[log.length - 1]?.sequence ?? 0) + 1;
+  const timestamp = new Date().toISOString();
+  const undoEvents: EngineEvent[] = targets.map((t) => ({
+    id: newId("evt"),
+    sequence: nextSeq++,
+    timestamp,
+    payload: { type: "UNDO", targetEventId: t.id },
+  }));
+
+  const finalState = meta.engine.replay(
+    matchId,
+    [...log, ...undoEvents],
+    meta.config,
+  );
+
+  try {
+    await dbTx.transaction(async (tx) => {
+      const d = meta.engine.denormalize(finalState);
+      await tx.insert(events).values(
+        undoEvents.map((ev, i) => ({
+          id: ev.id,
+          matchId,
+          tenantId: meta.tenantId,
+          sequence: ev.sequence,
+          timestamp: new Date(ev.timestamp),
+          eventType: "UNDO",
+          payload: ev.payload,
+          actor: opts.actor ?? "SCORER",
+          actorUserId: opts.actorUserId ?? null,
+          deviceInfo: opts.deviceInfo ?? null,
+          // The justification belongs on the first row of the batch: it is one
+          // decision, not N.
+          notes: i === 0 ? (opts.reason?.trim() || null) : null,
+          ...d,
+        })),
+      );
+      await tx
+        .update(matches)
+        // Same reasoning as undoLastEvent: the old snapshot still contains the
+        // cancelled points and must not be replayed from.
+        .set(derivedMatchColumns(meta, finalState, { includeSnapshot: true }))
+        .where(eq(matches.id, matchId));
+    });
+  } catch (err) {
+    throw toWriteError(err);
+  }
+
+  scheduleBroadcast([stateUpdateMessage(matchId, finalState.lastSequence)]);
+  scheduleVsrFeed(matchId);
+  {
+    const engineStatus = meta.engine.matchStatusOf(finalState);
+    scheduleBackupOnStatusChange(
+      meta,
+      engineStatus === "FINISHED" ? "PENDING_CONFIRMATION" : engineStatus,
+    );
+  }
+  return {
+    newEvents: undoEvents,
+    state: finalState,
+    undone: targets.map((t) => t.payload.type),
+    cancelled: points.length,
   };
 }
 

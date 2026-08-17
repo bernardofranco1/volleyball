@@ -56,6 +56,7 @@ const OVERRIDE_LABELS: { key: string; labelKey: string }[] = [
   { key: "ttoEnabled", labelKey: "comp.tto" },
   { key: "ttoDurationSecs", labelKey: "comp.ttoDuration" },
   { key: "resultSignatures", labelKey: "comp.resultSignatures" },
+  { key: "sanctionAutoPoint", labelKey: "comp.sanctionAutoPoint" },
   { key: "vcsEnabled", labelKey: "comp.vcs" },
   { key: "vcsChallengesPerSet", labelKey: "comp.vcsPerSet" },
   { key: "timeoutsPerSet", labelKey: "comp.timeouts" },
@@ -329,6 +330,7 @@ export default async function CompetitionOverviewPage({
                   city: competition.city,
                   country: competition.country,
                   hall: competition.hall,
+                  timezone: competition.timezone,
                   category: competition.category,
                   startDate: competition.startDate,
                   endDate: competition.endDate,
@@ -523,6 +525,30 @@ export default async function CompetitionOverviewPage({
                 </select>
               </div>
             )}
+            {/* What the console does about the point a penalty awards
+                (spec/29 F14). Recording is fact-only either way — this only
+                decides how much help the scorer gets in not forgetting the
+                consequence. */}
+            <div>
+              <label className={ui.label} htmlFor="sanctionAutoPoint">
+                {t("comp.sanctionAutoPoint")}
+              </label>
+              <select
+                id="sanctionAutoPoint"
+                name="sanctionAutoPoint"
+                defaultValue={configRow?.sanctionAutoPoint ?? ""}
+                className={ui.select}
+              >
+                <option value="">
+                  {t("common.default", {
+                    value: t(`comp.autoPoint.${resolved.sanctionAutoPoint}`),
+                  })}
+                </option>
+                <option value="PROMPT">{t("comp.autoPoint.PROMPT")}</option>
+                <option value="AUTO">{t("comp.autoPoint.AUTO")}</option>
+                <option value="OFF">{t("comp.autoPoint.OFF")}</option>
+              </select>
+            </div>
             {/* TTO length — drives the countdown on the scorer console and the
                 public board. FIVB beach default is 30 s (rule 15.4.2); a
                 different length needs FIVB approval for official events. */}

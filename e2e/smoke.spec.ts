@@ -25,3 +25,21 @@ test.describe("smoke", () => {
     await expect(page).toHaveURL(/\/login/);
   });
 });
+
+// ── official scoresheet download (spec/29 F7) ───────────────────────────────
+//
+// The renderer is covered by unit fixtures; what those cannot see is the ROUTE
+// — auth, headers, and the fact that a real HTTP response carries a PDF rather
+// than an HTML error page. That is the whole point of this one.
+test.describe("official scoresheet route", () => {
+  test("refuses an unauthenticated export instead of leaking a sheet", async ({
+    request,
+  }) => {
+    const res = await request.get("/api/matches/does-not-exist/export.pdf", {
+      maxRedirects: 0,
+    });
+    // Unauthorized / not found / redirect to login — never 200 with a document.
+    expect(res.status()).not.toBe(200);
+    expect(res.headers()["content-type"] ?? "").not.toContain("application/pdf");
+  });
+});

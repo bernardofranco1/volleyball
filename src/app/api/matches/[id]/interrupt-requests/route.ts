@@ -23,7 +23,16 @@ import { newId } from "@/lib/id";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const TYPES = ["TIMEOUT", "SUBSTITUTION", "CHALLENGE", "MEDICAL"] as const;
+// PROTEST (spec/29 F12): the team lodges an in-match protest from its tablet;
+// the scorer's approval records the PROTEST_LODGED marker. Unquota-ed — the
+// protest protocol, not this endpoint, decides whether it stands.
+const TYPES = [
+  "TIMEOUT",
+  "SUBSTITUTION",
+  "CHALLENGE",
+  "MEDICAL",
+  "PROTEST",
+] as const;
 type ReqType = (typeof TYPES)[number];
 
 // The current-set fields the quota backstop reads (indoor set state; tablets are
@@ -47,7 +56,7 @@ async function remainingFor(
   team: "A" | "B",
   type: ReqType,
 ): Promise<number | null> {
-  if (type === "MEDICAL") return null;
+  if (type === "MEDICAL" || type === "PROTEST") return null;
   try {
     const { state, config } = await loadMatchState(matchId);
     const s = state as unknown as {
@@ -89,6 +98,7 @@ export async function POST(
     note?: string;
     outPlayerId?: string;
     inPlayerId?: string;
+    isExceptional?: boolean;
   } | null;
   if (!body || (body.team !== "A" && body.team !== "B"))
     return Response.json({ error: "Bad request" }, { status: 400 });
@@ -119,8 +129,18 @@ export async function POST(
 
   // Quota backstop: a stale tablet must not be able to queue a request the team
   // has no allowance for (the buttons grey out client-side, but don't trust it).
+  //
+  // An EXCEPTIONAL substitution (Rule 15.7, spec/29 F9) is the one thing this
+  // must let through at zero: it exists precisely because the legal
+  // substitutions are gone, so "no allowance remaining" is its precondition,
+  // not its disqualification. Refusing it here made the tablet flow dead on
+  // arrival — spec/29 fixed the approval path, which the request never reached
+  // (spec/30 R2). The engine validator remains the real gate: it accepts the
+  // flag past the per-set cap and still rejects an illegal player choice.
+  const exceptionalSub =
+    body.requestType === "SUBSTITUTION" && body.isExceptional === true;
   const remaining = await remainingFor(id, body.team, body.requestType);
-  if (remaining != null && remaining <= 0)
+  if (!exceptionalSub && remaining != null && remaining <= 0)
     return Response.json(
       { error: "No allowance remaining for this request" },
       { status: 409 },
@@ -128,7 +148,13 @@ export async function POST(
 
   const payload =
     body.requestType === "SUBSTITUTION"
-      ? { outPlayerId: body.outPlayerId, inPlayerId: body.inPlayerId }
+      ? {
+          outPlayerId: body.outPlayerId,
+          inPlayerId: body.inPlayerId,
+          // Rule 15.7 (spec/29 F9) — the scorer approves what was asked for.
+          // Coerced, never trusted raw: this comes off a tablet.
+          isExceptional: body.isExceptional === true,
+        }
       : body.note
         ? { note: String(body.note).slice(0, 280) } // untrusted tablet note
         : null;
@@ -262,6 +288,7 @@ export async function PATCH(
     const pl = (reqRow.payload ?? {}) as {
       outPlayerId?: string;
       inPlayerId?: string;
+      isExceptional?: boolean;
     };
     const event =
       reqRow.requestType === "TIMEOUT"
@@ -274,7 +301,11 @@ export async function PATCH(
                 team: reqRow.team,
                 outPlayerId: pl.outPlayerId,
                 inPlayerId: pl.inPlayerId,
-                isExceptional: false,
+                // What the TEAM asked for (spec/29 F9). Hardcoding false here
+                // turned an exceptional substitution into an ordinary one,
+                // which the engine then rejected as over the per-set limit —
+                // exactly when a team most needs it.
+                isExceptional: pl.isExceptional === true,
               }
             : null;
     if (event) {

@@ -52,6 +52,7 @@ function report(discipline: string, events: ReportEvent[]): MatchReportData {
     phaseName: "Main",
     venue: "Hall 1",
     city: "Lausanne",
+    timezone: null,
     country: "Switzerland",
     hall: "Malley",
     category: "SENIOR",
