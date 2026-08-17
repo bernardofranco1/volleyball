@@ -200,7 +200,16 @@ Two tiers, deliberately separated because they have different failure modes:
 - Acceptance: Tier 1 snapshot tests green on both goldens + both extra
   fixtures; Tier 2 parity report checked in with any accepted gaps annotated.
 
-### Phase H — tablet pre-match signing (M; **gated on a product-owner security decision**)
+### Phase H — tablet pre-match signing — ❌ **DROPPED 2026-08-17 by decision**
+
+The product owner chose **console-only**: coaches and captains keep signing on
+the scorer device as spec/29 Phase 1 shipped, and G7's tablet capture stays
+unbuilt. Nothing is lost that the sheet needs — the signatures are collected,
+printed and retained; only the device differs. The design below is kept because
+it is the thing that would be built if the decision is ever revisited, and
+because writing it down is what made the decision answerable.
+
+*(Original plan, not implemented:)*
 
 The design, so the decision has something concrete to approve:
 
@@ -302,9 +311,9 @@ gate.** Phase B's acceptance extends the same fixtures *first*.
 | D — audit views mark cancellations | `feat/spec-30-followups` | done |
 | E — legacy queue migration | `feat/spec-30-followups` | done, **decision changed — see below** |
 | G — golden PDF text extraction | `feat/spec-30-followups` | done, both tiers |
-| F — medical limits | — | **blocked at F-0**, see below |
-| H — tablet signing | — | **blocked on §5.1** |
-| R — rollout | — | **blocked on authorization** |
+| F — medical limits | `feat/spec-30-followups` | **done** — F-0 passed on the supplied rulebook |
+| H — tablet signing | — | **dropped** by decision (console-only) |
+| R — rollout | — | **homolog only**, by decision |
 
 ### R4 — the engine was not ready for the exceptional substitution either
 
@@ -345,7 +354,23 @@ correction removed each row. Bonus fix found while there: the fault-correction
 picker was offering rallies a previous correction had already cancelled, so the
 count shown above the two-tap confirm overstated what the action would do.
 
-### F-0 — verified, and it fails: the rulebooks are not available
+### F-0 — failed first, then passed on the supplied rulebook
+
+**Resolved 2026-08-17.** The product owner supplied the Official Volleyball
+Rules 2025-2028 (39th FIVB World Congress 2024). **Rule 17.1.2** gives an
+injured player a 3-minute recovery "but not more than once for the same player
+in the match", and if they do not recover "his/her team is declared incomplete"
+(→ 6.4.3, 7.3.1 — which is spec/29 F14's SET_DEFAULT; the rulebook's own
+cross-reference and our model agree). Indoor is therefore capped at 1 with the
+citation in the config; beach/grass/light stay uncapped because the beach rules
+are a separate document that was not supplied and grass/light have no selected
+authority.
+
+Rule 15.7 in the same document independently confirms **R4**: an exceptional
+substitution is "beyond the limits of Rule 15.6" — the whole rule, not just the
+count — which is exactly the waiver Phase A had to add.
+
+*(The original F-0 finding, before the rulebook was supplied:)*
 
 Searched before concluding. There is no FIVB 2025–2028 rulebook in this repo or
 on this machine; the only rulebook present is **Light Volleyball 2022–2025**,
