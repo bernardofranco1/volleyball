@@ -24,6 +24,17 @@ import type { TournamentConfig } from "@/engine/config";
 import { matchTopic } from "@/lib/realtime-topics";
 import type { StaffFunction } from "@/lib/roster";
 
+/**
+ * How stale an unsent queue may be before it is discarded instead of replayed
+ * (spec/29 Phase 7 audit).
+ *
+ * Long enough to cover a real venue outage and a scorer walking back into
+ * range — a set, a change of ends, a device sleeping through half-time. Short
+ * enough that it can never reach the NEXT match on the same device, which is
+ * the case that would put someone else's rallies into this scoresheet.
+ */
+export const QUEUE_MAX_AGE_MS = 3 * 60 * 60 * 1000; // 3 hours
+
 export interface PlayerLite {
   id: string;
   /**
@@ -162,12 +173,32 @@ export function createMatchProvider<
 
     // Queued-but-unsent events survive a reload/navigation while offline —
     // previously they lived only in a ref and were silently lost.
+    //
+    // sessionStorage, NOT localStorage (spec/29 Phase 7 audit). localStorage is
+    // shared by every tab on the origin, and nothing here coordinated them:
+    //
+    //   • two consoles open on the same match both restored the SAME persisted
+    //     queue on mount and both flushed it — every queued point scored twice;
+    //   • `persistQueue` overwrites the key with the calling tab's queue, so a
+    //     second tab going idle (queue empty → removeItem) silently DELETED the
+    //     first tab's unsent events.
+    //
+    // sessionStorage is per tab and survives reload and navigation, which is
+    // exactly the documented purpose. The only thing given up is a queue
+    // surviving the tab being closed outright — a far smaller loss than
+    // double-scoring a match.
     const storageKey = `vbqueue_${matchId}`;
     const persistQueue = useCallback(() => {
       setQueuedCount(queue.current.length);
       try {
-        if (queue.current.length === 0) localStorage.removeItem(storageKey);
-        else localStorage.setItem(storageKey, JSON.stringify(queue.current));
+        if (queue.current.length === 0) sessionStorage.removeItem(storageKey);
+        else
+          sessionStorage.setItem(
+            storageKey,
+            // Stamped so a queue restored after a long disconnect can be aged
+            // out rather than replayed into a match that has moved on.
+            JSON.stringify({ savedAt: Date.now(), items: queue.current }),
+          );
       } catch {
         /* storage unavailable (private mode) — queue stays in memory */
       }
@@ -293,15 +324,32 @@ export function createMatchProvider<
     // Restore any queue persisted before a reload and try to drain it.
     useEffect(() => {
       try {
-        const raw = localStorage.getItem(storageKey);
-        if (raw) {
-          const items = JSON.parse(raw) as P[];
-          if (Array.isArray(items) && items.length > 0) {
-            queue.current.push(...items);
-            setQueuedCount(queue.current.length);
-            void flush();
-          }
+        const raw = sessionStorage.getItem(storageKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as
+          | { savedAt?: number; items?: P[] }
+          | P[];
+        // Tolerate the pre-stamp shape (a bare array) so a queue written by the
+        // previous build is not thrown away on the deploy that adds the stamp.
+        const items = Array.isArray(parsed) ? parsed : (parsed.items ?? []);
+        const savedAt = Array.isArray(parsed) ? null : (parsed.savedAt ?? null);
+        if (!Array.isArray(items) || items.length === 0) return;
+
+        // Age-out (spec/29 Phase 7 audit). Replaying rallies from hours ago
+        // into a match that has since been scored, corrected or signed would
+        // corrupt the official record, and the scorer has no way to see it
+        // coming. Old queues are dropped and SAID SO, never silently flushed.
+        if (savedAt != null && Date.now() - savedAt > QUEUE_MAX_AGE_MS) {
+          sessionStorage.removeItem(storageKey);
+          setError(
+            "Unsent actions from an earlier session were too old to send and have been discarded. Check the score against the court.",
+          );
+          return;
         }
+
+        queue.current.push(...items);
+        setQueuedCount(queue.current.length);
+        void flush();
       } catch {
         /* corrupt/unavailable storage — ignore */
       }

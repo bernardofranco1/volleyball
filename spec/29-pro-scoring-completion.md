@@ -1,6 +1,13 @@
 # 29 — Pro-scoring completion: remaining FIVB-fidelity corrections
 
-Status: **planned, Phase 0 verification done** (2026-08-17). No code yet. Consolidates the gap analysis of
+Status: **IMPLEMENTED 2026-08-17** — Phases 1–7 shipped on
+`feat/spec-29-pro-scoring`, one commit per phase, 543 tests passing. See
+§Implementation notes at the end for what was built differently from the plan
+and what is deliberately still open.
+
+*(Previously: planned, Phase 0 verification done 2026-08-17. No code yet.)*
+
+Consolidates the gap analysis of
 2026-08-17 (run against origin/main as of 2026-08-14) with spec/21's own
 "Remaining" list into one phased plan. Scope excludes, per product owner:
 **anything Video Challenge (VCS) related** and **anything serve-clock related**
@@ -315,3 +322,64 @@ net; as sequenced, Phase 3's L-sized rewind work lands without one.
 
 Prod consistency (Vercel, project `volleyball`):
 - ~~Production = deployment `24abc2e` ("review findings" merge, 2026-08-14), promoted via the spec/28 release console.~~ **Wrong — corrected 2026-08-17.** `/api/version` on the production domain reports `00e89e7`: the `24abc2e` production build exists and is READY but was never promoted (staged builds don't take the domain — spec/28 §3.2). So prod is 3 commits behind the code this plan was verified against, missing the 2026-08-14 review fixes (dashboard membership gate, promote safety nets, last-admin guard). The plan itself is unaffected — spec/29 targets code on main — but promote `24abc2e`+ before relying on those guards, and before any spec/29 phase ships.
+
+
+## Implementation notes — 2026-08-17
+
+Built phase by phase; each commit message carries the detail. The plan
+corrections in §Revalidation all held up in the building. What is worth
+recording here is the handful of things the code decided that the plan could
+not, and the two places where the work found a defect rather than added a
+feature.
+
+### Found while building (not in the plan)
+
+- **The sheet's scores were a stale cache.** `official-data` read each event
+  row's denormalized `scoreAfter*` columns. That is correct while undo only
+  ever removes events from the TAIL — which was true until F13's late-discovery
+  correction, whose whole purpose is undoing points in the MIDDLE of a set.
+  Every surviving rally after a cancelled one carried a score that still
+  counted it, so the printed ladder would have disagreed with the printed
+  result. Scores are now counted from the surviving rallies, with the
+  denormalized value kept as the fallback for imported matches that have no
+  rally events at all. The fault-correction golden fixture is what caught it.
+- **The tablet could not make an exceptional substitution.** The approval route
+  hardcoded `isExceptional: false`, so a team's request became an ordinary
+  substitution that the engine then rejected as over the per-set limit —
+  exactly when a team most needs one (F9).
+- **The offline queue was shared across tabs** (Phase 7 audit). It lived in
+  `localStorage` with no coordination: two consoles on one match both restored
+  and both flushed the same queue — every queued point scored twice — and a tab
+  going idle deleted the other tab's unsent events. Now per-tab
+  (`sessionStorage`, which still survives reload and navigation) and stamped,
+  so a queue older than 3 hours is discarded with a visible message instead of
+  replayed into a match that has moved on.
+- **Bench officials would have broken scoring** if added without the picker
+  work — see §Revalidation §1; the `courtRoster`/`staffRoster` filters and the
+  beach `roster.length !== 2` case were the load-bearing part of F1.
+
+### Deliberately still open
+
+- **Medical limits are recorded, not enforced** (F11). Recoveries are captured
+  per player, tallied and printed, and repeats are flagged on the sheet — but
+  no cap is applied. The per-discipline limits differ and this spec requires
+  them verified against the 2025–2028 rulebooks rather than assumed; that
+  verification has not happened, so enforcing a guess would be worse than
+  enforcing nothing. Marked in `baseReducer.ts` where it would go.
+- **Golden fixtures assert content and geometry, not a PDF diff** (F7). The
+  reference PDFs in `spec/reference/` remain the layout source of truth, matched
+  by eye in spec/21. Extracting their text to diff automatically is separate
+  work; a byte-count check presented as one would be worse than the honest gap.
+- **Tablet signature capture** (F3). Coaches sign on the scorer console like
+  captains. Real tablet signing needs a token-auth path on the signatures API —
+  a security decision, not a UI one (§Revalidation §3).
+- **Grass/light sheets.** F6 gave those consoles capture parity — the events
+  reach the log — but neither discipline has an official sheet, which stays out
+  of scope.
+
+### Sequencing, in hindsight
+
+F7's goldens were built in Phase 6 as scheduled, and they immediately caught a
+Phase-3 defect that had been sitting in the tree for three commits. The
+recommendation in §Revalidation stands and is now evidence rather than opinion:
+build the goldens in front of the work they protect.

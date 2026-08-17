@@ -340,7 +340,7 @@ const en: Dict = {
   "scoring.faultsHint": "Faults award the point to the opponent.",
   "scoring.queued": "{count} queued",
   "scoring.queuedTitle":
-    "Events scored while offline — sent automatically on reconnect",
+    "Events scored while offline — sent automatically on reconnect. Until they are sent, a scoresheet or report generated from this match will be missing them.",
   "scoring.online": "Online",
   "scoring.offline": "Offline — changes queued",
   "scoring.serving": "serving",
@@ -996,7 +996,7 @@ const fr: Dict = {
   "scoring.faultsHint": "Les fautes donnent le point à l’adversaire.",
   "scoring.queued": "{count} en attente",
   "scoring.queuedTitle":
-    "Événements saisis hors ligne — envoyés automatiquement à la reconnexion",
+    "Événements marqués hors ligne — envoyés automatiquement à la reconnexion. Tant qu’ils ne sont pas envoyés, une feuille de match ou un rapport généré ne les contiendra pas.",
   "scoring.online": "En ligne",
   "scoring.offline": "Hors ligne — modifications en file d’attente",
   "scoring.serving": "au service",
@@ -1641,7 +1641,7 @@ const de: Dict = {
   "scoring.faultsHint": "Fehler geben dem Gegner den Punkt.",
   "scoring.queued": "{count} in Warteschlange",
   "scoring.queuedTitle":
-    "Offline erfasste Ereignisse — werden bei Wiederverbindung automatisch gesendet",
+    "Offline erfasste Ereignisse — werden bei der Verbindung automatisch gesendet. Bis dahin fehlen sie in jedem erzeugten Spielberichtsbogen oder Bericht.",
   "scoring.online": "Online",
   "scoring.offline": "Offline — Änderungen in Warteschlange",
   "scoring.serving": "Aufschlag",
@@ -2287,7 +2287,7 @@ const es: Dict = {
   "scoring.faultsHint": "Las faltas dan el punto al rival.",
   "scoring.queued": "{count} en cola",
   "scoring.queuedTitle":
-    "Eventos anotados sin conexión — se envían automáticamente al reconectar",
+    "Eventos registrados sin conexión — se envían automáticamente al reconectar. Hasta entonces, cualquier acta o informe generado no los incluirá.",
   "scoring.online": "En línea",
   "scoring.offline": "Sin conexión — cambios en cola",
   "scoring.serving": "al saque",
@@ -2933,7 +2933,7 @@ const pt: Dict = {
   "scoring.faultsHint": "As faltas dão o ponto ao adversário.",
   "scoring.queued": "{count} em fila",
   "scoring.queuedTitle":
-    "Eventos marcados offline — enviados automaticamente ao reconectar",
+    "Eventos registados offline — enviados automaticamente ao reconectar. Até lá, qualquer súmula ou relatório gerado não os incluirá.",
   "scoring.online": "Online",
   "scoring.offline": "Offline — alterações em fila",
   "scoring.serving": "a servir",
