@@ -10,13 +10,11 @@ import {
   eq,
   ilike,
   inArray,
-  max,
   sql,
 } from "drizzle-orm";
 import { db } from "@/db";
 import {
   competitions,
-  events,
   matches,
   people,
   players,
@@ -26,6 +24,7 @@ import {
 } from "@/db/schema";
 import { DISCIPLINES, isCompetitionStatus, isDiscipline } from "@/lib/domain";
 import type { StaffFunction } from "@/lib/roster";
+import { loadSetScoresAuthoritative } from "@/lib/match-scores";
 
 export type Competition = typeof competitions.$inferSelect;
 export type TournamentConfigRow = typeof tournamentConfig.$inferSelect;
@@ -353,35 +352,16 @@ export async function matchStatusCounts(
  * Final score of every set of the given matches, so the match centre can show
  * "25-16 · 25-12 · 25-19" instead of just the set tally.
  *
- * Per-set MAX over the denormalised event scores — the same aggregate the
- * standings use (≤ matches × sets rows, no replay). A point removed by an
- * UNDO at the very end of a set can leave the max one ahead of the true final
- * score; the authoritative renderings (scoresheet, reports) replay the log.
+ * Delegates to the authoritative reader (spec/30 Phase C): a FINISHED match's
+ * per-set finals come from its replayed snapshot, and only a live match's
+ * in-progress set still uses the per-set MAX over event rows — which is
+ * fresher there, and whose imprecision is bounded again now that F13's mid-set
+ * cancellations are read from the snapshot instead.
  */
 export async function loadSetScores(
   matchIds: string[],
 ): Promise<Map<string, { a: number; b: number }[]>> {
-  const byMatch = new Map<string, { a: number; b: number }[]>();
-  if (matchIds.length === 0) return byMatch;
-  const rows = await db
-    .select({
-      matchId: events.matchId,
-      setNumber: events.setNumber,
-      a: max(events.scoreAfterA),
-      b: max(events.scoreAfterB),
-    })
-    .from(events)
-    .where(
-      and(inArray(events.matchId, matchIds), sql`${events.setNumber} is not null`),
-    )
-    .groupBy(events.matchId, events.setNumber)
-    .orderBy(asc(events.matchId), asc(events.setNumber));
-  for (const r of rows) {
-    const list = byMatch.get(r.matchId) ?? [];
-    list.push({ a: r.a ?? 0, b: r.b ?? 0 });
-    byMatch.set(r.matchId, list);
-  }
-  return byMatch;
+  return loadSetScoresAuthoritative(matchIds);
 }
 
 /**
