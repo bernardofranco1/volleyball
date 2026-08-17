@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    name: Lint, types, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm test
+
+  e2e:
+    name: Playwright e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+        env:
+          # ── Which tables the e2e run may touch ─────────────────────────────
+          # HOMOLOG, always. The authenticated specs WRITE: the scorer flow
+          # awards a real point and the tablet flow files a real request, both
+          # onto an append-only log that is somebody's official record.
+          #
+          # This must be explicit. `DB_SCHEMA` unset means `public` — that
+          # default exists so a missing dashboard variable can never take the
+          # live site down (db/env.ts) — and the Vercel cross-check that would
+          # catch the mismatch only fires on a Vercel deployment, which a
+          # GitHub runner is not. Without the line below, every push would
+          # score a point on a PRODUCTION match.
+          #
+          # The specs also verify this themselves against /api/version before
+          # writing, and FAIL rather than skip if the answer is `public`, so
+          # deleting this line breaks the build instead of the data.
+          DB_SCHEMA: homolog
+          NEXT_PUBLIC_DB_SCHEMA: homolog
+
+          # Dummy fallbacks let the dev server boot and the no-auth smoke pass
+          # without secrets; the scorer/tablet specs skip unless E2E_* are set.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy-anon-key' }}
+          # Deliberately NOT the real service-role key: the e2e flows sign in
+          # as an ordinary user and never need admin privileges, and the key
+          # can create and delete accounts in the SHARED auth project. Least
+          # privilege — the dummy is enough for the app to boot.
+          SUPABASE_SERVICE_ROLE_KEY: dummy-service-key
+          DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://u:p@localhost:5432/none' }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          E2E_SCORER_PATH: ${{ secrets.E2E_SCORER_PATH }}
+          E2E_TABLET_PATH: ${{ secrets.E2E_TABLET_PATH }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
