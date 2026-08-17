@@ -96,6 +96,24 @@ export interface TournamentConfig {
 
   // ── Medical ──────────────────────────────────────────────────────────────
   medicalTimeoutSecs: number;
+  /**
+   * How many medical recoveries ONE player may take in a match, or null to
+   * record without enforcing (spec/30 Phase F).
+   *
+   * INDOOR — Official Volleyball Rules 2025-2028, **Rule 17.1.2**: "If an
+   * injured/ill player cannot be substituted legally or exceptionally, the
+   * player is given a 3-minute recovery time, but not more than once for the
+   * same player in the match." Hence 1, and hence `medicalTimeoutSecs: 180`.
+   * If the player does not recover the team is declared incomplete (17.1.2 →
+   * 6.4.3, 7.3.1) — which is the SET_DEFAULT event spec/29 F14 added.
+   *
+   * BEACH / GRASS / LIGHT — null. The beach rules are a SEPARATE document that
+   * has not been supplied, and grass/light have no selected authority at all
+   * (see volleyball-codex spec/20, the rule-source register). spec/29 and
+   * spec/30 both hold that enforcing a guessed limit is worse than enforcing
+   * none, so these record and print without capping.
+   */
+  recoveriesPerPlayerPerMatch: number | null;
 
   // ── Team tablets ──────────────────────────────────────────────────────────
   teamTabletEnabled: boolean;
@@ -187,6 +205,8 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     blockCountsAsTeamHit: true,
 
     medicalTimeoutSecs: 300,
+    // No verified source for this discipline — record, do not cap.
+    recoveriesPerPlayerPerMatch: null,
 
     teamTabletEnabled: false,
     allowTeamTabletDirectEntry: false,
@@ -244,6 +264,8 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     blockCountsAsTeamHit: false,
 
     medicalTimeoutSecs: 180,
+    // Rule 17.1.2 — once per player per match.
+    recoveriesPerPlayerPerMatch: 1,
 
     teamTabletEnabled: true,
     allowTeamTabletDirectEntry: false,
@@ -301,6 +323,8 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     blockCountsAsTeamHit: true,
 
     medicalTimeoutSecs: 300,
+    // No verified source for this discipline — record, do not cap.
+    recoveriesPerPlayerPerMatch: null,
 
     teamTabletEnabled: false,
     allowTeamTabletDirectEntry: false,
@@ -358,6 +382,8 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     blockCountsAsTeamHit: false,
 
     medicalTimeoutSecs: 300,
+    // No verified source for this discipline — record, do not cap.
+    recoveriesPerPlayerPerMatch: null,
 
     teamTabletEnabled: false,
     allowTeamTabletDirectEntry: false,

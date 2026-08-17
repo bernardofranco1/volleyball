@@ -241,6 +241,9 @@ export const tournamentConfig = pgTable("tournament_config", {
 
   // Medical
   medicalTimeoutSecs: integer("medical_timeout_secs"),
+  // Recoveries one player may take per match (spec/30 Phase F). Indoor
+  // defaults to 1 per Rule 17.1.2; null override = use the discipline default.
+  recoveriesPerPlayerPerMatch: integer("recoveries_per_player_per_match"),
 
   // Team tablets
   teamTabletEnabled: boolean("team_tablet_enabled"),

@@ -1,0 +1,1 @@
+ALTER TABLE "tournament_config" ADD COLUMN "recoveries_per_player_per_match" integer;

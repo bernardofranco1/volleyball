@@ -22,6 +22,7 @@ import { usePrematchSignOff } from "@/components/scoring/shared/PrematchSignOff"
 import { SanctionsControl } from "@/components/scoring/shared/SanctionsControl";
 import { FaultCorrection } from "@/components/scoring/shared/FaultCorrection";
 import { ProtestControl } from "@/components/scoring/shared/ProtestControl";
+import { RecoveryControl } from "@/components/scoring/shared/RecoveryControl";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
@@ -281,6 +282,18 @@ export function LiveScoreboard({
               autoPoint={config.sanctionAutoPoint}
               misconductA={state.misconductA}
               misconductB={state.misconductB}
+            />
+            <RecoveryControl
+              status={state.status}
+              rallyPhase={state.rallyPhase}
+              teamAName={teamAName}
+              teamBName={teamBName}
+              rosterA={rosterA}
+              rosterB={rosterB}
+              dispatch={dispatch}
+              pending={pending}
+              recoveryLimit={config.recoveriesPerPlayerPerMatch}
+              recoveriesByPlayer={state.recoveriesByPlayer}
             />
             <ProtestControl
               status={state.status}

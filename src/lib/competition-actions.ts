@@ -241,6 +241,14 @@ export async function updateCompetitionConfig(
   const sanctionAutoPoint = isSanctionAutoPoint(rawAutoPoint)
     ? rawAutoPoint
     : null;
+  // Recoveries per player per match (spec/30 Phase F). Blank = discipline
+  // default (indoor 1, Rule 17.1.2; others unenforced).
+  const recoveriesPerPlayerPerMatch = intOrNull(fd, "recoveriesPerPlayerPerMatch");
+  if (
+    recoveriesPerPlayerPerMatch != null &&
+    (recoveriesPerPlayerPerMatch < 0 || recoveriesPerPlayerPerMatch > 9)
+  )
+    return fail("Recoveries per player must be between 0 and 9.");
   const vcsChallengesPerSet = intOrNull(fd, "vcsChallengesPerSet");
   if (
     vcsChallengesPerSet != null &&
@@ -276,6 +284,7 @@ export async function updateCompetitionConfig(
     ttoDurationSecs,
     resultSignatures,
     sanctionAutoPoint,
+    recoveriesPerPlayerPerMatch,
     setBreakDurationsSecs,
     vcsChallengesPerSet,
     // Tri-state: null = discipline default, true/false = explicit override.

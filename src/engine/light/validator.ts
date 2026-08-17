@@ -118,6 +118,29 @@ export function validateLightEvent(
       return fail("Illegal substitution (slot rules)");
     }
 
+    case "MEDICAL_TIMEOUT": {
+      // Rule 17.1.2 (Official Volleyball Rules 2025-2028): a player gets a
+      // 3-minute recovery "but not more than once for the same player in the
+      // match". Enforced only where the limit is sourced — see
+      // `recoveriesPerPlayerPerMatch` in engine/config.ts; null means record
+      // without capping, which is what beach/grass/light do until their own
+      // rulebooks are supplied (spec/30 Phase F).
+      //
+      // A recovery with NO playerId stays accepted: the referee may stop play
+      // before the player is identified, and refusing would lose the record of
+      // an interruption that really happened. Old logs replay unchanged —
+      // validation runs only at append.
+      const cap = config.recoveriesPerPlayerPerMatch;
+      if (cap != null && payload.playerId) {
+        const used = state.recoveriesByPlayer?.[payload.playerId] ?? 0;
+        if (used >= cap)
+          return fail(
+            `That player has already taken their recovery this match (Rule 17.1.2). If they cannot continue, use an exceptional substitution — or the team is incomplete.`,
+          );
+      }
+      return OK;
+    }
+
     case "MEDICAL_TIMEOUT_END":
       if (state.rallyPhase !== "MEDICAL_TIMEOUT_ACTIVE")
         return fail("No medical timeout is active");
