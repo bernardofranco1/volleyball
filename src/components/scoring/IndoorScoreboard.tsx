@@ -175,6 +175,9 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
               rosterB={rosterB}
               dispatch={dispatch}
               pending={pending}
+              autoPoint={config.sanctionAutoPoint}
+              misconductA={state.misconductA}
+              misconductB={state.misconductB}
             />
           </div>
         </div>

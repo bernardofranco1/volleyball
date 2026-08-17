@@ -50,8 +50,14 @@ export type GrassEventPayload =
   // start time for the VSR feed and timing exports (spec/22). Optional: a
   // rally scored without it falls back to approximated timing.
   | { type: "RALLY_START" }
-  | { type: "RALLY_WON_A" }
-  | { type: "RALLY_WON_B" }
+  // `causedBy` (spec/29 F14): the id of the sanction event this point came
+  // from, when the scorer awarded it through the guided flow. Optional and
+  // purely informational — the reducer ignores it, so old logs replay
+  // identically and nothing downstream has to know about it. It exists so the
+  // sheet can print a penalty and its point as one fact instead of two
+  // coincidental ones.
+  | { type: "RALLY_WON_A"; causedBy?: string }
+  | { type: "RALLY_WON_B"; causedBy?: string }
   | { type: "REPLAY_POINT" }
   | { type: "TIMEOUT_REQUEST"; team: TeamId }
   | { type: "TIMEOUT_END"; team: TeamId }
@@ -72,6 +78,9 @@ export type GrassEventPayload =
     }
   | { type: "MATCH_END"; winner: TeamId; setsA: number; setsB: number } // auto-emitted
   | { type: "FORFEIT"; team: TeamId; reason: "FORFEIT" | "RETIREMENT" }
+  // One set awarded to the opponent — incomplete team (spec/29 F14). The match
+  // continues; FORFEIT above ends it.
+  | { type: "SET_DEFAULT"; team: TeamId; reason: "INCOMPLETE_TEAM" | "OTHER" }
   | { type: "SERVE_CLOCK_EXPIRE" }
   | { type: "IMPROPER_REQUEST"; team: TeamId }
   | { type: "DELAY_WARNING"; team: TeamId }

@@ -148,6 +148,17 @@ export function validateGrassEvent(
         return fail("Match is already finished");
       return OK;
 
+    case "SET_DEFAULT": {
+      // Unlike a forfeit this awards ONE set, so it needs a set to award: it
+      // is meaningless before play and after the match is over (spec/29 F14).
+      if (state.status !== "LIVE")
+        return fail("A set can only be defaulted while the match is live");
+      const open = state.sets[state.currentSetNumber - 1];
+      if (!open || open.winner)
+        return fail("No set in progress to default");
+      return OK;
+    }
+
     case "RALLY_START":
       // Timing anchor (spec/22): only meaningful while play can start.
       if (state.status !== "LIVE") return fail("Match is not live");

@@ -225,7 +225,12 @@ export function computeAutoEmits(
 // ── append orchestration & replay (shared chassis) ───────────────────────────
 
 function isScoringEvent(type: GrassEventPayload["type"]): boolean {
-  return type === "RALLY_WON_A" || type === "RALLY_WON_B";
+  // SET_DEFAULT is here because it CHANGES THE SCORE (spec/29 F14): the
+  // auto-emit pass is what turns a winning score into SET_END/MATCH_END, and
+  // an awarded set has to close through exactly that path.
+  return (
+    type === "RALLY_WON_A" || type === "RALLY_WON_B" || type === "SET_DEFAULT"
+  );
 }
 
 export type AppendResult = CoreAppendResult<GrassMatchState, GrassEventPayload>;

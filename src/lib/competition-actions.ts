@@ -24,6 +24,7 @@ import {
 import {
   DISCIPLINE_DEFAULTS,
   isResultSignaturePolicy,
+  isSanctionAutoPoint,
 } from "@/engine/config";
 import { recordAudit } from "@/lib/audit";
 import { newId } from "@/lib/id";
@@ -230,6 +231,14 @@ export async function updateCompetitionConfig(
   const resultSignatures = isResultSignaturePolicy(rawSignatures)
     ? rawSignatures
     : null;
+  // What the console does about the point a penalty awards (spec/29 F14).
+  // "" = discipline default (null override), exactly like resultSignatures.
+  const rawAutoPoint = str(fd, "sanctionAutoPoint");
+  if (rawAutoPoint && !isSanctionAutoPoint(rawAutoPoint))
+    return fail("Pick a valid sanction-point setting.");
+  const sanctionAutoPoint = isSanctionAutoPoint(rawAutoPoint)
+    ? rawAutoPoint
+    : null;
   const vcsChallengesPerSet = intOrNull(fd, "vcsChallengesPerSet");
   if (
     vcsChallengesPerSet != null &&
@@ -264,6 +273,7 @@ export async function updateCompetitionConfig(
     timeoutDurationSecs,
     ttoDurationSecs,
     resultSignatures,
+    sanctionAutoPoint,
     setBreakDurationsSecs,
     vcsChallengesPerSet,
     // Tri-state: null = discipline default, true/false = explicit override.

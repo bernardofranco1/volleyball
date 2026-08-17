@@ -95,6 +95,19 @@ export type CommonEventPayload =
   // `team` forfeits/retires; the opponent wins the match (FIVB rule 6.4).
   // FORFEIT = default (no-show / refusal); RETIREMENT = unable to continue.
   | { type: "FORFEIT"; team: TeamId; reason: ForfeitReason }
+  // `team` loses the CURRENT SET only (spec/29 F14): an expelled member leaves
+  // them unable to field a complete team for the rest of it (FIVB 7.3.1 —
+  // "incomplete team"), so the set is awarded to the opponent and the MATCH
+  // continues into the next one. Distinct from FORFEIT, which ends the match.
+  //
+  // Deliberately NOT modelled as a client-submitted SET_END: that event is
+  // auto-emitted only, and accepting it from a client would let one fabricate
+  // results (spec/14 §A2). SET_DEFAULT instead adjusts the score the way the
+  // rulebook does — the opponent to exactly the score they needed, the
+  // defaulting team keeping the points they had — and the ordinary auto-emit
+  // pipeline closes the set (and the match, if that was the deciding one)
+  // exactly as it would for a set won on court.
+  | { type: "SET_DEFAULT"; team: TeamId; reason: SetDefaultReason }
   | { type: "MEDICAL_TIMEOUT"; team: TeamId }
   | { type: "MEDICAL_TIMEOUT_END" }
   | { type: "DELAY_WARNING"; team: TeamId }
@@ -120,6 +133,9 @@ export type UndoScope = "single" | "point";
 /** Why a team's match ended early (FIVB 6.4.2 default / 6.4.3 retirement). */
 export type ForfeitReason = "FORFEIT" | "RETIREMENT";
 
+/** Why a team lost one set without playing it out (spec/29 F14). */
+export type SetDefaultReason = "INCOMPLETE_TEAM" | "OTHER";
+
 const COMMON_EVENT_TYPES: ReadonlySet<string> = new Set<
   CommonEventPayload["type"]
 >([
@@ -132,6 +148,7 @@ const COMMON_EVENT_TYPES: ReadonlySet<string> = new Set<
   "SET_END",
   "MATCH_END",
   "FORFEIT",
+  "SET_DEFAULT",
   "MEDICAL_TIMEOUT",
   "MEDICAL_TIMEOUT_END",
   "DELAY_WARNING",
@@ -249,6 +266,25 @@ export function reduceCommon<Phase extends string>(
       s.status = "FINISHED";
       s.rallyPhase = "MATCH_OVER";
       // Clear any live interruption the forfeit landed in.
+      s.activeTimeoutTeam = null;
+      s.activeTimeoutStartedAt = null;
+      s.medicalTimeoutTeam = null;
+      return;
+    }
+
+    case "SET_DEFAULT": {
+      // Award the open set to the opponent, then get out of the way: the
+      // caller's auto-emit pass sees a set with a winning score and emits the
+      // usual SET_END (+ MATCH_END when it was the deciding set), so set
+      // tallies, phases, snapshots and backups all behave normally.
+      if (!set || set.winner) return;
+      const winner: TeamId = p.team === "A" ? "B" : "A";
+      const target = setWinTarget(set.setNumber, config);
+      const lead = config.twoPointLead ? 2 : 1;
+      if (winner === "A")
+        set.scoreA = Math.max(set.scoreA, target, set.scoreB + lead);
+      else set.scoreB = Math.max(set.scoreB, target, set.scoreA + lead);
+      // Any interruption the default landed in is over.
       s.activeTimeoutTeam = null;
       s.activeTimeoutStartedAt = null;
       s.medicalTimeoutTeam = null;

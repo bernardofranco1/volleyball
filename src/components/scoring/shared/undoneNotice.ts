@@ -17,6 +17,7 @@ const ITEM_KEYS: Record<string, string> = {
   MEDICAL_TIMEOUT_END: "undo.item.medicalTimeout",
   SUBSTITUTION: "undo.item.substitution",
   FORFEIT: "undo.item.forfeit",
+  SET_DEFAULT: "undo.item.setDefault",
   REPLAY_POINT: "undo.item.replay",
   NOTE: "undo.item.note",
 };

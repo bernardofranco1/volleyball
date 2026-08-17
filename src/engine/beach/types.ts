@@ -44,8 +44,14 @@ export type BeachEventPayload =
       /** Deciding-set re-toss winner (spec/21) — printed on the scoresheet. */
       tossWinner?: TeamId;
     }
-  | { type: "RALLY_WON_A" }
-  | { type: "RALLY_WON_B" }
+  // `causedBy` (spec/29 F14): the id of the sanction event this point came
+  // from, when the scorer awarded it through the guided flow. Optional and
+  // purely informational — the reducer ignores it, so old logs replay
+  // identically and nothing downstream has to know about it. It exists so the
+  // sheet can print a penalty and its point as one fact instead of two
+  // coincidental ones.
+  | { type: "RALLY_WON_A"; causedBy?: string }
+  | { type: "RALLY_WON_B"; causedBy?: string }
   | { type: "REPLAY_POINT" }
   // Declares which roster player serves first for `team` this set (FIVB rule
   // 12.2: each team's service order is chosen per set). Binds the abstract
@@ -66,6 +72,9 @@ export type BeachEventPayload =
     }
   | { type: "MATCH_END"; winner: TeamId; setsA: number; setsB: number } // auto-emitted
   | { type: "FORFEIT"; team: TeamId; reason: "FORFEIT" | "RETIREMENT" }
+  // One set awarded to the opponent — incomplete team (spec/29 F14). The match
+  // continues; FORFEIT above ends it.
+  | { type: "SET_DEFAULT"; team: TeamId; reason: "INCOMPLETE_TEAM" | "OTHER" }
   | { type: "SERVE_CLOCK_EXPIRE" }
   | { type: "IMPROPER_REQUEST"; team: TeamId }
   | { type: "DELAY_WARNING"; team: TeamId }

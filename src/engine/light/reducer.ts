@@ -251,7 +251,10 @@ function isScoringEvent(type: LightEventPayload["type"]): boolean {
     type === "RALLY_WON_A" ||
     type === "RALLY_WON_B" ||
     type === "JUMP_SERVE_FOOT_FAULT" ||
-    type === "ATTACK_ARC_FAULT"
+    type === "ATTACK_ARC_FAULT" ||
+    // Score-changing, so it must run the auto-emit pass that closes the set
+    // (spec/29 F14).
+    type === "SET_DEFAULT"
   );
 }
 

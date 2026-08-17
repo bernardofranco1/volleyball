@@ -239,6 +239,13 @@ export const tournamentConfig = pgTable("tournament_config", {
   // Team tablets
   teamTabletEnabled: boolean("team_tablet_enabled"),
   allowTeamTabletDirectEntry: boolean("allow_team_tablet_direct_entry"),
+
+  // Sanctions: what the console does about the point a penalty awards
+  // (spec/29 F14). Nullable override like every column here; the per-discipline
+  // default is PROMPT.
+  sanctionAutoPoint: text("sanction_auto_point", {
+    enum: ["PROMPT", "AUTO", "OFF"],
+  }),
 }).enableRLS();
 
 // ── Teams & players ──────────────────────────────────────────────────────────

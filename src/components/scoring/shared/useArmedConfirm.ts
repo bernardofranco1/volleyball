@@ -4,7 +4,10 @@
 // arms a button, the second (within ARM_MS) commits; otherwise it auto-disarms.
 import { useEffect, useState } from "react";
 
-export type Armed = "A" | "B" | "UNDO" | "REPLAY" | null;
+// "SET_DEFAULT" arms the awarding of a whole set to the opponent (spec/29
+// F14) — the heaviest single action in the console after a forfeit, so it
+// takes the same two-tap treatment as everything else that changes the result.
+export type Armed = "A" | "B" | "UNDO" | "REPLAY" | "SET_DEFAULT" | null;
 export const ARM_MS = 3000;
 
 export function useArmedConfirm() {

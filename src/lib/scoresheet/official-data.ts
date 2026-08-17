@@ -473,6 +473,20 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
         break;
       }
 
+      case "SET_DEFAULT": {
+        // A defaulted set has no ladder of its own to explain it, so it goes to
+        // REMARKS with the set and the score at the moment (spec/29 F14). The
+        // set itself closes through SET_END and prints in the RESULTS block
+        // like any other.
+        if (team) {
+          const setNo = ev.setNumber ?? cur?.setNumber ?? sets.length;
+          remarks.push(
+            `Set ${setNo}: team ${team} incomplete at ${evScore.a}:${evScore.b} — set awarded to ${team === "A" ? "B" : "A"}.`,
+          );
+        }
+        break;
+      }
+
       case "NOTE": {
         if (typeof p.text === "string" && p.text.trim())
           remarks.push(p.text.trim());

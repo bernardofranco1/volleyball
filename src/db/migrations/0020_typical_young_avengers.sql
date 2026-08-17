@@ -1,0 +1,1 @@
+ALTER TABLE "tournament_config" ADD COLUMN "sanction_auto_point" text;
