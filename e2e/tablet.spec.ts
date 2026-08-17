@@ -1,10 +1,14 @@
 import { test, expect } from "@playwright/test";
-import { E2E, hasCreds, login } from "./helpers";
+import { E2E, describeAuthenticatedFlow, hasCreds, login } from "./helpers";
 
 // Team-tablet flow. Skips unless E2E_TABLET_PATH is set (a tokenized team page).
 // Logs in first if creds are provided, in case the route is session-gated.
 test.describe("team tablet flow", () => {
-  test.skip(!E2E.tabletPath, "set E2E_TABLET_PATH to run");
+  // Files a real interrupt request, so the same production guard applies.
+  describeAuthenticatedFlow(
+    "set E2E_TABLET_PATH to run",
+    Boolean(E2E.tabletPath),
+  );
 
   test("team requests a time-out", async ({ page }) => {
     if (hasCreds) await login(page);

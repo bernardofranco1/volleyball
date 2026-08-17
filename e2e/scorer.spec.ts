@@ -1,13 +1,15 @@
 import { test, expect } from "@playwright/test";
-import { E2E, hasCreds, login } from "./helpers";
+import { E2E, describeAuthenticatedFlow, hasCreds, login } from "./helpers";
 
 // Authenticated scorer flow. Skips unless E2E creds + a scorer page path are set.
 // Scoring is a two-tap "arm → confirm" interaction (see *ActionBar.tsx): the first
 // tap on "Point <team>" arms it ("Confirm — <team>"), the second commits.
 test.describe("scorer flow", () => {
-  test.skip(
-    !hasCreds || !E2E.scorerPath,
+  // Skips without credentials; FAILS if pointed at the production tables —
+  // this test awards a real point (see requireNonProductionTarget).
+  describeAuthenticatedFlow(
     "set E2E_EMAIL / E2E_PASSWORD / E2E_SCORER_PATH to run",
+    hasCreds && Boolean(E2E.scorerPath),
   );
 
   test("scorer awards a point via arm + confirm", async ({ page }) => {
