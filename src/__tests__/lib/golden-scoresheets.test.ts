@@ -357,3 +357,58 @@ describe("golden fixture — fault correction", () => {
     expect(sheet.remarks.some((r) => r.includes("rotation fault"))).toBe(true);
   });
 });
+
+// ── the correction must reach every current-state document (spec/30 Phase B) ─
+//
+// The fault-correction fixture caught the sheet reading a stale per-row score
+// cache. The VSR feed and the timings export walked the same survivors and
+// stamped scores from that same cache — so they would have contradicted the
+// sheet built from the identical log. One shared counted walk now serves all
+// three; this is the fixture that proves they agree.
+
+describe("fault correction — every document agrees", () => {
+  /** A's two mid-set points cancelled; B's point inside the window survives. */
+  function correctedMatch(): MatchReportData {
+    const ev = events();
+    const evs: ReportEvent[] = [
+      ev("MATCH_CREATED", { matchId: "golden" }, null, null),
+      ev("COIN_TOSS", { firstServer: "A", teamAStartSide: "LEFT" }, null, null),
+      ev("MATCH_START", {}, null, null),
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("RALLY_START", {}, [0, 0]),
+      ev("RALLY_WON_A", {}, [1, 0]),
+      ev("RALLY_WON_A", {}, [2, 0]), // g7 — at fault
+      ev("RALLY_WON_B", {}, [2, 1]),
+      ev("RALLY_WON_A", {}, [3, 1]), // g9 — at fault
+      ev("ROTATION_FAULT", { team: "A" }, [3, 1]),
+      ev("UNDO", { targetEventId: "g7" }, [3, 1]),
+      ev("UNDO", { targetEventId: "g9" }, [3, 1]),
+    ];
+    return report("INDOOR", evs);
+  }
+
+  it("the scoresheet shows the corrected score", () => {
+    const sheet = buildOfficialSheetData(correctedMatch());
+    expect([sheet.sets[0].scoreA, sheet.sets[0].scoreB]).toEqual([1, 1]);
+  });
+
+  it("the VSR feed shows the same corrected score, not the cached one", async () => {
+    const { buildVsr } = await import("@/lib/vsr/build");
+    const vsr = buildVsr(correctedMatch(), resolveConfig("INDOOR", {})) as {
+      scout: { sets: { score: { home: number; away: number } }[] };
+    };
+    // The cache would have said 3:1 — the score including the points the
+    // referee cancelled.
+    expect(vsr.scout.sets[0].score).toEqual({ home: 1, away: 1 });
+  });
+
+  it("the timings export stamps rallies with the corrected running score", async () => {
+    const { computeMatchTimings } = await import("@/lib/timings");
+    const t = computeMatchTimings(correctedMatch());
+    // Only the two surviving rallies remain, and they count 1:0 then 1:1.
+    expect(t.rallies.map((r) => [r.scoreAfter.a, r.scoreAfter.b])).toEqual([
+      [1, 0],
+      [1, 1],
+    ]);
+  });
+});

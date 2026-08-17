@@ -143,6 +143,70 @@ export function survivingEvents(events: ReportEvent[]): ReportEvent[] {
   return survivors;
 }
 
+/** A surviving event paired with the score as of that event (spec/30 Phase B). */
+export interface ScoredEvent {
+  event: ReportEvent;
+  /** Score after this event when it is a rally; the running score otherwise. */
+  score: { a: number; b: number };
+}
+
+/**
+ * Resolve UNDO/REWIND **and** re-count the score, in one pass.
+ *
+ * Every document that states a CURRENT score has to do this, and until spec/30
+ * each did its own thing: the sheet counted (spec/29 Phase 6), while the VSR
+ * feed and the timings export walked the same survivors but stamped scores from
+ * each row's denormalized `scoreAfter*` columns.
+ *
+ * Those columns are a cache written once at append time and never corrected.
+ * That is harmless while undo only ever removes events from the TAIL — which
+ * was true until F13's fault correction, whose entire purpose is undoing points
+ * in the MIDDLE of a set. After one, every surviving later row still carries a
+ * score that counted the cancelled points, so a consumer trusting the cache
+ * reports a match that never happened.
+ *
+ * One implementation, so the sheet, the feed and the timings can never
+ * disagree again. The cache remains the fallback while a set has no rally
+ * events at all — imported/synthetic matches, where a declared SET_END score is
+ * the only score there is.
+ *
+ * Audit views deliberately do NOT use this: showing what was recorded at the
+ * time, and marking what was later cancelled, is their job (spec/30 Phase D).
+ */
+export function scoredSurvivingEvents(events: ReportEvent[]): ScoredEvent[] {
+  const survivors = survivingEvents(events);
+  const out: ScoredEvent[] = [];
+  let running = { a: 0, b: 0 };
+  let ralliesSeen = 0;
+
+  for (const ev of survivors) {
+    const p = (ev.payload ?? {}) as { type?: string };
+    const type = p.type ?? ev.eventType;
+    if (type === "SET_START") {
+      running = { a: 0, b: 0 };
+      ralliesSeen = 0;
+    }
+    if (type === "RALLY_WON_A") {
+      running = { a: running.a + 1, b: running.b };
+      ralliesSeen += 1;
+    } else if (type === "RALLY_WON_B") {
+      running = { a: running.a, b: running.b + 1 };
+      ralliesSeen += 1;
+    }
+    out.push({
+      event: ev,
+      score:
+        ralliesSeen > 0
+          ? { a: running.a, b: running.b }
+          : {
+              a: typeof ev.scoreAfterA === "number" ? ev.scoreAfterA : 0,
+              b: typeof ev.scoreAfterB === "number" ? ev.scoreAfterB : 0,
+            },
+    });
+  }
+  return out;
+}
+
 // ── main computation ─────────────────────────────────────────────────────────
 
 const num = (v: unknown): number => (typeof v === "number" ? v : 0);
@@ -188,7 +252,7 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
     return n == null ? null : String(n);
   };
 
-  const events = survivingEvents(report.events);
+  const scored = scoredSurvivingEvents(report.events);
   const isBeach = report.discipline === "BEACH";
   const positions = isBeach ? 2 : 6;
 
@@ -270,37 +334,12 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
     serverSlot = { A: null, B: null };
   };
 
-  // Running score, COUNTED from the surviving rallies rather than read off each
-  // row's denormalized `scoreAfter*` columns.
-  //
-  // Those columns are a cache written when the event was appended, and a
-  // targeted mid-log cancellation (spec/29 F13 — undoing the points a team
-  // scored while at fault) leaves every later surviving rally carrying a score
-  // that counted the cancelled ones. Reading them would print a ladder that
-  // disagrees with the result. Counting keeps the sheet what it claims to be:
-  // a deterministic rendering of the SURVIVING log.
-  //
-  // The denormalized value is still the fallback for events that are not
-  // rallies in a set with no rally events at all — imported/synthetic matches,
-  // where SET_END's declared score is all there is.
-  let running = { a: 0, b: 0 };
-  let ralliesSeen = 0;
-
-  for (const ev of events) {
+  // Scores are COUNTED from the surviving rallies, never read off each row's
+  // denormalized cache — see scoredSurvivingEvents above for why.
+  for (const { event: ev, score: evScore } of scored) {
     const p = (ev.payload ?? {}) as Record<string, unknown> & { type?: string };
     const type = p.type ?? ev.eventType;
     const team = (p.team === "A" || p.team === "B" ? p.team : null) as TeamId | null;
-    if (type === "SET_START") {
-      running = { a: 0, b: 0 };
-      ralliesSeen = 0;
-    }
-    if (type === "RALLY_WON_A") running = { a: running.a + 1, b: running.b };
-    if (type === "RALLY_WON_B") running = { a: running.a, b: running.b + 1 };
-    if (type === "RALLY_WON_A" || type === "RALLY_WON_B") ralliesSeen += 1;
-    const evScore =
-      ralliesSeen > 0
-        ? { a: running.a, b: running.b }
-        : { a: num(ev.scoreAfterA), b: num(ev.scoreAfterB) };
 
     switch (type) {
       case "COIN_TOSS": {
