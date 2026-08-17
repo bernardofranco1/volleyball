@@ -473,6 +473,21 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
         break;
       }
 
+      case "ROTATION_FAULT":
+      case "SERVICE_ORDER_FAULT": {
+        // Auto-composed remark (spec/29 F13). The point the fault awarded is an
+        // ordinary rally and shows in the ladder; this line says why.
+        if (team) {
+          const setNo = ev.setNumber ?? cur?.setNumber ?? sets.length;
+          const what =
+            type === "ROTATION_FAULT" ? "Rotation fault" : "Service order fault";
+          remarks.push(
+            `Set ${setNo}: ${what} — team ${team} at ${evScore.a}:${evScore.b}.`,
+          );
+        }
+        break;
+      }
+
       case "SET_DEFAULT": {
         // A defaulted set has no ladder of its own to explain it, so it goes to
         // REMARKS with the set and the score at the moment (spec/29 F14). The

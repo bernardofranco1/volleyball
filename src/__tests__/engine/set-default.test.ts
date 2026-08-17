@@ -240,3 +240,58 @@ describe("causedBy on a rally", () => {
     );
   });
 });
+
+// ── positional fault markers (spec/29 F13) ──────────────────────────────────
+//
+// Both faults are MARKERS: they record what was whistled and score nothing.
+// That is what makes late-discovery cancellation a plain batch of undos over
+// ordinary rallies, with no bespoke state to unwind.
+
+describe("positional fault markers", () => {
+  it("records a service order fault on beach without touching the score", () => {
+    const h = beachHarness();
+    startBeach(h);
+    rally(h, "RALLY_WON_A"); // 1-0
+    h.send({ type: "SERVICE_ORDER_FAULT", team: "B" });
+    const s = h.getState();
+    expect(s.sets[0].scoreA).toBe(1);
+    expect(s.sets[0].scoreB).toBe(0);
+    // The point comes separately, as an ordinary rally.
+    rally(h, "RALLY_WON_A");
+    expect(h.getState().sets[0].scoreA).toBe(2);
+  });
+
+  it("refuses a rotation fault where there is no rotation", () => {
+    const h = beachHarness();
+    startBeach(h);
+    const r = validateBeachEvent(
+      { type: "ROTATION_FAULT", team: "A" },
+      h.getState(),
+      BEACH,
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it("refuses a service order fault on a rotation discipline", () => {
+    let seq = 0;
+    let state: IndoorMatchState = initialIndoorState("m3");
+    const send = (payload: IndoorEventPayload) => {
+      const r = appendIndoorEvent(state, payload, INDOOR, {
+        nextSequence: seq + 1,
+        timestamp: TS,
+        makeId: (s) => `x${s}`,
+      });
+      if (!r.ok) throw new Error(r.reason);
+      seq = r.newEvents[r.newEvents.length - 1].sequence;
+      state = r.state;
+    };
+    send({ type: "MATCH_CREATED", matchId: "m3" });
+    send({ type: "COIN_TOSS", firstServer: "A", teamAStartSide: "LEFT" });
+    send({ type: "MATCH_START" });
+    send({ type: "SET_START", setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" });
+    // Indoor rotates, so the rotation fault is the applicable one…
+    expect(() => send({ type: "ROTATION_FAULT", team: "A" })).not.toThrow();
+    // …and the beach one is refused.
+    expect(() => send({ type: "SERVICE_ORDER_FAULT", team: "A" })).toThrow();
+  });
+});

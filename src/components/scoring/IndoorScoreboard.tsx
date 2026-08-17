@@ -14,6 +14,7 @@ import { IndoorActionBar } from "@/components/scoring/IndoorActionBar";
 import { useResultSignOff } from "@/components/scoring/shared/ResultSignOff";
 import { usePrematchSignOff } from "@/components/scoring/shared/PrematchSignOff";
 import { SanctionsControl } from "@/components/scoring/shared/SanctionsControl";
+import { FaultCorrection } from "@/components/scoring/shared/FaultCorrection";
 import { IndoorLineupEntry } from "@/components/scoring/IndoorLineupEntry";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ServeClockWidget } from "@/components/scoreboard/ServeClockWidget";
@@ -179,6 +180,18 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
               misconductA={state.misconductA}
               misconductB={state.misconductB}
             />
+            {set ? (
+              <FaultCorrection
+                matchId={matchId}
+                status={state.status}
+                rotationEnabled={config.rotationEnabled}
+                setNumber={set.setNumber}
+                teamAName={teamAName}
+                teamBName={teamBName}
+                dispatch={dispatch}
+                pending={pending}
+              />
+            ) : null}
           </div>
         </div>
       }

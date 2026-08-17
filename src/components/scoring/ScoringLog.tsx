@@ -139,6 +139,10 @@ export function ScoringLog({
           text: `${p.reason === "RETIREMENT" ? "Retirement" : "Forfeit"} — ${tn(team)}`,
           tone: "sanction",
         };
+      case "ROTATION_FAULT":
+        return { text: `Rotation fault — ${tn(team)}`, tone: "sanction" };
+      case "SERVICE_ORDER_FAULT":
+        return { text: `Service order fault — ${tn(team)}`, tone: "sanction" };
       case "SET_DEFAULT":
         return {
           // The set, not the match — the log must not read like a forfeit.

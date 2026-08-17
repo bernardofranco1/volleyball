@@ -84,6 +84,10 @@ export type LightEventPayload =
   | { type: "SET_DEFAULT"; team: TeamId; reason: "INCOMPLETE_TEAM" | "OTHER" }
   | { type: "SERVE_CLOCK_EXPIRE" }
   | { type: "IMPROPER_REQUEST"; team: TeamId }
+  // Positional faults, recorded as markers (spec/29 F13) — the point they
+  // award is an ordinary rally event with `causedBy`.
+  | { type: "ROTATION_FAULT"; team: TeamId; note?: string }
+  | { type: "SERVICE_ORDER_FAULT"; team: TeamId; note?: string }
   | { type: "DELAY_WARNING"; team: TeamId }
   | { type: "DELAY_PENALTY"; team: TeamId }
   | { type: "MEDICAL_TIMEOUT"; team: TeamId }

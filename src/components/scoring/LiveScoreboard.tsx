@@ -20,6 +20,7 @@ import { BeachActionBar } from "@/components/scoring/BeachActionBar";
 import { useResultSignOff } from "@/components/scoring/shared/ResultSignOff";
 import { usePrematchSignOff } from "@/components/scoring/shared/PrematchSignOff";
 import { SanctionsControl } from "@/components/scoring/shared/SanctionsControl";
+import { FaultCorrection } from "@/components/scoring/shared/FaultCorrection";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
 import { ScoringShell, ScoreStrip } from "@/components/scoring/ScoringShell";
 import { ScoringLog } from "@/components/scoring/ScoringLog";
@@ -280,6 +281,18 @@ export function LiveScoreboard({
               misconductA={state.misconductA}
               misconductB={state.misconductB}
             />
+            {set ? (
+              <FaultCorrection
+                matchId={matchId}
+                status={state.status}
+                rotationEnabled={config.rotationEnabled}
+                setNumber={set.setNumber}
+                teamAName={teamAName}
+                teamBName={teamBName}
+                dispatch={dispatch}
+                pending={pending}
+              />
+            ) : null}
           </div>
         </div>
       }

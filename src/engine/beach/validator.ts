@@ -123,6 +123,21 @@ export function validateBeachEvent(
       return OK;
     }
 
+    // Positional faults (spec/29 F13). Gated on the CONFIG, not the discipline
+    // name: a rotation fault is meaningless where there is no rotation, and a
+    // service-order fault is meaningless where there is one.
+    case "ROTATION_FAULT":
+      if (!config.rotationEnabled)
+        return fail("This discipline has no rotation order");
+      if (state.status !== "LIVE") return fail("Match is not live");
+      return OK;
+
+    case "SERVICE_ORDER_FAULT":
+      if (config.rotationEnabled)
+        return fail("Rotation disciplines record a rotation fault instead");
+      if (state.status !== "LIVE") return fail("Match is not live");
+      return OK;
+
     case "RALLY_START":
       // Timing anchor (spec/22): only meaningful while play can start.
       if (state.status !== "LIVE") return fail("Match is not live");

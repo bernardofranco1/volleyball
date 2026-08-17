@@ -121,6 +121,20 @@ export type CommonEventPayload =
   // the scoresheet only (max one per team per match — UI-enforced). No state
   // effect; the official sheet reads it straight from the log (spec/21).
   | { type: "IMPROPER_REQUEST"; team: TeamId }
+  // Positional faults (spec/29 F13). Both are MARKERS: they record what was
+  // whistled and where, and score nothing by themselves — the point the fault
+  // awards is dispatched as an ordinary rally event carrying `causedBy`, the
+  // same pattern as a penalty point (F14). Keeping them scoreless is what lets
+  // late discovery work: cancelling the points scored while a team was at
+  // fault is a batch of targeted UNDOs over ordinary rallies, with nothing
+  // bespoke to unwind.
+  //
+  // ROTATION_FAULT is the rotation disciplines' (indoor/grass/light) wrong
+  // position at service; SERVICE_ORDER_FAULT is beach's wrong server. The
+  // validators gate each on `config.rotationEnabled` rather than on the
+  // discipline name.
+  | { type: "ROTATION_FAULT"; team: TeamId; note?: string }
+  | { type: "SERVICE_ORDER_FAULT"; team: TeamId; note?: string }
   // `scope` is a request-time hint only (never persisted): "point" asks the
   // server to sweep set-start bookkeeping and undo the last real action in one
   // batch; absent/"single" keeps the one-event-at-a-time behaviour.
@@ -159,6 +173,8 @@ const COMMON_EVENT_TYPES: ReadonlySet<string> = new Set<
   "MISCONDUCT_DISQUALIFICATION",
   "SERVE_CLOCK_EXPIRE",
   "IMPROPER_REQUEST",
+  "ROTATION_FAULT",
+  "SERVICE_ORDER_FAULT",
   "UNDO",
   "NOTE",
 ]);
@@ -334,6 +350,9 @@ export function reduceCommon<Phase extends string>(
 
     case "SERVE_CLOCK_EXPIRE":
     case "IMPROPER_REQUEST":
+    // Markers: recorded in the log, printed on the sheet, no state effect.
+    case "ROTATION_FAULT":
+    case "SERVICE_ORDER_FAULT":
     case "UNDO":
     case "NOTE":
       return;
