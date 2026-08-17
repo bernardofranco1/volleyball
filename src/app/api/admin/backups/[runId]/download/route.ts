@@ -28,6 +28,14 @@ export async function GET(
 
   const url = await backupDownloadUrl(run.objectPath);
   if (!url)
-    return Response.json({ error: "Could not sign URL" }, { status: 500 });
+    return Response.json(
+      {
+        // Also the answer when the run belongs to another environment: cloned
+        // backup_runs rows point at production's objects (spec/28 §5).
+        error:
+          "Could not sign a URL for that backup — it may belong to another environment.",
+      },
+      { status: 500 },
+    );
   return NextResponse.redirect(url, 302);
 }

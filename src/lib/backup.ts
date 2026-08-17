@@ -40,7 +40,10 @@ import {
   users,
   userTenantRoles,
 } from "@/db/schema";
-import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import {
+  createSupabaseAdminClient,
+  ownsStoragePath,
+} from "@/lib/supabase-admin";
 import { captureError } from "@/lib/observability";
 import { newId } from "@/lib/id";
 import {
@@ -49,6 +52,7 @@ import {
   INCREMENTAL_DEBOUNCE_MS,
   MIGRATION_JOURNAL_IDX,
   TEST_TENANT_SLUG,
+  backupFolderFor,
   objectPathFor,
   selectExpiredBackups,
   type BackupKind,
@@ -347,12 +351,18 @@ export async function pruneBackups(tenantId: string): Promise<{
   const admin = createSupabaseAdminClient();
   const bucket = admin.storage.from(BACKUP_BUCKET);
 
-  const fulls = await bucket.list(`${tenantId}/full`, {
+  // Environment-scoped folders (spec/28): the bucket is shared with production
+  // and cloned tenant ids are identical, so an unprefixed prune run from
+  // homologation would DELETE production's backups.
+  const fullFolder = backupFolderFor(tenantId, "FULL");
+  const incrFolder = backupFolderFor(tenantId, "INCREMENTAL");
+
+  const fulls = await bucket.list(fullFolder, {
     limit: 1000,
     sortBy: { column: "name", order: "desc" }, // names are YYYY-MM-DD → newest first
   });
   if (fulls.error) throw new Error(`list fulls failed: ${fulls.error.message}`);
-  const incr = await bucket.list(`${tenantId}/incremental`, {
+  const incr = await bucket.list(incrFolder, {
     limit: 1000,
     sortBy: { column: "name", order: "asc" },
   });
@@ -364,8 +374,8 @@ export async function pruneBackups(tenantId: string): Promise<{
   );
 
   const toDelete = [
-    ...expiredFulls.map((n) => `${tenantId}/full/${n}`),
-    ...expiredIncrementals.map((n) => `${tenantId}/incremental/${n}`),
+    ...expiredFulls.map((n) => `${fullFolder}/${n}`),
+    ...expiredIncrementals.map((n) => `${incrFolder}/${n}`),
   ];
   if (toDelete.length > 0) {
     const { error } = await bucket.remove(toDelete);
@@ -400,6 +410,12 @@ export async function listTenantBackupRuns(
 
 /** Signed download URL for a completed run's object (60 minutes). */
 export async function backupDownloadUrl(objectPath: string): Promise<string | null> {
+  // `backup_runs` is cloned like every other table, so in homologation this
+  // list is full of rows whose objectPath points at PRODUCTION's backup — rows
+  // written before keys were namespaced. Signing a URL for one would hand out
+  // real tenant data from a test environment. The rows stay visible (they are
+  // part of what a tester is validating); only the download is refused.
+  if (!ownsStoragePath(objectPath)) return null;
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin.storage
     .from(BACKUP_BUCKET)

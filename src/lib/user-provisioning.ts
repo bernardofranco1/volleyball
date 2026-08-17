@@ -7,7 +7,10 @@ import { headers } from "next/headers";
 import { db, dbTx } from "@/db";
 import { users, userTenantRoles } from "@/db/schema";
 import type { Role } from "@/lib/authz";
-import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import {
+  authWriteBlockedReason,
+  createSupabaseAdminClient,
+} from "@/lib/supabase-admin";
 import { emailConfigured, sendTemplatedEmail } from "@/lib/email";
 import { newId } from "@/lib/id";
 
@@ -69,7 +72,13 @@ export async function sendPasswordSetupEmail(
   values?: { name?: string | null; accessSummary?: string | null },
 ): Promise<{ sent: true } | { sent: false; reason: string }> {
   const target = `${origin}/auth/set-password`;
-  const admin = createSupabaseAdminClient();
+  // Minting a recovery link IS an account mutation in every sense that matters:
+  // the token it returns sets the password on a real, production sign-in
+  // account (spec/28 §5). The fallback below hands the same power to Supabase's
+  // own mailer, so both are behind this gate.
+  const blocked = authWriteBlockedReason("send a set-password link");
+  if (blocked) return { sent: false, reason: blocked };
+  const admin = createSupabaseAdminClient({ authWrite: "mint a recovery link" });
 
   const probe = await admin.auth.admin.generateLink({
     type: "recovery",
@@ -146,7 +155,14 @@ export async function provisionUserByEmail(
     return { userId: existing.id, tempPassword: null, note: "Existing user." };
   }
 
-  const admin = createSupabaseAdminClient();
+  // Everything past this point creates or claims an account in the shared auth
+  // project (spec/28 §5). Returning the refusal rather than throwing keeps the
+  // Access and People consoles usable in homologation — granting a role to
+  // someone already cloned still works; only minting accounts is refused.
+  const blocked = authWriteBlockedReason("create a sign-in account");
+  if (blocked) return { error: blocked };
+
+  const admin = createSupabaseAdminClient({ authWrite: "create an account" });
 
   // Invitation flow first (spec/23 addendum), best transport available:
   //  a. SMTP configured → create the account, mint a one-time link, and send
@@ -284,7 +300,10 @@ export async function provisionUserByEmail(
 export async function resetUserPassword(
   userId: string,
 ): Promise<{ tempPassword: string } | { error: string }> {
-  const admin = createSupabaseAdminClient();
+  const blocked = authWriteBlockedReason("reset a password");
+  if (blocked) return { error: blocked };
+
+  const admin = createSupabaseAdminClient({ authWrite: "reset a password" });
   const tempPassword = genPassword();
   const { error } = await admin.auth.admin.updateUserById(userId, {
     password: tempPassword,

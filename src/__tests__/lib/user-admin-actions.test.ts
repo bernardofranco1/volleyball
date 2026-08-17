@@ -75,6 +75,9 @@ vi.mock("@/lib/user-provisioning", () => ({
 }));
 vi.mock("@/lib/supabase-admin", () => ({
   createSupabaseAdminClient: () => ({ auth: { admin: authAdmin } }),
+  // These tests run as the production schema; the refusal itself is covered in
+  // shared-auth-guard.test.ts.
+  authWriteBlockedReason: () => null,
 }));
 
 import { requireGlobalAdmin } from "@/lib/authz";

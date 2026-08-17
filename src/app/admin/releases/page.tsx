@@ -181,7 +181,11 @@ export default async function ReleasesPage() {
             Promoting swaps the app under their scorers and invalidates the
             assets their browsers already loaded. It works — a scorer reload
             recovers everything, and offline actions are queued — but if this is
-            not a hotfix, wait for the whistle. ({live.samples.join(" · ")})
+            not a hotfix, wait for the whistle. ({live.samples.join(" · ")}
+            {live.count > live.samples.length
+              ? ` · +${live.count - live.samples.length} more`
+              : ""}
+            )
           </span>
         </div>
       )}
