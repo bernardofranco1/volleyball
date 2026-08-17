@@ -20,6 +20,7 @@ import PDFDocument from "pdfkit";
 import { fitStrokes, type SignatureStrokes } from "@/lib/match-signatures";
 import type { MatchReportData, ReportPlayer } from "@/lib/match-report";
 import { isInterruption } from "@/lib/match-report";
+import { cancelledEventIds } from "@/lib/event-survival";
 
 const INK = "#111111";
 const DIM = "#5b5b5b";
@@ -453,6 +454,7 @@ function sanctionsAndRemarks(
   w: number,
 ): number {
   const { doc } = ctx;
+  const cancelled = cancelledEventIds(data.events);
   const sanctions = data.events.filter((e) => SANCTION_TYPES.has(e.eventType));
   const interruptions = data.events.filter(
     (e) => isInterruption(e.eventType) && !SANCTION_TYPES.has(e.eventType),
@@ -468,12 +470,15 @@ function sanctionsAndRemarks(
   }
   for (const e of sanctions) {
     const team = (e.payload as { team?: string } | null)?.team;
+    // Cancelled rows stay (append-only log) but say so — as-recorded scores
+    // beside a corrected set otherwise read as a score that jumps (spec/30 D).
+    const struck = cancelled.has(e.id) ? " · ✕ cancelled" : "";
     doc
-      .fillColor(INK)
+      .fillColor(cancelled.has(e.id) ? DIM : INK)
       .font("Helvetica")
       .fontSize(8.5)
       .text(
-        `${e.eventType.replace(/_/g, " ").toLowerCase()}${team ? ` — team ${team}` : ""} · set ${e.setNumber ?? "—"} · ${e.scoreAfterA ?? "?"}-${e.scoreAfterB ?? "?"} · ${fmtTime(e.timestamp)}`,
+        `${e.eventType.replace(/_/g, " ").toLowerCase()}${team ? ` — team ${team}` : ""} · set ${e.setNumber ?? "—"} · ${e.scoreAfterA ?? "?"}-${e.scoreAfterB ?? "?"} · ${fmtTime(e.timestamp)}${struck}`,
         x + 6,
         ry,
         { width: w - 12, ellipsis: true, lineBreak: false },
@@ -515,6 +520,7 @@ const MAX_INTERRUPTION_ROWS = 8;
 
 function interruptionsBlock(ctx: Ctx, data: MatchReportData) {
   const { doc, left, width } = ctx;
+  const cancelled = cancelledEventIds(data.events);
   const all = data.events.filter(
     (e) => isInterruption(e.eventType) && !SANCTION_TYPES.has(e.eventType),
   );
@@ -574,12 +580,13 @@ function interruptionsBlock(ctx: Ctx, data: MatchReportData) {
       e.scoreAfterA != null && e.scoreAfterB != null
         ? `${e.scoreAfterA}-${e.scoreAfterB}`
         : "—",
-      e.eventType.replace(/_/g, " ").toLowerCase(),
+      e.eventType.replace(/_/g, " ").toLowerCase() +
+        (cancelled.has(e.id) ? " (cancelled)" : ""),
       team,
       fmtTime(e.timestamp),
       String(e.sequence),
     ];
-    doc.fillColor(INK).font("Helvetica").fontSize(8.5);
+    doc.fillColor(cancelled.has(e.id) ? DIM : INK).font("Helvetica").fontSize(8.5);
     cells.forEach((c, i) =>
       doc.text(c, xs[i], ry, {
         width: cols[i][1] * (width - 12) - 4,

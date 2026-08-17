@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "@/lib/i18n/client";
+import { cancelledEventIds } from "@/lib/event-survival";
 
 // Read-only scoring log the scorer can open to consult the full chronological
 // record (points, subs, time-outs, TTO, set start/end, notes, sanctions…) in
@@ -11,6 +12,7 @@ import { useT } from "@/lib/i18n/client";
 // and it never disturbs the fixed scoring UI behind it.
 
 interface LogEvent {
+  id: string;
   sequence: number;
   eventType: string;
   setNumber: number | null;
@@ -208,6 +210,12 @@ export function ScoringLog({
   };
 
   const visible = (evs ?? []).filter((e) => !NOISE.has(e.eventType));
+  // Cancelled rows STAY — this is an audit view of an append-only log — but
+  // they are struck through so the reader can see why the score beside them
+  // does not match the scoreboard (spec/30 Phase D). After a fault correction
+  // several mid-set rallies are cancelled at once, and unmarked they read as a
+  // score that jumps around.
+  const cancelled = cancelledEventIds(evs ?? []);
 
   return (
     <>
@@ -276,11 +284,25 @@ export function ScoringLog({
                                 {t("log.set", { set: e.setNumber ?? "" })}
                               </div>
                             ) : null}
-                            <div className={`flex items-baseline gap-2 rounded px-2 py-1 text-sm ${toneClass[tone]}`}>
-                              <span className="w-12 flex-none text-right font-mono text-xs tabular-nums text-score-dim">
+                            <div
+                              className={`flex items-baseline gap-2 rounded px-2 py-1 text-sm ${toneClass[tone]} ${
+                                cancelled.has(e.id) ? "opacity-50" : ""
+                              }`}
+                            >
+                              <span
+                                className={`w-12 flex-none text-right font-mono text-xs tabular-nums text-score-dim ${
+                                  cancelled.has(e.id) ? "line-through" : ""
+                                }`}
+                              >
                                 {score}
                               </span>
-                              <span className="min-w-0 flex-1 break-words">{text}</span>
+                              <span
+                                className={`min-w-0 flex-1 break-words ${
+                                  cancelled.has(e.id) ? "line-through" : ""
+                                }`}
+                              >
+                                {text}
+                              </span>
                               <span className="flex-none font-mono text-[10px] tabular-nums text-score-dim">
                                 {fmtTime(e.timestamp)}
                               </span>
