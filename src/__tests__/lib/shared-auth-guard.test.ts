@@ -54,9 +54,24 @@ describe("createSupabaseAdminClient", () => {
     // Storage is namespaced rather than refused, so backup and restore stay
     // exercisable in homologation — the disaster path deserves rehearsal
     // somewhere other than production.
-    const { createSupabaseAdminClient } = await load("homolog");
+    //
+    // Asserts the GUARD, not that a Supabase client constructs: the client
+    // opens a realtime transport, so this used to fail on any Node without
+    // native WebSocket (< 22) for a reason that has nothing to do with the
+    // rule under test. Whatever else construction may do, it must not be
+    // refused for being on the clone.
+    const { createSupabaseAdminClient, authWriteBlockedReason } =
+      await load("homolog");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
-    expect(() => createSupabaseAdminClient()).not.toThrow();
+    // No `authWrite` argument ⇒ nothing to refuse.
+    expect(authWriteBlockedReason("read something")).not.toBeNull();
+    let refused = false;
+    try {
+      createSupabaseAdminClient();
+    } catch (e) {
+      refused = /Refused/.test(String(e));
+    }
+    expect(refused).toBe(false);
   });
 });
