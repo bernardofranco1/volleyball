@@ -156,7 +156,15 @@ export function TeamTablet({
 
   const sendRequest = async (
     requestType: string,
-    extra?: { outPlayerId: string; inPlayerId: string },
+    extra?: {
+      outPlayerId: string;
+      inPlayerId: string;
+      // Rule 15.7 (spec/29 F9). Carried through the request so the scorer's
+      // approval applies the sub the team actually asked for; the route used
+      // to hardcode `false`, which silently turned an exceptional sub into an
+      // ordinary one the engine would then reject as over the limit.
+      isExceptional?: boolean;
+    },
   ) => {
     setMsg(null);
     const res = await fetch(`/api/matches/${matchId}/interrupt-requests`, {
@@ -321,9 +329,14 @@ export function TeamTablet({
           roster={roster}
           court={teamCourt}
           subsUsed={subsUsed}
+          maxSubs={config?.maxSubsPerSet}
           excludeIds={liberoIds}
-          onSubstitute={(outPlayerId, inPlayerId) =>
-            void sendRequest("SUBSTITUTION", { outPlayerId, inPlayerId })
+          onSubstitute={(outPlayerId, inPlayerId, opts) =>
+            void sendRequest("SUBSTITUTION", {
+              outPlayerId,
+              inPlayerId,
+              ...(opts?.isExceptional ? { isExceptional: true } : {}),
+            })
           }
           onClose={() => setSubOpen(false)}
         />

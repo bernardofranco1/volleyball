@@ -295,3 +295,96 @@ describe("positional fault markers", () => {
     expect(() => send({ type: "SERVICE_ORDER_FAULT", team: "A" })).toThrow();
   });
 });
+
+// ── libero at position 1 (spec/29 F10) ──────────────────────────────────────
+//
+// Rule 19.3.2.1 lets the libero replace ANY back-row player — positions 1, 5
+// and 6 — but Rule 19.3.2.2 forbids the libero from serving. The old validator
+// enforced the second rule by banning position 1 outright, which also banned
+// the legal case: replacing there while the OPPONENT holds the serve.
+
+describe("libero at position 1", () => {
+  function indoorInSet() {
+    let seq = 0;
+    let state: IndoorMatchState = initialIndoorState("m4");
+    const send = (payload: IndoorEventPayload) => {
+      const r = appendIndoorEvent(state, payload, INDOOR, {
+        nextSequence: seq + 1,
+        timestamp: TS,
+        makeId: (s) => `l${s}`,
+      });
+      if (!r.ok) throw new Error(`rejected ${payload.type}: ${r.reason}`);
+      seq = r.newEvents[r.newEvents.length - 1].sequence;
+      state = r.state;
+    };
+    send({ type: "MATCH_CREATED", matchId: "m4" });
+    send({ type: "COIN_TOSS", firstServer: "A", teamAStartSide: "LEFT" });
+    send({ type: "MATCH_START" });
+    send({ type: "SET_START", setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" });
+    for (const team of ["A", "B"] as const) {
+      send({
+        type: "LINEUP_CONFIRMED",
+        team,
+        setNumber: 1,
+        playerIds: [`${team}1`, `${team}2`, `${team}3`, `${team}4`, `${team}5`, `${team}6`],
+        liberoId: `${team}L`,
+        secondLiberoId: null,
+      });
+    }
+    return { send, get: () => state };
+  }
+
+  it("allows the replacement at position 1 while the opponent serves", () => {
+    const h = indoorInSet();
+    // A serves first, so B is the receiving team: B's position-1 player may be
+    // replaced by their libero.
+    expect(() =>
+      h.send({
+        type: "LIBERO_REPLACEMENT",
+        team: "B",
+        liberoId: "BL",
+        direction: "IN",
+        outPlayerId: "B1",
+      }),
+    ).not.toThrow();
+  });
+
+  it("refuses it for the serving team — the libero may never serve", () => {
+    const h = indoorInSet();
+    expect(() =>
+      h.send({
+        type: "LIBERO_REPLACEMENT",
+        team: "A",
+        liberoId: "AL",
+        direction: "IN",
+        outPlayerId: "A1",
+      }),
+    ).toThrow(/cannot serve/);
+  });
+
+  it("still allows positions 5 and 6 for either team", () => {
+    const h = indoorInSet();
+    expect(() =>
+      h.send({
+        type: "LIBERO_REPLACEMENT",
+        team: "A",
+        liberoId: "AL",
+        direction: "IN",
+        outPlayerId: "A5",
+      }),
+    ).not.toThrow();
+  });
+
+  it("still refuses a front-row player", () => {
+    const h = indoorInSet();
+    expect(() =>
+      h.send({
+        type: "LIBERO_REPLACEMENT",
+        team: "B",
+        liberoId: "BL",
+        direction: "IN",
+        outPlayerId: "B3",
+      }),
+    ).toThrow(/back-row/);
+  });
+});

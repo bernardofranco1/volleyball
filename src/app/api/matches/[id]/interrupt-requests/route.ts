@@ -89,6 +89,7 @@ export async function POST(
     note?: string;
     outPlayerId?: string;
     inPlayerId?: string;
+    isExceptional?: boolean;
   } | null;
   if (!body || (body.team !== "A" && body.team !== "B"))
     return Response.json({ error: "Bad request" }, { status: 400 });
@@ -128,7 +129,13 @@ export async function POST(
 
   const payload =
     body.requestType === "SUBSTITUTION"
-      ? { outPlayerId: body.outPlayerId, inPlayerId: body.inPlayerId }
+      ? {
+          outPlayerId: body.outPlayerId,
+          inPlayerId: body.inPlayerId,
+          // Rule 15.7 (spec/29 F9) — the scorer approves what was asked for.
+          // Coerced, never trusted raw: this comes off a tablet.
+          isExceptional: body.isExceptional === true,
+        }
       : body.note
         ? { note: String(body.note).slice(0, 280) } // untrusted tablet note
         : null;
@@ -262,6 +269,7 @@ export async function PATCH(
     const pl = (reqRow.payload ?? {}) as {
       outPlayerId?: string;
       inPlayerId?: string;
+      isExceptional?: boolean;
     };
     const event =
       reqRow.requestType === "TIMEOUT"
@@ -274,7 +282,11 @@ export async function PATCH(
                 team: reqRow.team,
                 outPlayerId: pl.outPlayerId,
                 inPlayerId: pl.inPlayerId,
-                isExceptional: false,
+                // What the TEAM asked for (spec/29 F9). Hardcoding false here
+                // turned an exceptional substitution into an ordinary one,
+                // which the engine then rejected as over the per-set limit —
+                // exactly when a team most needs it.
+                isExceptional: pl.isExceptional === true,
               }
             : null;
     if (event) {

@@ -8,6 +8,7 @@
 // PDF; the renderers consume the result.
 
 import type { ReportEvent, MatchReportData, ReportPlayer } from "@/lib/match-report";
+import { remark, type RemarkContext } from "./remarks";
 
 type TeamId = "A" | "B";
 
@@ -144,6 +145,25 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
   for (const p of [...report.rosterA, ...report.rosterB]) {
     if (p.role === "STAFF") staffMark.set(p.id, p.staffFunction ?? "C");
   }
+  // Standardized REMARKS lines are composed from typed events (spec/29 Phase
+  // 4) so the block stays a rendering of the log rather than a second place
+  // facts are entered. Free-text NOTE keeps the scorer's own voice.
+  const ctxOf = (
+    ev: ReportEvent,
+    extra?: { team?: TeamId; playerId?: unknown },
+  ): RemarkContext => ({
+    setNumber: ev.setNumber ?? cur?.setNumber ?? sets.length,
+    score: { a: num(ev.scoreAfterA), b: num(ev.scoreAfterB) },
+    team: extra?.team,
+    member: extra?.playerId != null ? memberMark(extra.playerId) : null,
+    name: nameOf(extra?.playerId),
+  });
+  const nameById = new Map<string, string>();
+  for (const p of [...report.rosterA, ...report.rosterB])
+    nameById.set(p.id, p.jerseyName);
+  const nameOf = (id: unknown): string | null =>
+    typeof id === "string" ? (nameById.get(id) ?? null) : null;
+
   const memberMark = (id: unknown): string | null => {
     if (typeof id !== "string") return null;
     const staff = staffMark.get(id);
@@ -162,6 +182,8 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
   let tossWinnerSet1: TeamId | null = null;
   let forfeit: { team: TeamId; reason: string } | null = null;
   const remarks: string[] = [];
+  // Recoveries per player, so the remark can say "#2 for this player" (F11).
+  const recoveryCount = new Map<string, number>();
 
   // Per-set walk state.
   let cur: SheetSetData | null = null;
@@ -394,6 +416,46 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
           open.set(inId, rec);
           if (col >= 0 && lineup[col]) slots[team].set(lineup[col], inId);
         }
+        // Rule 15.7 (spec/29 F9): an exceptional substitution has no cell of
+        // its own on the sheet — the sub boxes look like any other — so the
+        // REMARKS line is the only thing that says it did not count.
+        if (p.isExceptional === true || p.isEmergency === true) {
+          remarks.push(
+            remark.exceptionalSubstitution(
+              ctxOf(ev, { team, playerId: outId }),
+              [memberMark(inId), nameOf(inId)].filter(Boolean).join(" ") || null,
+            ),
+          );
+        }
+        break;
+      }
+
+      case "MEDICAL_TIMEOUT": {
+        // Recovery with the player and the score (spec/29 F11).
+        if (team) {
+          const pid = typeof p.playerId === "string" ? p.playerId : undefined;
+          if (pid) recoveryCount.set(pid, (recoveryCount.get(pid) ?? 0) + 1);
+          remarks.push(
+            remark.recovery(
+              ctxOf(ev, { team, playerId: pid }),
+              pid ? recoveryCount.get(pid) : undefined,
+            ),
+          );
+        }
+        break;
+      }
+
+      case "LIBERO_REDESIGNATION": {
+        // Rule 19.4.2 (spec/29 F10).
+        if (team) {
+          const nid = typeof p.newLiberoId === "string" ? p.newLiberoId : null;
+          remarks.push(
+            remark.liberoRedesignation(
+              ctxOf(ev, { team }),
+              nid ? [memberMark(nid), nameOf(nid)].filter(Boolean).join(" ") : null,
+            ),
+          );
+        }
         break;
       }
 
@@ -465,11 +527,13 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
       }
 
       case "FORFEIT": {
-        if (team)
-          forfeit = {
-            team,
-            reason: typeof p.reason === "string" ? p.reason : "FORFEIT",
-          };
+        if (team) {
+          const reason = typeof p.reason === "string" ? p.reason : "FORFEIT";
+          forfeit = { team, reason };
+          // The RESULTS block prints the outcome; the remark says when it
+          // happened and at what score (spec/29 F8).
+          remarks.push(remark.forfeit(ctxOf(ev, { team }), reason));
+        }
         break;
       }
 
@@ -477,14 +541,13 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
       case "SERVICE_ORDER_FAULT": {
         // Auto-composed remark (spec/29 F13). The point the fault awarded is an
         // ordinary rally and shows in the ladder; this line says why.
-        if (team) {
-          const setNo = ev.setNumber ?? cur?.setNumber ?? sets.length;
-          const what =
-            type === "ROTATION_FAULT" ? "Rotation fault" : "Service order fault";
+        if (team)
           remarks.push(
-            `Set ${setNo}: ${what} — team ${team} at ${evScore.a}:${evScore.b}.`,
+            remark.positionalFault(
+              ctxOf(ev, { team }),
+              type === "ROTATION_FAULT" ? "ROTATION" : "SERVICE_ORDER",
+            ),
           );
-        }
         break;
       }
 
@@ -493,12 +556,7 @@ export function buildOfficialSheetData(report: MatchReportData): OfficialSheetDa
         // REMARKS with the set and the score at the moment (spec/29 F14). The
         // set itself closes through SET_END and prints in the RESULTS block
         // like any other.
-        if (team) {
-          const setNo = ev.setNumber ?? cur?.setNumber ?? sets.length;
-          remarks.push(
-            `Set ${setNo}: team ${team} incomplete at ${evScore.a}:${evScore.b} — set awarded to ${team === "A" ? "B" : "A"}.`,
-          );
-        }
+        if (team) remarks.push(remark.setDefault(ctxOf(ev, { team })));
         break;
       }
 

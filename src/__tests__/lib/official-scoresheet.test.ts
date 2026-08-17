@@ -358,3 +358,77 @@ describe("bench officials", () => {
     expect(indoor.subarray(0, 5).toString()).toBe("%PDF-");
   });
 });
+
+// ── Phase 4: injury, libero and recovery completeness (spec/29 F9/F10/F11) ──
+
+describe("remarks composed from the log", () => {
+  it("records an exceptional substitution — the sub boxes can't show it", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("LINEUP_CONFIRMED", { team: "A", setNumber: 1, playerIds: ["a1", "a2"] }, [0, 0]),
+      ev("RALLY_WON_A", {}, [1, 0]),
+      ev(
+        "SUBSTITUTION",
+        { team: "A", outPlayerId: "a1", inPlayerId: "a2", isExceptional: true },
+        [1, 0],
+      ),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    const line = sheet.remarks.find((r) => r.includes("exceptional substitution"));
+    expect(line).toBeDefined();
+    expect(line).toContain("Set 1");
+    expect(line).toContain("1:0");
+  });
+
+  it("leaves an ordinary substitution out of REMARKS", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("SUBSTITUTION", { team: "A", outPlayerId: "a1", inPlayerId: "a2" }, [0, 0]),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    expect(sheet.remarks.some((r) => r.includes("substitution"))).toBe(false);
+  });
+
+  it("prints a recovery with the player and the score, counting repeats", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("RALLY_WON_A", {}, [1, 0]),
+      ev("MEDICAL_TIMEOUT", { team: "A", playerId: "a1" }, [1, 0]),
+      ev("MEDICAL_TIMEOUT_END", {}, [1, 0]),
+      ev("RALLY_WON_B", {}, [1, 1]),
+      ev("MEDICAL_TIMEOUT", { team: "A", playerId: "a1" }, [1, 1]),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    const recoveries = sheet.remarks.filter((r) => r.includes("medical recovery"));
+    expect(recoveries).toHaveLength(2);
+    expect(recoveries[0]).toContain("1 Duda Lisboa");
+    // The second one for the same player is flagged as such — the per-player
+    // limits differ by discipline and the sheet must make repeats visible.
+    expect(recoveries[1]).toContain("#2 for this player");
+  });
+
+  it("records a libero re-designation with the incoming libero", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("LIBERO_REDESIGNATION", { team: "A", newLiberoId: "a2" }, [0, 0]),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    const line = sheet.remarks.find((r) => r.includes("libero re-designated"));
+    expect(line).toBeDefined();
+    expect(line).toContain("Ana Patricia");
+  });
+
+  it("keeps the scorer's free-text notes in their own words", () => {
+    const ev = eventFactory();
+    const evs = [
+      ev("SET_START", { setNumber: 1, firstServer: "A", teamAStartSide: "LEFT" }, [0, 0]),
+      ev("NOTE", { text: "Net height re-measured at 2.43 m" }, [0, 0]),
+    ];
+    const sheet = buildOfficialSheetData(baseReport("INDOOR", evs));
+    expect(sheet.remarks).toContain("Net height re-measured at 2.43 m");
+  });
+});

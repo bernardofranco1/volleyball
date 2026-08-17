@@ -71,6 +71,12 @@ export interface CommonMatchState<Phase extends string = CommonRallyPhase> {
   matchStartedAt: string | null;
   misconductA: MisconductRecord[];
   misconductB: MisconductRecord[];
+  /**
+   * How many medical recoveries each player has taken this match (spec/29
+   * F11), keyed by roster-row id. Optional: snapshots written before this
+   * existed simply have none, and replay rebuilds it.
+   */
+  recoveriesByPlayer?: Record<string, number>;
 }
 
 // ── the event payloads every discipline handles identically ─────────────────
@@ -108,7 +114,17 @@ export type CommonEventPayload =
   // pipeline closes the set (and the match, if that was the deciding one)
   // exactly as it would for a set won on court.
   | { type: "SET_DEFAULT"; team: TeamId; reason: SetDefaultReason }
-  | { type: "MEDICAL_TIMEOUT"; team: TeamId }
+  // `playerId` (spec/29 F11): WHO is being treated. Optional — old logs have
+  // none, and a recovery can be called before the player is identified — but
+  // the official sheet prints the recovery with the player and the score, and
+  // the per-player recovery counts below need it.
+  //
+  // NOTE (deliberate, spec/29 Phase 4): the counts are recorded and printed,
+  // but no LIMIT is enforced here. The per-discipline caps differ (beach: one
+  // recovery per player per match; indoor: a 3-minute recovery only when no
+  // legal substitution exists) and spec/29 requires them verified against the
+  // 2025-2028 rulebooks rather than assumed. Recording first is the safe half.
+  | { type: "MEDICAL_TIMEOUT"; team: TeamId; playerId?: string }
   | { type: "MEDICAL_TIMEOUT_END" }
   | { type: "DELAY_WARNING"; team: TeamId }
   | { type: "DELAY_PENALTY"; team: TeamId }
@@ -310,6 +326,15 @@ export function reduceCommon<Phase extends string>(
     case "MEDICAL_TIMEOUT":
       s.medicalTimeoutTeam = p.team;
       s.rallyPhase = "MEDICAL_TIMEOUT_ACTIVE";
+      // Per-player recovery tally (spec/29 F11), for the console to show and
+      // the sheet to print. Optional on the state shape so old snapshots (which
+      // have no such field) keep replaying.
+      if (p.playerId && s.recoveriesByPlayer) {
+        s.recoveriesByPlayer[p.playerId] =
+          (s.recoveriesByPlayer[p.playerId] ?? 0) + 1;
+      } else if (p.playerId) {
+        s.recoveriesByPlayer = { [p.playerId]: 1 };
+      }
       return;
 
     case "MEDICAL_TIMEOUT_END":

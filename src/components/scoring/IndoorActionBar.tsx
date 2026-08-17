@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useIndoorMatch } from "@/lib/indoor-match-context";
 import { timeoutCapForSet } from "@/engine/config";
 import { useT } from "@/lib/i18n/client";
+import { courtRoster } from "@/lib/roster";
 import {
   type IndoorSetState,
   type TeamId,
@@ -223,9 +224,17 @@ export function IndoorActionBar({
           roster={subTeam === "A" ? rosterA : rosterB}
           court={subTeam === "A" ? set.courtPositionsA : set.courtPositionsB}
           subsUsed={subTeam === "A" ? set.subsUsedA : set.subsUsedB}
+          maxSubs={config.maxSubsPerSet}
           excludeIds={liberoIdsOf(set, subTeam)}
-          onSubstitute={(outPlayerId, inPlayerId) =>
-            dispatch({ type: "SUBSTITUTION", team: subTeam, outPlayerId, inPlayerId })
+          onSubstitute={(outPlayerId, inPlayerId, opts) =>
+            dispatch({
+              type: "SUBSTITUTION",
+              team: subTeam,
+              outPlayerId,
+              inPlayerId,
+              // Rule 15.7 (spec/29 F9): does not count toward the per-set cap.
+              ...(opts?.isExceptional ? { isExceptional: true } : {}),
+            })
           }
           onClose={() => setSubTeam(null)}
         />
@@ -249,9 +258,21 @@ function LiberoPanel({ team, onClose }: { team: TeamId; onClose: () => void }) {
   const liberoId = team === "A" ? set.libero.liberoIdA : set.libero.liberoIdB;
   const replacing = team === "A" ? set.libero.liberoReplacingA : set.libero.liberoReplacingB;
   const court = team === "A" ? set.courtPositionsA : set.courtPositionsB;
-  // Back-row positions are 1,5,6 → indices 0,4,5 (but pos 1 serves; libero usually 5/6).
-  const backRow = [5, 6].map((p) => court[p - 1]).filter(Boolean);
+  // Back-row positions are 1, 5, 6 → indices 0, 4, 5. Position 1 is offered
+  // too (spec/29 F10 — Rule 19.3.2.1 allows it), but only while the OPPONENT
+  // holds the serve: the libero may never serve, and the engine validator
+  // enforces the same rule.
+  const canUsePosition1 = set.currentServer !== team;
+  const backRow = (canUsePosition1 ? [1, 5, 6] : [5, 6])
+    .map((p) => court[p - 1])
+    .filter(Boolean);
   const [outId, setOutId] = useState(backRow[0] ?? "");
+  // A re-designated libero comes from the players NOT on court and not already
+  // a libero (Rule 19.4.2).
+  const redesignationCandidates = courtRoster(roster)
+    .filter((p) => !court.includes(p.id) && p.id !== liberoId)
+    .map((p) => p.id);
+  const [newLiberoId, setNewLiberoId] = useState("");
   const label = (id: string) => {
     const p = roster.find((r) => r.id === id);
     return p ? `${p.jerseyNumber ?? "–"} ${p.jerseyName}` : id;
@@ -303,6 +324,44 @@ function LiberoPanel({ team, onClose }: { team: TeamId; onClose: () => void }) {
           </PanelConfirm>
         </>
       )}
+
+      {/* Re-designation (Rule 19.4.2, spec/29 F10): the libero is unable to
+          continue, and one of the players NOT on court takes over the role for
+          the rest of the match. The engine has always understood the event —
+          only this writer was missing. Offered while the libero is off court,
+          so the re-designation never happens mid-replacement. */}
+      {!onCourt ? (
+        <div className="mt-3 border-t border-border pt-3">
+          <p className="mb-1.5 text-xs uppercase tracking-wide text-score-dim">
+            {t("scoring.liberoRedesignate")}
+          </p>
+          <p className="mb-2 text-xs text-score-dim">
+            {t("scoring.liberoRedesignateExplain")}
+          </p>
+          <SelectRow
+            label={t("scoring.liberoNew")}
+            value={newLiberoId}
+            onChange={setNewLiberoId}
+            options={redesignationCandidates}
+            optionLabel={label}
+          />
+          <PanelConfirm
+            disabled={!newLiberoId}
+            onClick={() => {
+              dispatch({
+                type: "LIBERO_REDESIGNATION",
+                team,
+                newLiberoId,
+              });
+              onClose();
+            }}
+          >
+            {t("scoring.liberoRedesignateConfirm", {
+              player: newLiberoId ? label(newLiberoId) : "",
+            })}
+          </PanelConfirm>
+        </div>
+      ) : null}
     </ScoringModal>
   );
 }

@@ -148,6 +148,7 @@ export function SubPanel({
   roster,
   court,
   subsUsed,
+  maxSubs,
   excludeIds = [],
   onSubstitute,
   onClose,
@@ -156,8 +157,14 @@ export function SubPanel({
   roster: PlayerLite[];
   court: string[];
   subsUsed: number;
+  /** Per-set legal substitution cap; omit where the discipline has none. */
+  maxSubs?: number;
   excludeIds?: string[];
-  onSubstitute: (outPlayerId: string, inPlayerId: string) => void;
+  onSubstitute: (
+    outPlayerId: string,
+    inPlayerId: string,
+    opts?: { isExceptional?: boolean },
+  ) => void;
   onClose: () => void;
 }) {
   const t = useT();
@@ -169,6 +176,14 @@ export function SubPanel({
   );
   const [outId, setOutId] = useState(onCourt[0] ?? "");
   const [inId, setInId] = useState(bench[0]?.id ?? "");
+  // Exceptional substitution (Rule 15.7, spec/29 F9): a player injured with no
+  // legal substitution left may be replaced by anyone not on court, and it
+  // does not count toward the per-set limit. The engine has always accepted
+  // the flag; it had no writer. Offered ONLY once the legal subs are gone —
+  // otherwise the ordinary substitution is the correct one, and a scorer given
+  // both choices will eventually pick the wrong one.
+  const legalSubsGone = maxSubs != null && subsUsed >= maxSubs;
+  const [exceptional, setExceptional] = useState(false);
   const label = (id: string) => {
     const p = roster.find((r) => r.id === id);
     return p ? `${p.jerseyNumber ?? "–"} ${p.jerseyName}` : id;
@@ -178,14 +193,25 @@ export function SubPanel({
     <ScoringModal title={t("scoring.subTitle", { team, used: subsUsed })} onClose={onClose}>
       <SelectRow label={t("scoring.out")} value={outId} onChange={setOutId} options={onCourt} optionLabel={label} />
       <SelectRow label={t("scoring.in")} value={inId} onChange={setInId} options={bench.map((b) => b.id)} optionLabel={label} />
+      {legalSubsGone ? (
+        <label className="mt-2 flex items-start gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          <input
+            type="checkbox"
+            checked={exceptional}
+            onChange={(e) => setExceptional(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>{t("scoring.exceptionalSub")}</span>
+        </label>
+      ) : null}
       <PanelConfirm
         disabled={!outId || !inId}
         onClick={() => {
-          onSubstitute(outId, inId);
+          onSubstitute(outId, inId, exceptional ? { isExceptional: true } : undefined);
           onClose();
         }}
       >
-        {t("scoring.confirmSub")}
+        {exceptional ? t("scoring.confirmExceptionalSub") : t("scoring.confirmSub")}
       </PanelConfirm>
     </ScoringModal>
   );

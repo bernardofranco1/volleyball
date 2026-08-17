@@ -83,7 +83,8 @@ export type BeachEventPayload =
   | { type: "SERVICE_ORDER_FAULT"; team: TeamId; note?: string }
   | { type: "DELAY_WARNING"; team: TeamId }
   | { type: "DELAY_PENALTY"; team: TeamId }
-  | { type: "MEDICAL_TIMEOUT"; team: TeamId }
+  // `playerId` (spec/29 F11): who is treated — printed on the sheet.
+  | { type: "MEDICAL_TIMEOUT"; team: TeamId; playerId?: string }
   | { type: "MEDICAL_TIMEOUT_END" }
   | { type: "MISCONDUCT_WARNING"; team: TeamId; playerId: string }
   | { type: "MISCONDUCT_PENALTY"; team: TeamId; playerId: string }
@@ -167,6 +168,8 @@ export interface BeachMatchState {
   lastSequence: number;
   misconductA: MisconductRecord[];
   misconductB: MisconductRecord[];
+  /** Medical recoveries per roster-row id (spec/29 F11); absent on old snapshots. */
+  recoveriesByPlayer?: Record<string, number>;
 }
 
 /** Serve-order slot (1 | 2) of the player expected to serve next, or null pre-set. */

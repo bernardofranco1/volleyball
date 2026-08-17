@@ -163,10 +163,18 @@ export function validateIndoorEvent(
         if (onCourt) return fail("Libero is already on court");
         const idx = court.indexOf(payload.outPlayerId);
         if (idx < 0) return fail("Player being replaced is not on court");
-        // Back-row, non-server only (indices 4,5). Index 0 is back-row but is the
-        // server — the libero can't serve (Rule 19), so it can't replace there.
-        if (idx !== 4 && idx !== 5)
-          return fail("Libero may only replace a back-row player (not the server)");
+        // Back-row positions are 1, 5, 6 → indices 0, 4, 5 (Rule 7.4). The
+        // libero may replace ANY of them (Rule 19.3.2.1) — including position
+        // 1 — but may never SERVE (spec/29 F10). Position 1 is the serving
+        // position, so the replacement there is legal only while the other
+        // team holds the serve; once this team side-outs, the libero must come
+        // off before their serve.
+        if (idx !== 0 && idx !== 4 && idx !== 5)
+          return fail("Libero may only replace a back-row player");
+        if (idx === 0 && set.currentServer === payload.team)
+          return fail(
+            "The libero cannot serve — replace a different back-row player, or wait until the opponent serves",
+          );
         return OK;
       }
       // OUT: the replaced back-row player returns.

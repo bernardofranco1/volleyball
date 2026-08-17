@@ -150,8 +150,16 @@ export function GrassActionBar() {
           roster={subTeam === "A" ? rosterA : rosterB}
           court={subTeam === "A" ? set.courtPositionsA : set.courtPositionsB}
           subsUsed={subTeam === "A" ? set.subsUsedA : set.subsUsedB}
-          onSubstitute={(outPlayerId, inPlayerId) =>
-            dispatch({ type: "SUBSTITUTION", team: subTeam, outPlayerId, inPlayerId })
+          maxSubs={config.maxSubsPerSet}
+          onSubstitute={(outPlayerId, inPlayerId, opts) =>
+            dispatch({
+              type: "SUBSTITUTION",
+              team: subTeam,
+              outPlayerId,
+              inPlayerId,
+              // Rule 15.7 (spec/29 F9): does not count toward the per-set cap.
+              ...(opts?.isExceptional ? { isEmergency: true } : {}),
+            })
           }
           onClose={() => setSubTeam(null)}
         />
