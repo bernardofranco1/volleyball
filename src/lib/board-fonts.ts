@@ -20,6 +20,7 @@ import {
   Barlow_Condensed,
   Saira_Condensed,
 } from "next/font/google";
+import localFont from "next/font/local";
 
 // Weights match what the old Google Fonts URL requested, so the boards render
 // with the same range of weights they were designed against.
@@ -63,6 +64,16 @@ const anton = Anton({
   preload: false,
 });
 
+// Ancorli — the FIVB venue-brand face for the VIS-fed official boards
+// (spec/34). Supplied as a licensed TTF, so next/font/local rather than
+// next/font/google; same preload-off reasoning as the four faces above.
+const ancorli = localFont({
+  src: "../fonts/Ancorli.ttf",
+  variable: "--font-ancorli",
+  display: "swap",
+  preload: false,
+});
+
 /**
  * Class names that define the four board font variables. Applied to <html> in
  * the root layout, NOT to a wrapper on the scoreboard route: next/font emits
@@ -78,6 +89,7 @@ export const boardFontClassName = [
   barlowCondensed.variable,
   archivo.variable,
   anton.variable,
+  ancorli.variable,
 ].join(" ");
 
 // The name→variable mapping and `boardFontStack()` live in board-theme.ts: they

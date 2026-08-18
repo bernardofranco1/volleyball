@@ -1,0 +1,45 @@
+import { notFound, redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { competitions, tenants } from "@/db/schema";
+import { tournamentOfMatch } from "@/lib/vis-live/store";
+
+// Short URL by VIS MATCH NUMBER alone (spec/34): /Scoreboard/vis/28803 → the
+// board, with query params (?layout=ushape, ?screen=…, ?bg=…, ?window=…)
+// passed through. Resolvable because VIS match numbers are globally unique and
+// the allowlist maps them to their tournament; the tournament maps to exactly
+// one VIS-linked competition here.
+export const dynamic = "force-dynamic";
+
+export default async function ShortVisBoard({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ matchNo: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { matchNo } = await params;
+  const query = await searchParams;
+  if (!/^\d{1,9}$/.test(matchNo)) notFound();
+
+  const tournamentNo = await tournamentOfMatch(Number(matchNo)).catch(() => null);
+  if (tournamentNo == null) notFound();
+
+  const rows = await db
+    .select({ competitionId: competitions.id, tenantSlug: tenants.slug })
+    .from(competitions)
+    .innerJoin(tenants, eq(tenants.id, competitions.tenantId))
+    .where(eq(competitions.visTournamentNo, tournamentNo))
+    .limit(1);
+  const row = rows[0];
+  if (!row) notFound();
+
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) {
+    if (typeof v === "string") qs.set(k, v);
+  }
+  const suffix = qs.size > 0 ? `?${qs.toString()}` : "";
+  redirect(
+    `/t/${row.tenantSlug}/scoreboard/vis/${row.competitionId}/${matchNo}${suffix}`,
+  );
+}

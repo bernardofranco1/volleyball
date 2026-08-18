@@ -329,3 +329,56 @@ driven by probing production VIS read-only on the day.
   rehearsal and add it to the vis-connector ledger.
 - Country plates show the 3-letter code. The template has flags; a flag asset
   can drop into the same box without moving anything else.
+
+---
+
+## BRANDING PASS 2026-08-18 (second commit)
+
+The boards are now the official FIVB/AVC venue branding, rebuilt from the
+Illustrator masters supplied on 2026-08-18 (`~/AVC-VenueBrand-*.ai`,
+`~/U-Shape-VW-AVC-*.ai` — .ai files are PDF-compatible; rasterise with
+`pdftoppm` to inspect). **These boards are FIVB-official-competition surfaces
+and the branding is not negotiable** — palette sampled from the master
+(accent `#FF002C`, ground `#000827`, in `vis-board-theme.ts`), Ancorli brand
+face self-hosted via next/font/local (`src/fonts/Ancorli.ttf`,
+`--font-ancorli`). They remain unreachable for client tenants: only
+script-provisioned competitions carry `vis_tournament_no`.
+
+What exists now:
+
+- **Full-screen scoreboard** (`VisBoard`) corrected to the master: plain
+  vertical SERVE text, the ball beside the serving player's row, flags on the
+  white plates (self-hosted `public/flags/<CODE>.png`, 41 assets covering all
+  four linked events; **TPE is deliberately the Chinese Taipei
+  Olympic-committee flag**), long names shrink instead of truncating, no
+  event logo (the master carries none).
+- **Set-break statistics screen** (`VisSetStats`), from the AVC Set master:
+  sets won on the small outer plates, the just-ended set's score on the big
+  pair; ATTACKS / BLOCKS / SERVES / OPPONENT ERRORS with the leading value on
+  a red plate. Team totals are DERIVED by summing the player match-total rows
+  (spike + back-row spike = attacks) — at the board's Options level VIS keeps
+  TeamStatistics thin (OpponentErrors/TeamFaults only); the sums equal the
+  full payload's team rows exactly (verified against 65535).
+- **U-shape** (`VisBoardUShape`, `?layout=ushape`): rails + bottom band around
+  a TRANSPARENT centre window for the venue TV feed (vMix/OBS browser source;
+  `?window=black` for standalone). Rails follow the PHYSICAL court sides via
+  `Set@NoTeamAtLeft` — the master carries no team names, so left rail = team
+  on the camera's left, swapping at court switches. Counter dots follow the
+  master (challenge 2 / subst 6 / timeout 1) and grow if the feed reports
+  more used.
+- **Screen rotation** (full layout only): 10 s after a set ends (detected by
+  `Set@Duration` being stamped — the feed's explicit signal, no score
+  heuristics) the stats screen takes over; the next set's first data snaps it
+  back. After the match the stats screen stays. `?screen=board|stats` pins.
+  The U-shape never rotates — it frames the feed.
+- **Short URL by VIS match number**: `/Scoreboard/vis/<matchNo>` (+ query
+  passthrough) resolves tournament → competition → tenant via the allowlist.
+- `comp_vis_1671` (Girls' U17, finished) remains the fully-populated
+  verification target; all screens were screenshot-verified against it at
+  1920×1080.
+
+Open for the rehearsal (Aug 19): confirm `Set@Duration` really is stamped
+during the live break (the rotation trigger), capture a live fixture, record
+the live `Match@Status` enum in the vis-connector ledger. Open with the
+design team: hi-res background artwork (`public/board-bg/<competitionId>.jpg`)
+and the official flag pack to replace the public-source stand-ins.

@@ -46,6 +46,18 @@ export interface VisBoardSet {
   winner: "A" | "B" | null;
 }
 
+/** Match-total team statistics — the set-break screen's four bars. */
+export interface VisTeamTotals {
+  attacksA: number;
+  attacksB: number;
+  blocksA: number;
+  blocksB: number;
+  servesA: number;
+  servesB: number;
+  opponentErrorsA: number;
+  opponentErrorsB: number;
+}
+
 export interface VisBoardData {
   matchNo: number;
   status: VisMatchStatus;
@@ -62,6 +74,22 @@ export interface VisBoardData {
   serving: "A" | "B" | null;
   /** Completed + in-progress sets, for the ladder. */
   sets: VisBoardSet[];
+  /**
+   * Which team stands on the LEFT of the court (`Set@NoTeamAtLeft`), or null
+   * when unknown. The U-shape board frames the actual TV picture, so its rails
+   * follow the physical sides, not A/B.
+   */
+  teamAAtLeft: boolean | null;
+  /**
+   * The latest set is over but the match is not (VIS stamps `Set@Duration`
+   * when a set completes). This is what flips the venue screen to the
+   * set-break statistics and back (spec/34 set-rotation).
+   */
+  inSetBreak: boolean;
+  /** The set whose result the break screen headlines, or null before any. */
+  lastFinishedSet: VisBoardSet | null;
+  /** Match-total team statistics, or null when the feed carries none. */
+  stats: VisTeamTotals | null;
   poolName: string | null;
   tournamentName: string | null;
   /** Venue-local kick-off as VIS states it ("2026-08-19 11:00"); no offset. */
@@ -239,17 +267,59 @@ export function mapVolleyLive(
   );
   const latest = setBlocks[setBlocks.length - 1] ?? null;
 
+  // A set is OVER when VIS has stamped its Duration — the feed's explicit
+  // signal, deliberately preferred over a 25-plus-2 score heuristic: a set the
+  // scorer is still correcting must not be declared done by us.
+  const latestEnded =
+    !!latest && num(latest.attrs, "Duration") > 0 &&
+    num(latest.attrs, "PointsTeamA") + num(latest.attrs, "PointsTeamB") > 0;
+
   const sets: VisBoardSet[] = setBlocks.map((s, i) => {
     const scoreA = num(s.attrs, "PointsTeamA");
     const scoreB = num(s.attrs, "PointsTeamB");
     const isLatest = i === setBlocks.length - 1;
-    // A set in progress has NO winner even at 25-23: VIS may still correct it,
-    // and a dimmed row on a TV would be wrong for as long as it took.
-    const decided = !isLatest || status === "FINISHED";
+    // The set in PLAY has no winner even at 25-23 (VIS may still correct it);
+    // a set with its Duration stamped is over and does.
+    const decided = !isLatest || status === "FINISHED" || latestEnded;
     const winner: "A" | "B" | null =
       decided && scoreA !== scoreB ? (scoreA > scoreB ? "A" : "B") : null;
     return { setNumber: num(s.attrs, "No", i + 1), scoreA, scoreB, winner };
   });
+
+  const finishedSets = sets.filter((x) => x.winner !== null);
+  const inSetBreak = status === "LIVE" && latestEnded;
+
+  const atLeft = num(latest?.attrs, "NoTeamAtLeft", -99);
+  const teamAAtLeft =
+    atLeft === noTeamA ? true : atLeft === noTeamB ? false : null;
+
+  // Team totals. At the board's Options level VIS keeps TeamStatistics thin
+  // (OpponentErrors/TeamFaults only) — the skill aggregates live on the PLAYER
+  // match-total rows, whose per-team sums equal the full payload's team rows
+  // exactly (verified against the 65535 reference, 2026-08-18). "Attacks" on
+  // the venue screen is total attack points, i.e. spike + back-row spike.
+  const teamStats = allTagAttrs(matchBlock?.inner ?? "", "TeamStatistics");
+  const statsRowA = teamStats.find((t) => num(t, "NoTeam", -99) === noTeamA) ?? null;
+  const statsRowB = teamStats.find((t) => num(t, "NoTeam", -99) === noTeamB) ?? null;
+  const playerRows = allTagAttrs(matchBlock?.inner ?? "", "PlayerStatistics");
+  const sumFor = (roster: Map<number, unknown>, key: string): number =>
+    playerRows.reduce(
+      (sum, r) => (roster.has(num(r, "NoPlayer", -1)) ? sum + num(r, key) : sum),
+      0,
+    );
+  const stats: VisTeamTotals | null =
+    playerRows.length > 0 || statsRowA || statsRowB
+      ? {
+          attacksA: sumFor(rosterA, "SpikePoint") + sumFor(rosterA, "BackSpikePoint"),
+          attacksB: sumFor(rosterB, "SpikePoint") + sumFor(rosterB, "BackSpikePoint"),
+          blocksA: sumFor(rosterA, "BlockPoint"),
+          blocksB: sumFor(rosterB, "BlockPoint"),
+          servesA: sumFor(rosterA, "ServePoint"),
+          servesB: sumFor(rosterB, "ServePoint"),
+          opponentErrorsA: num(statsRowA, "OpponentErrors"),
+          opponentErrorsB: num(statsRowB, "OpponentErrors"),
+        }
+      : null;
 
   const servingNo = num(latest?.attrs, "NoServingTeam", -99);
   const serving: "A" | "B" | null =
@@ -294,6 +364,10 @@ export function mapVolleyLive(
     currentSet: status === "UPCOMING" ? null : num(latest?.attrs, "No", 1),
     serving,
     sets,
+    teamAAtLeft,
+    inSetBreak,
+    lastFinishedSet: finishedSets[finishedSets.length - 1] ?? null,
+    stats,
     poolName: str(firstTagAttrs(xml, "Pool"), "Name"),
     tournamentName: str(firstTagAttrs(xml, "Tournament"), "Name"),
     scheduledLocal: scheduledLocal(
@@ -336,6 +410,10 @@ export function mapVolleyMatch(
     currentSet: null,
     serving: null,
     sets: [],
+    teamAAtLeft: null,
+    inSetBreak: false,
+    lastFinishedSet: null,
+    stats: null,
     poolName: null,
     tournamentName: null,
     scheduledLocal: scheduledLocal(str(attrs, "DateLocal"), str(attrs, "TimeLocal")),

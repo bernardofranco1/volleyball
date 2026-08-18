@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * VNL-style broadcast board for VIS-fed matches (spec/34).
  *
@@ -18,29 +20,13 @@
  */
 
 import type { VisBoardData, VisBoardPlayer } from "@/lib/vis-live/board-data";
+import {
+  VIS_BOARD_THEME,
+  type VisBoardTheme,
+  flagSrc,
+} from "@/components/scoreboard/vis-board-theme";
 
-export interface VisBoardTheme {
-  /** Page behind the board. */
-  bg: string;
-  /** Score-box fill (the template's white plates). */
-  plate: string;
-  /** Numerals on the plates. */
-  plateInk: string;
-  /** Frames, rails and the serving highlight. */
-  accent: string;
-  /** Text on the background. */
-  ink: string;
-  ff: string;
-}
-
-export const VIS_BOARD_THEME: VisBoardTheme = {
-  bg: "#0B1024",
-  plate: "#FFFFFF",
-  plateInk: "#E4132B",
-  accent: "#E4132B",
-  ink: "#FFFFFF",
-  ff: "var(--font-saira-condensed),var(--font-barlow-condensed),system-ui,sans-serif",
-};
+export { VIS_BOARD_THEME, type VisBoardTheme } from "@/components/scoreboard/vis-board-theme";
 
 /** Design space of the reference templates. */
 const W = 1920;
@@ -64,8 +50,6 @@ export interface VisBoardProps {
   theme?: VisBoardTheme;
   /** Hi-res venue artwork; falls back to the built-in gradient when absent. */
   backgroundUrl?: string | null;
-  /** Competition wordmark, top-left. */
-  logoUrl?: string | null;
   /** Shown small and dim — "signal lost 90s ago" while VIS is unreachable. */
   notice?: string | null;
   /**
@@ -79,7 +63,6 @@ export function VisBoard({
   board,
   theme = VIS_BOARD_THEME,
   backgroundUrl,
-  logoUrl,
   notice,
   scheduledFallback,
 }: VisBoardProps) {
@@ -135,23 +118,8 @@ export function VisBoard({
           backgroundPosition: "center",
         }}
       >
-        {logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- board art, arbitrary remote host
-          <img
-            src={logoUrl}
-            alt=""
-            style={{
-              position: "absolute",
-              left: x(40),
-              top: y(30),
-              height: y(90),
-              width: "auto",
-              objectFit: "contain",
-              opacity: 0.95,
-            }}
-          />
-        ) : null}
-
+        {/* The AVC scoreboard master carries no logo — the event mark lives on
+            the set-break screen only. `logoUrl` is accepted for that screen. */}
         {/* SET n / FINAL */}
         <div
           style={{
@@ -353,23 +321,24 @@ function TeamName({
     >
       <div
         style={{
-          fontSize: f(70),
+          // Long names (e.g. "United States", "Dominican Republic") SHRINK
+          // rather than truncate — an ellipsis on a venue TV reads as a fault.
+          fontSize: f(name.length > 16 ? 46 : name.length > 11 ? 56 : 70),
           fontWeight: 800,
           lineHeight: 1,
           letterSpacing: f(1),
           textTransform: "uppercase",
           textAlign: left ? "right" : "left",
-          // Long names (e.g. "Dominican Republic") shrink rather than wrap.
           overflow: "hidden",
           whiteSpace: "nowrap",
-          textOverflow: "ellipsis",
           flex: "1 1 auto",
         }}
       >
         {name}
       </div>
-      {/* Country plate. Holds the 3-letter code today; a flag asset can drop
-          in here later without moving anything else. */}
+      {/* Flag on the white plate, per the master. Self-hosted assets
+          (public/flags, spec/34 — TPE is deliberately the Olympic-committee
+          flag); the 3-letter code stands in when no asset exists. */}
       <div
         style={{
           flex: "0 0 auto",
@@ -379,59 +348,57 @@ function TeamName({
           color: "#101010",
           display: "grid",
           placeItems: "center",
-          fontSize: f(44),
+          fontSize: f(40),
           fontWeight: 800,
           letterSpacing: f(1),
+          overflow: "hidden",
         }}
       >
-        {code}
+        {flagSrc(code) ? (
+          // eslint-disable-next-line @next/next/no-img-element -- board art asset
+          <img
+            src={flagSrc(code)!}
+            alt={code}
+            style={{ width: x(96), height: y(76), objectFit: "cover" }}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+              e.currentTarget.parentElement!.textContent = code;
+            }}
+          />
+        ) : (
+          code
+        )}
       </div>
     </div>
   );
 }
 
-/** Vertical SERVE rail + ball, hugging the serving side of the score block. */
+/** Vertical SERVE text on the serving side of the score block — plain white
+ *  lettering per the AVC master (no filled rail; the ball marks the serving
+ *  player's row in the line-up instead). */
 function ServeMark({ side, theme }: { side: "A" | "B"; theme: VisBoardTheme }) {
   const left = side === "A";
   return (
-    <>
-      <div
-        style={{
-          position: "absolute",
-          left: left ? x(690) : undefined,
-          right: left ? undefined : x(690),
-          top: y(128),
-          width: x(40),
-          height: y(206),
-          background: theme.accent,
-          color: theme.ink,
-          display: "grid",
-          placeItems: "center",
-          fontSize: f(24),
-          fontWeight: 800,
-          letterSpacing: f(2),
-        }}
-      >
-        <span
-          style={{
-            writingMode: "vertical-rl",
-            transform: "rotate(180deg)",
-          }}
-        >
-          SERVE
-        </span>
-      </div>
-      <Ball
-        style={{
-          position: "absolute",
-          left: left ? x(628) : undefined,
-          right: left ? undefined : x(628),
-          top: y(188),
-          width: x(52),
-          height: y(92),
-        }}
-      />
-    </>
+    <div
+      style={{
+        position: "absolute",
+        left: left ? x(688) : undefined,
+        right: left ? undefined : x(688),
+        top: y(128),
+        width: x(36),
+        height: y(206),
+        color: theme.ink,
+        display: "grid",
+        placeItems: "center",
+        fontSize: f(26),
+        fontWeight: 700,
+        letterSpacing: f(3),
+      }}
+    >
+      <span style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>
+        SERVE
+      </span>
+    </div>
   );
 }
 
@@ -525,6 +492,11 @@ function Lineup({
             >
               {p?.name ?? ""}
             </div>
+            {/* The master marks the server with the ball at the row's inner
+                end (both flex directions end toward the court centre). */}
+            {serving && p?.position === 1 ? (
+              <Ball style={{ flex: "0 0 auto", width: x(44), height: y(78) }} />
+            ) : null}
           </div>
         ))}
       </div>

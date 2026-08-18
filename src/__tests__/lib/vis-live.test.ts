@@ -131,12 +131,62 @@ describe("mapVolleyLive — finished match", () => {
   it("honours the feed's own poll delay", () => {
     expect(board.pollDelaySeconds).toBe(20);
   });
+
+  it("knows which team stands on the left of the court", () => {
+    // Fixture set 3: NoTeamAtLeft="8713" = team A — the U-shape rails follow this.
+    expect(board.teamAAtLeft).toBe(true);
+  });
+
+  it("derives the team totals for the break screen from the player rows", () => {
+    // Cross-checked against the full 65535 payload's TeamStatistics: USA
+    // spike 45 + back-row 6, block 12, serve 9; OpponentErrors from the thin
+    // team row itself.
+    expect(board.stats).not.toBeNull();
+    expect(board.stats!.attacksA).toBe(51);
+    expect(board.stats!.blocksA).toBe(12);
+    expect(board.stats!.servesA).toBe(9);
+    expect(board.stats!.opponentErrorsA).toBe(9);
+    expect(board.stats!.attacksB).toBe(27);
+    expect(board.stats!.opponentErrorsB).toBe(21);
+  });
+
+  it("is not in a set break once the match is over", () => {
+    expect(board.inSetBreak).toBe(false);
+    expect(board.lastFinishedSet).toMatchObject({ setNumber: 3, scoreA: 25 });
+  });
+});
+
+describe("mapVolleyLive — set break (set over, match not)", () => {
+  // Only the match end timestamp stripped: the last set keeps its Duration,
+  // which is exactly what the feed shows between sets.
+  const breakXml = BOARD_XML.replace(/\sEndDateTime="[^"]*"/, "");
+  const board = mapVolleyLive(breakXml, 27062, Date.parse("2026-08-17T00:10:00Z"));
+
+  it("detects the break from the set's stamped Duration", () => {
+    expect(board.status).toBe("LIVE");
+    expect(board.inSetBreak).toBe(true);
+    expect(board.lastFinishedSet).toMatchObject({
+      setNumber: 3,
+      scoreA: 25,
+      scoreB: 23,
+      winner: "A",
+    });
+  });
+
+  it("gives the ended set its winner in the ladder", () => {
+    expect(board.sets[2].winner).toBe("A");
+  });
 });
 
 describe("mapVolleyLive — the same match treated as live", () => {
-  // Strip the end timestamp: the payload is then indistinguishable from one
-  // arriving mid-match, which is the state we cannot capture on demand.
-  const liveXml = BOARD_XML.replace(/\sEndDateTime="[^"]*"/, "");
+  // Strip the match end timestamp AND the last set's Duration: the payload is
+  // then indistinguishable from one arriving MID-SET, which is the state we
+  // cannot capture on demand. (Duration present = the set is over — that case
+  // has its own describe below.)
+  const liveXml = BOARD_XML.replace(/\sEndDateTime="[^"]*"/, "").replace(
+    /(<Set [^>]*No="3"[^>]*?)\sDuration="[^"]*"/,
+    "$1",
+  );
   const board = mapVolleyLive(liveXml, 27062, Date.parse("2026-08-17T00:10:00Z"));
 
   it("infers LIVE from the timestamps, never from the status enum", () => {

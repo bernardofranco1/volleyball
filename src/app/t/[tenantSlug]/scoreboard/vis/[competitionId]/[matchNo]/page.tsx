@@ -19,7 +19,7 @@ import { getCompetitionBranding } from "@/lib/board-theme";
 import {
   VIS_BOARD_THEME,
   type VisBoardTheme,
-} from "@/components/scoreboard/VisBoard";
+} from "@/components/scoreboard/vis-board-theme";
 import { VisBoardDisplay } from "@/components/scoreboard/VisBoardDisplay";
 
 export const dynamic = "force-dynamic";
@@ -41,10 +41,15 @@ export default async function VisBoardPage({
   searchParams,
 }: {
   params: Promise<{ tenantSlug: string; competitionId: string; matchNo: string }>;
-  searchParams: Promise<{ bg?: string }>;
+  searchParams: Promise<{
+    bg?: string;
+    layout?: string;
+    screen?: string;
+    window?: string;
+  }>;
 }) {
   const { tenantSlug, competitionId, matchNo: rawNo } = await params;
-  const { bg } = await searchParams;
+  const { bg, layout: layoutParam, screen, window: windowParam } = await searchParams;
   const { t } = await getT();
   if (!/^\d{1,9}$/.test(rawNo)) notFound();
   const matchNo = Number(rawNo);
@@ -98,18 +103,34 @@ export default async function VisBoardPage({
   const backgroundUrl =
     safeBackground(bg) ?? `/board-bg/${encodeURIComponent(competitionId)}.jpg`;
 
+  const layout = layoutParam === "ushape" ? ("ushape" as const) : ("full" as const);
+  const screenOverride =
+    screen === "board" ? ("board" as const) : screen === "stats" ? ("stats" as const) : null;
+  const windowFill = windowParam === "black" ? ("black" as const) : ("transparent" as const);
+
   return (
-    <VisBoardDisplay
-      matchNo={matchNo}
-      initialBoard={boardResult.board}
-      theme={theme}
-      backgroundUrl={backgroundUrl}
-      logoUrl={branding?.logoUrl ?? null}
-      scheduledFallback={
-        scheduleRow?.dateLocal
-          ? [scheduleRow.dateLocal, scheduleRow.timeLocal].filter(Boolean).join(" ")
-          : null
-      }
-    />
+    <>
+      {layout === "ushape" && windowFill === "transparent" ? (
+        // The U-shape's centre window must key through to the TV feed in
+        // vMix/OBS, which requires the PAGE itself to be transparent — the
+        // root layout paints an opaque body that would otherwise fill the cut.
+        <style>{"html,body{background:transparent!important}"}</style>
+      ) : null}
+      <VisBoardDisplay
+        matchNo={matchNo}
+        initialBoard={boardResult.board}
+        layout={layout}
+        screenOverride={screenOverride}
+        theme={theme}
+        backgroundUrl={backgroundUrl}
+        logoUrl={branding?.logoUrl ?? null}
+        windowFill={windowFill}
+        scheduledFallback={
+          scheduleRow?.dateLocal
+            ? [scheduleRow.dateLocal, scheduleRow.timeLocal].filter(Boolean).join(" ")
+            : null
+        }
+      />
+    </>
   );
 }
