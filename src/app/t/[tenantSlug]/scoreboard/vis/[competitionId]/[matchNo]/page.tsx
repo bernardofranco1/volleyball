@@ -14,7 +14,13 @@
 import { notFound } from "next/navigation";
 import { getTenantBySlug } from "@/lib/tenant";
 import { getT } from "@/lib/i18n/server";
-import { getBoard, getMatchList, getVisCompetition } from "@/lib/vis-live/store";
+import {
+  MOCK_LABEL,
+  getBoard,
+  getMatchList,
+  getMockBoard,
+  getVisCompetition,
+} from "@/lib/vis-live/store";
 import { getCompetitionBranding } from "@/lib/board-theme";
 import {
   VIS_BOARD_THEME,
@@ -46,13 +52,22 @@ export default async function VisBoardPage({
     layout?: string;
     screen?: string;
     window?: string;
+    replica?: string;
   }>;
 }) {
   const { tenantSlug, competitionId, matchNo: rawNo } = await params;
-  const { bg, layout: layoutParam, screen, window: windowParam } = await searchParams;
+  const {
+    bg,
+    layout: layoutParam,
+    screen,
+    window: windowParam,
+    replica,
+  } = await searchParams;
   const { t } = await getT();
-  if (!/^\d{1,9}$/.test(rawNo)) notFound();
-  const matchNo = Number(rawNo);
+  // The validation mock (spec/35 W9) bypasses VIS and the schedule check.
+  const isMock = rawNo === "mock";
+  if (!isMock && !/^\d{1,9}$/.test(rawNo)) notFound();
+  const matchNo = isMock ? 21546 : Number(rawNo);
 
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) notFound();
@@ -62,14 +77,15 @@ export default async function VisBoardPage({
   // The match must belong to THIS competition's tournament — the URL is public,
   // so it must not be a way to render any VIS match under any competition's
   // branding. This read also warms the allowlist the board API checks.
-  const { value: schedule } = await getMatchList(comp.visTournamentNo).catch(() => ({
-    value: [],
-  }));
-  const scheduleRow = schedule.find((m) => m.matchNo === matchNo) ?? null;
-  if (schedule.length > 0 && !scheduleRow) notFound();
+  const schedule = isMock
+    ? []
+    : (await getMatchList(comp.visTournamentNo).catch(() => ({ value: [] }))).value;
+  if (!isMock && schedule.length > 0 && !schedule.some((m) => m.matchNo === matchNo)) {
+    notFound();
+  }
 
   const [boardResult, branding] = await Promise.all([
-    getBoard(matchNo).then(
+    (isMock ? Promise.resolve(getMockBoard()) : getBoard(matchNo)).then(
       (r) => ({ ok: true as const, board: r.value }),
       (err: unknown) => ({ ok: false as const, err }),
     ),
@@ -125,11 +141,8 @@ export default async function VisBoardPage({
         backgroundUrl={backgroundUrl}
         logoUrl={branding?.logoUrl ?? null}
         windowFill={windowFill}
-        scheduledFallback={
-          scheduleRow?.dateLocal
-            ? [scheduleRow.dateLocal, scheduleRow.timeLocal].filter(Boolean).join(" ")
-            : null
-        }
+        replica={replica === "1"}
+        notice={isMock ? MOCK_LABEL : null}
       />
     </>
   );

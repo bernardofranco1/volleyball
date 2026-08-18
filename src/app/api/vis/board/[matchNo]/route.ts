@@ -7,7 +7,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getBoard, isKnownMatch } from "@/lib/vis-live/store";
+import { getBoard, getMockBoard, isKnownMatch } from "@/lib/vis-live/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +17,15 @@ export async function GET(
   { params }: { params: Promise<{ matchNo: string }> },
 ) {
   const { matchNo: raw } = await params;
+  // The validation mock (spec/35 W9) is served from the embedded capture: no
+  // VIS call, no allowlist, never cached.
+  if (raw === "mock") {
+    const { value, ageSeconds } = getMockBoard();
+    return NextResponse.json(
+      { board: value, ageSeconds },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
   if (!/^\d{1,9}$/.test(raw)) {
     return NextResponse.json({ error: "bad match number" }, { status: 400 });
   }

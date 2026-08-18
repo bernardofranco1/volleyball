@@ -32,6 +32,7 @@ import {
   mapVolleyMatch,
   mapVolleyMatchList,
 } from "./board-data";
+import { MOCK_MATCH_NO, mockLiveXml } from "./mock";
 
 interface Entry<T> {
   value: T;
@@ -226,6 +227,20 @@ export async function getVisCompetition(
     country: row.country,
   };
 }
+
+/**
+ * The validation mock (spec/35 W9): VNL 2025 QF Japan-Poland at its latest
+ * stage, rendered as if live. Mapped from the embedded capture on every call —
+ * it never touches VIS, so it needs no cache and cannot go stale.
+ */
+export function getMockBoard(now: number = Date.now()): Aged<VisBoardData> {
+  return {
+    value: mapVolleyLive(mockLiveXml(), MOCK_MATCH_NO, now),
+    ageSeconds: 0,
+  };
+}
+
+export { MOCK_LABEL, MOCK_MATCH_NO } from "./mock";
 
 /** Test seam: drop every cache. */
 export function __resetVisCaches(): void {

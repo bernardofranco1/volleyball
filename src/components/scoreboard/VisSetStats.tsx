@@ -1,21 +1,28 @@
 "use client";
 
 /**
- * Set-break statistics screen (spec/34), rebuilt from the AVC master
- * (~/AVC-VenueBrand-Set-RGB-16-9.ai): event mark top-centre, team names with
- * flag plates, a score cluster — sets won on the small outer plates, the score
- * of the set that just ended on the big central pair — and four full-width
- * bars: ATTACKS / BLOCKS / SERVES / OPPONENT ERRORS. Per the master, the
- * LEADING side's number sits on a red plate, the trailing on white; a tie gets
- * white on both (neither leads).
+ * The official FIVB/AVC set-break statistics screen (spec/34, geometry
+ * spec/35 W7), measured from ~/AVC-VenueBrand-Set-RGB-16-9.ai. As with the
+ * scoreboard: finished design, nothing here is a styling choice of ours.
+ *
+ * Measured constants (design px, 1920×1080):
+ *   event mark       ≈ x 890 → 1030, y 46 → 142 (centred)
+ *   score frame      x 670.5 → 1250, y 185.5 → 364.5
+ *   small plates     680.5 & 1155, y 195.5, 85 × 110   (sets won)
+ *   big plates       775.5 & 965.5, y 195.5, 179 × 159 (the ended set)
+ *   flags            489.5 & 1300.5, y 185.5, 130 × 130 — borderless
+ *   team names       cap 52
+ *   stats block      x 80 → 1840.5, y 410 → 996
+ *   value plates     x 90 & 1696.5, 134 × 134, rows y 420/564/708/852 (pitch 144)
+ *   labels           cap 43   ·   value digits cap 46.5
  *
  * The venue rotation (VisBoardDisplay) shows this screen 10 seconds after a
- * set ends and snaps back to the scoreboard the moment the next set begins.
- * Same 16:9 cqw/cqh stage as VisBoard.
+ * set ends and snaps back to the scoreboard when the next set begins.
  */
 
 import type { VisBoardData } from "@/lib/vis-live/board-data";
 import {
+  AVC_BACKGROUND,
   VIS_BOARD_THEME,
   type VisBoardTheme,
   flagSrc,
@@ -26,6 +33,17 @@ const H = 1080;
 const x = (px: number) => `${((px / W) * 100).toFixed(4)}cqw`;
 const y = (px: number) => `${((px / H) * 100).toFixed(4)}cqh`;
 const f = (px: number) => `${((px / W) * 100).toFixed(4)}cqw`;
+const cap = (capPx: number) => f(capPx / 0.72);
+
+const LOGO = { x: 890, y: 46, w: 140, h: 96 };
+const CLUSTER = { x: 670.5, y: 185.5, w: 579.5, h: 179 };
+const SMALL = { lx: 680.5, rx: 1155, y: 195.5, w: 85, h: 110, cap: 56 };
+const BIG = { lx: 775.5, rx: 965.5, y: 195.5, w: 179, h: 159, cap: 96 };
+const FLAG = { lx: 489.5, rx: 1300.5, y: 185.5, size: 130 };
+const NAME = { cap: 52, y: 210, lRight: 465, rLeft: 1455, w: 430 };
+const BLOCK = { x: 80, y: 410, w: 1760.5, h: 586 };
+const VALUE = { lx: 90, rx: 1696.5, size: 134, rowY0: 420, pitch: 144, cap: 46.5 };
+const LABEL_CAP = 43;
 
 export function VisSetStats({
   board,
@@ -63,16 +81,12 @@ export function VisSetStats({
           width: `min(100vw, ${((W / H) * 100).toFixed(4)}vh)`,
           aspectRatio: `${W} / ${H}`,
           containerType: "size",
-          backgroundImage: [
-            backgroundUrl ? `url("${backgroundUrl}")` : null,
-            "radial-gradient(120% 90% at 8% 0%, rgba(255,0,44,0.28) 0%, rgba(255,0,44,0) 55%)",
-            "radial-gradient(120% 90% at 92% 100%, rgba(41,86,196,0.34) 0%, rgba(41,86,196,0) 55%)",
-            "radial-gradient(90% 70% at 50% 120%, rgba(255,0,44,0.20) 0%, rgba(255,0,44,0) 60%)",
-            `linear-gradient(180deg, ${theme.bg} 0%, #0A1233 55%, ${theme.bg} 100%)`,
-          ]
+          backgroundColor: theme.bg,
+          backgroundImage: [backgroundUrl, AVC_BACKGROUND.set]
             .filter(Boolean)
+            .map((u) => `url("${u}")`)
             .join(","),
-          backgroundSize: "cover, auto, auto, auto, auto",
+          backgroundSize: "cover",
           backgroundPosition: "center",
         }}
       >
@@ -83,101 +97,118 @@ export function VisSetStats({
             alt=""
             style={{
               position: "absolute",
-              left: "50%",
-              transform: "translateX(-50%)",
-              top: y(36),
-              height: y(110),
-              width: "auto",
+              left: x(LOGO.x),
+              top: y(LOGO.y),
+              width: x(LOGO.w),
+              height: y(LOGO.h),
               objectFit: "contain",
             }}
           />
         ) : null}
 
-        {/* ── header: names, flags, score cluster ─────────────────────── */}
-        <TeamHalf side="left" code={board.teamA.code} name={board.teamA.name} theme={theme} />
-        <TeamHalf side="right" code={board.teamB.code} name={board.teamB.name} theme={theme} />
+        <TeamName side="left" name={board.teamA.name} />
+        <TeamName side="right" name={board.teamB.name} />
+        <Flag side="left" code={board.teamA.code} theme={theme} />
+        <Flag side="right" code={board.teamB.code} theme={theme} />
 
-        {/* Score cluster: small outer plates = sets won; the big central pair
-            = the set that just ended (the match result once it is over). */}
+        {/* Score cluster: sets won on the small outer plates, the just-ended
+            set on the big central pair. */}
         <div
           style={{
             position: "absolute",
-            left: x(672),
-            top: y(186),
-            width: x(576),
-            height: y(130),
+            left: x(CLUSTER.x),
+            top: y(CLUSTER.y),
+            width: x(CLUSTER.w),
+            height: y(CLUSTER.h),
             background: theme.accent,
-            padding: x(5),
-            display: "grid",
-            gridTemplateColumns: `${x(96)} 1fr 1fr ${x(96)}`,
-            gap: x(5),
           }}
-        >
-          <SmallPlate value={board.setsWonA} theme={theme} />
-          <BigPlate value={last ? last.scoreA : board.setsWonA} theme={theme} />
-          <BigPlate value={last ? last.scoreB : board.setsWonB} theme={theme} />
-          <SmallPlate value={board.setsWonB} theme={theme} />
-        </div>
+        />
+        <PlateBox
+          left={SMALL.lx} top={SMALL.y} w={SMALL.w} h={SMALL.h}
+          capPx={SMALL.cap} value={board.setsWonA} theme={theme}
+        />
+        <PlateBox
+          left={BIG.lx} top={BIG.y} w={BIG.w} h={BIG.h}
+          capPx={BIG.cap} value={last ? last.scoreA : board.setsWonA} theme={theme}
+        />
+        <PlateBox
+          left={BIG.rx} top={BIG.y} w={BIG.w} h={BIG.h}
+          capPx={BIG.cap} value={last ? last.scoreB : board.setsWonB} theme={theme}
+        />
+        <PlateBox
+          left={SMALL.rx} top={SMALL.y} w={SMALL.w} h={SMALL.h}
+          capPx={SMALL.cap} value={board.setsWonB} theme={theme}
+        />
 
-        {/* ── the four stat bars ──────────────────────────────────────── */}
+        {/* Stats block: red ground with the row interiors and value plates
+            knocked out of it. */}
         <div
           style={{
             position: "absolute",
-            left: x(84),
-            top: y(410),
-            width: x(1752),
-            border: `${f(6)} solid ${theme.accent}`,
+            left: x(BLOCK.x),
+            top: y(BLOCK.y),
+            width: x(BLOCK.w),
+            height: y(BLOCK.h),
+            background: theme.accent,
           }}
-        >
-          {rows.map((r, i) => (
-            <div
-              key={r.label}
-              style={{
-                height: y(142),
-                display: "grid",
-                gridTemplateColumns: `${x(146)} 1fr ${x(146)}`,
-                borderTop: i === 0 ? undefined : `${f(6)} solid ${theme.accent}`,
-              }}
-            >
-              <ValuePlate value={r.a} leading={r.a > r.b} theme={theme} />
+        />
+        {rows.map((r, i) => {
+          const top = VALUE.rowY0 + i * VALUE.pitch;
+          return (
+            <div key={r.label}>
               <div
                 style={{
+                  position: "absolute",
+                  left: x(VALUE.lx + VALUE.size),
+                  top: y(top),
+                  width: x(VALUE.rx - VALUE.lx - VALUE.size),
+                  height: y(VALUE.size),
+                  background: theme.bg,
                   display: "grid",
                   placeItems: "center",
-                  fontSize: f(54),
-                  fontWeight: 700,
+                  fontSize: cap(LABEL_CAP),
+                  lineHeight: 1,
                   letterSpacing: f(2),
                 }}
               >
                 {r.label}
               </div>
-              <ValuePlate value={r.b} leading={r.b > r.a} theme={theme} />
+              {/* The LEADING side's number sits on red — the block's own
+                  ground showing through — the trailing side's on a white
+                  plate. A tie leaves both white: neither leads. */}
+              <ValueCell value={r.a} leading={r.a > r.b} left={VALUE.lx} top={top} theme={theme} />
+              <ValueCell value={r.b} leading={r.b > r.a} left={VALUE.rx} top={top} theme={theme} />
             </div>
-          ))}
-          {rows.length === 0 ? (
-            <div
-              style={{
-                height: y(142),
-                display: "grid",
-                placeItems: "center",
-                fontSize: f(40),
-                fontWeight: 700,
-                opacity: 0.7,
-              }}
-            >
-              STATISTICS NOT AVAILABLE
-            </div>
-          ) : null}
-        </div>
+          );
+        })}
+        {rows.length === 0 ? (
+          <div
+            style={{
+              position: "absolute",
+              left: x(VALUE.lx),
+              top: y(VALUE.rowY0),
+              width: x(VALUE.rx + VALUE.size - VALUE.lx),
+              height: y(VALUE.size),
+              background: theme.bg,
+              display: "grid",
+              placeItems: "center",
+              fontSize: cap(LABEL_CAP),
+              letterSpacing: f(2),
+            }}
+          >
+            STATISTICS NOT AVAILABLE
+          </div>
+        ) : null}
 
         {notice ? (
           <div
             style={{
               position: "absolute",
-              right: x(40),
-              bottom: y(24),
-              fontSize: f(22),
-              opacity: 0.7,
+              right: x(28),
+              bottom: y(14),
+              fontSize: cap(20),
+              opacity: 0.75,
+              letterSpacing: f(1),
             }}
           >
             {notice}
@@ -188,144 +219,118 @@ export function VisSetStats({
   );
 }
 
-function TeamHalf({
-  side,
-  code,
-  name,
-  theme,
+function ValueCell({
+  value, leading, left, top, theme,
 }: {
-  side: "left" | "right";
-  code: string;
-  name: string;
-  theme: VisBoardTheme;
+  value: number; leading: boolean; left: number; top: number; theme: VisBoardTheme;
 }) {
-  const left = side === "left";
   return (
     <div
       style={{
         position: "absolute",
-        left: left ? x(84) : undefined,
-        right: left ? undefined : x(84),
-        top: y(186),
-        width: x(560),
-        height: y(130),
-        display: "flex",
-        flexDirection: left ? "row" : "row-reverse",
-        alignItems: "center",
-        justifyContent: "flex-end",
-        gap: x(26),
-      }}
-    >
-      <div
-        style={{
-          // Same shrink-not-truncate rule as the scoreboard header.
-          fontSize: f(name.length > 16 ? 44 : name.length > 11 ? 54 : 66),
-          fontWeight: 800,
-          textTransform: "uppercase",
-          letterSpacing: f(1),
-          overflow: "hidden",
-          whiteSpace: "nowrap",
-          textAlign: left ? "right" : "left",
-          flex: "1 1 auto",
-        }}
-      >
-        {name}
-      </div>
-      <div
-        style={{
-          flex: "0 0 auto",
-          width: x(126),
-          height: y(120),
-          background: theme.plate,
-          display: "grid",
-          placeItems: "center",
-          color: "#101010",
-          fontSize: f(40),
-          fontWeight: 800,
-          overflow: "hidden",
-        }}
-      >
-        {flagSrc(code) ? (
-          // eslint-disable-next-line @next/next/no-img-element -- board art asset
-          <img
-            src={flagSrc(code)!}
-            alt={code}
-            style={{ width: x(102), height: y(82), objectFit: "cover" }}
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-              e.currentTarget.parentElement!.textContent = code;
-            }}
-          />
-        ) : (
-          code
-        )}
-      </div>
-    </div>
-  );
-}
-
-function BigPlate({ value, theme }: { value: number; theme: VisBoardTheme }) {
-  return (
-    <div
-      style={{
-        background: theme.plate,
-        color: theme.plateInk,
-        display: "grid",
-        placeItems: "center",
-        fontSize: f(92),
-        fontWeight: 800,
-        lineHeight: 1,
-        fontVariantNumeric: "tabular-nums",
-      }}
-    >
-      {value}
-    </div>
-  );
-}
-
-function SmallPlate({ value, theme }: { value: number; theme: VisBoardTheme }) {
-  return (
-    <div
-      style={{
-        background: theme.plate,
-        color: theme.plateInk,
-        display: "grid",
-        placeItems: "center",
-        fontSize: f(56),
-        fontWeight: 800,
-        lineHeight: 1,
-        fontVariantNumeric: "tabular-nums",
-        alignSelf: "start",
-        height: y(78),
-      }}
-    >
-      {value}
-    </div>
-  );
-}
-
-function ValuePlate({
-  value,
-  leading,
-  theme,
-}: {
-  value: number;
-  leading: boolean;
-  theme: VisBoardTheme;
-}) {
-  return (
-    <div
-      style={{
+        left: x(left),
+        top: y(top),
+        width: x(VALUE.size),
+        height: y(VALUE.size),
         background: leading ? theme.accent : theme.plate,
         color: leading ? theme.ink : theme.bg,
         display: "grid",
         placeItems: "center",
-        fontSize: f(58),
-        fontWeight: 800,
+        fontSize: cap(VALUE.cap),
+        lineHeight: 1,
         fontVariantNumeric: "tabular-nums",
       }}
     >
       {value}
+    </div>
+  );
+}
+
+function PlateBox({
+  left, top, w, h, capPx, value, theme,
+}: {
+  left: number; top: number; w: number; h: number;
+  capPx: number; value: number; theme: VisBoardTheme;
+}) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: x(left), top: y(top), width: x(w), height: y(h),
+        background: theme.plate,
+        color: theme.plateInk,
+        display: "grid",
+        placeItems: "center",
+        fontSize: cap(capPx),
+        lineHeight: 1,
+        fontVariantNumeric: "tabular-nums",
+      }}
+    >
+      {value}
+    </div>
+  );
+}
+
+function TeamName({ side, name }: { side: "left" | "right"; name: string }) {
+  const left = side === "left";
+  const capPx = name.length > 16 ? 36 : name.length > 12 ? 44 : NAME.cap;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: x(left ? NAME.lRight - NAME.w : NAME.rLeft),
+        top: y(NAME.y),
+        width: x(NAME.w),
+        height: y(NAME.cap * 1.6),
+        display: "flex",
+        alignItems: "center",
+        justifyContent: left ? "flex-end" : "flex-start",
+        fontSize: cap(capPx),
+        lineHeight: 1,
+        letterSpacing: f(1),
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+      }}
+    >
+      {name}
+    </div>
+  );
+}
+
+function Flag({
+  side, code, theme,
+}: { side: "left" | "right"; code: string; theme: VisBoardTheme }) {
+  const src = flagSrc(code);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: x(side === "left" ? FLAG.lx : FLAG.rx),
+        top: y(FLAG.y),
+        width: x(FLAG.size),
+        height: y(FLAG.size),
+        display: "grid",
+        placeItems: "center",
+        overflow: "hidden",
+        fontSize: cap(40),
+        color: theme.ink,
+      }}
+    >
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element -- board art asset
+        <img
+          src={src}
+          alt={code}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+            e.currentTarget.parentElement!.textContent = code;
+          }}
+        />
+      ) : (
+        code
+      )}
     </div>
   );
 }

@@ -20,9 +20,14 @@ export default async function ShortVisBoard({
 }) {
   const { matchNo } = await params;
   const query = await searchParams;
-  if (!/^\d{1,9}$/.test(matchNo)) notFound();
+  // The validation mock (spec/35 W9) hangs off the U17 competition so it has a
+  // tenant and branding, but its data comes from the embedded capture.
+  const isMock = matchNo === "mock";
+  if (!isMock && !/^\d{1,9}$/.test(matchNo)) notFound();
 
-  const tournamentNo = await tournamentOfMatch(Number(matchNo)).catch(() => null);
+  const tournamentNo = isMock
+    ? 1670
+    : await tournamentOfMatch(Number(matchNo)).catch(() => null);
   if (tournamentNo == null) notFound();
 
   const rows = await db

@@ -96,11 +96,15 @@ export async function visRequest(envelope: string): Promise<string> {
  *     1 → + Rally/Action play-by-play ................ ~66 KB (not needed)
  * 65535 → everything ............................... ~284 KB (not needed)
  *
- * 8|16|2048 = 2072 → ~37 KB carrying exactly what the board renders: score,
- * sets, serving side, timeouts/subs/challenges, the six on court, and each
- * player's point total. Poll it at PollDelay and everything else stays cheap.
+ *   512 → + the Events/Rally stream, which carries a LineUp PER RALLY ..~60 KB
+ *
+ * 8|16|512|2048 = 2584 → ~95 KB carrying exactly what the board renders:
+ * score, sets, serving side, timeouts/subs/challenges, each player's point
+ * total, and — the reason for bit 512 — the CURRENT rotation rather than only
+ * the registered starting six (spec/35 W3). Polled once per PollDelay per
+ * match and cached server-side, so the extra payload costs nothing per viewer.
  */
-export const BOARD_OPTIONS = 2072;
+export const BOARD_OPTIONS = 2584;
 
 export function volleyLiveEnvelope(matchNo: number, options = BOARD_OPTIONS): string {
   return `<Requests><Request Type="GetVolleyLive" No="${matchNo}" Options="${options}" Version="0"></Request></Requests>`;

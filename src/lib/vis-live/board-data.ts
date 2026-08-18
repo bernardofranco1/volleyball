@@ -331,10 +331,19 @@ export function mapVolleyLive(
           ? "B"
           : null;
 
-  // LineUps are nested in the current set, one per team.
+  // LineUps are nested in the current set, in CHRONOLOGICAL order — one per
+  // rally once the events stream is requested (Options bit 512). The LAST one
+  // for a team is therefore the rotation on court right now, reflecting every
+  // rotation, substitution and libero replacement since the set began
+  // (spec/35 W3). A payload carrying only the registered starting six has
+  // exactly one per team, and this picks the same row it always did.
   const lineups = latest ? allTagAttrs(latest.inner, "LineUp") : [];
-  const lineupA = lineups.find((l) => num(l, "NoTeam", -99) === noTeamA) ?? null;
-  const lineupB = lineups.find((l) => num(l, "NoTeam", -99) === noTeamB) ?? null;
+  const lastFor = (noTeam: number): Attrs | null => {
+    const own = lineups.filter((l) => num(l, "NoTeam", -99) === noTeam);
+    return own.length > 0 ? own[own.length - 1] : null;
+  };
+  const lineupA = lastFor(noTeamA);
+  const lineupB = lastFor(noTeamB);
 
   const matchRow = firstAliasAttrs(matchBlock?.inner ?? "", ...MATCH_ALIASES);
 

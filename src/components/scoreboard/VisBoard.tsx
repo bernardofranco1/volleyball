@@ -1,26 +1,37 @@
 "use client";
 
 /**
- * VNL-style broadcast board for VIS-fed matches (spec/34).
+ * The official FIVB/AVC full-screen scoreboard (spec/34, geometry spec/35).
  *
- * Rebuilt from the FIVB digital-scoreboard templates: SET label, the big
- * current-set score with sets-won hanging beneath it, both line-ups with a PTS
- * column, the set ladder down the middle, and the time-out / substitution /
- * challenge counters at the foot.
+ * EVERY number below is MEASURED from the Illustrator master
+ * (~/AVC-VenueBrand-Scoreboard-RGB-16-9.ai) by scanline, not estimated —
+ * see spec/reference/avc/{measure.py,scan.py,*.measure.json}. The template is
+ * finished design: no element may be moved, resized or restyled here. If
+ * something looks wrong the fix is to re-measure, never to nudge.
  *
- * GEOMETRY. Everything lives inside a 16:9 "stage" sized
- * `min(100vw, 100vh × 16/9)`, declared a size container. Every dimension is
- * then written in `cqw`/`cqh` — 1cqw = 1% of stage width — so the whole board
- * scales exactly, at any resolution, with no JS measurement and therefore no
- * flash of unscaled layout on a TV that boots into the page.
- *
- * BACKGROUND. `backgroundUrl` paints behind everything, with the CSS fallback
- * underneath it: a missing/404 image simply reveals the fallback rather than
- * breaking the board, so a venue can drop the hi-res artwork in at any time.
+ * Measured constants (design px in a 1920×1080 frame, y from the top):
+ *   score frame      x 726.5 → 1193.5   y 128.25 → 343.25, stroke 12
+ *   big plates       738.5 & 966.25, w 214.75, y 140.25, h 191, divider 12.75
+ *   sets frame       x 800.75 → 1119.25, y 331.25 → 488.75, stroke 12
+ *   sets plates      813 & 965.25, w 140.25, h 133.5
+ *   big digits       cap 120.5   ·   sets digits cap 78
+ *   flags            489.25 & 1301, y 171.5, 130 × 130 — NO plate, NO border
+ *   team names       cap 52
+ *   SERVE            vertical text at x ≈ 688 / 1213, spans the score frame
+ *   player rows      jersey plate 73.5 at x 108.75 / 1737.5, y0 457.5,
+ *                    pitch 93.2, border 10, name cap 28
+ *   serving frame    462 × 98 at x 97 / 1361, stroke 5
+ *   ball             52.5 ⌀ at x 575.5 / 1291.5
+ *   PTS column       x 647.5 & 1168.5, w 103, y 381.75, border 10, pitch 93.2
+ *   ladder rails     917.25 & 985.5 (stroke 10), y 488.75 → 736.25, pitch 62
+ *   counters         x 823.75 → 1089, y 736.25 → 1011.25, stroke 10, pitch 88.25
  */
 
 import type { VisBoardData, VisBoardPlayer } from "@/lib/vis-live/board-data";
 import {
+  AVC_BACKGROUND,
+  COUNTER_ICON,
+  MIKASA_BALL,
   VIS_BOARD_THEME,
   type VisBoardTheme,
   flagSrc,
@@ -28,35 +39,76 @@ import {
 
 export { VIS_BOARD_THEME, type VisBoardTheme } from "@/components/scoreboard/vis-board-theme";
 
-/** Design space of the reference templates. */
 const W = 1920;
 const H = 1080;
-
-// Every length is a CONTAINER-query unit, never a percentage: `cqw`/`cqh`
-// always resolve against the stage, while a percentage resolves against
-// whatever the parent happens to be — so nested boxes (a jersey plate inside a
-// row inside a column) silently collapsed. 1cqw = 1% of stage width.
-/** Horizontal size/offset: design px → stage width units. */
+// Container-query units, never percentages: they resolve against the stage at
+// any nesting depth, so the board scales exactly with no JS measurement.
 const x = (px: number) => `${((px / W) * 100).toFixed(4)}cqw`;
-/** Vertical size/offset: design px → stage height units. */
 const y = (px: number) => `${((px / H) * 100).toFixed(4)}cqh`;
-/** Font size / border width: design px → stage width units. */
 const f = (px: number) => `${((px / W) * 100).toFixed(4)}cqw`;
+/** Measured values are CAP heights; Ancorli's cap is ~0.72em. */
+const cap = (capPx: number) => f(capPx / 0.72);
+/**
+ * Optically centring text means centring its LINE BOX, and Ancorli's ascent is
+ * taller than its descent, so a centred glyph sits high. Measured against the
+ * master (spec/35 W8): the correction is a constant fraction of the cap height,
+ * verified on both the 120.5-cap score digits (10.5 px) and the 52-cap team
+ * names (4.5 px). Applied as a transform so it never affects layout.
+ */
+const NUDGE = 0.087;
+const nudge = (capPx: number) => `translateY(${y(capPx * NUDGE)})`;
 
 const ROMAN = ["I", "II", "III", "IV", "V"];
+
+const SCORE = { x: 726.5, y: 128.25, w: 467, h: 215 };
+const BIG_PLATE = { lx: 738.5, rx: 966.25, y: 140.25, w: 214.75, h: 191, cap: 120.5 };
+const SETS = { x: 800.75, y: 331.25, w: 318.5, h: 157.5 };
+const SETS_PLATE = { lx: 813, rx: 965.25, y: 343.25, w: 140.25, h: 133.5, cap: 78 };
+const FLAG = { lx: 489.25, rx: 1301, y: 171.5, size: 130 };
+const NAME = { cap: 52, y: 196, lRight: 453.5, rLeft: 1466.5, w: 430 };
+const SERVE = { lx: 688.5, rx: 1213.5, w: 18, y: 188.5, h: 87.5, cap: 18 };
+const ROW = { y0: 457.5, pitch: 93.2, plate: 73.5, border: 10, cap: 28 };
+const JERSEY = { lx: 108.75, rx: 1737.5 };
+const NAME_COL = { lx: 203.75, rx: 1690, w: 350 };
+const FRAME = { lx: 97, rx: 1361, w: 462, h: 98, stroke: 5, dy: -12 };
+const BALL = { lx: 575.5, rx: 1291.5, dy: 11, size: 52.5 };
+const PTS = { lx: 647.5, rx: 1168.5, w: 103, y: 381.75, headerBottom: 443, border: 10, cap: 23 };
+const LADDER = {
+  railL: 917.25, railR: 985.5, stroke: 10, y: 488.75, h: 247.5,
+  // Measured cap tops 509 / 571.5 / 633.5 / 695.5 and glyph centres 871 / 1041.5.
+  rowPitch: 62.17, rowY0: 500, cap: 25, scoreLx: 871, scoreRx: 1041.5,
+};
+const COUNTERS = {
+  x: 823.75, y: 736.25, w: 265.25, h: 275, stroke: 10,
+  // Measured row interiors and divider bands — equal thirds put the dividers
+  // 3-7 px low, which the diff showed as two solid mismatch bands.
+  rows: [
+    { top: 746.25, h: 78.25 },
+    { top: 834.5, h: 78.25 },
+    { top: 922.75, h: 78.5 },
+  ],
+  dividers: [824.5, 912.75],
+  cap: 31.5,
+  // The master's own icons, at their measured sizes.
+  icon: {
+    timeout: { w: 47.5, h: 55.5 },
+    subs: { w: 68.5, h: 56.5 },
+    challenge: { w: 53, h: 33.5 },
+  },
+};
 
 export interface VisBoardProps {
   board: VisBoardData;
   theme?: VisBoardTheme;
-  /** Hi-res venue artwork; falls back to the built-in gradient when absent. */
+  /** Overrides the official artwork (a venue's own plate, or `?bg=`). */
   backgroundUrl?: string | null;
-  /** Shown small and dim — "signal lost 90s ago" while VIS is unreachable. */
+  /** Small and dim, bottom-right: "no signal for 90s", or the mock marker. */
   notice?: string | null;
   /**
-   * Venue-local kick-off from the schedule, used when the live feed carries no
-   * date of its own (it usually doesn't — GetVolleyLive takes no Fields list).
+   * Replica mode for the pixel-diff gate (spec/35 W8) — the master's dummy
+   * state frames BOTH first rows. Never true in production.
    */
-  scheduledFallback?: string | null;
+  replica?: boolean;
 }
 
 export function VisBoard({
@@ -64,194 +116,131 @@ export function VisBoard({
   theme = VIS_BOARD_THEME,
   backgroundUrl,
   notice,
-  scheduledFallback,
+  replica = false,
 }: VisBoardProps) {
   const live = board.status === "LIVE";
-  const scheduled = board.scheduledLocal ?? scheduledFallback ?? null;
-  // The top slot always says what the viewer is looking at: which set is being
-  // played, that the match is over, or when it starts. An empty slot on a TV
-  // reads as a broken feed.
-  const setLabel =
-    board.status === "FINISHED"
-      ? "FINAL"
-      : board.currentSet
-        ? `SET ${board.currentSet}`
-        : scheduled
-          ? `${scheduled} · LOCAL`
-          : "NOT STARTED";
-
-  // Ladder height: at least three rows so the shape reads as a ladder before
-  // anything is played, at most five (the longest indoor match). It grows
-  // downward into free space, so adding a set never pushes anything else.
-  const ladderRows = Math.min(5, Math.max(3, board.sets.length));
+  const finished = board.status === "FINISHED";
+  // No date/time in this slot (spec/35 requirement 5).
+  const setLabel = finished ? "FINAL" : board.currentSet ? `SET ${board.currentSet}` : "";
+  const ladderRows = Math.min(5, Math.max(4, board.sets.length));
 
   return (
     <div
       className="fixed inset-0 grid place-items-center overflow-hidden"
-      style={{
-        background: theme.bg,
-        fontFamily: theme.ff,
-        color: theme.ink,
-      }}
+      style={{ background: theme.bg, fontFamily: theme.ff, color: theme.ink }}
     >
-      {/* Stage: 16:9, size container, so every child can use cqw/cqh. */}
       <div
         className="relative"
         style={{
-          // Widest 16:9 box that fits: letterboxes on either axis.
           width: `min(100vw, ${((W / H) * 100).toFixed(4)}vh)`,
           aspectRatio: `${W} / ${H}`,
           containerType: "size",
-          // Layer order: artwork over the built-in gradient, so a 404 on the
-          // artwork reveals the gradient instead of a bare colour.
-          backgroundImage: [
-            backgroundUrl ? `url("${backgroundUrl}")` : null,
-            // Evokes the template's sweeping bands without needing the asset.
-            "radial-gradient(120% 90% at 8% 0%, rgba(228,19,43,0.30) 0%, rgba(228,19,43,0) 55%)",
-            "radial-gradient(120% 90% at 92% 100%, rgba(41,86,196,0.34) 0%, rgba(41,86,196,0) 55%)",
-            "radial-gradient(90% 70% at 50% 120%, rgba(228,19,43,0.22) 0%, rgba(228,19,43,0) 60%)",
-            "linear-gradient(180deg, #0B1024 0%, #121A38 55%, #0B1024 100%)",
-          ]
+          // The master's OWN artwork; an override sits on top of it.
+          backgroundColor: theme.bg,
+          backgroundImage: [backgroundUrl, AVC_BACKGROUND.scoreboard]
             .filter(Boolean)
+            .map((u) => `url("${u}")`)
             .join(","),
-          backgroundSize: "cover, auto, auto, auto, auto",
+          backgroundSize: "cover",
           backgroundPosition: "center",
         }}
       >
-        {/* The AVC scoreboard master carries no logo — the event mark lives on
-            the set-break screen only. `logoUrl` is accepted for that screen. */}
-        {/* SET n / FINAL */}
+        {/* Measured: cap 35.5, glyph run x 889.5 → 1021.5 (centre 955.5),
+            cap top y 69. */}
         <div
           style={{
             position: "absolute",
-            left: 0,
-            right: 0,
-            top: y(52),
+            left: x(955.5 - 300),
+            width: x(600),
+            top: y(60),
             textAlign: "center",
-            fontSize: board.currentSet || board.status === "FINISHED" ? f(58) : f(40),
-            fontWeight: 800,
+            fontSize: cap(35.5),
+            lineHeight: 1,
             letterSpacing: f(2),
             whiteSpace: "nowrap",
+            transform: nudge(35.5),
           }}
         >
           {setLabel}
         </div>
 
-        {/* ── team identities ─────────────────────────────────────────── */}
-        <TeamName
-          side="left"
-          name={board.teamA.name}
-          code={board.teamA.code}
-          theme={theme}
-        />
-        <TeamName
-          side="right"
-          name={board.teamB.name}
-          code={board.teamB.code}
-          theme={theme}
-        />
+        <TeamName side="left" name={board.teamA.name} />
+        <TeamName side="right" name={board.teamB.name} />
+        <Flag side="left" code={board.teamA.code} theme={theme} />
+        <Flag side="right" code={board.teamB.code} theme={theme} />
 
-        {/* SERVE rail + ball, on the serving side of the score block */}
+        {/* SERVE: plain vertical lettering, no filled rail (the master has none). */}
         {live && board.serving ? (
-          <ServeMark side={board.serving} theme={theme} />
-        ) : null}
-
-        {/* ── score plates ────────────────────────────────────────────────
-            While play is on, the template's hierarchy is right: the big plates
-            carry the running set, the small ones the sets won. Once the match
-            is over that reads as a riddle — a big "25 23" over a small "3 0" —
-            so the result takes the big plates and the last set's points fall
-            back to the ladder, which already lists every set. */}
-        <div
-          style={{
-            position: "absolute",
-            left: x(731),
-            top: y(128),
-            width: x(452),
-            height: y(206),
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: x(6),
-            background: theme.accent,
-            padding: x(5),
-          }}
-        >
-          <Plate
-            value={board.status === "FINISHED" ? board.setsWonA : board.scoreA}
-            theme={theme}
-            size={140}
-          />
-          <Plate
-            value={board.status === "FINISHED" ? board.setsWonB : board.scoreB}
-            theme={theme}
-            size={140}
-          />
-        </div>
-        {board.status !== "FINISHED" ? (
           <div
             style={{
               position: "absolute",
-              left: x(804),
-              top: y(338),
-              width: x(306),
-              height: y(140),
+              left: x(board.serving === "A" ? SERVE.lx : SERVE.rx),
+              width: x(SERVE.w),
+              top: y(SERVE.y),
+              height: y(SERVE.h),
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: x(6),
-              background: theme.accent,
-              padding: x(5),
+              placeItems: "center",
+              fontSize: cap(SERVE.cap),
+              lineHeight: 1,
             }}
           >
-            <Plate value={board.setsWonA} theme={theme} size={96} />
-            <Plate value={board.setsWonB} theme={theme} size={96} />
+            <span style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>
+              SERVE
+            </span>
           </div>
         ) : null}
 
-        {/* ── line-ups + points ──────────────────────────────────────── */}
-        <Lineup
-          side="left"
-          players={board.teamA.players}
-          serving={live && board.serving === "A"}
+        {/* Score block: one red form with the plates knocked out of it. */}
+        <Solid left={SCORE.x} top={SCORE.y} w={SCORE.w} h={SCORE.h} fill={theme.accent} />
+        <Plate
+          left={BIG_PLATE.lx} top={BIG_PLATE.y} w={BIG_PLATE.w} h={BIG_PLATE.h}
+          capPx={BIG_PLATE.cap} value={finished ? board.setsWonA : board.scoreA} theme={theme}
+        />
+        <Plate
+          left={BIG_PLATE.rx} top={BIG_PLATE.y} w={BIG_PLATE.w} h={BIG_PLATE.h}
+          capPx={BIG_PLATE.cap} value={finished ? board.setsWonB : board.scoreB} theme={theme}
+        />
+
+        <Solid left={SETS.x} top={SETS.y} w={SETS.w} h={SETS.h} fill={theme.accent} />
+        <Plate
+          left={SETS_PLATE.lx} top={SETS_PLATE.y} w={SETS_PLATE.w} h={SETS_PLATE.h}
+          capPx={SETS_PLATE.cap}
+          // Once the match is over the big plates carry the result, so these
+          // would repeat it; show the deciding set's points instead.
+          value={finished ? (board.lastFinishedSet?.scoreA ?? 0) : board.setsWonA}
           theme={theme}
         />
-        <Lineup
-          side="right"
-          players={board.teamB.players}
-          serving={live && board.serving === "B"}
+        <Plate
+          left={SETS_PLATE.rx} top={SETS_PLATE.y} w={SETS_PLATE.w} h={SETS_PLATE.h}
+          capPx={SETS_PLATE.cap}
+          value={finished ? (board.lastFinishedSet?.scoreB ?? 0) : board.setsWonB}
           theme={theme}
         />
 
-        {/* ── set ladder ─────────────────────────────────────────────── */}
+        <Lineup
+          side="left" players={board.teamA.players}
+          serving={(live && board.serving === "A") || replica} theme={theme}
+        />
+        <Lineup
+          side="right" players={board.teamB.players}
+          serving={(live && board.serving === "B") || replica} theme={theme}
+          replicaSecond={replica && board.serving !== "B"}
+        />
+        <PtsColumn side="left" players={board.teamA.players} theme={theme} />
+        <PtsColumn side="right" players={board.teamB.players} theme={theme} />
+
         <Ladder rows={ladderRows} sets={board.sets} theme={theme} />
-
-        {/* ── interruption counters ──────────────────────────────────── */}
         <Counters board={board} theme={theme} />
-
-        {/* Pool / round, bottom-left; keeps the board self-identifying on a
-            wall of screens. */}
-        {board.poolName ? (
-          <div
-            style={{
-              position: "absolute",
-              left: x(40),
-              bottom: y(28),
-              fontSize: f(26),
-              opacity: 0.75,
-              letterSpacing: f(1),
-            }}
-          >
-            {board.poolName}
-          </div>
-        ) : null}
 
         {notice ? (
           <div
             style={{
               position: "absolute",
-              right: x(40),
-              bottom: y(28),
-              fontSize: f(22),
-              opacity: 0.7,
+              right: x(28),
+              bottom: y(20),
+              fontSize: cap(20),
+              opacity: 0.75,
+              letterSpacing: f(1),
             }}
           >
             {notice}
@@ -264,437 +253,367 @@ export function VisBoard({
 
 // ── pieces ───────────────────────────────────────────────────────────────────
 
+function Solid({
+  left, top, w, h, fill,
+}: { left: number; top: number; w: number; h: number; fill: string }) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: x(left), top: y(top), width: x(w), height: y(h), background: fill,
+      }}
+    />
+  );
+}
+
 function Plate({
-  value,
-  theme,
-  size,
+  left, top, w, h, capPx, value, theme,
 }: {
-  value: number;
-  theme: VisBoardTheme;
-  size: number;
+  left: number; top: number; w: number; h: number;
+  capPx: number; value: number; theme: VisBoardTheme;
 }) {
   return (
     <div
       style={{
+        position: "absolute",
+        left: x(left), top: y(top), width: x(w), height: y(h),
         background: theme.plate,
         color: theme.plateInk,
         display: "grid",
         placeItems: "center",
-        fontSize: f(size),
-        fontWeight: 800,
+        fontSize: cap(capPx),
         lineHeight: 1,
         fontVariantNumeric: "tabular-nums",
       }}
     >
-      {value}
+      {/* The nudge goes on the GLYPH: transforming the plate itself would move
+          the white box off the master's measured position. */}
+      <span style={{ transform: nudge(capPx), display: "block" }}>{value}</span>
     </div>
   );
 }
 
-function TeamName({
-  side,
-  name,
-  code,
-  theme,
-}: {
-  side: "left" | "right";
-  name: string;
-  code: string;
-  theme: VisBoardTheme;
-}) {
+function TeamName({ side, name }: { side: "left" | "right"; name: string }) {
   const left = side === "left";
+  // Long names shrink rather than truncate — an ellipsis on a venue TV reads
+  // as a fault. The master's own names sit at cap 52.
+  const capPx = name.length > 16 ? 36 : name.length > 12 ? 44 : NAME.cap;
   return (
     <div
       style={{
         position: "absolute",
-        left: left ? x(60) : undefined,
-        right: left ? undefined : x(60),
-        top: y(168),
-        width: x(560),
-        height: y(120),
+        left: x(left ? NAME.lRight - NAME.w : NAME.rLeft),
+        top: y(NAME.y),
+        width: x(NAME.w),
+        height: y(NAME.cap * 1.6),
         display: "flex",
-        flexDirection: left ? "row" : "row-reverse",
         alignItems: "center",
-        justifyContent: "flex-end",
-        gap: x(24),
+        justifyContent: left ? "flex-end" : "flex-start",
+        fontSize: cap(capPx),
+        lineHeight: 1,
+        letterSpacing: f(1),
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        transform: nudge(capPx),
       }}
     >
-      <div
-        style={{
-          // Long names (e.g. "United States", "Dominican Republic") SHRINK
-          // rather than truncate — an ellipsis on a venue TV reads as a fault.
-          fontSize: f(name.length > 16 ? 46 : name.length > 11 ? 56 : 70),
-          fontWeight: 800,
-          lineHeight: 1,
-          letterSpacing: f(1),
-          textTransform: "uppercase",
-          textAlign: left ? "right" : "left",
-          overflow: "hidden",
-          whiteSpace: "nowrap",
-          flex: "1 1 auto",
-        }}
-      >
-        {name}
-      </div>
-      {/* Flag on the white plate, per the master. Self-hosted assets
-          (public/flags, spec/34 — TPE is deliberately the Olympic-committee
-          flag); the 3-letter code stands in when no asset exists. */}
-      <div
-        style={{
-          flex: "0 0 auto",
-          width: x(118),
-          height: y(112),
-          background: theme.plate,
-          color: "#101010",
-          display: "grid",
-          placeItems: "center",
-          fontSize: f(40),
-          fontWeight: 800,
-          letterSpacing: f(1),
-          overflow: "hidden",
-        }}
-      >
-        {flagSrc(code) ? (
-          // eslint-disable-next-line @next/next/no-img-element -- board art asset
-          <img
-            src={flagSrc(code)!}
-            alt={code}
-            style={{ width: x(96), height: y(76), objectFit: "cover" }}
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-              e.currentTarget.parentElement!.textContent = code;
-            }}
-          />
-        ) : (
-          code
-        )}
-      </div>
+      {name}
     </div>
   );
 }
 
-/** Vertical SERVE text on the serving side of the score block — plain white
- *  lettering per the AVC master (no filled rail; the ball marks the serving
- *  player's row in the line-up instead). */
-function ServeMark({ side, theme }: { side: "A" | "B"; theme: VisBoardTheme }) {
-  const left = side === "A";
+/** 130 × 130, filling its box — no plate, no border (spec/35 W2). */
+function Flag({
+  side, code, theme,
+}: { side: "left" | "right"; code: string; theme: VisBoardTheme }) {
+  const src = flagSrc(code);
   return (
     <div
       style={{
         position: "absolute",
-        left: left ? x(688) : undefined,
-        right: left ? undefined : x(688),
-        top: y(128),
-        width: x(36),
-        height: y(206),
-        color: theme.ink,
+        left: x(side === "left" ? FLAG.lx : FLAG.rx),
+        top: y(FLAG.y),
+        width: x(FLAG.size),
+        height: y(FLAG.size),
         display: "grid",
         placeItems: "center",
-        fontSize: f(26),
-        fontWeight: 700,
-        letterSpacing: f(3),
+        overflow: "hidden",
+        fontSize: cap(40),
+        color: theme.ink,
       }}
     >
-      <span style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>
-        SERVE
-      </span>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element -- board art asset
+        <img
+          src={src}
+          alt={code}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+            e.currentTarget.parentElement!.textContent = code;
+          }}
+        />
+      ) : (
+        code
+      )}
     </div>
   );
 }
 
-function Ball({ style }: { style: React.CSSProperties }) {
-  return (
-    <svg viewBox="0 0 48 48" style={style} aria-hidden="true">
-      <circle cx="24" cy="24" r="22" fill="#F5C518" stroke="#0B1024" strokeWidth="2" />
-      <path
-        d="M6 18c12-4 24-2 34 8M8 32c10-8 24-10 34-4M24 2c-6 12-6 32 2 44"
-        fill="none"
-        stroke="#0B1024"
-        strokeWidth="2.5"
-      />
-    </svg>
-  );
-}
-
-const ROW_TOP = 452;
-const ROW_H = 91;
-
 function Lineup({
-  side,
-  players,
-  serving,
-  theme,
+  side, players, serving, theme, replicaSecond = false,
 }: {
   side: "left" | "right";
   players: VisBoardPlayer[];
   serving: boolean;
   theme: VisBoardTheme;
+  /** Replica-only: framed like the serving side but without the ball. */
+  replicaSecond?: boolean;
 }) {
   const left = side === "left";
-  // Six rows always, so the board's shape is constant before line-ups land.
+  // Six rows in CURRENT rotation order: players[0] is position 1 right now
+  // (spec/35 requirement 3), which is who serves when this team serves.
   const rows = Array.from({ length: 6 }, (_, i) => players[i] ?? null);
   return (
     <>
-      {/* names + jersey plates */}
-      <div
-        style={{
-          position: "absolute",
-          left: left ? x(108) : undefined,
-          right: left ? undefined : x(108),
-          top: y(ROW_TOP),
-          width: x(470),
-        }}
-      >
-        {rows.map((p, i) => (
-          <div
-            key={i}
-            style={{
-              height: y(ROW_H),
-              display: "flex",
-              flexDirection: left ? "row" : "row-reverse",
-              alignItems: "center",
-              gap: x(16),
-              // Position 1 of the serving team is the server (FIVB 12.2).
-              outline:
-                serving && p?.position === 1 ? `${f(5)} solid ${theme.accent}` : undefined,
-              outlineOffset: f(2),
-              paddingInline: x(6),
-            }}
-          >
+      {rows.map((p, i) => {
+        const top = ROW.y0 + i * ROW.pitch;
+        const isServer = serving && i === 0;
+        // The master's dummy state frames BOTH first rows but draws the ball
+        // once, on the serving side only.
+        const showBall = isServer && !replicaSecond;
+        return (
+          <div key={i}>
+            {isServer ? (
+              <div
+                style={{
+                  position: "absolute",
+                  left: x(left ? FRAME.lx : FRAME.rx),
+                  top: y(top + FRAME.dy),
+                  width: x(FRAME.w),
+                  height: y(FRAME.h),
+                  border: `${f(FRAME.stroke)} solid ${theme.accent}`,
+                }}
+              />
+            ) : null}
             <div
               style={{
-                flex: "0 0 auto",
-                width: x(66),
-                height: y(62),
-                border: `${f(4)} solid ${theme.ink}`,
+                position: "absolute",
+                left: x(left ? JERSEY.lx : JERSEY.rx),
+                top: y(top),
+                width: x(ROW.plate),
+                height: y(ROW.plate),
+                border: `${f(ROW.border)} solid ${theme.ink}`,
                 display: "grid",
                 placeItems: "center",
-                fontSize: f(38),
-                fontWeight: 800,
+                fontSize: cap(ROW.cap),
+                lineHeight: 1,
                 fontVariantNumeric: "tabular-nums",
-                background: p?.isLibero ? "rgba(255,255,255,0.16)" : "transparent",
               }}
             >
-              {p?.jersey ?? ""}
+              <span style={{ transform: nudge(ROW.cap), display: "block" }}>
+                {p?.jersey ?? ""}
+              </span>
             </div>
             <div
               style={{
-                flex: "1 1 auto",
-                fontSize: f(38),
-                fontWeight: 700,
-                textTransform: "uppercase",
+                position: "absolute",
+                left: x(left ? NAME_COL.lx : NAME_COL.rx - NAME_COL.w),
+                top: y(top),
+                width: x(NAME_COL.w),
+                height: y(ROW.plate),
+                display: "flex",
+                alignItems: "center",
+                justifyContent: left ? "flex-start" : "flex-end",
+                fontSize: cap(ROW.cap),
+                lineHeight: 1,
                 letterSpacing: f(0.5),
-                textAlign: left ? "left" : "right",
-                overflow: "hidden",
+                textTransform: "uppercase",
                 whiteSpace: "nowrap",
-                textOverflow: "ellipsis",
+                overflow: "hidden",
+                transform: nudge(ROW.cap),
               }}
             >
               {p?.name ?? ""}
             </div>
-            {/* The master marks the server with the ball at the row's inner
-                end (both flex directions end toward the court centre). */}
-            {serving && p?.position === 1 ? (
-              <Ball style={{ flex: "0 0 auto", width: x(44), height: y(78) }} />
+            {showBall ? (
+              // eslint-disable-next-line @next/next/no-img-element -- board art asset
+              <img
+                src={MIKASA_BALL}
+                alt=""
+                style={{
+                  position: "absolute",
+                  left: x(left ? BALL.lx : BALL.rx),
+                  top: y(top + BALL.dy),
+                  width: x(BALL.size),
+                  height: y(BALL.size),
+                }}
+              />
             ) : null}
           </div>
-        ))}
-      </div>
+        );
+      })}
+    </>
+  );
+}
 
-      {/* PTS column */}
+function PtsColumn({
+  side, players, theme,
+}: { side: "left" | "right"; players: VisBoardPlayer[]; theme: VisBoardTheme }) {
+  const left = side === "left";
+  const rows = Array.from({ length: 6 }, (_, i) => players[i] ?? null);
+  const colX = left ? PTS.lx : PTS.rx;
+  const border = `${f(PTS.border)} solid ${theme.ink}`;
+  return (
+    <>
       <div
         style={{
           position: "absolute",
-          left: left ? x(653) : undefined,
-          right: left ? undefined : x(653),
-          top: y(ROW_TOP - 58),
-          width: x(92),
+          left: x(colX),
+          top: y(PTS.y),
+          width: x(PTS.w),
+          height: y(PTS.headerBottom + PTS.border - PTS.y),
+          border,
+          display: "grid",
+          placeItems: "center",
+          fontSize: cap(PTS.cap),
+          lineHeight: 1,
+          letterSpacing: f(1),
         }}
       >
+        <span style={{ transform: nudge(PTS.cap), display: "block" }}>PTS</span>
+      </div>
+      {rows.map((p, i) => (
         <div
+          key={i}
           style={{
-            height: y(50),
-            border: `${f(4)} solid ${theme.ink}`,
+            position: "absolute",
+            left: x(colX),
+            top: y(PTS.headerBottom + i * ROW.pitch),
+            width: x(PTS.w),
+            height: y(ROW.pitch + PTS.border),
+            border,
             display: "grid",
             placeItems: "center",
-            fontSize: f(26),
-            fontWeight: 800,
-            letterSpacing: f(1),
+            fontSize: cap(ROW.cap + 3),
+            lineHeight: 1,
+            fontVariantNumeric: "tabular-nums",
           }}
         >
-          PTS
-        </div>
-        {rows.map((p, i) => (
-          <div
-            key={i}
-            style={{
-              height: y(ROW_H),
-              marginTop: i === 0 ? y(8) : 0,
-              border: `${f(4)} solid ${theme.ink}`,
-              borderTopWidth: i === 0 ? f(4) : 0,
-              display: "grid",
-              placeItems: "center",
-              fontSize: f(38),
-              fontWeight: 800,
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
+          <span style={{ transform: nudge(ROW.cap + 3), display: "block" }}>
             {p ? p.points : ""}
-          </div>
-        ))}
-      </div>
+          </span>
+        </div>
+      ))}
     </>
   );
 }
 
 function Ladder({
-  rows,
-  sets,
-  theme,
-}: {
-  rows: number;
-  sets: VisBoardData["sets"];
-  theme: VisBoardTheme;
-}) {
+  rows, sets, theme,
+}: { rows: number; sets: VisBoardData["sets"]; theme: VisBoardTheme }) {
+  const romanCx = (LADDER.railL + LADDER.railR + LADDER.stroke) / 2;
   return (
-    <div
-      style={{
-        position: "absolute",
-        left: x(806),
-        top: y(494),
-        width: x(308),
-        display: "grid",
-        // 5 × 50 design px keeps the longest ladder clear of the counters below.
-        gridTemplateRows: `repeat(${rows}, ${y(50)})`,
-      }}
-    >
+    <>
+      <Solid
+        left={LADDER.railL} top={LADDER.y} w={LADDER.stroke} h={LADDER.h} fill={theme.accent}
+      />
+      <Solid
+        left={LADDER.railR} top={LADDER.y} w={LADDER.stroke} h={LADDER.h} fill={theme.accent}
+      />
       {Array.from({ length: rows }, (_, i) => {
         const s = sets[i];
-        return (
+        const top = LADDER.rowY0 + i * LADDER.rowPitch;
+        const cell = (val: string, cx: number, k: string) => (
           <div
-            key={i}
+            key={k}
             style={{
+              position: "absolute",
+              left: x(cx - 60),
+              top: y(top),
+              width: x(120),
+              height: y(LADDER.cap * 1.7),
               display: "grid",
-              gridTemplateColumns: "1fr auto 1fr",
-              alignItems: "center",
-              fontSize: f(40),
-              fontWeight: 700,
+              placeItems: "center",
+              fontSize: cap(LADDER.cap),
+              lineHeight: 1,
               fontVariantNumeric: "tabular-nums",
+              transform: nudge(LADDER.cap),
             }}
           >
-            <div style={{ textAlign: "center" }}>{s ? s.scoreA : ""}</div>
-            <div
-              style={{
-                width: x(66),
-                textAlign: "center",
-                fontSize: f(34),
-                borderInline: `${f(5)} solid ${theme.accent}`,
-                alignSelf: "stretch",
-                display: "grid",
-                placeItems: "center",
-                opacity: 0.95,
-              }}
-            >
-              {ROMAN[i] ?? i + 1}
-            </div>
-            <div style={{ textAlign: "center" }}>{s ? s.scoreB : ""}</div>
+            {val}
+          </div>
+        );
+        return (
+          <div key={i}>
+            {cell(s ? String(s.scoreA) : "", LADDER.scoreLx, "a")}
+            {cell(ROMAN[i] ?? String(i + 1), romanCx, "r")}
+            {cell(s ? String(s.scoreB) : "", LADDER.scoreRx, "b")}
           </div>
         );
       })}
-    </div>
+    </>
   );
 }
 
-function Counters({
-  board,
-  theme,
-}: {
-  board: VisBoardData;
-  theme: VisBoardTheme;
-}) {
-  const rows: {
-    icon: React.ReactNode;
-    a: number;
-    b: number;
-    label: string;
-  }[] = [
+function Counters({ board, theme }: { board: VisBoardData; theme: VisBoardTheme }) {
+  const rows: { icon: React.ReactNode; a: number; b: number; label: string }[] = [
     {
-      icon: <StopwatchIcon />,
-      a: board.teamA.timeouts,
-      b: board.teamB.timeouts,
-      label: "Time-outs this set",
+      icon: <Icon src={COUNTER_ICON.timeout} size={COUNTERS.icon.timeout} />,
+      a: board.teamA.timeouts, b: board.teamB.timeouts, label: "Time-outs this set",
     },
     {
-      icon: <SubsIcon />,
-      a: board.teamA.substitutions,
-      b: board.teamB.substitutions,
+      icon: <Icon src={COUNTER_ICON.subs} size={COUNTERS.icon.subs} />,
+      a: board.teamA.substitutions, b: board.teamB.substitutions,
       label: "Substitutions this set",
     },
     {
-      icon: <ChallengeIcon />,
-      a: board.teamA.challenges,
-      b: board.teamB.challenges,
-      label: "Challenges this set",
+      icon: <Icon src={COUNTER_ICON.challenge} size={COUNTERS.icon.challenge} />,
+      a: board.teamA.challenges, b: board.teamB.challenges, label: "Challenges this set",
     },
   ];
   return (
-    <div
-      style={{
-        position: "absolute",
-        left: x(824),
-        top: y(756),
-        width: x(272),
-        border: `${f(5)} solid ${theme.accent}`,
-      }}
-    >
-      {rows.map((r, i) => (
-        <div
-          key={i}
-          title={r.label}
-          style={{
-            height: y(86),
-            display: "grid",
-            gridTemplateColumns: "1fr auto 1fr",
-            alignItems: "center",
-            borderTop: i === 0 ? undefined : `${f(5)} solid ${theme.accent}`,
-            fontSize: f(38),
-            fontWeight: 800,
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          <div style={{ textAlign: "center" }}>{r.a}</div>
-          <div style={{ width: x(70), display: "grid", placeItems: "center" }}>
-            {r.icon}
+    <>
+      {/* Red ground, then the three row interiors knocked out of it — the
+          dividers are simply the ground showing between them. */}
+      <Solid
+        left={COUNTERS.x} top={COUNTERS.y} w={COUNTERS.w} h={COUNTERS.h} fill={theme.accent}
+      />
+      {rows.map((r, i) => {
+        const row = COUNTERS.rows[i];
+        return (
+          <div
+            key={i}
+            title={r.label}
+            style={{
+              position: "absolute",
+              left: x(COUNTERS.x + COUNTERS.stroke),
+              top: y(row.top),
+              width: x(COUNTERS.w - 2 * COUNTERS.stroke),
+              height: y(row.h),
+              background: theme.bg,
+              display: "grid",
+              gridTemplateColumns: "1fr auto 1fr",
+              alignItems: "center",
+              fontSize: cap(COUNTERS.cap),
+              lineHeight: 1,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            <div style={{ textAlign: "center", transform: nudge(COUNTERS.cap) }}>{r.a}</div>
+            <div style={{ width: x(72), display: "grid", placeItems: "center" }}>{r.icon}</div>
+            <div style={{ textAlign: "center", transform: nudge(COUNTERS.cap) }}>{r.b}</div>
           </div>
-          <div style={{ textAlign: "center" }}>{r.b}</div>
-        </div>
-      ))}
-    </div>
+        );
+      })}
+    </>
   );
 }
 
-const ICON_SIZE = { width: f(42), height: f(42) } as const;
-
-function StopwatchIcon() {
+function Icon({ src, size }: { src: string; size: { w: number; h: number } }) {
   return (
-    <svg viewBox="0 0 24 24" style={ICON_SIZE} aria-hidden="true" fill="currentColor">
-      <path d="M9 1h6v2H9zM12 4a9 9 0 1 0 0 18 9 9 0 0 0 0-18m1 4v5h4v2h-6V8z" />
-    </svg>
-  );
-}
-
-function SubsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" style={ICON_SIZE} aria-hidden="true" fill="currentColor">
-      <path d="M3 8h13l-3.5-3.5L14 3l6 6-6 6-1.5-1.5L16 10H3zM21 16H8l3.5 3.5L10 21l-6-6 1-1h16z" />
-    </svg>
-  );
-}
-
-function ChallengeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" style={ICON_SIZE} aria-hidden="true" fill="currentColor">
-      <path d="M3 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2m15 4 5-3v10l-5-3z" />
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element -- board art asset
+    <img src={src} alt="" style={{ width: x(size.w), height: y(size.h) }} />
   );
 }

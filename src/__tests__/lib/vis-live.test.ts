@@ -14,6 +14,7 @@ import {
   mapVolleyMatchList,
 } from "@/lib/vis-live/board-data";
 import { allTagAttrs, decodeXml, num, tagBlocks } from "@/lib/vis-live/parse";
+import { MOCK_MATCH_NO, mockLiveXml } from "@/lib/vis-live/mock";
 
 /**
  * Fixtures are REAL VIS responses captured on 2026-08-18 (read-only Get*
@@ -58,9 +59,9 @@ describe("vis parse helpers", () => {
 
 describe("vis client envelopes", () => {
   it("asks for the lean board bitmask, not the whole live store", () => {
-    expect(BOARD_OPTIONS).toBe(2072); // 8 rosters | 16 line-ups | 2048 stats
+    expect(BOARD_OPTIONS).toBe(2584); // 8 rosters | 16 line-ups | 512 events | 2048 stats
     expect(volleyLiveEnvelope(27062)).toContain('Type="GetVolleyLive"');
-    expect(volleyLiveEnvelope(27062)).toContain('Options="2072"');
+    expect(volleyLiveEnvelope(27062)).toContain('Options="2584"');
   });
 
   it("builds read-only envelopes for every request it makes", () => {
@@ -271,5 +272,72 @@ describe("mapVolleyMatchList", () => {
       '<VolleyballMatch No="2" Status="7" TeamAName="A" TeamBName="B"/>',
     );
     expect(running[0].status).toBe("LIVE");
+  });
+});
+
+// ── spec/35: current rotation, and the validation mock ───────────────────────
+
+describe("current rotation from the events stream (spec/35 W3)", () => {
+  const ROT_XML = fixture("volley-live-rotation-finished");
+
+  it("takes the LAST line-up of the set, not the registered starting six", () => {
+    // The Options-2584 payload carries a LineUp per rally; the last one is the
+    // rotation on court, and it must differ from the first in a played set.
+    const first = /<Set\b[^>]*No="1"[^>]*>([\s\S]*?)<\/Set>/.exec(ROT_XML)![1];
+    const lineups = [...first.matchAll(/<LineUp\b[^>]*NoTeam="8713"[^>]*/g)].map((m) => m[0]);
+    expect(lineups.length).toBeGreaterThan(10); // per-rally, not per-set
+    expect(lineups[0]).not.toBe(lineups[lineups.length - 1]);
+
+    const board = mapVolleyLive(ROT_XML, 27062, Date.parse("2026-08-17T06:00:00Z"));
+    // Position 1 comes from the LAST line-up (NoPlayer1 = 219116 there).
+    expect(board.teamA.players).toHaveLength(6);
+    expect(board.teamA.players[0].position).toBe(1);
+    expect(board.teamA.players.every((p) => p.name !== "")).toBe(true);
+  });
+
+  it("still works on a payload carrying only the registered six", () => {
+    // The older capture has one LineUp per team per set; first === last, so the
+    // same code path yields the starting rotation.
+    const board = mapVolleyLive(BOARD_XML, 27062, Date.parse("2026-08-17T06:00:00Z"));
+    expect(board.teamA.players).toHaveLength(6);
+  });
+});
+
+describe("validation mock — VNL 2025 QF Japan v Poland (spec/35 W9)", () => {
+  const board = mapVolleyLive(mockLiveXml(), MOCK_MATCH_NO, Date.parse("2026-08-18T12:00:00Z"));
+
+  it("reads as a LIVE match at its latest stage", () => {
+    // The capture is a finished 3-0; the transform strips the match end stamp
+    // and the last set's Duration so the board shows a match in progress.
+    expect(board.status).toBe("LIVE");
+    expect(board.currentSet).toBe(3);
+    expect(board.scoreA).toBe(12);
+    expect(board.scoreB).toBe(25);
+    expect(board.inSetBreak).toBe(false);
+  });
+
+  it("carries the real teams, result and court sides", () => {
+    expect(board.teamA.code).toBe("JPN");
+    expect(board.teamB.code).toBe("POL");
+    expect(board.setsWonA).toBe(0);
+    expect(board.setsWonB).toBe(3);
+    // Japan stood on the left in set 3 — what the U-shape rails follow.
+    expect(board.teamAAtLeft).toBe(true);
+    expect(board.serving).toBe("B"); // Poland served the last rally
+  });
+
+  it("shows a full six per side with names, jerseys and stats", () => {
+    for (const t of [board.teamA, board.teamB]) {
+      expect(t.players).toHaveLength(6);
+      expect(t.players.every((p) => p.name !== "" && p.jersey != null)).toBe(true);
+    }
+    expect(board.stats).not.toBeNull();
+    expect(board.stats!.attacksA).toBeGreaterThan(0);
+    expect(board.stats!.attacksB).toBeGreaterThan(0);
+  });
+
+  it("keeps the two completed sets decided in the ladder", () => {
+    expect(board.sets.slice(0, 2).map((s) => s.winner)).toEqual(["B", "B"]);
+    expect(board.sets[2].winner).toBeNull(); // the "live" set
   });
 });

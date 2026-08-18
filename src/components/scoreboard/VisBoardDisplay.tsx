@@ -45,7 +45,8 @@ export function VisBoardDisplay({
   backgroundUrl,
   logoUrl,
   windowFill = "transparent",
-  scheduledFallback,
+  replica = false,
+  notice: noticeOverride = null,
 }: {
   matchNo: number;
   initialBoard: VisBoardData;
@@ -57,7 +58,10 @@ export function VisBoardDisplay({
   /** Event mark for the stats screen (the scoreboard master carries none). */
   logoUrl?: string | null;
   windowFill?: "transparent" | "black";
-  scheduledFallback?: string | null;
+  /** Replica mode for the pixel-diff gate (spec/35 W8). */
+  replica?: boolean;
+  /** Always-on marker, e.g. the validation mock's label (spec/35 W9). */
+  notice?: string | null;
 }) {
   const [board, setBoard] = useState(initialBoard);
   const [staleSince, setStaleSince] = useState<number | null>(null);
@@ -109,10 +113,13 @@ export function VisBoardDisplay({
   }, [staleSince, waitingOnDelay]);
 
   const staleFor = staleSince == null ? 0 : now - staleSince;
-  const notice =
+  const stale =
     staleFor >= STALE_NOTICE_MS
       ? `no signal for ${Math.round(staleFor / 1000)}s`
       : null;
+  // A permanent marker (the mock) and a transient one (lost signal) can both
+  // apply; show both rather than letting either hide the other.
+  const notice = [noticeOverride, stale].filter(Boolean).join("  ·  ") || null;
 
   const ended = board.inSetBreak || board.status === "FINISHED";
   const delayPassed = endSeenAt == null || now - endSeenAt >= STATS_DELAY_MS;
@@ -148,7 +155,7 @@ export function VisBoardDisplay({
       theme={theme}
       backgroundUrl={backgroundUrl}
       notice={notice}
-      scheduledFallback={scheduledFallback}
+      replica={replica}
     />
   );
 }
