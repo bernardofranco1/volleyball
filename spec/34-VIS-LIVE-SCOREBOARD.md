@@ -266,3 +266,66 @@ independently rate-bounded):
 Rotation grids and player-level data (needs `GetVolleyLive` Options bitmask +
 lineup mapping); mirroring VIS matches into the engine (standings/PDFs);
 short URLs (`/Scoreboard/vis/…` alias can come later); beach events.
+
+---
+
+## IMPLEMENTED 2026-08-18 (commit follows this file)
+
+Built as specified, with four decisions the spec did not anticipate. All were
+driven by probing production VIS read-only on the day.
+
+1. **The board is the FIVB VNL template, not the existing BroadcastBoard.**
+   The reference artwork (`~/Screenshot 2026-08-18 at 14.48.24.png`, plus the
+   `VNL-VenueBrand-*` and `U-Shape-VW-VNL-*` sheets) defines: SET label, big
+   current-set plates with sets-won beneath, both line-ups with a PTS column,
+   the roman-numeral set ladder down the middle, and time-out / substitution /
+   challenge counters at the foot. New `VisBoard` + `VisBoardDisplay`; the old
+   `BroadcastBoard` is untouched and still serves engine-scored matches.
+   - Geometry: a 16:9 stage sized `min(100vw, 177.7778vh)` declared
+     `container-type: size`, with every length in `cqw`/`cqh`. Percentages were
+     tried first and are WRONG here — they resolve against the parent, so
+     nested plates (jersey inside row inside column) collapse to nothing.
+   - Once a match is FINISHED the big plates show SETS WON, not the last set's
+     points; the template's live hierarchy reads as a riddle on a final score.
+   - The top slot always says something: `SET n` live, `FINAL` after,
+     the venue-local kick-off before.
+
+2. **Player data IS available on the guest tier** — the spec assumed rotation
+   grids were out of reach. `GetVolleyLive` with `Options=2072` returns rosters,
+   the set's line-up (court positions 1-6), and per-player `TotalPoints` in
+   ~37 KB. The bitmask was mapped empirically (documented in
+   `src/lib/vis-live/client.ts`); 65535 is 284 KB and unnecessary.
+   Honest limit: one LineUp per team per set, so mid-set rotation and
+   substitutions are not tracked — that needs the rally feed, which a
+   scoreboard does not need.
+
+3. **A fourth competition, `comp_vis_1671`** (Girls' U17 World Championship,
+   finished 2026-08-16) was provisioned. It is the only VIS event with COMPLETE
+   live data before the AVC events start, so it is what the board was verified
+   against — and what a reviewer can look at today.
+
+4. **Background artwork needs no migration** (ground rule 5 held).
+   `public/board-bg/<competitionId>.jpg` is picked up automatically, with
+   `?bg=<path|https url>` as a per-screen override. A missing file reveals the
+   built-in gradient, because CSS falls through a 404 background layer. See
+   `public/board-bg/README.md`.
+
+### Verified against production VIS
+
+- Board API on a real finished match (27062, USA 3-0 Türkiye): ladder
+  25-23 / 25-11 / 25-23, jerseys, shirt names, per-player points (Knotts 23),
+  counters 2 time-outs / 4 subs / 2 challenges.
+- The allowlist works: match 27062 was refused until its tournament was linked.
+- LIVE rendering verified by intercepting the board API with a synthesised live
+  payload — SERVE rail, ball on the serving side, server's row outlined, the
+  in-progress set left undecided in the ladder.
+- UPCOMING rendering verified on 27547 (Argentina v Poland, Aug 19 11:00).
+- Day index: 46 matches of 1670, grouped by venue-local date.
+
+### Still open
+
+- `Match@Status` for a running match remains unverified — nothing depends on
+  it (status comes from Begin/EndDateTime), but capture it during the U17
+  rehearsal and add it to the vis-connector ledger.
+- Country plates show the 3-letter code. The template has flags; a flag asset
+  can drop into the same box without moving anything else.

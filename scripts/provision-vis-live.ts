@@ -45,6 +45,21 @@ const COMPETITIONS = [
     endDate: "2026-08-29",
   },
   {
+    // Finished on 2026-08-16 — the only VIS event with COMPLETE live data
+    // (scores, line-ups, per-player points) available before the AVC events
+    // start, so it is what the boards can be verified against today.
+    id: "comp_vis_1671",
+    visTournamentNo: 1671,
+    name: "FIVB Girls' U17 World Championship 2026",
+    gender: "WOMEN" as const,
+    category: "YOUTH" as const,
+    city: "Doha",
+    country: "Qatar",
+    timezone: "Asia/Qatar",
+    startDate: "2026-08-06",
+    endDate: "2026-08-16",
+  },
+  {
     id: "comp_vis_1766",
     visTournamentNo: 1766,
     name: "AVC Women's Asian Championship 2026",
