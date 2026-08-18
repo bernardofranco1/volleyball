@@ -1,0 +1,679 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><Responses><VolleyLive PollDelay="20" Version="57012219">
+  <Match No="27062" Status="25" NbRallies="132" NbSpectators="2204" NoReferee1="152743" NoReferee2="159377" NoTeamA="8713" NoTeamB="8720" BeginDateTime="2026-08-16T23:00:00Z" MatchPointsA="3" MatchPointsB="0" EndDateTime="2026-08-17T00:23:03Z" ResultType="0" TimePlayed="1748047">
+    <PlayerStatistics NoPlayer="229656" ServeContinue="2" ServeTotalAttempts="2" ServeContinuePercentage="100.00" ServeFaultPercentage="0.00" ServePointPercentage="0.00" ServeEfficiencyPercentage="0.00" ScorerPointsPercentage="0.00" ScorerEfficiency="0" ScorerTotalAttempts="2" PointsEfficiencyPercentage="0.00" TotalAttempts="2" NbRallies="2" RalliesPercentage="1.52" TimePlayed="30951" TimePlayedPercentage="1.77" />
+    <PlayerStatistics NoPlayer="229342" ServeContinue="1" ServeTotalAttempts="1" ServeContinuePercentage="100.00" ServeFaultPercentage="0.00" ServePointPercentage="0.00" ServeEfficiencyPercentage="0.00" ScorerPointsPercentage="0.00" ScorerEfficiency="0" ScorerTotalAttempts="1" PointsEfficiencyPercentage="0.00" TotalAttempts="1" NbRallies="1" RalliesPercentage="0.76" TimePlayed="10829" TimePlayedPercentage="0.62" />
+    <PlayerStatistics NoPlayer="229343" BlockContinue="1" BlockFault="2" BlockPoint="2" BlockTotalAttempts="5" BlockContinuePercentage="20.00" BlockFaultPercentage="40.00" BlockPointPercentage="40.00" BlockEfficiencyPercentage="0.00" DigContinue="1" DigExcellent="2" DigFault="1" DigTotalAttempts="4" DigContinuePercentage="25.00" DigExcellentPercentage="50.00" DigFaultPercentage="25.00" DigEfficiencyPercentage="25.00" ReceptionContinue="1" ReceptionTotalAttempts="1" ReceptionContinuePercentage="100.00" ReceptionExcellentPercentage="0.00" ReceptionFaultPercentage="0.00" ReceptionEfficiencyPercentage="0.00" ReceptionPositivePercentage="0.00" ServeContinue="13" ServePoint="3" ServeTotalAttempts="16" ServeContinuePercentage="81.25" ServeFaultPercentage="0.00" ServePointPercentage="18.75" ServeEfficiencyPercentage="18.75" SetContinue="40" SetExcellent="26" SetFault="1" SetTotalAttempts="67" SetContinuePercentage="59.70" SetExcellentPercentage="38.81" SetFaultPercentage="1.49" SetEfficiencyPercentage="37.31" SpikeContinue="1" SpikePoint="2" SpikeTotalAttempts="3" SpikeContinuePercentage="33.33" SpikeFaultPercentage="0.00" SpikePointPercentage="66.67" SpikeEfficiencyPercentage="66.67" ScorerPointsPercentage="29.17" ScorerEfficiency="5" ScorerTotalFaults="2" ScorerTotalAttempts="24" PointsEfficiencyPercentage="20.83" TotalAttempts="96" TotalPoints="7" TotalFaults="4" NbRallies="132" RalliesPercentage="100.00" TimePlayed="1748047" TimePlayedPercentage="100.00" />
+    <PlayerStatistics NoPlayer="229658" BlockContinue="2" BlockFault="2" BlockPoint="2" BlockTotalAttempts="6" BlockContinuePercentage="33.33" BlockFaultPercentage="33.33" BlockPointPercentage="33.33" BlockEfficiencyPercentage="0.00" DigExcellent="4" DigTotalAttempts="4" DigContinuePercentage="0.00" DigExcellentPercentage="100.00" DigFaultPercentage="0.00" DigEfficiencyPercentage="100.00" ReceptionFault="1" ReceptionTotalAttempts="1" ReceptionContinuePercentage="0.00" ReceptionExcellentPercentage="0.00" ReceptionFaultPercentage="100.00" ReceptionEfficiencyPercentage="-100.00" ReceptionPositivePercentage="0.00" ServeContinue="4" ServeFault="2" ServeTotalAttempts="6" ServeContinuePercentage="66.67" ServeFaultPercentage="33.33" ServePointPercentage="0.00" ServeEfficiencyPercentage="-33.33" SetContinue="2" SetTotalAttempts="2" SetContinuePercentage="100.00" SetExcellentPercentage="0.00" SetFaultPercentage="0.00" SetEfficiencyPercentage="0.00" SpikeContinue="2" SpikeFault="2" SpikePoint="4" SpikeTotalAttempts="8" SpikeContinuePercentage="25.00" SpikeFaultPercentage="25.00" SpikePointPercentage="50.00" SpikeEfficiencyPercentage="25.00" ScorerPointsPercentage="30.00" ScorerEfficiency="0" ScorerTotalFaults="6" ScorerTotalAttempts="20" PointsEfficiencyPercentage="0.00" TotalAttempts="27" TotalPoints="6" TotalFaults="7" NbRallies="68" RalliesPercentage="51.52" TimePlayed="875865" TimePlayedPercentage="50.11" />
+    <PlayerStatistics NoPlayer="223514" BackSpikeContinue="3" BackSpikePoint="4" BackSpikeTotalAttempts="7" BackSpikeContinuePercentage="42.86" BackSpikeFaultPercentage="0.00" BackSpikePointPercentage="57.14" BackSpikeEfficiencyPercentage="57.14" BlockContinue="3" BlockFault="2" BlockPoint="2" BlockTotalAttempts="7" BlockContinuePercentage="42.86" BlockFaultPercentage="28.57" BlockPointPercentage="28.57" BlockEfficiencyPercentage="0.00" DigContinue="1" DigExcellent="5" DigFault="2" DigTotalAttempts="8" DigContinuePercentage="12.50" DigExcellentPercentage="62.50" DigFaultPercentage="25.00" DigEfficiencyPercentage="37.50" ServeContinue="7" ServeFault="3" ServePoint="4" ServeTotalAttempts="14" ServeContinuePercentage="50.00" ServeFaultPercentage="21.43" ServePointPercentage="28.57" ServeEfficiencyPercentage="7.14" SpikeContinue="13" SpikeFault="2" SpikePoint="17" SpikeTotalAttempts="32" SpikeContinuePercentage="40.62" SpikeFaultPercentage="6.25" SpikePointPercentage="53.12" SpikeEfficiencyPercentage="46.88" ScorerPointsPercentage="43.40" ScorerEfficiency="16" ScorerTotalFaults="7" ScorerTotalAttempts="53" PointsEfficiencyPercentage="30.19" TotalAttempts="61" TotalPoints="23" TotalFaults="9" NbRallies="132" RalliesPercentage="100.00" TimePlayed="1748047" TimePlayedPercentage="100.00" />
+    <PlayerStatistics NoPlayer="229344" ScorerEfficiency="0" NbRallies="0" RalliesPercentage="0.00" TimePlayed="0" TimePlayedPercentage="0.00" />
+    <PlayerStatistics NoPlayer="229346" ScorerEfficiency="0" NbRallies="0" RalliesPercentage="0.00" TimePlayed="0" TimePlayedPercentage="0.00" />
+    <PlayerStatistics NoPlayer="229657" BlockFault="3" BlockPoint="1" BlockTotalAttempts="4" BlockContinuePercentage="0.00" BlockFaultPercentage="75.00" BlockPointPercentage="25.00" BlockEfficiencyPercentage="-50.00" DigContinue="1" DigExcellent="5" DigFault="2" DigTotalAttempts="8" DigContinuePercentage="12.50" DigExcellentPercentage="62.50" DigFaultPercentage="25.00" DigEfficiencyPercentage="37.50" ReceptionContinue="5" ReceptionExcellent="1" ReceptionTotalAttempts="6" ReceptionContinuePercentage="83.33" ReceptionExcellentPercentage="16.67" ReceptionFaultPercentage="0.00" ReceptionEfficiencyPercentage="16.67" ReceptionPositivePercentage="16.67" ServeContinue="10" ServeFault="1" ServeTotalAttempts="11" ServeContinuePercentage="90.91" ServeFaultPercentage="9.09" ServePointPercentage="0.00" ServeEfficiencyPercentage="-9.09" SetContinue="3" SetTotalAttempts="3" SetContinuePercentage="100.00" SetExcellentPercentage="0.00" SetFaultPercentage="0.00" SetEfficiencyPercentage="0.00" SpikeContinue="4" SpikeFault="5" SpikePoint="5" SpikeTotalAttempts="14" SpikeContinuePercentage="28.57" SpikeFaultPercentage="35.71" SpikePointPercentage="35.71" SpikeEfficiencyPercentage="0.00" ScorerPointsPercentage="20.69" ScorerEfficiency="-3" ScorerTotalFaults="9" ScorerTotalAttempts="29" PointsEfficiencyPercentage="-10.34" TotalAttempts="46" TotalPoints="6" TotalFaults="11" NbRallies="132" RalliesPercentage="100.00" TimePlayed="1748047" TimePlayedPercentage="100.00" />
+    <PlayerStatistics NoPlayer="229349" ScorerEfficiency="0" NbRallies="0" RalliesPercentage="0.00" TimePlayed="0" TimePlayedPercentage="0.00" />
+    <PlayerStatistics NoPlayer="229350" BackSpikePoint="2" BackSpikeTotalAttempts="2" BackSpikeContinuePercentage="0.00" BackSpikeFaultPercentage="0.00" BackSpikePointPercentage="100.00" BackSpikeEfficiencyPercentage="100.00" BlockContinue="3" BlockFault="1" BlockPoint="2" BlockTotalAttempts="6" BlockContinuePercentage="50.00" BlockFaultPercentage="16.67" BlockPointPercentage="33.33" BlockEfficiencyPercentage="16.67" DigContinue="2" DigExcellent="3" DigTotalAttempts="5" DigContinuePercentage="40.00" DigExcellentPercentage="60.00" DigFaultPercentage="0.00" DigEfficiencyPercentage="60.00" ReceptionContinue="13" ReceptionExcellent="4" ReceptionFault="2" ReceptionTotalAttempts="19" ReceptionContinuePercentage="68.42" ReceptionExcellentPercentage="21.05" ReceptionFaultPercentage="10.53" ReceptionEfficiencyPercentage="10.53" ReceptionPositivePercentage="21.05" ServeContinue="11" ServeFault="1" ServePoint="2" ServeTotalAttempts="14" ServeContinuePercentage="78.57" ServeFaultPercentage="7.14" ServePointPercentage="14.29" ServeEfficiencyPercentage="7.14" SpikeFault="4" SpikePoint="14" SpikeTotalAttempts="18" SpikeContinuePercentage="0.00" SpikeFaultPercentage="22.22" SpikePointPercentage="77.78" SpikeEfficiencyPercentage="55.56" ScorerPointsPercentage="47.37" ScorerEfficiency="12" ScorerTotalFaults="6" ScorerTotalAttempts="38" PointsEfficiencyPercentage="31.58" TotalAttempts="62" TotalPoints="18" TotalFaults="8" NbRallies="132" RalliesPercentage="100.00" TimePlayed="1748047" TimePlayedPercentage="100.00" />
+    <PlayerStatistics NoPlayer="234263" DigContinue="1" DigExcellent="9" DigFault="4" DigTotalAttempts="14" DigContinuePercentage="7.14" DigExcellentPercentage="64.29" DigFaultPercentage="28.57" DigEfficiencyPercentage="35.71" ReceptionContinue="17" ReceptionExcellent="7" ReceptionFault="1" ReceptionTotalAttempts="25" ReceptionContinuePercentage="68.00" ReceptionExcellentPercentage="28.00" ReceptionFaultPercentage="4.00" ReceptionEfficiencyPercentage="24.00" ReceptionPositivePercentage="28.00" SetContinue="6" SetTotalAttempts="6" SetContinuePercentage="100.00" SetExcellentPercentage="0.00" SetFaultPercentage="0.00" SetEfficiencyPercentage="0.00" ScorerEfficiency="0" TotalAttempts="45" TotalFaults="5" NbRallies="114" RalliesPercentage="86.36" TimePlayed="1460794" TimePlayedPercentage="83.57" />
+    <PlayerStatistics NoPlayer="233926" BlockContinue="2" BlockFault="3" BlockPoint="3" BlockTotalAttempts="8" BlockContinuePercentage="25.00" BlockFaultPercentage="37.50" BlockPointPercentage="37.50" BlockEfficiencyPercentage="0.00" DigExcellent="3" DigFault="3" DigTotalAttempts="6" DigContinuePercentage="0.00" DigExcellentPercentage="50.00" DigFaultPercentage="50.00" DigEfficiencyPercentage="0.00" ServeContinue="6" ServeFault="3" ServeTotalAttempts="9" ServeContinuePercentage="66.67" ServeFaultPercentage="33.33" ServePointPercentage="0.00" ServeEfficiencyPercentage="-33.33" SpikeContinue="1" SpikeFault="2" SpikePoint="3" SpikeTotalAttempts="6" SpikeContinuePercentage="16.67" SpikeFaultPercentage="33.33" SpikePointPercentage="50.00" SpikeEfficiencyPercentage="16.67" ScorerPointsPercentage="26.09" ScorerEfficiency="-2" ScorerTotalFaults="8" ScorerTotalAttempts="23" PointsEfficiencyPercentage="-8.70" TotalAttempts="29" TotalPoints="6" TotalFaults="11" NbRallies="79" RalliesPercentage="59.85" TimePlayed="1117655" TimePlayedPercentage="63.94" />
+    <PlayerStatistics NoPlayer="233928" ScorerEfficiency="0" NbRallies="0" RalliesPercentage="0.00" TimePlayed="0" TimePlayedPercentage="0.00" />
+    <PlayerStatistics NoPlayer="215821" ScorerEfficiency="0" NbRallies="0" RalliesPercentage="0.00" TimePlayed="0" TimePlayedPercentage="0.00" />
+    <PlayerStatistics NoPlayer="235195" ScorerEfficiency="0" NbRallies="0" RalliesPercentage="0.00" TimePlayed="0" TimePlayedPercentage="0.00" />
+    <PlayerStatistics NoPlayer="208652" BlockContinue="2" BlockFault="1" BlockPoint="1" BlockTotalAttempts="4" BlockContinuePercentage="50.00" BlockFaultPercentage="25.00" BlockPointPercentage="25.00" BlockEfficiencyPercentage="0.00" DigContinue="1" DigExcellent="5" DigFault="2" DigTotalAttempts="8" DigContinuePercentage="12.50" DigExcellentPercentage="62.50" DigFaultPercentage="25.00" DigEfficiencyPercentage="37.50" ReceptionContinue="19" ReceptionExcellent="6" ReceptionFault="5" ReceptionTotalAttempts="30" ReceptionContinuePercentage="63.33" ReceptionExcellentPercentage="20.00" ReceptionFaultPercentage="16.67" ReceptionEfficiencyPercentage="3.33" ReceptionPositivePercentage="20.00" ServeContinue="5" ServeTotalAttempts="5" ServeContinuePercentage="100.00" ServeFaultPercentage="0.00" ServePointPercentage="0.00" ServeEfficiencyPercentage="0.00" SpikeContinue="4" SpikeFault="1" SpikePoint="5" SpikeTotalAttempts="10" SpikeContinuePercentage="40.00" SpikeFaultPercentage="10.00" SpikePointPercentage="50.00" SpikeEfficiencyPercentage="40.00" ScorerPointsPercentage="31.58" ScorerEfficiency="4" ScorerTotalFaults="2" ScorerTotalAttempts="19" PointsEfficiencyPercentage="21.05" TotalAttempts="57" TotalPoints="6" TotalFaults="9" NbRallies="114" RalliesPercentage="86.36" TimePlayed="1561849" TimePlayedPercentage="89.35" />
+    <PlayerStatistics NoPlayer="223532" ReceptionContinue="2" ReceptionExcellent="1" ReceptionFault="1" ReceptionTotalAttempts="4" ReceptionContinuePercentage="50.00" ReceptionExcellentPercentage="25.00" ReceptionFaultPercentage="25.00" ReceptionEfficiencyPercentage="0.00" ReceptionPositivePercentage="25.00" ServeContinue="2" ServeFault="1" ServePoint="1" ServeTotalAttempts="4" ServeContinuePercentage="50.00" ServeFaultPercentage="25.00" ServePointPercentage="25.00" ServeEfficiencyPercentage="0.00" ScorerPointsPercentage="25.00" ScorerEfficiency="0" ScorerTotalFaults="1" ScorerTotalAttempts="4" PointsEfficiencyPercentage="0.00" TotalAttempts="8" TotalPoints="1" TotalFaults="2" NbRallies="15" RalliesPercentage="11.36" TimePlayed="147354" TimePlayedPercentage="8.43" />
+    <PlayerStatistics NoPlayer="213951" DigContinue="1" DigExcellent="7" DigFault="6" DigTotalAttempts="14" DigContinuePercentage="7.14" DigExcellentPercentage="50.00" DigFaultPercentage="42.86" DigEfficiencyPercentage="7.14" ReceptionContinue="9" ReceptionExcellent="3" ReceptionFault="1" ReceptionTotalAttempts="13" ReceptionContinuePercentage="69.23" ReceptionExcellentPercentage="23.08" ReceptionFaultPercentage="7.69" ReceptionEfficiencyPercentage="15.38" ReceptionPositivePercentage="23.08" SetContinue="4" SetTotalAttempts="4" SetContinuePercentage="100.00" SetExcellentPercentage="0.00" SetFaultPercentage="0.00" SetEfficiencyPercentage="0.00" ScorerEfficiency="0" TotalAttempts="31" TotalFaults="7" NbRallies="113" RalliesPercentage="85.61" TimePlayed="1528131" TimePlayedPercentage="87.42" />
+    <PlayerStatistics NoPlayer="213950" BlockPoint="1" BlockTotalAttempts="1" BlockContinuePercentage="0.00" BlockFaultPercentage="0.00" BlockPointPercentage="100.00" BlockEfficiencyPercentage="100.00" ScorerPointsPercentage="100.00" ScorerEfficiency="1" ScorerTotalAttempts="1" PointsEfficiencyPercentage="100.00" TotalAttempts="1" TotalPoints="1" NbRallies="8" RalliesPercentage="6.06" TimePlayed="89225" TimePlayedPercentage="5.10" />
+    <PlayerStatistics NoPlayer="219099" ScorerEfficiency="0" NbRallies="0" RalliesPercentage="0.00" TimePlayed="0" TimePlayedPercentage="0.00" />
+    <PlayerStatistics NoPlayer="235191" BlockContinue="2" BlockFault="2" BlockPoint="2" BlockTotalAttempts="6" BlockContinuePercentage="33.33" BlockFaultPercentage="33.33" BlockPointPercentage="33.33" BlockEfficiencyPercentage="0.00" DigContinue="1" DigExcellent="1" DigTotalAttempts="2" DigContinuePercentage="50.00" DigExcellentPercentage="50.00" DigFaultPercentage="0.00" DigEfficiencyPercentage="50.00" ServeContinue="2" ServeFault="1" ServeTotalAttempts="3" ServeContinuePercentage="66.67" ServeFaultPercentage="33.33" ServePointPercentage="0.00" ServeEfficiencyPercentage="-33.33" SetContinue="1" SetTotalAttempts="1" SetContinuePercentage="100.00" SetExcellentPercentage="0.00" SetFaultPercentage="0.00" SetEfficiencyPercentage="0.00" SpikeFault="1" SpikeTotalAttempts="1" SpikeContinuePercentage="0.00" SpikeFaultPercentage="100.00" SpikePointPercentage="0.00" SpikeEfficiencyPercentage="-100.00" ScorerPointsPercentage="20.00" ScorerEfficiency="-2" ScorerTotalFaults="4" ScorerTotalAttempts="10" PointsEfficiencyPercentage="-20.00" TotalAttempts="13" TotalPoints="2" TotalFaults="4" NbRallies="56" RalliesPercentage="42.42" TimePlayed="700335" TimePlayedPercentage="40.06" />
+    <PlayerStatistics NoPlayer="213949" BlockContinue="1" BlockPoint="1" BlockTotalAttempts="2" BlockContinuePercentage="50.00" BlockFaultPercentage="0.00" BlockPointPercentage="50.00" BlockEfficiencyPercentage="50.00" DigContinue="1" DigFault="2" DigTotalAttempts="3" DigContinuePercentage="33.33" DigExcellentPercentage="0.00" DigFaultPercentage="66.67" DigEfficiencyPercentage="-66.67" ServeContinue="11" ServePoint="1" ServeTotalAttempts="12" ServeContinuePercentage="91.67" ServeFaultPercentage="0.00" ServePointPercentage="8.33" ServeEfficiencyPercentage="8.33" SetContinue="3" SetTotalAttempts="3" SetContinuePercentage="100.00" SetExcellentPercentage="0.00" SetFaultPercentage="0.00" SetEfficiencyPercentage="0.00" SpikeContinue="3" SpikeFault="1" SpikePoint="2" SpikeTotalAttempts="6" SpikeContinuePercentage="50.00" SpikeFaultPercentage="16.67" SpikePointPercentage="33.33" SpikeEfficiencyPercentage="16.67" ScorerPointsPercentage="20.00" ScorerEfficiency="3" ScorerTotalFaults="1" ScorerTotalAttempts="20" PointsEfficiencyPercentage="15.00" TotalAttempts="26" TotalPoints="4" TotalFaults="3" NbRallies="83" RalliesPercentage="62.88" TimePlayed="1135823" TimePlayedPercentage="64.98" />
+    <PlayerStatistics NoPlayer="219111" BackSpikeContinue="4" BackSpikeFault="1" BackSpikePoint="2" BackSpikeTotalAttempts="7" BackSpikeContinuePercentage="57.14" BackSpikeFaultPercentage="14.29" BackSpikePointPercentage="28.57" BackSpikeEfficiencyPercentage="14.29" BlockContinue="1" BlockFault="3" BlockPoint="2" BlockTotalAttempts="6" BlockContinuePercentage="16.67" BlockFaultPercentage="50.00" BlockPointPercentage="33.33" BlockEfficiencyPercentage="-16.67" DigContinue="1" DigExcellent="2" DigFault="1" DigTotalAttempts="4" DigContinuePercentage="25.00" DigExcellentPercentage="50.00" DigFaultPercentage="25.00" DigEfficiencyPercentage="25.00" ServeContinue="4" ServeFault="3" ServePoint="1" ServeTotalAttempts="8" ServeContinuePercentage="50.00" ServeFaultPercentage="37.50" ServePointPercentage="12.50" ServeEfficiencyPercentage="-25.00" SpikeContinue="13" SpikeFault="4" SpikePoint="7" SpikeTotalAttempts="24" SpikeContinuePercentage="54.17" SpikeFaultPercentage="16.67" SpikePointPercentage="29.17" SpikeEfficiencyPercentage="12.50" ScorerPointsPercentage="26.32" ScorerEfficiency="0" ScorerTotalFaults="10" ScorerTotalAttempts="38" PointsEfficiencyPercentage="0.00" TotalAttempts="42" TotalPoints="10" TotalFaults="11" NbRallies="113" RalliesPercentage="85.61" TimePlayed="1541232" TimePlayedPercentage="88.17" />
+    <PlayerStatistics NoPlayer="223541" BackSpikeContinue="1" BackSpikeFault="2" BackSpikeTotalAttempts="3" BackSpikeContinuePercentage="33.33" BackSpikeFaultPercentage="66.67" BackSpikePointPercentage="0.00" BackSpikeEfficiencyPercentage="-66.67" ServeContinue="1" ServeTotalAttempts="1" ServeContinuePercentage="100.00" ServeFaultPercentage="0.00" ServePointPercentage="0.00" ServeEfficiencyPercentage="0.00" SpikeContinue="2" SpikeFault="2" SpikeTotalAttempts="4" SpikeContinuePercentage="50.00" SpikeFaultPercentage="50.00" SpikePointPercentage="0.00" SpikeEfficiencyPercentage="-50.00" ScorerPointsPercentage="0.00" ScorerEfficiency="-2" ScorerTotalFaults="2" ScorerTotalAttempts="5" PointsEfficiencyPercentage="-40.00" TotalAttempts="5" TotalFaults="2" NbRallies="19" RalliesPercentage="14.39" TimePlayed="206815" TimePlayedPercentage="11.83" />
+    <PlayerStatistics NoPlayer="219107" BackSpikeContinue="1" BackSpikePoint="1" BackSpikeTotalAttempts="2" BackSpikeContinuePercentage="50.00" BackSpikeFaultPercentage="0.00" BackSpikePointPercentage="50.00" BackSpikeEfficiencyPercentage="50.00" BlockFault="1" BlockPoint="1" BlockTotalAttempts="2" BlockContinuePercentage="0.00" BlockFaultPercentage="50.00" BlockPointPercentage="50.00" BlockEfficiencyPercentage="0.00" DigExcellent="2" DigFault="3" DigTotalAttempts="5" DigContinuePercentage="0.00" DigExcellentPercentage="40.00" DigFaultPercentage="60.00" DigEfficiencyPercentage="-20.00" ReceptionContinue="14" ReceptionTotalAttempts="14" ReceptionContinuePercentage="100.00" ReceptionExcellentPercentage="0.00" ReceptionFaultPercentage="0.00" ReceptionEfficiencyPercentage="0.00" ReceptionPositivePercentage="0.00" ServeContinue="8" ServeTotalAttempts="8" ServeContinuePercentage="100.00" ServeFaultPercentage="0.00" ServePointPercentage="0.00" ServeEfficiencyPercentage="0.00" SetContinue="1" SetTotalAttempts="1" SetContinuePercentage="100.00" SetExcellentPercentage="0.00" SetFaultPercentage="0.00" SetEfficiencyPercentage="0.00" SpikeContinue="12" SpikeFault="3" SpikePoint="9" SpikeTotalAttempts="24" SpikeContinuePercentage="50.00" SpikeFaultPercentage="12.50" SpikePointPercentage="37.50" SpikeEfficiencyPercentage="25.00" ScorerPointsPercentage="29.41" ScorerEfficiency="6" ScorerTotalFaults="4" ScorerTotalAttempts="34" PointsEfficiencyPercentage="17.65" TotalAttempts="54" TotalPoints="10" TotalFaults="7" NbRallies="116" RalliesPercentage="87.88" TimePlayed="1581572" TimePlayedPercentage="90.48" />
+    <PlayerStatistics NoPlayer="219116" BlockContinue="1" BlockFault="1" BlockTotalAttempts="2" BlockContinuePercentage="50.00" BlockFaultPercentage="50.00" BlockPointPercentage="0.00" BlockEfficiencyPercentage="-50.00" DigContinue="4" DigExcellent="4" DigFault="1" DigTotalAttempts="9" DigContinuePercentage="44.44" DigExcellentPercentage="44.44" DigFaultPercentage="11.11" DigEfficiencyPercentage="33.33" ServeContinue="13" ServeFault="1" ServePoint="1" ServeTotalAttempts="15" ServeContinuePercentage="86.67" ServeFaultPercentage="6.67" ServePointPercentage="6.67" ServeEfficiencyPercentage="0.00" SetContinue="51" SetExcellent="7" SetTotalAttempts="58" SetContinuePercentage="87.93" SetExcellentPercentage="12.07" SetFaultPercentage="0.00" SetEfficiencyPercentage="12.07" SpikeContinue="3" SpikeTotalAttempts="3" SpikeContinuePercentage="100.00" SpikeFaultPercentage="0.00" SpikePointPercentage="0.00" SpikeEfficiencyPercentage="0.00" ScorerPointsPercentage="5.00" ScorerEfficiency="-1" ScorerTotalFaults="2" ScorerTotalAttempts="20" PointsEfficiencyPercentage="-5.00" TotalAttempts="87" TotalPoints="1" TotalFaults="3" NbRallies="122" RalliesPercentage="92.42" TimePlayed="1641866" TimePlayedPercentage="93.93" />
+    <PlayerStatistics NoPlayer="213945" ReceptionFault="2" ReceptionTotalAttempts="2" ReceptionContinuePercentage="0.00" ReceptionExcellentPercentage="0.00" ReceptionFaultPercentage="100.00" ReceptionEfficiencyPercentage="-100.00" ReceptionPositivePercentage="0.00" ServeFault="1" ServeTotalAttempts="1" ServeContinuePercentage="0.00" ServeFaultPercentage="100.00" ServePointPercentage="0.00" ServeEfficiencyPercentage="-100.00" SetContinue="1" SetTotalAttempts="1" SetContinuePercentage="100.00" SetExcellentPercentage="0.00" SetFaultPercentage="0.00" SetEfficiencyPercentage="0.00" SpikeFault="1" SpikePoint="1" SpikeTotalAttempts="2" SpikeContinuePercentage="0.00" SpikeFaultPercentage="50.00" SpikePointPercentage="50.00" SpikeEfficiencyPercentage="0.00" ScorerPointsPercentage="33.33" ScorerEfficiency="-1" ScorerTotalFaults="2" ScorerTotalAttempts="3" PointsEfficiencyPercentage="-33.33" TotalAttempts="6" TotalPoints="1" TotalFaults="4" NbRallies="21" RalliesPercentage="15.91" TimePlayed="222275" TimePlayedPercentage="12.72" />
+    <PlayerStatistics NoPlayer="213934" ServeContinue="2" ServeTotalAttempts="2" ServeContinuePercentage="100.00" ServeFaultPercentage="0.00" ServePointPercentage="0.00" ServeEfficiencyPercentage="0.00" SetContinue="4" SetTotalAttempts="4" SetContinuePercentage="100.00" SetExcellentPercentage="0.00" SetFaultPercentage="0.00" SetEfficiencyPercentage="0.00" ScorerPointsPercentage="0.00" ScorerEfficiency="0" ScorerTotalAttempts="2" PointsEfficiencyPercentage="0.00" TotalAttempts="6" NbRallies="12" RalliesPercentage="9.09" TimePlayed="131805" TimePlayedPercentage="7.54" />
+    <TeamStatistics NoTeam="8713" OpponentErrors="9" TeamFaults="2" />
+    <TeamStatistics NoTeam="8720" OpponentErrors="21" TeamFaults="23" />
+    <VolleyballMatch No="27062" City="Santiago" CountryCode="CL" DateTimeLocal="2026-08-16T19:00:00" DateTimeUtc="2026-08-16T23:00:00Z" Format="1" Hall="National Stadium Park court 1" LiveStreamUri="https://www.youtube.com/@volleyballworld" LoserRank="2" NbSpectators="2204" NoDocumentP2="256909042" NoInTournament="104" WinnerRank="1" />
+  </Match>
+  <Tournament Code="GU172026" Name="FIVB Volleyball Girls' U17 World Championship 2026" No="1671">
+    <VolleyballTournament No="1671" City="Santiago" CountryCode="CL" EndDate="2026-08-16" Gender="1" Name="FIVB Volleyball Girls' U17 World Championship 2026" NoEvent="1821" Season="2026" ShortName="GU17 WCH" ShortNameOrName="GU17 WCH" StartDate="2026-08-06" Logos="&lt;Logos Competition=&quot;202302382&quot; CompetitionHighRes=&quot;202302382&quot; CompetitionMobile=&quot;202302382&quot; CompetitionWeb=&quot;202302382&quot; Organizer=&quot;201451877&quot; Publicity=&quot;201451880&quot; /&gt;" />
+  </Tournament>
+  <Pool Code="F1-2" Name="Final 1-2" No="5812">
+    <VolleyballPool No="5812" NoRound="321" RoundCode="F" RoundName="Final Round" TechnicalInfo="&lt;TechnicalInfo /&gt;" Type="4" />
+  </Pool>
+  <Team Code="USA" Name="United States" No="8713">
+    <Player No="229656" NoShirt="3">
+      <VolleyballPlayer No="1019039" NoPlayer="229656" Birthdate="2010-08-13" Block="2950000" ClubName="Legacy Volleyball Club" FirstNamePlayer="Lexi" Height="1850000" LastNamePlayer="Coleman" NbSelOther="5" Position="2" Spike="3120000" TeamNamePlayer="Coleman" Weight="64000000" />
+    </Player>
+    <Player No="229342" NoShirt="5">
+      <VolleyballPlayer No="1019045" NoPlayer="229342" Birthdate="2011-01-09" Block="2790000" ClubName="Legacy Volleyball Club" FirstNamePlayer="Kaelyn" Height="1800000" LastNamePlayer="Easton" NbSelOther="5" Position="1" Spike="2900000" TeamNamePlayer="Easton" Weight="68000000" />
+    </Player>
+    <Player No="229343" NoShirt="6" IsCaptain="true">
+      <VolleyballPlayer No="1019186" NoPlayer="229343" Birthdate="2010-09-30" Block="2920000" ClubName="Winter Park VB Club" FirstNamePlayer="Ellie" Height="1850000" IsCaptain="true" LastNamePlayer="Enger" NbSelOther="5" Position="1" Spike="3050000" TeamNamePlayer="Enger" Weight="75000000" />
+    </Player>
+    <Player No="229658" NoShirt="7">
+      <VolleyballPlayer No="1019040" NoPlayer="229658" Birthdate="2010-07-09" Block="3050000" ClubName="Norco Volleyball Club" FirstNamePlayer="Madlen" Height="1960000" LastNamePlayer="Gloessner" NbSelOther="9" Position="3" Spike="3150000" TeamNamePlayer="Gloessner" Weight="76000000" />
+    </Player>
+    <Player No="223514" NoShirt="8">
+      <VolleyballPlayer No="1019185" NoPlayer="223514" Birthdate="2010-11-01" Block="3110000" ClubName="A5 Volleyball Club" FirstNamePlayer="Kari" Height="1930000" LastNamePlayer="Knotts" NbSelOther="5" Position="6" Spike="3320000" TeamNamePlayer="Knotts" Weight="67000000" />
+    </Player>
+    <Player No="229344" NoShirt="9" IsLibero="true">
+      <VolleyballPlayer No="1019047" NoPlayer="229344" Birthdate="2010-05-30" Block="2790000" ClubName="MadFrog Volleyball" FirstNamePlayer="Grace" Height="1630000" IsLibero="true" LastNamePlayer="Hengler" Position="4" Spike="2900000" TeamNamePlayer="Hengler" Weight="68000000" />
+    </Player>
+    <Player No="229346" NoShirt="11">
+      <VolleyballPlayer No="1019049" NoPlayer="229346" Birthdate="2010-04-01" Block="2870000" ClubName="Dallas Skyline Juniors" FirstNamePlayer="Taylor" Height="1520000" LastNamePlayer="Johnson" NbSelOther="5" Position="2" Spike="3150000" TeamNamePlayer="Johnson" Weight="66000000" />
+    </Player>
+    <Player No="229657" NoShirt="13">
+      <VolleyballPlayer No="1019059" NoPlayer="229657" Birthdate="2010-07-06" Block="2950000" ClubName="Kairos Elite Volleyball Club" FirstNamePlayer="Julia" Height="1880000" LastNamePlayer="Masselink" NbSelOther="5" Position="2" Spike="3100000" TeamNamePlayer="Masselink" Weight="68000000" />
+    </Player>
+    <Player No="229349" NoShirt="15">
+      <VolleyballPlayer No="1019051" NoPlayer="229349" Birthdate="2010-12-08" Block="3050000" ClubName="A5 Volleyball Club" FirstNamePlayer="Madison" Height="1850000" LastNamePlayer="Middleton" NbSelOther="5" Position="3" Spike="3120000" TeamNamePlayer="Middleton" Weight="59000000" />
+    </Player>
+    <Player No="229350" NoShirt="16">
+      <VolleyballPlayer No="1019187" NoPlayer="229350" Birthdate="2010-03-16" Block="3020000" ClubName="Texas Advantage Volleyball" FirstNamePlayer="Maya" Height="1830000" LastNamePlayer="Ogbogu" NbSelOther="5" Position="2" Spike="3230000" TeamNamePlayer="Ogbogu" Weight="69000000" />
+    </Player>
+    <Player No="234263" NoShirt="19" IsLibero="true">
+      <VolleyballPlayer No="1019052" NoPlayer="234263" Birthdate="2010-10-11" Block="2540000" ClubName="Dallas Skyline Juniors" FirstNamePlayer="Brynli" Height="1750000" IsLibero="true" LastNamePlayer="Burgess" Position="4" Spike="2690000" TeamNamePlayer="Burgess" Weight="72000000" />
+    </Player>
+    <Player No="233926" NoShirt="24">
+      <VolleyballPlayer No="1019058" NoPlayer="233926" Birthdate="2010-04-19" Block="2970000" ClubName="South County Volleyball Club" FirstNamePlayer="Maija" Height="1930000" LastNamePlayer="Mortensen" Position="3" Spike="3150000" TeamNamePlayer="Mortensen" Weight="75000000" />
+    </Player>
+    <Player No="233928" NoShirt="26">
+      <VolleyballPlayer No="1019056" NoPlayer="233928" Birthdate="2011-04-25" Block="2870000" ClubName="MadFrog Volleyball" FirstNamePlayer="Peyton" Height="1830000" LastNamePlayer="Smith" Position="2" Spike="3120000" TeamNamePlayer="Smith" Weight="73000000" />
+    </Player>
+    <Player No="215821" NoShirt="28">
+      <VolleyballPlayer No="1019061" NoPlayer="215821" Birthdate="2011-06-03" Block="3020000" ClubName="Sunshine Volleyball Club" FirstNamePlayer="Kaya" Height="1930000" LastNamePlayer="Young" Position="3" Spike="3180000" TeamNamePlayer="Young  " Weight="88000000" />
+    </Player>
+    <VolleyballTeam No="8713" LiberoUniformColor1="Red" LiberoUniformColor2="White" LiberoUniformColor3="Navy" ShirtColor1="Navy" ShirtColor2="Red" ShirtColor3="White" />
+  </Team>
+  <Team Code="TUR" Name="Türkiye" No="8720">
+    <Player No="235195" NoShirt="1" IsLibero="true">
+      <VolleyballPlayer No="1023761" NoPlayer="235195" Birthdate="2011-12-09" Block="2550000" ClubName="İlbank" FirstNamePlayer="Zeynep" Height="1600000" IsLibero="true" LastNamePlayer="Duygun" NbSelOther="5" Position="4" Spike="2650000" TeamNamePlayer="Duygun" Weight="65000000" />
+    </Player>
+    <Player No="208652" NoShirt="4" IsCaptain="true">
+      <VolleyballPlayer No="1023742" NoPlayer="208652" Birthdate="2010-01-01" Block="2840000" ClubName="Eczacıbaşı" FirstNamePlayer="Ecrin Selis" Height="1850000" IsCaptain="true" LastNamePlayer="Türkyaşar" NbSelOther="15" Position="6" Spike="3050000" TeamNamePlayer="Türkyaşar" Weight="73000000" />
+    </Player>
+    <Player No="223532" NoShirt="5">
+      <VolleyballPlayer No="1023743" NoPlayer="223532" Birthdate="2011-03-07" Block="2820000" ClubName="THY" FirstNamePlayer="Öykü" Height="1750000" LastNamePlayer="Durgun" NbSelOther="20" Position="6" Spike="2870000" TeamNamePlayer="Durgun" Weight="66000000" />
+    </Player>
+    <Player No="213951" NoShirt="6" IsLibero="true">
+      <VolleyballPlayer No="1023774" NoPlayer="213951" Birthdate="2010-06-23" Block="2750000" ClubName="THY" FirstNamePlayer="Asya" Height="1700000" IsLibero="true" LastNamePlayer="Şener" NbSelOther="5" Position="4" Spike="2800000" TeamNamePlayer="Şener" Weight="60000000" />
+    </Player>
+    <Player No="213950" NoShirt="8">
+      <VolleyballPlayer No="1023745" NoPlayer="213950" Birthdate="2010-01-31" Block="2990000" ClubName="Nilüfer Belediye" FirstNamePlayer="Ayşe Naz" Height="1880000" LastNamePlayer="Kurtulan" NbSelOther="15" Position="3" Spike="3100000" TeamNamePlayer="Kurtulan" Weight="80000000" />
+    </Player>
+    <Player No="219099" NoShirt="9">
+      <VolleyballPlayer No="1023738" NoPlayer="219099" Birthdate="2011-04-09" Block="2960000" ClubName="Vakıfbank" FirstNamePlayer="Suden Defne" Height="1850000" LastNamePlayer="Kaçan" Position="3" Spike="3030000" TeamNamePlayer="Kaçan" Weight="75000000" />
+    </Player>
+    <Player No="235191" NoShirt="11">
+      <VolleyballPlayer No="1023731" NoPlayer="235191" Birthdate="2011-02-11" Block="2960000" ClubName="Eczacıbaşı" FirstNamePlayer="Zeynep" Height="1840000" LastNamePlayer="Bezircioğlu" Position="3" Spike="3070000" TeamNamePlayer="Bezircioğlu" Weight="64000000" />
+    </Player>
+    <Player No="213949" NoShirt="14">
+      <VolleyballPlayer No="1023751" NoPlayer="213949" Birthdate="2010-05-11" Block="2890000" ClubName="Vakıfbank" FirstNamePlayer="Nejla" Height="1890000" LastNamePlayer="Guzonjic" NbSelOther="20" Position="3" Spike="2950000" TeamNamePlayer="Guzonjic" Weight="86000000" />
+    </Player>
+    <Player No="219111" NoShirt="16">
+      <VolleyballPlayer No="1023744" NoPlayer="219111" Birthdate="2010-02-26" Block="2900000" ClubName="THY" FirstNamePlayer="Çağla" Height="1860000" LastNamePlayer="Çağlayandere" NbSelOther="15" Position="6" Spike="2940000" TeamNamePlayer="Çağlayandere" Weight="68000000" />
+    </Player>
+    <Player No="223541" NoShirt="19">
+      <VolleyballPlayer No="1023753" NoPlayer="223541" Birthdate="2011-05-06" Block="2890000" ClubName="Eczacıbaşı" FirstNamePlayer="Aylin Ecrin" Height="1790000" LastNamePlayer="Uzuner" NbSelOther="15" Position="6" Spike="2950000" TeamNamePlayer="Uzuner" Weight="56000000" />
+    </Player>
+    <Player No="219107" NoShirt="20">
+      <VolleyballPlayer No="1023739" NoPlayer="219107" Birthdate="2010-06-21" Block="3020000" ClubName="Beşiktaş" FirstNamePlayer="Zeynep Doğa" Height="1850000" LastNamePlayer="Alpay" NbSelOther="5" Position="6" Spike="3100000" TeamNamePlayer="Alpay" Weight="76000000" />
+    </Player>
+    <Player No="219116" NoShirt="33">
+      <VolleyballPlayer No="1023733" NoPlayer="219116" Birthdate="2010-02-22" Block="2900000" ClubName="Eczacıbaşı" FirstNamePlayer="Ela" Height="1840000" LastNamePlayer="Demirağ" Position="1" Spike="2930000" TeamNamePlayer="Demirağ" Weight="62000000" />
+    </Player>
+    <Player No="213945" NoShirt="35">
+      <VolleyballPlayer No="1023755" NoPlayer="213945" Birthdate="2010-08-28" Block="2890000" ClubName="Eczacıbaşı" FirstNamePlayer="Halise" Height="1800000" LastNamePlayer="Metin" NbSelOther="5" Position="6" Spike="2950000" TeamNamePlayer="Metin" Weight="65000000" />
+    </Player>
+    <Player No="213934" NoShirt="44">
+      <VolleyballPlayer No="1023740" NoPlayer="213934" Birthdate="2010-12-03" Block="2090000" ClubName="GÖZTEPE" FirstNamePlayer="Melis" Height="1870000" LastNamePlayer="Erdoğan" NbSelOther="20" Position="1" Spike="3060000" TeamNamePlayer="Erdoğan" Weight="67000000" />
+    </Player>
+    <VolleyballTeam No="8720" LiberoUniformColor1="Red" LiberoUniformColor2="White" LiberoUniformColor3="Black" LiberoUniformColorOptional="Opposite" ShirtColor1="Red" ShirtColor2="White" ShirtColor3="Black" ShirtColorOptional="Opposite" />
+  </Team>
+  <Referee FederationCode="POR" FirstName="Pedro Miguel" Gender="0" LastName="Pereira Lopes Pinto" No="152743" />
+  <Referee FederationCode="PAR" FirstName="Cristina Maria" Gender="1" LastName="Gamarra Rivarola" No="159377" />
+  <Set BeginTimeOffset="0" No="1" Duration="1620" NbChallengeRefusedTeamA="1" NbChallengeRefusedTeamB="2" NbChallengeRequestedTeamA="1" NbChallengeRequestedTeamB="2" NbRallies="48" NbRemainingSubstitutionTeamA="6" NbRemainingSubstitutionTeamB="6" NbSetPointsTeamA="1" NbSubstitutionTeamA="2" NbSubstitutionTeamB="2" NbTimeoutTeamA="2" NbTimeoutTeamB="2" NoServingTeam="8713" NoTeamAtLeft="8713" NoTeamAtRight="8720" PointsTeamA="25" PointsTeamB="23" TimePlayed="684831">
+    <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="229658" NoLibero2="234263" NoSubstitute6="229656" NoTeam="8713" />
+    <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="235191" NoLibero2="213951" NoSubstitute6="213934" NoTeam="8720" />
+    <Events>
+      <Rally No="1" Duration="10158" FaultAdmission="0" PointsTeamA="0" PointsTeamB="1" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="2" Duration="15716" FaultAdmission="0" PointsTeamA="0" PointsTeamB="2" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="3" Duration="19350" FaultAdmission="0" PointsTeamA="0" PointsTeamB="3" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="4" Duration="12938" FaultAdmission="0" PointsTeamA="1" PointsTeamB="3" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="5" Duration="20297" FaultAdmission="0" PointsTeamA="2" PointsTeamB="3" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="6" Duration="21474" FaultAdmission="0" PointsTeamA="2" PointsTeamB="4" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="7" Duration="11386" FaultAdmission="0" PointsTeamA="2" PointsTeamB="5" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="8" Duration="19748" FaultAdmission="0" PointsTeamA="3" PointsTeamB="5" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="9" Duration="10519" FaultAdmission="0" PointsTeamA="3" PointsTeamB="6" UserSetsScore="true">
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="10" Duration="18267" FaultAdmission="0" PointsTeamA="4" PointsTeamB="6" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213949" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="11" Duration="9858" FaultAdmission="0" PointsTeamA="5" PointsTeamB="6" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="12" Duration="8586" FaultAdmission="0" PointsTeamA="6" PointsTeamB="6" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="13" Duration="6863" FaultAdmission="0" PointsTeamA="6" PointsTeamB="7" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="14" Duration="12826" FaultAdmission="0" PointsTeamA="6" PointsTeamB="8" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="15" Duration="13452" FaultAdmission="0" PointsTeamA="7" PointsTeamB="8" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="16" Duration="10442" FaultAdmission="0" PointsTeamA="8" PointsTeamB="8" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="17" Duration="8747" FaultAdmission="0" PointsTeamA="8" PointsTeamB="9" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="18" Duration="11789" FaultAdmission="0" PointsTeamA="9" PointsTeamB="9" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="208652" NoPlayer2="235191" NoPlayer3="219116" NoPlayer4="219107" NoPlayer5="213951" NoPlayer6="219111" NoTeam="8720" />
+      </Rally>
+      <Rally No="19" Duration="13296" FaultAdmission="0" PointsTeamA="9" PointsTeamB="10" UserSetsScore="true">
+        <LineUp NoPlayer1="229658" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="208652" NoPlayer2="235191" NoPlayer3="219116" NoPlayer4="219107" NoPlayer5="213951" NoPlayer6="219111" NoTeam="8720" />
+      </Rally>
+      <Rally No="20" Duration="7531" FaultAdmission="0" PointsTeamA="10" PointsTeamB="10" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="235191" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="21" Duration="20155" FaultAdmission="0" PointsTeamA="11" PointsTeamB="10" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="22" Duration="11405" FaultAdmission="0" PointsTeamA="12" PointsTeamB="10" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="23" Duration="14421" FaultAdmission="0" PointsTeamA="12" PointsTeamB="11" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="24" Duration="12714" FaultAdmission="0" PointsTeamA="12" PointsTeamB="12" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="25" Duration="27386" FaultAdmission="0" PointsTeamA="12" PointsTeamB="13" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="26" Duration="15383" FaultAdmission="0" PointsTeamA="13" PointsTeamB="13" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="27" Duration="10121" FaultAdmission="0" PointsTeamA="13" PointsTeamB="14" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="28" Duration="13430" FaultAdmission="0" PointsTeamA="14" PointsTeamB="14" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="29" Duration="14579" FaultAdmission="0" PointsTeamA="15" PointsTeamB="14" UserSetsScore="true">
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="30" Duration="18246" FaultAdmission="0" PointsTeamA="15" PointsTeamB="15" UserSetsScore="true">
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="31" Duration="9113" FaultAdmission="0" PointsTeamA="16" PointsTeamB="15" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213949" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="32" Duration="15955" FaultAdmission="0" PointsTeamA="17" PointsTeamB="15" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="33" Duration="10240" FaultAdmission="0" PointsTeamA="18" PointsTeamB="15" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="34" Duration="15328" FaultAdmission="0" PointsTeamA="19" PointsTeamB="15" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="35" Duration="13687" FaultAdmission="0" PointsTeamA="19" PointsTeamB="16" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="36" Duration="9713" FaultAdmission="0" PointsTeamA="20" PointsTeamB="16" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="37" Duration="15521" FaultAdmission="0" PointsTeamA="20" PointsTeamB="17" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="38" Duration="19413" FaultAdmission="0" PointsTeamA="21" PointsTeamB="17" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="208652" NoPlayer2="235191" NoPlayer3="219116" NoPlayer4="219107" NoPlayer5="213951" NoPlayer6="219111" NoTeam="8720" />
+      </Rally>
+      <Rally No="39" Duration="16649" FaultAdmission="0" PointsTeamA="21" PointsTeamB="18" UserSetsScore="true">
+        <LineUp NoPlayer1="229656" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="208652" NoPlayer2="235191" NoPlayer3="219116" NoPlayer4="219107" NoPlayer5="213951" NoPlayer6="219111" NoTeam="8720" />
+      </Rally>
+      <Rally No="40" Duration="15977" FaultAdmission="0" PointsTeamA="21" PointsTeamB="19" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="213934" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="41" Duration="9647" FaultAdmission="0" PointsTeamA="22" PointsTeamB="19" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="213934" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="42" Duration="11085" FaultAdmission="0" PointsTeamA="22" PointsTeamB="20" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="43" Duration="13343" FaultAdmission="0" PointsTeamA="22" PointsTeamB="21" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="44" Duration="15256" FaultAdmission="0" PointsTeamA="22" PointsTeamB="22" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="45" Duration="18277" FaultAdmission="0" PointsTeamA="22" PointsTeamB="23" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="46" Duration="14609" FaultAdmission="0" PointsTeamA="23" PointsTeamB="23" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="47" Duration="8300" FaultAdmission="0" PointsTeamA="24" PointsTeamB="23" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="48" Duration="31635" FaultAdmission="0" PointsTeamA="25" PointsTeamB="23" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+    </Events>
+  </Set>
+  <Set BeginTimeOffset="1800000" No="2" Duration="1080" NbChallengeRefusedTeamB="1" NbChallengeRequestedTeamB="1" NbRallies="36" NbRemainingSubstitutionTeamA="8" NbRemainingSubstitutionTeamB="3" NbSetPointsTeamA="2" NbSubstitutionTeamB="5" NbTimeoutTeamB="2" NoServingTeam="8713" NoTeamAtLeft="8720" NoTeamAtRight="8713" PointsTeamA="25" PointsTeamB="11" TimePlayed="486433">
+    <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="229658" NoLibero2="234263" NoTeam="8713" />
+    <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="235191" NoLibero2="213951" NoSubstitute1="213934" NoSubstitute2="213945" NoSubstitute4="223541" NoSubstitute5="223532" NoSubstitute6="213950" NoTeam="8720" />
+    <Events>
+      <Rally No="49" Duration="12015" FaultAdmission="0" PointsTeamA="1" PointsTeamB="0" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="50" Duration="10948" FaultAdmission="0" PointsTeamA="1" PointsTeamB="1" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="51" Duration="12202" FaultAdmission="0" PointsTeamA="2" PointsTeamB="1" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="52" Duration="13766" FaultAdmission="0" PointsTeamA="2" PointsTeamB="2" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="53" Duration="15492" FaultAdmission="0" PointsTeamA="3" PointsTeamB="2" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="213949" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="54" Duration="22233" FaultAdmission="0" PointsTeamA="4" PointsTeamB="2" UserSetsScore="true">
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="55" Duration="18694" FaultAdmission="0" PointsTeamA="5" PointsTeamB="2" UserSetsScore="true">
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="56" Duration="21111" FaultAdmission="0" PointsTeamA="5" PointsTeamB="3" UserSetsScore="true">
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="57" Duration="9716" FaultAdmission="0" PointsTeamA="6" PointsTeamB="3" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="58" Duration="13406" FaultAdmission="0" PointsTeamA="7" PointsTeamB="3" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="59" Duration="19784" FaultAdmission="0" PointsTeamA="7" PointsTeamB="4" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="60" Duration="16506" FaultAdmission="0" PointsTeamA="8" PointsTeamB="4" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="208652" NoPlayer2="235191" NoPlayer3="219116" NoPlayer4="219107" NoPlayer5="213951" NoPlayer6="219111" NoTeam="8720" />
+      </Rally>
+      <Rally No="61" Duration="13375" FaultAdmission="0" PointsTeamA="8" PointsTeamB="5" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="208652" NoPlayer2="235191" NoPlayer3="219116" NoPlayer4="219107" NoPlayer5="213951" NoPlayer6="219111" NoTeam="8720" />
+      </Rally>
+      <Rally No="62" Duration="17155" FaultAdmission="0" PointsTeamA="9" PointsTeamB="5" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="235191" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="63" Duration="14158" FaultAdmission="0" PointsTeamA="10" PointsTeamB="5" UserSetsScore="true">
+        <LineUp NoPlayer1="229658" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="64" Duration="27149" FaultAdmission="0" PointsTeamA="11" PointsTeamB="5" UserSetsScore="true">
+        <LineUp NoPlayer1="229658" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="65" Duration="21908" FaultAdmission="0" PointsTeamA="12" PointsTeamB="5" UserSetsScore="true">
+        <LineUp NoPlayer1="229658" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="66" Duration="16953" FaultAdmission="0" PointsTeamA="12" PointsTeamB="6" UserSetsScore="true">
+        <LineUp NoPlayer1="229658" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="223541" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="67" Duration="15721" FaultAdmission="0" PointsTeamA="13" PointsTeamB="6" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="223541" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="68" Duration="7666" FaultAdmission="0" PointsTeamA="14" PointsTeamB="6" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="223541" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="69" Duration="16603" FaultAdmission="0" PointsTeamA="14" PointsTeamB="7" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="213945" NoPlayer3="213949" NoPlayer4="223541" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="70" Duration="8701" FaultAdmission="0" PointsTeamA="15" PointsTeamB="7" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213945" NoPlayer2="213949" NoPlayer3="223541" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="71" Duration="10773" FaultAdmission="0" PointsTeamA="16" PointsTeamB="7" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="213945" NoPlayer2="213949" NoPlayer3="223541" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="72" Duration="5337" FaultAdmission="0" PointsTeamA="16" PointsTeamB="8" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="213945" NoPlayer2="213949" NoPlayer3="223541" NoPlayer4="223532" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="73" Duration="7631" FaultAdmission="0" PointsTeamA="17" PointsTeamB="8" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="213949" NoPlayer2="223541" NoPlayer3="223532" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="213945" NoTeam="8720" />
+      </Rally>
+      <Rally No="74" Duration="10360" FaultAdmission="0" PointsTeamA="17" PointsTeamB="9" UserSetsScore="true">
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="223541" NoPlayer3="223532" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="213945" NoTeam="8720" />
+      </Rally>
+      <Rally No="75" Duration="12626" FaultAdmission="0" PointsTeamA="18" PointsTeamB="9" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="223541" NoPlayer2="223532" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="213945" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="76" Duration="5219" FaultAdmission="0" PointsTeamA="19" PointsTeamB="9" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="223541" NoPlayer2="223532" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="213945" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="77" Duration="8331" FaultAdmission="0" PointsTeamA="20" PointsTeamB="9" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="223541" NoPlayer2="223532" NoPlayer3="213950" NoPlayer4="213934" NoPlayer5="213945" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="78" Duration="7459" FaultAdmission="0" PointsTeamA="20" PointsTeamB="10" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="223541" NoPlayer2="223532" NoPlayer3="213950" NoPlayer4="213934" NoPlayer5="213945" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="79" Duration="13601" FaultAdmission="0" PointsTeamA="20" PointsTeamB="11" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="223532" NoPlayer2="213950" NoPlayer3="213934" NoPlayer4="213945" NoPlayer5="213951" NoPlayer6="223541" NoTeam="8720" />
+      </Rally>
+      <Rally No="80" Duration="11896" FaultAdmission="0" PointsTeamA="21" PointsTeamB="11" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="223532" NoPlayer2="213950" NoPlayer3="213934" NoPlayer4="213945" NoPlayer5="213951" NoPlayer6="223541" NoTeam="8720" />
+      </Rally>
+      <Rally No="81" Duration="10006" FaultAdmission="0" PointsTeamA="22" PointsTeamB="11" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="223532" NoPlayer2="213950" NoPlayer3="213934" NoPlayer4="213945" NoPlayer5="213951" NoPlayer6="223541" NoTeam="8720" />
+      </Rally>
+      <Rally No="82" Duration="11852" FaultAdmission="0" PointsTeamA="23" PointsTeamB="11" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="223532" NoPlayer2="213950" NoPlayer3="213934" NoPlayer4="213945" NoPlayer5="213951" NoPlayer6="223541" NoTeam="8720" />
+      </Rally>
+      <Rally No="83" Duration="10780" FaultAdmission="0" PointsTeamA="24" PointsTeamB="11" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="223532" NoPlayer2="213950" NoPlayer3="213934" NoPlayer4="213945" NoPlayer5="213951" NoPlayer6="223541" NoTeam="8720" />
+      </Rally>
+      <Rally No="84" Duration="15300" FaultAdmission="0" PointsTeamA="25" PointsTeamB="11" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="223532" NoPlayer2="213950" NoPlayer3="213934" NoPlayer4="213945" NoPlayer5="213951" NoPlayer6="223541" NoTeam="8720" />
+      </Rally>
+    </Events>
+  </Set>
+  <Set BeginTimeOffset="3120000" No="3" Duration="1620" NbChallengeAcceptedTeamB="1" NbChallengeRefusedTeamA="2" NbChallengeRefusedTeamB="1" NbChallengeRequestedTeamA="2" NbChallengeRequestedTeamB="2" NbRallies="48" NbRemainingSubstitutionTeamA="4" NbRemainingSubstitutionTeamB="2" NbSetPointsTeamA="3" NbSubstitutionTeamA="4" NbSubstitutionTeamB="6" NbTimeoutTeamA="2" NbTimeoutTeamB="2" NoServingTeam="8713" NoTeamAtLeft="8713" NoTeamAtRight="8720" PointsTeamA="25" PointsTeamB="23" TimePlayed="576783">
+    <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="229658" NoLibero2="234263" NoSubstitute3="229342" NoSubstitute6="229656" NoTeam="8713" />
+    <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="235191" NoLibero2="213951" NoSubstitute1="213934" NoSubstitute5="213945" NoSubstitute6="223532" NoTeam="8720" />
+    <Events>
+      <Rally No="85" Duration="9617" FaultAdmission="0" PointsTeamA="1" PointsTeamB="0" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="86" Duration="11997" FaultAdmission="0" PointsTeamA="2" PointsTeamB="0" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="87" Duration="23918" FaultAdmission="0" PointsTeamA="2" PointsTeamB="1" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="88" Duration="13986" FaultAdmission="0" PointsTeamA="3" PointsTeamB="1" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="89" Duration="15084" FaultAdmission="0" PointsTeamA="3" PointsTeamB="2" UserSetsScore="true">
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="90" Duration="7986" FaultAdmission="0" PointsTeamA="4" PointsTeamB="2" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213949" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="91" Duration="17908" FaultAdmission="0" PointsTeamA="4" PointsTeamB="3" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="92" Duration="11283" FaultAdmission="0" PointsTeamA="4" PointsTeamB="4" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="93" Duration="15646" FaultAdmission="0" PointsTeamA="5" PointsTeamB="4" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="94" Duration="14352" FaultAdmission="0" PointsTeamA="6" PointsTeamB="4" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="95" Duration="4192" FaultAdmission="0" PointsTeamA="6" PointsTeamB="5" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="96" Duration="11022" FaultAdmission="0" PointsTeamA="7" PointsTeamB="5" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="208652" NoPlayer2="235191" NoPlayer3="219116" NoPlayer4="219107" NoPlayer5="213951" NoPlayer6="219111" NoTeam="8720" />
+      </Rally>
+      <Rally No="97" Duration="11725" FaultAdmission="0" PointsTeamA="7" PointsTeamB="6" UserSetsScore="true">
+        <LineUp NoPlayer1="229658" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="208652" NoPlayer2="235191" NoPlayer3="219116" NoPlayer4="219107" NoPlayer5="213951" NoPlayer6="219111" NoTeam="8720" />
+      </Rally>
+      <Rally No="98" Duration="10973" FaultAdmission="0" PointsTeamA="8" PointsTeamB="6" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="235191" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="99" Duration="16929" FaultAdmission="0" PointsTeamA="9" PointsTeamB="6" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="100" Duration="9614" FaultAdmission="0" PointsTeamA="10" PointsTeamB="6" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="101" Duration="11833" FaultAdmission="0" PointsTeamA="10" PointsTeamB="7" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="213945" NoTeam="8720" />
+      </Rally>
+      <Rally No="102" Duration="15085" FaultAdmission="0" PointsTeamA="11" PointsTeamB="7" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="213945" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="103" Duration="6821" FaultAdmission="0" PointsTeamA="12" PointsTeamB="7" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="213945" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="104" Duration="10152" FaultAdmission="0" PointsTeamA="12" PointsTeamB="8" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="213945" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="105" Duration="11909" FaultAdmission="0" PointsTeamA="13" PointsTeamB="8" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="213945" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="106" Duration="9458" FaultAdmission="0" PointsTeamA="13" PointsTeamB="9" UserSetsScore="true">
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="107" Duration="17962" FaultAdmission="0" PointsTeamA="13" PointsTeamB="10" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213949" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="108" Duration="15705" FaultAdmission="0" PointsTeamA="13" PointsTeamB="11" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213949" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="109" Duration="17282" FaultAdmission="0" PointsTeamA="13" PointsTeamB="12" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213949" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="110" Duration="9154" FaultAdmission="0" PointsTeamA="13" PointsTeamB="13" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213949" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="111" Duration="9356" FaultAdmission="0" PointsTeamA="14" PointsTeamB="13" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213949" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="112" Duration="6453" FaultAdmission="0" PointsTeamA="14" PointsTeamB="14" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="113" Duration="9544" FaultAdmission="0" PointsTeamA="14" PointsTeamB="15" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="114" Duration="8819" FaultAdmission="0" PointsTeamA="15" PointsTeamB="15" UserSetsScore="true">
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229658" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="115" Duration="12994" FaultAdmission="0" PointsTeamA="15" PointsTeamB="16" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="219111" NoPlayer2="208652" NoPlayer3="235191" NoPlayer4="219116" NoPlayer5="219107" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="116" Duration="9364" FaultAdmission="0" PointsTeamA="16" PointsTeamB="16" UserSetsScore="true">
+        <LineUp NoPlayer1="229657" NoPlayer2="229658" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <LineUp NoPlayer1="208652" NoPlayer2="235191" NoPlayer3="219116" NoPlayer4="219107" NoPlayer5="213951" NoPlayer6="219111" NoTeam="8720" />
+      </Rally>
+      <Rally No="117" Duration="14302" FaultAdmission="0" PointsTeamA="16" PointsTeamB="17" UserSetsScore="true">
+        <LineUp NoPlayer1="229656" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="208652" NoPlayer2="235191" NoPlayer3="219116" NoPlayer4="219107" NoPlayer5="213951" NoPlayer6="219111" NoTeam="8720" />
+      </Rally>
+      <Rally No="118" Duration="7095" FaultAdmission="0" PointsTeamA="16" PointsTeamB="18" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="223532" NoPlayer2="213934" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="119" Duration="9861" FaultAdmission="0" PointsTeamA="17" PointsTeamB="18" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <LineUp NoPlayer1="223532" NoPlayer2="213934" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="120" Duration="15637" FaultAdmission="0" PointsTeamA="18" PointsTeamB="18" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="121" Duration="7772" FaultAdmission="0" PointsTeamA="19" PointsTeamB="18" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="122" Duration="16518" FaultAdmission="0" PointsTeamA="20" PointsTeamB="18" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="123" Duration="16038" FaultAdmission="0" PointsTeamA="21" PointsTeamB="18" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="124" Duration="15739" FaultAdmission="0" PointsTeamA="21" PointsTeamB="19" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="213951" NoPlayer2="219116" NoPlayer3="219107" NoPlayer4="213949" NoPlayer5="219111" NoPlayer6="208652" NoTeam="8720" />
+      </Rally>
+      <Rally No="125" Duration="14553" FaultAdmission="0" PointsTeamA="22" PointsTeamB="19" UserSetsScore="true">
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="126" Duration="7369" FaultAdmission="0" PointsTeamA="23" PointsTeamB="19" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="127" Duration="8118" FaultAdmission="0" PointsTeamA="23" PointsTeamB="20" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219116" NoPlayer2="219107" NoPlayer3="213949" NoPlayer4="219111" NoPlayer5="208652" NoPlayer6="213951" NoTeam="8720" />
+      </Rally>
+      <Rally No="128" Duration="19122" FaultAdmission="0" PointsTeamA="23" PointsTeamB="21" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="129" Duration="11978" FaultAdmission="0" PointsTeamA="24" PointsTeamB="21" UserSetsScore="true">
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="130" Duration="10829" FaultAdmission="0" PointsTeamA="24" PointsTeamB="22" UserSetsScore="true">
+        <LineUp NoPlayer1="229342" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="219107" NoPlayer2="213949" NoPlayer3="219111" NoPlayer4="208652" NoPlayer5="213951" NoPlayer6="219116" NoTeam="8720" />
+      </Rally>
+      <Rally No="131" Duration="5170" FaultAdmission="0" PointsTeamA="24" PointsTeamB="23" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213949" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+      <Rally No="132" Duration="8559" FaultAdmission="0" PointsTeamA="25" PointsTeamB="23" UserSetsScore="true">
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229658" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <LineUp NoPlayer1="213949" NoPlayer2="219111" NoPlayer3="208652" NoPlayer4="235191" NoPlayer5="219116" NoPlayer6="219107" NoTeam="8720" />
+      </Rally>
+    </Events>
+  </Set>
+</VolleyLive></Responses>
