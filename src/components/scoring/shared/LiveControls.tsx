@@ -122,15 +122,24 @@ export function LiveScoreGrid({
   );
 }
 
-/** Two-column per-team row for T/O / Sub / discipline-specific controls. */
+/**
+ * Two-column per-team row for T/O / Sub / discipline-specific controls.
+ * Columns follow the court sides (like LiveScoreGrid above them): the buttons
+ * carry no team name, so their position under the team's score button is the
+ * scorer's only cue — a fixed A/B order would target the wrong team whenever
+ * team A plays on the right court.
+ */
 export function TeamActionsGrid({
+  teamASide,
   children,
 }: {
+  teamASide: Side;
   children: (team: TeamId) => React.ReactNode;
 }) {
+  const order = teamASide === "RIGHT" ? (["B", "A"] as const) : (["A", "B"] as const);
   return (
     <div className="grid grid-cols-2 gap-3">
-      {(["A", "B"] as const).map((t) => (
+      {order.map((t) => (
         <div key={t} className="flex flex-wrap items-center justify-center gap-1.5">
           {children(t)}
         </div>

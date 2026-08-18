@@ -214,25 +214,22 @@ export function BeachActionBar({
         confirmUndoLabel={confirmUndoLabel}
       />
 
+      {/* Timeout buttons follow the court sides, matching the point buttons
+          and the officiating rows of the other disciplines. */}
       <div className="flex flex-wrap items-center justify-center gap-2">
-        <SecondaryButton
-          disabled={timeoutFull("A")}
-          onClick={() => dispatch({ type: "TIMEOUT_REQUEST", team: "A" })}
-        >
-          {t("scoring.timeoutTeam", {
-            team: teamAName,
-            remaining: timeoutCap - set.timeoutsUsedA,
-          })}
-        </SecondaryButton>
-        <SecondaryButton
-          disabled={timeoutFull("B")}
-          onClick={() => dispatch({ type: "TIMEOUT_REQUEST", team: "B" })}
-        >
-          {t("scoring.timeoutTeam", {
-            team: teamBName,
-            remaining: timeoutCap - set.timeoutsUsedB,
-          })}
-        </SecondaryButton>
+        {[leftTeam, rightTeam].map((team) => (
+          <SecondaryButton
+            key={team}
+            disabled={timeoutFull(team)}
+            onClick={() => dispatch({ type: "TIMEOUT_REQUEST", team })}
+          >
+            {t("scoring.timeoutTeam", {
+              team: team === "A" ? teamAName : teamBName,
+              remaining:
+                timeoutCap - (team === "A" ? set.timeoutsUsedA : set.timeoutsUsedB),
+            })}
+          </SecondaryButton>
+        ))}
       </div>
       {forfeit}
     </div>

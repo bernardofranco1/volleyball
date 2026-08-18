@@ -179,7 +179,7 @@ export function IndoorActionBar({
       />
 
       {/* Per-team officiating row */}
-      <TeamActionsGrid>
+      <TeamActionsGrid teamASide={set.teamASide}>
         {(team) => (
           <>
             <SecondaryButton disabled={toFull(team)} onClick={() => dispatch({ type: "TIMEOUT_REQUEST", team })}>

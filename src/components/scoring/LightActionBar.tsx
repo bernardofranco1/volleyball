@@ -133,7 +133,7 @@ export function LightActionBar() {
         confirmUndoLabel={confirmUndoLabel}
       />
 
-      <TeamActionsGrid>
+      <TeamActionsGrid teamASide={set.teamASide}>
         {(team) => (
           <>
             <SecondaryButton disabled={toFull(team)} onClick={() => dispatch({ type: "TIMEOUT_REQUEST", team })}>
