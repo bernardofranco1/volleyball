@@ -7,7 +7,9 @@ turns the user's 2026-08-18 feedback into binding requirements, and — the
 important part — replaces eyeballing with **measured geometry and a pixel-diff
 gate**, so "exact" is verified, not asserted.
 
-Written for an implementer with no prior context. spec/34's ground rules all
+Written for an implementer with no prior context. Deliverables include a
+user-validation mock (W9) — the user signs off on the mock URLs, so they are
+part of done, not an extra. spec/34's ground rules all
 still apply (read them first: read-only VIS, raw-XML POST, PollDelay, no
 migrations, no new deps, verification gate). This spec ADDS the fidelity
 rules below.
@@ -136,7 +138,40 @@ top-centre logo slot.
    BRA/JPN flag interiors may be excluded (different flag sources), the box
    POSITION may not.
 
-**W9 — gate & wrap.** spec/34 gate (tsc/lint/test/build) + updated fixture
+**W9 — validation mock (user acceptance vehicle).** The user validates the
+whole fidelity pass against ONE real match rendered as if live: **VIS match
+21546 — Japan v Poland, VNL 2025 quarterfinal** (Poland 3-0: 25-23, 26-24,
+25-12; full rosters, per-rally rotations, team stats, and a court switch —
+Japan is at the LEFT in set 3, so the U-shape side mapping is visible). The
+payload is captured in
+`src/__tests__/fixtures/vis/volley-live-mock-21546.xml` (Options 2584,
+2026-08-18) — serve THAT, never live-fetch 21546.
+
+- `src/lib/vis-live/mock.ts`: embeds the fixture XML (generate a TS module
+  with the XML as a JSON-escaped string — do not fs.read at runtime, bundling
+  must carry it) and exports `mockBoard()`: the payload transformed so the
+  latest stage reads as LIVE — strip `Match@EndDateTime` and the LAST set's
+  `Duration`. Result: status LIVE, set 3 at 12-25 (match point pending),
+  serving side real (`NoServingTeam` = Poland), current rotation = last
+  LineUps, ladder sets 1-2 decided, stats populated.
+- Routes accept the literal id `mock` alongside digits:
+  `/api/vis/board/mock` returns the transformed payload (`Cache-Control:
+  no-store`, allowlist bypassed for this one literal — it never touches VIS);
+  the board page special-cases it (skip the schedule-membership check);
+  `/Scoreboard/vis/mock` short URL redirects into
+  `comp_vis_1670`'s board path with id `mock`.
+- The notice slot (bottom-right) shows `MOCK · 21546 JPN-POL` on every screen
+  so the mock can never be mistaken for a real feed.
+- Validation URLs for the user (all on production after promote):
+  `/Scoreboard/vis/mock` (scoreboard, live state) ·
+  `/Scoreboard/vis/mock?screen=stats` (set-break screen) ·
+  `/Scoreboard/vis/mock?layout=ushape` (U-shape; note Japan on the LEFT rail)
+  · `/Scoreboard/vis/mock?layout=ushape&window=black` (standalone).
+- Tests: mapper over the mock fixture (codes JPN/POL, setsWon 0-3, set-3 last
+  LineUp differs from first, `teamAAtLeft === true` in set 3) and the
+  transformation (EndDateTime + last Duration stripped ⇒ LIVE, serving "B").
+
+**W10 — gate & wrap.** spec/34 gate (tsc/lint/test/build) + updated fixture
 tests + a short "implemented" note appended to this file. Do not promote —
 the user reviews the diff numbers first.
 
