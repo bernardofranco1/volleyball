@@ -159,6 +159,10 @@ export const competitions = pgTable(
       enum: ["SENIOR", "JUNIOR", "YOUTH", "KID"],
     }),
     color: text("color"), // hex accent (nullable) — tints the name on the Matches page
+    // FIVB VIS tournament number (spec/34): links a competition to an event
+    // scored in VIS so the read-only live scoreboard can serve its matches.
+    // Nullable — almost every competition is scored here, not mirrored.
+    visTournamentNo: integer("vis_tournament_no"),
     status: text("status", { enum: ["DRAFT", "ACTIVE", "FINISHED"] })
       .default("DRAFT")
       .notNull(),

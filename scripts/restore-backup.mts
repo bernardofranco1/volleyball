@@ -29,7 +29,7 @@ const EXPECTED_FORMAT = 1;
 // drifted to 8 while the exporter stamped 14 — every backup since migration 9
 // would have been refused here despite restoring fine (exports carry full rows,
 // so additive columns flow through).
-const KNOWN_JOURNAL_IDX = 22;
+const KNOWN_JOURNAL_IDX = 23;
 
 // Restore order = EXPORTED_TABLES order (FK-safe). Column lists come from the
 // backup rows themselves (drizzle exports camelCase keys → snake_case here).

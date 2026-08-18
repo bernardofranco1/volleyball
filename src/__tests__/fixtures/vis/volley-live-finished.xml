@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><Responses><VolleyLive PollDelay="20" Version="57012219">
+  <Match No="27062" Status="25" NbRallies="132" NbSpectators="2204" NoReferee1="152743" NoReferee2="159377" NoTeamA="8713" NoTeamB="8720" BeginDateTime="2026-08-16T23:00:00Z" MatchPointsA="3" MatchPointsB="0" EndDateTime="2026-08-17T00:23:03Z" ResultType="0" TimePlayed="1748047" />
+  <Tournament Code="GU172026" Name="FIVB Volleyball Girls' U17 World Championship 2026" No="1671" />
+  <Pool Code="F1-2" Name="Final 1-2" No="5812" />
+  <Team Code="USA" Name="United States" No="8713" />
+  <Team Code="TUR" Name="Türkiye" No="8720" />
+  <Set BeginTimeOffset="0" No="1" Duration="1620" NbChallengeRefusedTeamA="1" NbChallengeRefusedTeamB="2" NbChallengeRequestedTeamA="1" NbChallengeRequestedTeamB="2" NbRallies="48" NbRemainingSubstitutionTeamA="6" NbRemainingSubstitutionTeamB="6" NbSetPointsTeamA="1" NbSubstitutionTeamA="2" NbSubstitutionTeamB="2" NbTimeoutTeamA="2" NbTimeoutTeamB="2" NoServingTeam="8713" NoTeamAtLeft="8713" NoTeamAtRight="8720" PointsTeamA="25" PointsTeamB="23" TimePlayed="684831" />
+  <Set BeginTimeOffset="1800000" No="2" Duration="1080" NbChallengeRefusedTeamB="1" NbChallengeRequestedTeamB="1" NbRallies="36" NbRemainingSubstitutionTeamA="8" NbRemainingSubstitutionTeamB="3" NbSetPointsTeamA="2" NbSubstitutionTeamB="5" NbTimeoutTeamB="2" NoServingTeam="8713" NoTeamAtLeft="8720" NoTeamAtRight="8713" PointsTeamA="25" PointsTeamB="11" TimePlayed="486433" />
+  <Set BeginTimeOffset="3120000" No="3" Duration="1620" NbChallengeAcceptedTeamB="1" NbChallengeRefusedTeamA="2" NbChallengeRefusedTeamB="1" NbChallengeRequestedTeamA="2" NbChallengeRequestedTeamB="2" NbRallies="48" NbRemainingSubstitutionTeamA="4" NbRemainingSubstitutionTeamB="2" NbSetPointsTeamA="3" NbSubstitutionTeamA="4" NbSubstitutionTeamB="6" NbTimeoutTeamA="2" NbTimeoutTeamB="2" NoServingTeam="8713" NoTeamAtLeft="8713" NoTeamAtRight="8720" PointsTeamA="25" PointsTeamB="23" TimePlayed="576783" />
+</VolleyLive></Responses>

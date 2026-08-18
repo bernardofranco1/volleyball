@@ -1,0 +1,1 @@
+ALTER TABLE "competitions" ADD COLUMN "vis_tournament_no" integer;
