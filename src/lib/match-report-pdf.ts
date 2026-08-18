@@ -10,6 +10,7 @@ import {
   isInterruption,
 } from "@/lib/match-report";
 import { drawSignatureInBox } from "@/lib/scoresheet-pdf";
+import { forfeitReasonLabel } from "@/lib/domain";
 
 
 const PAGE = { margin: 50 };
@@ -419,7 +420,7 @@ function describeLogEvent(
     case "MATCH_END":
       return `Match end — ${team(p.winner)} wins ${p.setsA}-${p.setsB}`;
     case "FORFEIT":
-      return `${p.reason === "RETIREMENT" ? "Retirement" : "Forfeit"} — ${team(p.team)}`;
+      return `${forfeitReasonLabel(String(p.reason))} — ${team(p.team)}`;
     case "SERVICE_ORDER":
       return `Service order declared — ${team(p.team)}`;
     case "LINEUP_CONFIRMED":

@@ -155,3 +155,14 @@ export const OFFICIAL_SHEET_DISCIPLINES: readonly Discipline[] = [
   "BEACH",
   "INDOOR",
 ];
+
+/**
+ * How a forfeit's reason prints on the sheets, the event log and the report
+ * (spec/33 F1). One helper because five renderers used to spell the same
+ * ternary out, and the third reason had to reach all of them at once.
+ */
+export function forfeitReasonLabel(reason: string): string {
+  if (reason === "RETIREMENT") return "Retirement";
+  if (reason === "INCOMPLETE_TEAM") return "Incomplete team";
+  return "Forfeit";
+}

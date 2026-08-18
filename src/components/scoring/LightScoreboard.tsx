@@ -10,6 +10,7 @@ export function LightScoreboard({ competitionName }: { competitionName: string }
   const ctx = useLightMatch();
   return (
     <RotationScoreboard
+      discipline="LIGHT"
       disciplineLabel="Light"
       competitionName={competitionName}
       ctx={ctx}

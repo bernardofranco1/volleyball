@@ -78,7 +78,7 @@ export type LightEventPayload =
       setNumber: SetNumber;
     }
   | { type: "MATCH_END"; winner: TeamId; setsA: number; setsB: number }
-  | { type: "FORFEIT"; team: TeamId; reason: "FORFEIT" | "RETIREMENT" }
+  | { type: "FORFEIT"; team: TeamId; reason: "FORFEIT" | "RETIREMENT" | "INCOMPLETE_TEAM" }
   // One set awarded to the opponent — incomplete team (spec/29 F14). The match
   // continues; FORFEIT above ends it.
   | { type: "SET_DEFAULT"; team: TeamId; reason: "INCOMPLETE_TEAM" | "OTHER" }
@@ -137,6 +137,15 @@ export interface LightSetState {
   subsUsedB: number;
   subSlotsA: Record<string, string | null>;
   subSlotsB: Record<string, string | null>;
+  /**
+   * Players who have entered as a substitute this set — slot still open OR
+   * already exhausted (spec/33 F2, Rule 15.6.2: a substitute may enter "only
+   * once per set"). `subSlots` alone cannot answer this: a returning starter
+   * sets their slot to null, erasing the fact that the substitute was used.
+   * Optional — snapshots written before spec/33 lack it.
+   */
+  usedSubsA?: string[];
+  usedSubsB?: string[];
 
   decidingSwitchDone: boolean;
   delaySanctionsA: number;

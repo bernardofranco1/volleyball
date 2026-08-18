@@ -261,7 +261,11 @@ export const DISCIPLINE_DEFAULTS: Record<Discipline, TournamentConfig> = {
     serverPlayerRequired: true,
 
     liberoEnabled: true,
-    liberoCount: 1,
+    // Rule 19.1.1: a team may designate up to TWO liberos — and two are
+    // mandatory in FIVB senior competitions with more than 12 players on the
+    // sheet. The old cap of 1 was arbitrary and blocked that configuration
+    // outright (spec/33 F4).
+    liberoCount: 2,
 
     serveClockEnabled: true,
     serveClockSecs: 8,

@@ -18,6 +18,7 @@
  * Pure and dependency-free so both renderers and the tests can use it.
  */
 import type { TeamId } from "@/engine/types";
+import { forfeitReasonLabel } from "@/lib/domain";
 
 export interface RemarkContext {
   setNumber: number;
@@ -123,7 +124,7 @@ export const remark = {
   forfeit(ctx: RemarkContext, reason: string): string {
     return line(
       ctx,
-      reason === "RETIREMENT" ? "retirement" : "forfeit",
+      forfeitReasonLabel(reason).toLowerCase(),
       undefined,
     );
   },

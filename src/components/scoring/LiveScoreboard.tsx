@@ -273,6 +273,7 @@ export function LiveScoreboard({
             {prematch.trigger}
             <SanctionsControl
               status={state.status}
+              discipline="BEACH"
               teamAName={teamAName}
               teamBName={teamBName}
               rosterA={rosterA}

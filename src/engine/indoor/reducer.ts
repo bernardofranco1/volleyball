@@ -38,6 +38,7 @@ import {
   type SetNumber,
   type Side,
   type TeamId,
+  actingLibero,
   activeSet,
   initialIndoorState,
   oppositeSide,
@@ -112,6 +113,8 @@ function newSetState(
     subsUsedB: 0,
     subSlotsA: {},
     subSlotsB: {},
+    usedSubsA: [],
+    usedSubsB: [],
     libero: {
       liberoIdA: null,
       liberoIdB: null,
@@ -174,8 +177,10 @@ function liberoLegalIndex(idx: number): boolean {
 function enforceLiberoLegality(set: IndoorSetState, team: TeamId): void {
   const onCourt =
     team === "A" ? set.libero.liberoOnCourtA : set.libero.liberoOnCourtB;
-  const liberoId =
-    team === "A" ? set.libero.liberoIdA : set.libero.liberoIdB;
+  // The ACTING libero, not always libero #1 (spec/33 F4): once the second
+  // libero can take the court, resolving this to `liberoIdA/B` would leave a
+  // second libero rotated into the front row standing there illegally.
+  const liberoId = actingLibero(set, team);
   if (!onCourt || !liberoId) return;
   const court = team === "A" ? set.courtPositionsA : set.courtPositionsB;
   const idx = court.indexOf(liberoId);
@@ -286,6 +291,13 @@ export function reduce(
     case "SUBSTITUTION": {
       if (!set) return s;
       applySubstitution(s, set, p, !p.isExceptional);
+      // Rule 15.7: the player an exceptional substitution takes out "is not
+      // allowed to re-enter the match" (spec/33 F3). Lazy-init so pre-spec/33
+      // snapshots keep replaying.
+      if (p.isExceptional) {
+        const barred = (s.exceptionallyReplaced ??= []);
+        if (!barred.includes(p.outPlayerId)) barred.push(p.outPlayerId);
+      }
       return s;
     }
 
@@ -293,14 +305,25 @@ export function reduce(
       if (!set) return s;
       const court = p.team === "A" ? set.courtPositionsA : set.courtPositionsB;
       if (p.direction === "IN") {
+        // Rule 19.3.2.2 (spec/33 F4): when the outgoing player is the OTHER
+        // libero this is a libero-for-libero swap, and the "regular
+        // replacement player for that position" is unchanged — the court
+        // player the first libero came on for is still the one who returns on
+        // OUT. Overwriting `liberoReplacing` with the outgoing libero's id
+        // would strand that player off court for the rest of the set.
+        const designated =
+          p.team === "A"
+            ? [set.libero.liberoIdA, set.libero.secondLiberoIdA]
+            : [set.libero.liberoIdB, set.libero.secondLiberoIdB];
+        const isSwap = designated.includes(p.outPlayerId);
         swapOnCourt(court, p.outPlayerId, p.liberoId);
         if (p.team === "A") {
           set.libero.liberoOnCourtA = true;
-          set.libero.liberoReplacingA = p.outPlayerId;
+          if (!isSwap) set.libero.liberoReplacingA = p.outPlayerId;
           set.libero.lastLiberoRallyA = set.ralliesPlayed;
         } else {
           set.libero.liberoOnCourtB = true;
-          set.libero.liberoReplacingB = p.outPlayerId;
+          if (!isSwap) set.libero.liberoReplacingB = p.outPlayerId;
           set.libero.lastLiberoRallyB = set.ralliesPlayed;
         }
       } else {
@@ -325,6 +348,15 @@ export function reduce(
 
     case "LIBERO_REDESIGNATION":
       if (set) {
+        // Rule 19.4.2.2: the libero being replaced "may not play for the
+        // remainder of the match" — recorded BEFORE the id is overwritten,
+        // which is the only moment it is still known (spec/33 F3).
+        const previous =
+          p.team === "A" ? set.libero.liberoIdA : set.libero.liberoIdB;
+        if (previous) {
+          const retired = (s.retiredLiberos ??= []);
+          if (!retired.includes(previous)) retired.push(previous);
+        }
         if (p.team === "A") set.libero.liberoIdA = p.newLiberoId;
         else set.libero.liberoIdB = p.newLiberoId;
       }

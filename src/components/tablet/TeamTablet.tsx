@@ -31,6 +31,7 @@ export function TeamTablet({
   teamName,
   lineupRequired,
   liberoEnabled,
+  liberoCount,
   playersPerSide,
 }: {
   matchId: string;
@@ -41,6 +42,8 @@ export function TeamTablet({
   teamName: string;
   lineupRequired: boolean;
   liberoEnabled: boolean;
+  /** Rule 19.1.1 — how many liberos may be designated (spec/33 F4). */
+  liberoCount: number;
   playersPerSide: number;
 }) {
   const [state, setState] = useState<IndoorMatchState>(initialState);
@@ -330,6 +333,7 @@ export function TeamTablet({
           setNumber={state.currentSetNumber}
           size={playersPerSide}
           liberoEnabled={liberoEnabled}
+          liberoCount={liberoCount}
           onResult={setMsg}
         />
       ) : (
@@ -436,6 +440,7 @@ function LineupForm({
   setNumber,
   size,
   liberoEnabled,
+  liberoCount,
   onResult,
 }: {
   matchId: string;
@@ -445,6 +450,7 @@ function LineupForm({
   setNumber: number;
   size: number;
   liberoEnabled: boolean;
+  liberoCount: number;
   onResult: (msg: string) => void;
 }) {
   // Bench officials ride along on the roster (spec/29 F1) but are never
@@ -457,6 +463,11 @@ function LineupForm({
   const [liberoId, setLiberoId] = useState(
     roster.find((p) => p.isLibero)?.id ?? "",
   );
+  // Second libero (Rule 19.1.1, spec/33 F4) — mandatory in FIVB senior events
+  // with more than 12 players on the sheet, and previously un-declarable here.
+  const [secondLiberoId, setSecondLiberoId] = useState(
+    roster.filter((p) => p.isLibero)[1]?.id ?? "",
+  );
   const [busy, setBusy] = useState(false);
 
   const label = (id: string) => {
@@ -464,7 +475,10 @@ function LineupForm({
     return p ? `${p.jerseyNumber ?? "–"} ${p.jerseyName}` : id;
   };
   const distinct = new Set(lineup.filter(Boolean)).size === size;
-  const clash = liberoId !== "" && lineup.includes(liberoId);
+  const clash =
+    (liberoId !== "" && lineup.includes(liberoId)) ||
+    (secondLiberoId !== "" && lineup.includes(secondLiberoId)) ||
+    (liberoId !== "" && secondLiberoId === liberoId);
 
   const submit = async () => {
     if (!distinct || clash) return;
@@ -478,7 +492,10 @@ function LineupForm({
         setNumber,
         playerIds: lineup,
         liberoId: liberoEnabled && liberoId ? liberoId : null,
-        secondLiberoId: null,
+        secondLiberoId:
+          liberoEnabled && liberoCount >= 2 && secondLiberoId
+            ? secondLiberoId
+            : null,
       }),
     });
     setBusy(false);
@@ -537,11 +554,32 @@ function LineupForm({
             </select>
           </label>
         ) : null}
+        {liberoEnabled && liberoCount >= 2 ? (
+          <label className="flex items-center gap-2 text-sm">
+            <span className="w-20 text-amber-400">Libero 2</span>
+            <select
+              value={secondLiberoId}
+              onChange={(e) => setSecondLiberoId(e.target.value)}
+              className="flex-1 rounded-lg border border-border bg-surface px-2 py-2"
+            >
+              <option value="">— none —</option>
+              {onCourt
+                .filter((p) => p.id !== liberoId)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {label(p.id)}
+                  </option>
+                ))}
+            </select>
+          </label>
+        ) : null}
       </div>
       {!distinct ? (
         <p className="mt-2 text-xs text-red-400">Pick {size} distinct players.</p>
       ) : clash ? (
-        <p className="mt-2 text-xs text-red-400">Libero can’t be a starter.</p>
+        <p className="mt-2 text-xs text-red-400">
+          A libero can’t be a starter, and the two liberos must differ.
+        </p>
       ) : null}
       <button
         type="button"

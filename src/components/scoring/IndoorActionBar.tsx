@@ -9,6 +9,7 @@ import { courtRoster } from "@/lib/roster";
 import {
   type IndoorSetState,
   type TeamId,
+  actingLibero,
   activeSet,
 } from "@/engine/indoor/types";
 import { ScoringModal } from "@/components/scoring/ScoringModal";
@@ -256,7 +257,16 @@ function LiberoPanel({ team, onClose }: { team: TeamId; onClose: () => void }) {
   const set = activeSet(state)!;
   const roster = team === "A" ? rosterA : rosterB;
   const onCourt = team === "A" ? set.libero.liberoOnCourtA : set.libero.liberoOnCourtB;
-  const liberoId = team === "A" ? set.libero.liberoIdA : set.libero.liberoIdB;
+  // Both designated liberos (Rule 19.1.1) — the panel used to know only the
+  // first, which made the second one inoperable (spec/33 F4).
+  const designated = liberoIdsOf(set, team);
+  const acting = actingLibero(set, team);
+  // Whom the panel is about: the libero on court if there is one, else the
+  // libero the scorer has selected to bring on (first by default).
+  const [chosenId, setChosenId] = useState<string>(designated[0] ?? "");
+  const liberoId = acting ?? (designated.includes(chosenId) ? chosenId : designated[0] ?? null);
+  // Rule 19.3.2.2: the acting libero may be replaced directly by the second.
+  const otherLibero = designated.find((id) => id !== liberoId) ?? null;
   const replacing = team === "A" ? set.libero.liberoReplacingA : set.libero.liberoReplacingB;
   const court = team === "A" ? set.courtPositionsA : set.courtPositionsB;
   // Back-row positions are 1, 5, 6 → indices 0, 4, 5. Position 1 is offered
@@ -271,7 +281,7 @@ function LiberoPanel({ team, onClose }: { team: TeamId; onClose: () => void }) {
   // A re-designated libero comes from the players NOT on court and not already
   // a libero (Rule 19.4.2).
   const redesignationCandidates = courtRoster(roster)
-    .filter((p) => !court.includes(p.id) && p.id !== liberoId)
+    .filter((p) => !court.includes(p.id) && !designated.includes(p.id))
     .map((p) => p.id);
   const [newLiberoId, setNewLiberoId] = useState("");
   const label = (id: string) => {
@@ -288,6 +298,34 @@ function LiberoPanel({ team, onClose }: { team: TeamId; onClose: () => void }) {
 
   return (
     <ScoringModal title={t("scoring.liberoTitle", { player: label(liberoId) })} onClose={onClose}>
+      {/* Two liberos registered (Rule 19.1.1): off court the scorer picks who
+          comes on; on court the second one can take over directly, which is
+          the libero-for-libero replacement of Rule 19.3.2.2 (spec/33 F4). */}
+      {designated.length > 1 && !acting ? (
+        <SelectRow
+          label={t("scoring.libero")}
+          value={liberoId ?? ""}
+          onChange={setChosenId}
+          options={designated}
+          optionLabel={label}
+        />
+      ) : null}
+      {acting && otherLibero ? (
+        <PanelConfirm
+          onClick={() => {
+            dispatch({
+              type: "LIBERO_REPLACEMENT",
+              team,
+              liberoId: otherLibero,
+              direction: "IN",
+              outPlayerId: acting,
+            });
+            onClose();
+          }}
+        >
+          {t("scoring.liberoSwap", { player: label(otherLibero) })}
+        </PanelConfirm>
+      ) : null}
       {onCourt ? (
         <PanelConfirm
           onClick={() => {

@@ -5,7 +5,7 @@
 // thin GrassScoreboard/LightScoreboard wrappers supply the discipline pieces.
 import { useMemo } from "react";
 import type { TournamentConfig } from "@/engine/config";
-import { activeSet, type Side, type TeamId } from "@/engine/types";
+import { activeSet, type Discipline, type Side, type TeamId } from "@/engine/types";
 import type { PlayerLite } from "@/lib/match-provider";
 import { useT } from "@/lib/i18n/client";
 import { InterruptNotifications } from "@/components/scoring/InterruptNotifications";
@@ -81,6 +81,7 @@ export interface RotationCourtProps {
 }
 
 export function RotationScoreboard({
+  discipline,
   disciplineLabel,
   competitionName,
   ctx,
@@ -88,6 +89,10 @@ export function RotationScoreboard({
   lineupEntry,
   actionBar,
 }: {
+  /** Which rotation discipline this is — the sanction consequences read it
+   *  (spec/33 F1); neither has a rulebook authority, so both take the generic
+   *  handling, but the console must still say which it is. */
+  discipline: Discipline;
   disciplineLabel: string;
   competitionName: string;
   ctx: {
@@ -242,6 +247,7 @@ export function RotationScoreboard({
               Their own sheets stay out of scope; the LOG is what matters. */}
           <SanctionsControl
             status={state.status}
+            discipline={discipline}
             teamAName={teamAName}
             teamBName={teamBName}
             rosterA={rosterA}

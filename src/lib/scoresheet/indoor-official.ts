@@ -9,6 +9,7 @@ import type { TournamentConfig } from "@/engine/config";
 import type { MatchReportData } from "@/lib/match-report";
 import { drawSignatureInBox } from "@/lib/scoresheet-pdf";
 import { staffRoster } from "@/lib/roster";
+import { forfeitReasonLabel } from "@/lib/domain";
 import type { OfficialSheetData, SheetSetData } from "./official-data";
 import {
   DIM,
@@ -519,7 +520,7 @@ function resultsBlock(
   if (sheet.forfeit) {
     const f = sheet.forfeit;
     g.text(
-      `${f.reason === "RETIREMENT" ? "Retirement" : "Forfeit"}: team ${f.team}` +
+      `${forfeitReasonLabel(f.reason)}: team ${f.team}` +
         // FIVB 6.4.2 (spec/29 F8): a team that does not appear loses the match
         // by the convention score — every set to the set target, zero against.
         // Printing a blank ladder instead left the sheet unable to say what the

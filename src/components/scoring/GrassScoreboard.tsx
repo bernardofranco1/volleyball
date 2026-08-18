@@ -10,6 +10,7 @@ export function GrassScoreboard({ competitionName }: { competitionName: string }
   const ctx = useGrassMatch();
   return (
     <RotationScoreboard
+      discipline="GRASS"
       disciplineLabel="Grass"
       competitionName={competitionName}
       ctx={ctx}

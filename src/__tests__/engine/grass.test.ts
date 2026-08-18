@@ -224,6 +224,34 @@ describe("grass lineup & substitutions", () => {
   });
 });
 
+describe("grass — substitute re-entry (shared slot model, spec/33 F2)", () => {
+  it("refuses a substitute who already entered this set, even after their slot closed", () => {
+    const m = new TestMatch();
+    m.ready();
+    m.apply({ type: "SUBSTITUTION", team: "A", outPlayerId: "a1", inPlayerId: "as1" });
+    m.apply({ type: "SUBSTITUTION", team: "A", outPlayerId: "as1", inPlayerId: "a1" });
+    const again = validateGrassEvent(
+      { type: "SUBSTITUTION", team: "A", outPlayerId: "a2", inPlayerId: "as1" },
+      m.state,
+      GRASS,
+    );
+    expect(again.ok).toBe(false);
+    // An emergency substitution still waives it, like indoor's Rule 15.7.
+    const emergency = validateGrassEvent(
+      {
+        type: "SUBSTITUTION",
+        team: "A",
+        outPlayerId: "a2",
+        inPlayerId: "as1",
+        isEmergency: true,
+      },
+      m.state,
+      GRASS,
+    );
+    expect(emergency.ok).toBe(true);
+  });
+});
+
 describe("grass — replay", () => {
   it("replayEvents reproduces the incrementally reduced state", () => {
     const m = new TestMatch();

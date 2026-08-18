@@ -341,6 +341,66 @@ describe("indoor validator — timeouts & subs", () => {
     );
     expect(reused.ok).toBe(false);
   });
+
+  // Rule 15.6.2: a substitute enters "only once per set". Once their starter
+  // came back, the slot map held null and had forgotten who had used it, so a
+  // second entry into a DIFFERENT slot was accepted (spec/33 F2).
+  it("refuses a substitute who already entered this set, even after their slot closed", () => {
+    const m = new TestMatch();
+    m.ready();
+    m.apply({ type: "SUBSTITUTION", team: "A", outPlayerId: "a1", inPlayerId: "as1" });
+    m.apply({ type: "SUBSTITUTION", team: "A", outPlayerId: "as1", inPlayerId: "a1" });
+
+    const secondEntry = validateIndoorEvent(
+      { type: "SUBSTITUTION", team: "A", outPlayerId: "a2", inPlayerId: "as1" },
+      m.state,
+      INDOOR,
+    );
+    expect(secondEntry.ok).toBe(false);
+    expect(secondEntry.reason).toMatch(/15\.6\.2|already entered/i);
+
+    // A substitute who has NOT played is still free to come in.
+    const freshSub = validateIndoorEvent(
+      { type: "SUBSTITUTION", team: "A", outPlayerId: "a2", inPlayerId: "as2" },
+      m.state,
+      INDOOR,
+    );
+    expect(freshSub.ok).toBe(true);
+  });
+
+  it("still allows a used substitute back for an EXCEPTIONAL substitution (15.7)", () => {
+    const m = new TestMatch();
+    m.ready();
+    m.apply({ type: "SUBSTITUTION", team: "A", outPlayerId: "a1", inPlayerId: "as1" });
+    m.apply({ type: "SUBSTITUTION", team: "A", outPlayerId: "as1", inPlayerId: "a1" });
+    const exceptional = validateIndoorEvent(
+      {
+        type: "SUBSTITUTION",
+        team: "A",
+        outPlayerId: "a2",
+        inPlayerId: "as1",
+        isExceptional: true,
+      },
+      m.state,
+      INDOOR,
+    );
+    expect(exceptional.ok).toBe(true);
+  });
+
+  it("replays a pre-spec/33 log containing the once-legal second entry", () => {
+    // Validation runs only at append, so a log recorded before the rule was
+    // enforced must still replay — and rebuild the new bookkeeping.
+    const m = new TestMatch();
+    m.ready();
+    m.apply({ type: "SUBSTITUTION", team: "A", outPlayerId: "a1", inPlayerId: "as1" });
+    m.apply({ type: "SUBSTITUTION", team: "A", outPlayerId: "as1", inPlayerId: "a1" });
+    m.apply({ type: "SUBSTITUTION", team: "A", outPlayerId: "a2", inPlayerId: "as1" });
+
+    const replayed = replayEvents("m1", m.events, INDOOR);
+    const set = activeSet(replayed)!;
+    expect(set.courtPositionsA).toEqual(m.set.courtPositionsA);
+    expect(set.usedSubsA).toContain("as1");
+  });
 });
 
 describe("indoor libero", () => {
@@ -575,5 +635,309 @@ describe("indoor — lineups before the set (spec/21 flow fix)", () => {
       secondLiberoId: null,
     });
     expect(m.state.rallyPhase).toBe("BETWEEN_RALLIES");
+  });
+});
+
+// ── spec/33 F3: participation bans ───────────────────────────────────────────
+
+describe("indoor participation bans (spec/33 F3)", () => {
+  it("bars an expelled member for that set only", () => {
+    const m = new TestMatch();
+    m.ready();
+    m.apply({ type: "MISCONDUCT_EXPULSION", team: "A", playerId: "a5" });
+
+    // Rule 21.3.2.1 — no return during the set they were expelled in.
+    const sameSet = validateIndoorEvent(
+      { type: "SUBSTITUTION", team: "A", outPlayerId: "a1", inPlayerId: "a5" },
+      m.state,
+      INDOOR,
+    );
+    expect(sameSet.ok).toBe(false);
+    expect(sameSet.reason).toMatch(/expelled|21\.3\.2/i);
+
+    // …but the next set is theirs again.
+    m.apply({ type: "SET_END", winner: "A", scoreA: 25, scoreB: 10, setNumber: 1 });
+    const nextSet = validateIndoorEvent(
+      {
+        type: "LINEUP_CONFIRMED",
+        team: "A",
+        setNumber: 2,
+        playerIds: A6,
+        liberoId: "a7",
+        secondLiberoId: null,
+      },
+      m.state,
+      INDOOR,
+    );
+    expect(nextSet.ok).toBe(true);
+  });
+
+  it("bars a disqualified member for the whole match", () => {
+    const m = new TestMatch();
+    m.ready();
+    m.apply({ type: "MISCONDUCT_DISQUALIFICATION", team: "A", playerId: "a5" });
+    m.apply({ type: "SET_END", winner: "A", scoreA: 25, scoreB: 10, setNumber: 1 });
+
+    const nextSet = validateIndoorEvent(
+      {
+        type: "LINEUP_CONFIRMED",
+        team: "A",
+        setNumber: 2,
+        playerIds: A6,
+        liberoId: "a7",
+        secondLiberoId: null,
+      },
+      m.state,
+      INDOOR,
+    );
+    expect(nextSet.ok).toBe(false);
+    expect(nextSet.reason).toMatch(/disqualified|21\.3\.3/i);
+  });
+
+  it("bars a player taken out by an exceptional substitution (15.7)", () => {
+    const m = new TestMatch();
+    m.ready();
+    m.apply({
+      type: "SUBSTITUTION",
+      team: "A",
+      outPlayerId: "a5",
+      inPlayerId: "as9",
+      isExceptional: true,
+    });
+    expect(m.state.exceptionallyReplaced).toContain("a5");
+
+    const back = validateIndoorEvent(
+      { type: "SUBSTITUTION", team: "A", outPlayerId: "a1", inPlayerId: "a5" },
+      m.state,
+      INDOOR,
+    );
+    expect(back.ok).toBe(false);
+    expect(back.reason).toMatch(/exceptional|15\.7/i);
+  });
+
+  it("bars a libero replaced by a re-designation (19.4.2.2)", () => {
+    const m = new TestMatch();
+    m.ready();
+    m.apply({ type: "LIBERO_REDESIGNATION", team: "A", newLiberoId: "a9" });
+    expect(m.state.retiredLiberos).toContain("a7");
+
+    const asPlayer = validateIndoorEvent(
+      { type: "SUBSTITUTION", team: "A", outPlayerId: "a1", inPlayerId: "a7" },
+      m.state,
+      INDOOR,
+    );
+    expect(asPlayer.ok).toBe(false);
+    expect(asPlayer.reason).toMatch(/re-designation|19\.4\.2/i);
+  });
+
+  it("tolerates a snapshot written before the ban bookkeeping existed", () => {
+    const m = new TestMatch();
+    m.ready();
+    const old = { ...m.state };
+    delete (old as { exceptionallyReplaced?: string[] }).exceptionallyReplaced;
+    delete (old as { retiredLiberos?: string[] }).retiredLiberos;
+    const res = validateIndoorEvent(
+      { type: "SUBSTITUTION", team: "A", outPlayerId: "a1", inPlayerId: "as1" },
+      old,
+      INDOOR,
+    );
+    expect(res.ok).toBe(true);
+  });
+});
+
+// ── spec/33 F4: the second libero ────────────────────────────────────────────
+
+describe("indoor second libero (spec/33 F4)", () => {
+  /** Lineups with two liberos declared for team A. */
+  const readyTwoLiberos = () => {
+    const m = new TestMatch();
+    m.begin();
+    m.apply({
+      type: "LINEUP_CONFIRMED",
+      team: "A",
+      setNumber: 1,
+      playerIds: A6,
+      liberoId: "a7",
+      secondLiberoId: "a8",
+    });
+    m.apply({
+      type: "LINEUP_CONFIRMED",
+      team: "B",
+      setNumber: 1,
+      playerIds: B6,
+      liberoId: "b7",
+      secondLiberoId: null,
+    });
+    return m;
+  };
+
+  it("accepts a libero-for-libero replacement and keeps the replacement player", () => {
+    const m = readyTwoLiberos();
+    m.apply({ type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a7", direction: "IN", outPlayerId: "a6" });
+    expect(m.set.libero.liberoReplacingA).toBe("a6");
+    m.dispatch({ type: "RALLY_WON_A" }); // completed rally between replacements
+
+    const swap = validateIndoorEvent(
+      { type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a8", direction: "IN", outPlayerId: "a7" },
+      m.state,
+      INDOOR,
+    );
+    expect(swap.ok).toBe(true);
+
+    m.apply({ type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a8", direction: "IN", outPlayerId: "a7" });
+    expect(m.set.courtPositionsA).toContain("a8");
+    expect(m.set.courtPositionsA).not.toContain("a7");
+    expect(m.set.libero.liberoOnCourtA).toBe(true);
+    // Rule 19.3.2.2 — the regular replacement player for that position is
+    // unchanged; a6 is still the one who returns.
+    expect(m.set.libero.liberoReplacingA).toBe("a6");
+  });
+
+  it("sends the original court player back when the second libero leaves", () => {
+    const m = readyTwoLiberos();
+    m.apply({ type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a7", direction: "IN", outPlayerId: "a6" });
+    m.dispatch({ type: "RALLY_WON_A" });
+    m.apply({ type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a8", direction: "IN", outPlayerId: "a7" });
+    m.dispatch({ type: "RALLY_WON_A" });
+
+    // Only the libero actually on court can go out.
+    const wrongOne = validateIndoorEvent(
+      { type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a7", direction: "OUT", outPlayerId: "a6" },
+      m.state,
+      INDOOR,
+    );
+    expect(wrongOne.ok).toBe(false);
+
+    m.apply({ type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a8", direction: "OUT", outPlayerId: "a6" });
+    expect(m.set.courtPositionsA).toContain("a6");
+    expect(m.set.libero.liberoOnCourtA).toBe(false);
+  });
+
+  it("still refuses a swap without a completed rally in between", () => {
+    const m = readyTwoLiberos();
+    m.apply({ type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a7", direction: "IN", outPlayerId: "a6" });
+    const tooSoon = validateIndoorEvent(
+      { type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a8", direction: "IN", outPlayerId: "a7" },
+      m.state,
+      INDOOR,
+    );
+    expect(tooSoon.ok).toBe(false);
+    expect(tooSoon.reason).toMatch(/rally/i);
+  });
+
+  it("still refuses bringing a libero in over an ordinary player while one is on court", () => {
+    const m = readyTwoLiberos();
+    m.apply({ type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a7", direction: "IN", outPlayerId: "a6" });
+    m.dispatch({ type: "RALLY_WON_A" });
+    const res = validateIndoorEvent(
+      { type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a8", direction: "IN", outPlayerId: "a5" },
+      m.state,
+      INDOOR,
+    );
+    expect(res.ok).toBe(false);
+    expect(res.reason).toMatch(/already on court/i);
+  });
+
+  it("auto-removes the ACTING second libero when rotation reaches the front row", () => {
+    const m = readyTwoLiberos();
+    m.apply({ type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a7", direction: "IN", outPlayerId: "a6" });
+    m.dispatch({ type: "RALLY_WON_A" });
+    m.apply({ type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a8", direction: "IN", outPlayerId: "a7" });
+    expect(m.set.courtPositionsA[5]).toBe("a8");
+
+    // Rotate A twice: libero 6 → 5 → 4 (front row).
+    m.score("B", 1);
+    m.score("A", 1);
+    m.score("B", 1);
+    m.score("A", 1);
+    expect(m.set.libero.liberoOnCourtA).toBe(false);
+    expect(m.set.courtPositionsA).not.toContain("a8");
+    expect(m.set.courtPositionsA).toContain("a6");
+  });
+
+  it("rejects a second libero inside the six, or the same player twice", () => {
+    const m = new TestMatch();
+    m.begin();
+    const inSix = validateIndoorEvent(
+      {
+        type: "LINEUP_CONFIRMED",
+        team: "A",
+        setNumber: 1,
+        playerIds: A6,
+        liberoId: "a7",
+        secondLiberoId: "a3",
+      },
+      m.state,
+      INDOOR,
+    );
+    expect(inSix.ok).toBe(false);
+    const duplicate = validateIndoorEvent(
+      {
+        type: "LINEUP_CONFIRMED",
+        team: "A",
+        setNumber: 1,
+        playerIds: A6,
+        liberoId: "a7",
+        secondLiberoId: "a7",
+      },
+      m.state,
+      INDOOR,
+    );
+    expect(duplicate.ok).toBe(false);
+    expect(duplicate.reason).toMatch(/different/i);
+  });
+});
+
+// ── spec/33 F5: the libero's replacement player is not an exceptional sub ─────
+
+describe("indoor exceptional substitution exclusions (spec/33 F5)", () => {
+  it("refuses the libero's regular replacement player while the libero is on court", () => {
+    const m = new TestMatch();
+    m.ready();
+    m.apply({ type: "LIBERO_REPLACEMENT", team: "A", liberoId: "a7", direction: "IN", outPlayerId: "a6" });
+    expect(m.set.libero.liberoReplacingA).toBe("a6");
+
+    const res = validateIndoorEvent(
+      {
+        type: "SUBSTITUTION",
+        team: "A",
+        outPlayerId: "a1",
+        inPlayerId: "a6",
+        isExceptional: true,
+      },
+      m.state,
+      INDOOR,
+    );
+    expect(res.ok).toBe(false);
+    expect(res.reason).toMatch(/replacement player|15\.7/i);
+
+    // An ordinary bench player is still fine.
+    const ok = validateIndoorEvent(
+      {
+        type: "SUBSTITUTION",
+        team: "A",
+        outPlayerId: "a1",
+        inPlayerId: "as9",
+        isExceptional: true,
+      },
+      m.state,
+      INDOOR,
+    );
+    expect(ok.ok).toBe(true);
+  });
+});
+
+// ── spec/33 F1: the third forfeit reason closes a match like the others ──────
+
+describe("forfeit for an incomplete team (spec/33 F1)", () => {
+  it("ends the match exactly like a retirement", () => {
+    const m = new TestMatch();
+    m.ready();
+    m.score("A", 10);
+    m.score("B", 5);
+    m.apply({ type: "FORFEIT", team: "B", reason: "INCOMPLETE_TEAM" });
+    expect(m.state.status).toBe("FINISHED");
+    expect(m.state.winner).toBe("A");
+    expect(m.state.setsWonA).toBe(3);
   });
 });

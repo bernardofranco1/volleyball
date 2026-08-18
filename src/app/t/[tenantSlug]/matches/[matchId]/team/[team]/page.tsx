@@ -111,6 +111,7 @@ export default async function TeamTabletPage({
       teamName={team === "A" ? view.teamAName : view.teamBName}
       lineupRequired={view.config.lineupRequired}
       liberoEnabled={view.config.liberoEnabled}
+      liberoCount={view.config.liberoCount}
       playersPerSide={view.config.playersPerSide}
     />
   );

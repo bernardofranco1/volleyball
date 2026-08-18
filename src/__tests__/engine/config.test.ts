@@ -34,7 +34,7 @@ describe("DISCIPLINE_DEFAULTS", () => {
     expect(c.bestOf).toBe(5);
     expect(c.setScore).toBe(25);
     expect(c.liberoEnabled).toBe(true);
-    expect(c.liberoCount).toBe(1);
+    expect(c.liberoCount).toBe(2); // Rule 19.1.1 — up to two (spec/33 F4)
     expect(c.sideSwitchBetweenSetsOnly).toBe(true);
     expect(c.sideSwitchDecidingSetAt).toBe(8);
     expect(c.blockCountsAsTeamHit).toBe(false);
@@ -81,12 +81,12 @@ describe("resolveConfig", () => {
     const c = resolveConfig("INDOOR", {
       liberoCount: null as unknown as number,
     });
-    expect(c.liberoCount).toBe(1);
+    expect(c.liberoCount).toBe(2); // Rule 19.1.1 — up to two (spec/33 F4)
   });
 
   it("ignores undefined overrides", () => {
     const c = resolveConfig("INDOOR", { liberoCount: undefined });
-    expect(c.liberoCount).toBe(1);
+    expect(c.liberoCount).toBe(2); // Rule 19.1.1 — up to two (spec/33 F4)
   });
 
   it("does not mutate the shared defaults object", () => {

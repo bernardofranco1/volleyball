@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "@/lib/i18n/client";
 import { cancelledEventIds } from "@/lib/event-survival";
+import { forfeitReasonLabel } from "@/lib/domain";
 
 // Read-only scoring log the scorer can open to consult the full chronological
 // record (points, subs, time-outs, TTO, set start/end, notes, sanctions…) in
@@ -138,7 +139,7 @@ export function ScoringLog({
         return { text: "Match end", tone: "info" };
       case "FORFEIT":
         return {
-          text: `${p.reason === "RETIREMENT" ? "Retirement" : "Forfeit"} — ${tn(team)}`,
+          text: `${forfeitReasonLabel(String(p.reason))} — ${tn(team)}`,
           tone: "sanction",
         };
       case "PROTEST_LODGED":

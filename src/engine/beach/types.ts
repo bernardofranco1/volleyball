@@ -71,7 +71,7 @@ export type BeachEventPayload =
       setNumber: SetNumber;
     }
   | { type: "MATCH_END"; winner: TeamId; setsA: number; setsB: number } // auto-emitted
-  | { type: "FORFEIT"; team: TeamId; reason: "FORFEIT" | "RETIREMENT" }
+  | { type: "FORFEIT"; team: TeamId; reason: "FORFEIT" | "RETIREMENT" | "INCOMPLETE_TEAM" }
   // One set awarded to the opponent — incomplete team (spec/29 F14). The match
   // continues; FORFEIT above ends it.
   | { type: "SET_DEFAULT"; team: TeamId; reason: "INCOMPLETE_TEAM" | "OTHER" }

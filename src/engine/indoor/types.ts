@@ -88,7 +88,7 @@ export type IndoorEventPayload =
       setNumber: SetNumber;
     }
   | { type: "MATCH_END"; winner: TeamId; setsA: number; setsB: number } // auto-emitted
-  | { type: "FORFEIT"; team: TeamId; reason: "FORFEIT" | "RETIREMENT" }
+  | { type: "FORFEIT"; team: TeamId; reason: "FORFEIT" | "RETIREMENT" | "INCOMPLETE_TEAM" }
   // One set awarded to the opponent — incomplete team (spec/29 F14). The match
   // continues; FORFEIT above ends it.
   | { type: "SET_DEFAULT"; team: TeamId; reason: "INCOMPLETE_TEAM" | "OTHER" }
@@ -175,6 +175,15 @@ export interface IndoorSetState {
   // Sub slots: starterId → current substitute on court for that slot (or null).
   subSlotsA: Record<string, string | null>;
   subSlotsB: Record<string, string | null>;
+  /**
+   * Players who have entered as a substitute this set — slot still open OR
+   * already exhausted (spec/33 F2, Rule 15.6.2: a substitute may enter "only
+   * once per set"). `subSlots` alone cannot answer this: a returning starter
+   * sets their slot to null, erasing the fact that the substitute was used.
+   * Optional — snapshots written before spec/33 lack it.
+   */
+  usedSubsA?: string[];
+  usedSubsB?: string[];
 
   libero: LiberoState;
   vcs: VCSState;
@@ -230,6 +239,18 @@ export interface IndoorMatchState {
   misconductB: MisconductRecord[];
   /** Medical recoveries per roster-row id (spec/29 F11); absent on old snapshots. */
   recoveriesByPlayer?: Record<string, number>;
+  /**
+   * Players taken out by an EXCEPTIONAL substitution — barred from the rest of
+   * the match (Rule 15.7: "not allowed to re-enter the match"). spec/33 F3.
+   * Optional: absent on pre-spec/33 snapshots.
+   */
+  exceptionallyReplaced?: string[];
+  /**
+   * Liberos replaced by a re-designation — barred from the rest of the match
+   * (Rule 19.4.2.2: "a Libero who is the subject of a re-designation may not
+   * play for the remainder of the match"). spec/33 F3.
+   */
+  retiredLiberos?: string[];
 }
 
 // ── Construction & helpers ─────────────────────────────────────────────────────
@@ -253,6 +274,8 @@ export function initialIndoorState(matchId: string): IndoorMatchState {
     totalMatchSubsB: 0,
     misconductA: [],
     misconductB: [],
+    exceptionallyReplaced: [],
+    retiredLiberos: [],
   };
 }
 
@@ -261,6 +284,24 @@ export function initialIndoorState(matchId: string): IndoorMatchState {
 const BACK_ROW_INDICES = new Set([0, 4, 5]);
 export function isBackRowIndex(positionIndex: number): boolean {
   return BACK_ROW_INDICES.has(positionIndex);
+}
+
+/**
+ * The designated libero currently on court for `team`, or null (spec/33 F4).
+ *
+ * Rule 19.1.3: "The Libero on court is the Acting Libero." With two liberos
+ * registered that is simply whichever of them is out there, so it is DERIVED
+ * from the court rather than stored — one less field that a snapshot, an undo
+ * or a replay could disagree with.
+ */
+export function actingLibero(set: IndoorSetState, team: TeamId): string | null {
+  const court = team === "A" ? set.courtPositionsA : set.courtPositionsB;
+  const ids =
+    team === "A"
+      ? [set.libero.liberoIdA, set.libero.secondLiberoIdA]
+      : [set.libero.liberoIdB, set.libero.secondLiberoIdB];
+  for (const id of ids) if (id && court.includes(id)) return id;
+  return null;
 }
 
 /** Clockwise rotation: pos2→pos1, …, pos1→pos6 (a left-shift of the array). */

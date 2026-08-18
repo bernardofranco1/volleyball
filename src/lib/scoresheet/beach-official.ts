@@ -8,6 +8,7 @@ import type { TournamentConfig } from "@/engine/config";
 import type { MatchReportData } from "@/lib/match-report";
 import { drawSignatureInBox } from "@/lib/scoresheet-pdf";
 import { computeMatchTimings } from "@/lib/timings";
+import { forfeitReasonLabel } from "@/lib/domain";
 import type { OfficialSheetData, SheetSetData, SheetSanction } from "./official-data";
 import {
   DIM,
@@ -696,7 +697,7 @@ function remarksAndToss(
     .map((s) => `${s.role}: ${s.remarks}`);
   const forfeitNote = sheet.forfeit
     ? [
-        `${sheet.forfeit.reason === "RETIREMENT" ? "Retirement" : "Forfeit"}: team ${sheet.forfeit.team}` +
+        `${forfeitReasonLabel(sheet.forfeit.reason)}: team ${sheet.forfeit.team}` +
           // FIVB 6.4.2 (spec/29 F8): a no-show loses by the convention score.
           (sheet.forfeit.noShow
             ? ` — no show, 2 × ${config.setScore}:0 to team ${

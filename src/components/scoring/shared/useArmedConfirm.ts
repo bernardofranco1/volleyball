@@ -7,7 +7,16 @@ import { useEffect, useState } from "react";
 // "SET_DEFAULT" arms the awarding of a whole set to the opponent (spec/29
 // F14) — the heaviest single action in the console after a forfeit, so it
 // takes the same two-tap treatment as everything else that changes the result.
-export type Armed = "A" | "B" | "UNDO" | "REPLAY" | "SET_DEFAULT" | null;
+// "FORFEIT" arms the match-level version of the same thing: a disqualification
+// that leaves a team unable to play on (spec/33 F1).
+export type Armed =
+  | "A"
+  | "B"
+  | "UNDO"
+  | "REPLAY"
+  | "SET_DEFAULT"
+  | "FORFEIT"
+  | null;
 export const ARM_MS = 3000;
 
 export function useArmedConfirm() {

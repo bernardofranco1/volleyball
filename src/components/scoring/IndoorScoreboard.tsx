@@ -172,6 +172,7 @@ export function IndoorScoreboard({ competitionName }: { competitionName: string 
             {prematch.trigger}
             <SanctionsControl
               status={state.status}
+              discipline="INDOOR"
               teamAName={teamAName}
               teamBName={teamBName}
               rosterA={rosterA}

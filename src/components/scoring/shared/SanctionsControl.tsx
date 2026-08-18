@@ -13,7 +13,7 @@
  */
 
 import { useState } from "react";
-import type { TeamId } from "@/engine/types";
+import type { Discipline, TeamId } from "@/engine/types";
 import type { SanctionAutoPoint } from "@/engine/config";
 import { useT } from "@/lib/i18n/client";
 import type { PlayerLite } from "@/lib/match-provider";
@@ -49,16 +49,22 @@ export type SanctionDispatch = (
     | { type: "RALLY_WON_A" | "RALLY_WON_B"; causedBy?: string }
     // An expelled member leaving a team unable to field a complete six ends the
     // SET, not the match (FIVB 7.3.1).
-    | { type: "SET_DEFAULT"; team: TeamId; reason: "INCOMPLETE_TEAM" | "OTHER" },
+    | { type: "SET_DEFAULT"; team: TeamId; reason: "INCOMPLETE_TEAM" | "OTHER" }
+    // A disqualification can leave a team unable to field a side for the REST
+    // OF THE MATCH (indoor 15.8 → 6.4.3; beach 20.3.3) — that is a forfeit.
+    | { type: "FORFEIT"; team: TeamId; reason: "INCOMPLETE_TEAM" },
 ) => void;
 
-/** Sanctions that award a point + service to the opponent (FIVB 21.3). */
-const PENALTY_KINDS: SanctionType[] = [
-  "DELAY_PENALTY",
-  "MISCONDUCT_PENALTY",
-  "MISCONDUCT_EXPULSION",
-  "MISCONDUCT_DISQUALIFICATION",
-];
+/**
+ * Sanctions that award a point + service to the opponent.
+ *
+ * ONLY the two penalties (indoor 21.3.1 / D9a, beach 20.3.1 / D7a). Expulsion
+ * and disqualification are sanctioned "with no other consequences" — the member
+ * leaves, and no point is awarded. Both used to sit in this list, so the console
+ * offered (and in AUTO mode silently awarded) a point the rulebook does not give
+ * — spec/33 F1.
+ */
+const PENALTY_KINDS: SanctionType[] = ["DELAY_PENALTY", "MISCONDUCT_PENALTY"];
 
 /** Severity order, for the escalation guard (FIVB 21.3: cards never go down). */
 const SEVERITY: Record<string, number> = {
@@ -82,6 +88,7 @@ const MISCONDUCT: SanctionType[] = [
 
 export function SanctionsControl({
   status,
+  discipline,
   teamAName,
   teamBName,
   rosterA,
@@ -93,6 +100,9 @@ export function SanctionsControl({
   misconductB = [],
 }: {
   status: string;
+  /** Drives the expulsion/disqualification consequences, which differ by
+   *  rulebook (spec/33 F1). */
+  discipline: Discipline;
   teamAName: string;
   teamBName: string;
   rosterA: PlayerLite[];
@@ -110,13 +120,19 @@ export function SanctionsControl({
   const [team, setTeam] = useState<TeamId | null>(null);
   const [kind, setKind] = useState<SanctionType | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
-  // After recording a penalty the modal stays open on a second step offering
+  // After recording a sanction the modal stays open on a second step offering
   // the consequence, so the score cannot drift from the sanction. Nothing is
   // dispatched unasked (unless the competition is configured AUTO).
-  const [awarded, setAwarded] = useState<{
-    to: TeamId;
-    expulsion: boolean;
-  } | null>(null);
+  //
+  // Two shapes, because the consequences are different in kind (spec/33 F1):
+  //   POINT — a penalty's point and service to the opponent.
+  //   CARD  — an expulsion/disqualification, which awards NO point; what it can
+  //           leave behind is an incomplete team, per discipline.
+  const [consequence, setConsequence] = useState<
+    | { kind: "POINT"; to: TeamId }
+    | { kind: "EXPULSION" | "DISQUALIFICATION"; offender: TeamId }
+    | null
+  >(null);
   const { armed, tapConfirm } = useArmedConfirm();
 
   if (status === "SETUP" || status === "FINISHED") return null;
@@ -135,7 +151,7 @@ export function SanctionsControl({
     setTeam(null);
     setKind(null);
     setPlayerId(null);
-    setAwarded(null);
+    setConsequence(null);
   };
 
   const held = team === "A" ? misconductA : team === "B" ? misconductB : [];
@@ -182,12 +198,22 @@ export function SanctionsControl({
       dispatch({ type: kind as "DELAY_WARNING" | "DELAY_PENALTY" | "IMPROPER_REQUEST", team });
     }
 
+    // A card is never a point (spec/33 F1): expulsion and disqualification go
+    // straight to their own consequence step, and `autoPoint` — which is only
+    // ever about a penalty's point — does not apply to them at all.
+    if (kind === "MISCONDUCT_EXPULSION" || kind === "MISCONDUCT_DISQUALIFICATION") {
+      setConsequence({
+        kind: kind === "MISCONDUCT_EXPULSION" ? "EXPULSION" : "DISQUALIFICATION",
+        offender: team,
+      });
+      return;
+    }
+
     // The sanction itself never scores — the paper procedure records the fact
     // and the point is a separate act. What changes here is only whether the
     // console offers to make that second act one tap (spec/29 F14).
     const opponent: TeamId = team === "A" ? "B" : "A";
-    const isPenalty = PENALTY_KINDS.includes(kind);
-    if (!isPenalty || autoPoint === "OFF") {
+    if (!PENALTY_KINDS.includes(kind) || autoPoint === "OFF") {
       close();
       return;
     }
@@ -196,15 +222,7 @@ export function SanctionsControl({
       close();
       return;
     }
-    setAwarded({
-      to: opponent,
-      // An expulsion can leave a team unable to field a complete six; the
-      // console offers the set default rather than making the scorer hunt for
-      // it while the hall waits.
-      expulsion:
-        kind === "MISCONDUCT_EXPULSION" ||
-        kind === "MISCONDUCT_DISQUALIFICATION",
-    });
+    setConsequence({ kind: "POINT", to: opponent });
   };
 
   const choice = (active: boolean) =>
@@ -226,53 +244,24 @@ export function SanctionsControl({
         </button>
       </div>
 
-      {open && awarded ? (
-        // Step 2 (spec/29 F14): the sanction is already recorded. This is the
+      {open && consequence?.kind === "POINT" ? (
+        // Step 2 (spec/29 F14): the penalty is already recorded. This is the
         // consequence, offered rather than assumed — the scorer can walk away
         // and tap the point as an ordinary rally, exactly as before.
         <ScoringModal title={t("sanctions.consequenceTitle")} onClose={close}>
           <div className="flex flex-col gap-3">
             <p className="text-sm text-score-dim">
-              {t("sanctions.consequenceExplain", { team: name(awarded.to) })}
+              {t("sanctions.consequenceExplain", { team: name(consequence.to) })}
             </p>
             <SecondaryButton
               disabled={pending}
               onClick={() => {
-                awardPoint(awarded.to);
+                awardPoint(consequence.to);
                 close();
               }}
             >
-              {t("sanctions.awardPoint", { team: name(awarded.to) })}
+              {t("sanctions.awardPoint", { team: name(consequence.to) })}
             </SecondaryButton>
-            {awarded.expulsion ? (
-              <>
-                <p className="text-xs text-score-dim">
-                  {t("sanctions.incompleteExplain")}
-                </p>
-                <SecondaryButton
-                  armed={armed === "SET_DEFAULT"}
-                  disabled={pending}
-                  onClick={() =>
-                    tapConfirm("SET_DEFAULT", () => {
-                      // The team that lost the member defaults the set.
-                      const loser: TeamId = awarded.to === "A" ? "B" : "A";
-                      dispatch({
-                        type: "SET_DEFAULT",
-                        team: loser,
-                        reason: "INCOMPLETE_TEAM",
-                      });
-                      close();
-                    })
-                  }
-                >
-                  {armed === "SET_DEFAULT"
-                    ? t("sanctions.setDefaultArmed")
-                    : t("sanctions.setDefault", {
-                        team: name(awarded.to === "A" ? "B" : "A"),
-                      })}
-                </SecondaryButton>
-              </>
-            ) : null}
             <button
               type="button"
               onClick={close}
@@ -281,6 +270,99 @@ export function SanctionsControl({
               {t("sanctions.consequenceSkip")}
             </button>
           </div>
+        </ScoringModal>
+      ) : open && consequence && consequence.kind !== "POINT" ? (
+        // Step 2 for a CARD (spec/33 F1). No point button exists on this path —
+        // the rulebook awards none. What differs per discipline is what an
+        // expelled/disqualified member LEAVES BEHIND:
+        //   indoor — substitute legally or exceptionally (15.8); incomplete
+        //            only if that is impossible, so both offers are optional.
+        //   beach  — a pair cannot substitute, so the team IS incomplete: for
+        //            the set on an expulsion (20.3.2), for the match on a
+        //            disqualification (20.3.3). Required, not offered.
+        //   grass/light — no rulebook authority (spec/32 §4); keep the generic
+        //            optional set default.
+        <ScoringModal title={t("sanctions.consequenceTitle")} onClose={close}>
+          {(() => {
+            const offender = consequence.offender;
+            const opponent: TeamId = offender === "A" ? "B" : "A";
+            const disq = consequence.kind === "DISQUALIFICATION";
+            const beach = discipline === "BEACH";
+            const indoor = discipline === "INDOOR";
+            const explain = indoor
+              ? disq
+                ? t("sanctions.disqualificationExplainIndoor")
+                : t("sanctions.expulsionExplainIndoor")
+              : beach
+                ? disq
+                  ? t("sanctions.disqualificationExplainBeach")
+                  : t("sanctions.expulsionExplainBeach")
+                : t("sanctions.incompleteExplain");
+            // Beach disqualification is a MATCH-level incompleteness — the set
+            // default would understate it, so it is not offered there.
+            const offerSetDefault = !(beach && disq);
+            // The match-ending forfeit belongs only where a disqualification
+            // can end the match: indoor (when no substitution is possible) and
+            // beach (always).
+            const offerForfeit = disq && (indoor || beach);
+            return (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-score-dim">{explain}</p>
+                {offerSetDefault ? (
+                  <SecondaryButton
+                    armed={armed === "SET_DEFAULT"}
+                    disabled={pending}
+                    onClick={() =>
+                      tapConfirm("SET_DEFAULT", () => {
+                        dispatch({
+                          type: "SET_DEFAULT",
+                          team: offender,
+                          reason: "INCOMPLETE_TEAM",
+                        });
+                        close();
+                      })
+                    }
+                  >
+                    {armed === "SET_DEFAULT"
+                      ? t("sanctions.setDefaultArmed")
+                      : t("sanctions.setDefault", { team: name(opponent) })}
+                  </SecondaryButton>
+                ) : null}
+                {offerForfeit ? (
+                  <SecondaryButton
+                    armed={armed === "FORFEIT"}
+                    disabled={pending}
+                    onClick={() =>
+                      tapConfirm("FORFEIT", () => {
+                        dispatch({
+                          type: "FORFEIT",
+                          team: offender,
+                          reason: "INCOMPLETE_TEAM",
+                        });
+                        close();
+                      })
+                    }
+                  >
+                    {armed === "FORFEIT"
+                      ? t("sanctions.forfeitIncompleteArmed")
+                      : t("sanctions.forfeitIncomplete", { team: name(opponent) })}
+                  </SecondaryButton>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={close}
+                  className="px-2 py-1 text-xs text-score-dim underline decoration-dotted underline-offset-2"
+                >
+                  {/* Beach must record one of the above — the modal still
+                      closes (the scorer may need to fix something first), but
+                      the wording never suggests "nothing further" is an option. */}
+                  {beach
+                    ? t("sanctions.consequenceClose")
+                    : t("sanctions.consequenceSkip")}
+                </button>
+              </div>
+            );
+          })()}
         </ScoringModal>
       ) : open ? (
         <ScoringModal title={t("sanctions.title")} onClose={close}>

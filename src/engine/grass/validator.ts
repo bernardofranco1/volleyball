@@ -109,6 +109,14 @@ export function validateGrassEvent(
       if (outIsStarter && slots[payload.outPlayerId] === undefined) {
         if (lineup.includes(payload.inPlayerId))
           return fail("Incoming player is a starter — not a legal substitute");
+        // Rule 15.6.2 — a substitute enters "only once per set". The slot map
+        // forgets them once their starter returns, so the entry list is what
+        // makes the second entry refusable (spec/33 F2). Absent on old
+        // snapshots ⇒ empty, and the slot check below still covers open slots.
+        const alreadyEntered =
+          payload.team === "A" ? (set.usedSubsA ?? []) : (set.usedSubsB ?? []);
+        if (alreadyEntered.includes(payload.inPlayerId))
+          return fail("That substitute has already entered this set (Rule 15.6.2)");
         if (slotForSub(slots, payload.inPlayerId) !== null)
           return fail("That substitute has already been used in another slot");
         return OK;

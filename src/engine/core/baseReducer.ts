@@ -175,8 +175,16 @@ export type CommonEventPayload =
 /** How far a client-requested UNDO reaches (see selectUndoTargets). */
 export type UndoScope = "single" | "point";
 
-/** Why a team's match ended early (FIVB 6.4.2 default / 6.4.3 retirement). */
-export type ForfeitReason = "FORFEIT" | "RETIREMENT";
+/**
+ * Why a team's match ended early (FIVB 6.4.2 default / 6.4.3 retirement).
+ *
+ * INCOMPLETE_TEAM (spec/33 F1) is the match-level consequence of a
+ * disqualification: the team can no longer field a complete side for the rest
+ * of the match (indoor 15.8 → 6.4.3 / 7.3.1; beach 20.3.3, where a pair has no
+ * substitution to make). It closes the match exactly like the other two — only
+ * the recorded reason, and what the sheet prints, differ.
+ */
+export type ForfeitReason = "FORFEIT" | "RETIREMENT" | "INCOMPLETE_TEAM";
 
 /** Why a team lost one set without playing it out (spec/29 F14). */
 export type SetDefaultReason = "INCOMPLETE_TEAM" | "OTHER";
@@ -412,6 +420,10 @@ export interface SubstitutionSetState {
   subsUsedB: number;
   subSlotsA: Record<string, string | null>;
   subSlotsB: Record<string, string | null>;
+  /** Substitutes who have entered this set — see the discipline set states
+   *  (spec/33 F2). Optional: absent on pre-spec/33 snapshots. */
+  usedSubsA?: string[];
+  usedSubsB?: string[];
 }
 
 /**
@@ -437,6 +449,15 @@ export function applySubstitution(
     // returning starter → exhaust the slot
     const starter = Object.keys(slots).find((k) => slots[k] === p.outPlayerId);
     if (starter) slots[starter] = null;
+  }
+  // Remember every substitute who has ENTERED this set, even once their slot is
+  // exhausted (spec/33 F2 — Rule 15.6.2 allows one entry per set). Recorded for
+  // exceptional/emergency substitutions too: who entered is a fact, and only
+  // the VALIDATOR exempts those from the limit. Lazy-init keeps pre-spec/33
+  // snapshots replaying (same pattern as `recoveriesByPlayer`).
+  if (!lineup.includes(p.inPlayerId)) {
+    const used = p.team === "A" ? (set.usedSubsA ??= []) : (set.usedSubsB ??= []);
+    if (!used.includes(p.inPlayerId)) used.push(p.inPlayerId);
   }
   swapOnCourt(court, p.outPlayerId, p.inPlayerId);
 

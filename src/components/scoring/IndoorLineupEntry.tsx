@@ -56,6 +56,7 @@ export function IndoorLineupEntry() {
           setNumber={upcomingSet}
           size={config.playersPerSide}
           liberoEnabled={config.liberoEnabled}
+          liberoCount={config.liberoCount}
         />
         <TeamLineupForm
           team="B"
@@ -66,6 +67,7 @@ export function IndoorLineupEntry() {
           setNumber={upcomingSet}
           size={config.playersPerSide}
           liberoEnabled={config.liberoEnabled}
+          liberoCount={config.liberoCount}
         />
       </div>
       {!preSet ? (
@@ -89,6 +91,7 @@ function TeamLineupForm({
   setNumber,
   size,
   liberoEnabled,
+  liberoCount,
 }: {
   team: TeamId;
   teamName: string;
@@ -98,6 +101,8 @@ function TeamLineupForm({
   setNumber: number;
   size: number;
   liberoEnabled: boolean;
+  /** Rule 19.1.1 — how many liberos may be designated (spec/33 F4). */
+  liberoCount: number;
 }) {
   const { dispatch, pending } = useIndoorMatch();
   // A pre-declared lineup is re-submittable (it only overwrites the stash).
@@ -113,6 +118,12 @@ function TeamLineupForm({
   const [lineup, setLineup] = useState<string[]>(defaultLineup);
   const [liberoId, setLiberoId] = useState<string>(
     roster.find((p) => p.isLibero)?.id ?? "",
+  );
+  // Rule 19.1.1 allows a second libero, and FIVB senior events with more than
+  // 12 players on the sheet REQUIRE one. The field existed in the engine all
+  // along; the form used to hardcode null (spec/33 F4).
+  const [secondLiberoId, setSecondLiberoId] = useState<string>(
+    roster.filter((p) => p.isLibero)[1]?.id ?? "",
   );
 
   if (confirmed && !(preSet && editing)) {
@@ -137,8 +148,11 @@ function TeamLineupForm({
     return p ? `${p.jerseyNumber ?? "–"} ${p.jerseyName}` : id;
   };
   const distinct = new Set(lineup.filter(Boolean)).size === size;
-  const liberoClash = liberoId !== "" && lineup.includes(liberoId);
-  const canConfirm = distinct && !liberoClash && !pending;
+  const liberoClash =
+    (liberoId !== "" && lineup.includes(liberoId)) ||
+    (secondLiberoId !== "" && lineup.includes(secondLiberoId));
+  const liberoDuplicate = liberoId !== "" && secondLiberoId === liberoId;
+  const canConfirm = distinct && !liberoClash && !liberoDuplicate && !pending;
 
   const submit = () => {
     if (!canConfirm) return;
@@ -148,7 +162,10 @@ function TeamLineupForm({
       setNumber,
       playerIds: lineup,
       liberoId: liberoEnabled && liberoId ? liberoId : null,
-      secondLiberoId: null,
+      secondLiberoId:
+        liberoEnabled && liberoCount >= 2 && secondLiberoId
+          ? secondLiberoId
+          : null,
     });
     setEditing(false);
   };
@@ -197,12 +214,35 @@ function TeamLineupForm({
             </select>
           </label>
         ) : null}
+        {liberoEnabled && liberoCount >= 2 ? (
+          <label className="flex items-center gap-2 text-sm">
+            <span className="w-16 text-amber-400">Libero 2</span>
+            <select
+              value={secondLiberoId}
+              onChange={(e) => setSecondLiberoId(e.target.value)}
+              className="flex-1 rounded-lg border border-border bg-surface px-2 py-1.5"
+            >
+              <option value="">— none —</option>
+              {onCourt
+                .filter((p) => p.id !== liberoId)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {label(p.id)}
+                  </option>
+                ))}
+            </select>
+          </label>
+        ) : null}
       </div>
       {!distinct ? (
         <p className="mt-2 text-xs text-red-400">Pick {size} distinct players.</p>
       ) : liberoClash ? (
         <p className="mt-2 text-xs text-red-400">
-          Libero can’t be in the starting six.
+          A libero can’t be in the starting six.
+        </p>
+      ) : liberoDuplicate ? (
+        <p className="mt-2 text-xs text-red-400">
+          The two liberos must be different players.
         </p>
       ) : null}
       <button

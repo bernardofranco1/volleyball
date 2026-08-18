@@ -79,6 +79,8 @@ function newSetState(
     subsUsedB: 0,
     subSlotsA: {},
     subSlotsB: {},
+    usedSubsA: [],
+    usedSubsB: [],
     delaySanctionsA: 0,
     delaySanctionsB: 0,
     winner: null,

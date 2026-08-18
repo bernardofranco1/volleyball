@@ -9,6 +9,7 @@ import {
   type IndoorEventPayload,
   type IndoorMatchState,
   type IndoorSetState,
+  actingLibero,
   activeSet,
 } from "./types";
 
@@ -35,6 +36,46 @@ function liberoIdsFor(set: IndoorSetState, team: "A" | "B"): (string | null)[] {
   return team === "A"
     ? [set.libero.liberoIdA, set.libero.secondLiberoIdA]
     : [set.libero.liberoIdB, set.libero.secondLiberoIdB];
+}
+
+/**
+ * Why `playerId` may not enter play, or null if nothing bars them (spec/33 F3).
+ *
+ * Four bans the rulebook states and the console could not previously honour —
+ * every one of them was enterable through a substitution or the next set's
+ * line-up:
+ *   21.3.3.1 disqualification — the rest of the MATCH
+ *   21.3.2.1 expulsion        — the rest of THAT SET only, hence `forSetNumber`
+ *   15.7     the player an exceptional substitution took out — the match
+ *   19.4.2.2 a libero replaced by a re-designation — the match
+ *
+ * `forSetNumber` is null when the bar is being checked for a FUTURE set (a
+ * line-up stashed during the break): expulsion never reaches a later set, so
+ * that check is skipped rather than guessed.
+ */
+function participationBar(
+  state: IndoorMatchState,
+  team: "A" | "B",
+  playerId: string,
+  forSetNumber: number | null,
+): string | null {
+  const cards = team === "A" ? state.misconductA : state.misconductB;
+  for (const c of cards) {
+    if (c.playerId !== playerId) continue;
+    if (c.type === "MISCONDUCT_DISQUALIFICATION")
+      return "That member was disqualified and cannot play again in this match (Rule 21.3.3.1)";
+    if (
+      c.type === "MISCONDUCT_EXPULSION" &&
+      forSetNumber != null &&
+      c.setNumber === forSetNumber
+    )
+      return "That member was expelled and cannot play again in this set (Rule 21.3.2.1)";
+  }
+  if (state.exceptionallyReplaced?.includes(playerId))
+    return "That player left via an exceptional substitution and cannot re-enter the match (Rule 15.7)";
+  if (state.retiredLiberos?.includes(playerId))
+    return "That libero was replaced by a re-designation and cannot play again in this match (Rule 19.4.2.2)";
+  return null;
 }
 
 export function validateIndoorEvent(
@@ -79,9 +120,34 @@ export function validateIndoorEvent(
         return fail(`Lineup must list ${config.playersPerSide} players`);
       if (new Set(payload.playerIds).size !== payload.playerIds.length)
         return fail("Lineup has duplicate players");
+      // Participation bans (spec/33 F3). An expulsion bars only its own set,
+      // so it counts here just while lineups are being collected FOR that set;
+      // a lineup stashed for the next one passes `null`.
+      for (const id of [
+        ...payload.playerIds,
+        payload.liberoId,
+        payload.secondLiberoId,
+      ]) {
+        if (!id) continue;
+        const barred = participationBar(
+          state,
+          payload.team,
+          id,
+          collecting ? state.currentSetNumber : null,
+        );
+        if (barred) return fail(barred);
+      }
       if (config.liberoEnabled && payload.liberoId) {
         if (payload.playerIds.includes(payload.liberoId))
           return fail("Libero must not be in the starting six");
+      }
+      // Second libero (Rule 19.1.1, spec/33 F4) — same rules, plus it must be
+      // a different player from the first.
+      if (config.liberoEnabled && payload.secondLiberoId) {
+        if (payload.playerIds.includes(payload.secondLiberoId))
+          return fail("Second libero must not be in the starting six");
+        if (payload.secondLiberoId === payload.liberoId)
+          return fail("The two liberos must be different players");
       }
       return OK;
     }
@@ -114,6 +180,16 @@ export function validateIndoorEvent(
 
       if (!payload.isExceptional && used >= config.maxSubsPerSet)
         return fail("Substitution limit reached for this set");
+      // A barred member may never come back on — not even through an
+      // exceptional substitution, which waives Rule 15.6, not the bans
+      // (spec/33 F3).
+      const barredIn = participationBar(
+        state,
+        payload.team,
+        payload.inPlayerId,
+        set.setNumber,
+      );
+      if (barredIn) return fail(barredIn);
       if (!court.includes(payload.outPlayerId))
         return fail("Outgoing player is not on court");
       if (court.includes(payload.inPlayerId))
@@ -131,7 +207,21 @@ export function validateIndoorEvent(
       // under the slot rules only their own starter may replace them, so
       // waiving the count alone still refused the case. The physical checks
       // above stand — on court, not already on court, not the libero.
-      if (payload.isExceptional) return OK;
+      if (payload.isExceptional) {
+        // 15.7 names three players who may NOT come in this way: the Libero,
+        // the second Libero — both already refused above — "or their regular
+        // replacement player" (spec/33 F5). While the libero is on court that
+        // player is off it, so every other check passes them.
+        const liberoReplacement =
+          payload.team === "A"
+            ? set.libero.liberoReplacingA
+            : set.libero.liberoReplacingB;
+        if (liberoReplacement && payload.inPlayerId === liberoReplacement)
+          return fail(
+            "That player is the libero's regular replacement player and cannot be used for an exceptional substitution (Rule 15.7)",
+          );
+        return OK;
+      }
 
       const outIsStarter = lineup.includes(payload.outPlayerId);
       const slotOpenedFor = outIsStarter ? slots[payload.outPlayerId] : undefined;
@@ -139,6 +229,14 @@ export function validateIndoorEvent(
       if (outIsStarter && slotOpenedFor === undefined) {
         if (lineup.includes(payload.inPlayerId))
           return fail("Incoming player is a starter — not a legal substitute");
+        // Rule 15.6.2 — a substitute enters "only once per set". The slot map
+        // forgets them once their starter returns, so the entry list is what
+        // makes the second entry refusable (spec/33 F2). Absent on old
+        // snapshots ⇒ empty, and the slot check below still covers open slots.
+        const alreadyEntered =
+          payload.team === "A" ? (set.usedSubsA ?? []) : (set.usedSubsB ?? []);
+        if (alreadyEntered.includes(payload.inPlayerId))
+          return fail("That substitute has already entered this set (Rule 15.6.2)");
         if (slotForSub(slots, payload.inPlayerId) !== null)
           return fail("That substitute has already been used in another slot");
         return OK;
@@ -168,8 +266,29 @@ export function validateIndoorEvent(
         return fail("A rally must be completed between libero replacements");
 
       const court = payload.team === "A" ? set.courtPositionsA : set.courtPositionsB;
+      const acting = actingLibero(set, payload.team);
       if (payload.direction === "IN") {
-        if (onCourt) return fail("Libero is already on court");
+        // A libero barred from further play cannot come on (spec/33 F3).
+        const barred = participationBar(
+          state,
+          payload.team,
+          payload.liberoId,
+          set.setNumber,
+        );
+        if (barred) return fail(barred);
+
+        // Rule 19.3.2.2 (spec/33 F4): "The Acting Libero can only be replaced
+        // by the regular replacement player for that position or by the second
+        // Libero." The second half is a libero-for-libero swap — the ONE legal
+        // "IN" while a libero is already on court. Everything else still
+        // refuses, exactly as before.
+        if (onCourt || acting) {
+          if (!acting || payload.outPlayerId !== acting)
+            return fail("Libero is already on court");
+          if (payload.liberoId === acting)
+            return fail("That libero is already on court");
+          return OK;
+        }
         const idx = court.indexOf(payload.outPlayerId);
         if (idx < 0) return fail("Player being replaced is not on court");
         // Back-row positions are 1, 5, 6 → indices 0, 4, 5 (Rule 7.4). The
@@ -188,6 +307,10 @@ export function validateIndoorEvent(
       }
       // OUT: the replaced back-row player returns.
       if (!onCourt) return fail("Libero is not on court");
+      // With two liberos registered, only the one actually on court can leave
+      // it (Rule 19.1.3 — spec/33 F4).
+      if (acting && payload.liberoId !== acting)
+        return fail("That libero is not the one on court");
       const replacing =
         payload.team === "A"
           ? set.libero.liberoReplacingA
