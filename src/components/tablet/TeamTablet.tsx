@@ -14,6 +14,7 @@ import {
 import { SubPanel } from "@/components/scoring/shared/LiveControls";
 import { matchTopic } from "@/lib/realtime-topics";
 import { courtRoster } from "@/lib/roster";
+import { VCS_UI_ENABLED } from "@/lib/features";
 
 interface InterruptRow {
   id: string;
@@ -222,7 +223,7 @@ export function TeamTablet({
       ? set.vcs.challengesRemainingA
       : set.vcs.challengesRemainingB
     : null;
-  const vcsOn = config?.vcsEnabled ?? false;
+  const vcsOn = VCS_UI_ENABLED && (config?.vcsEnabled ?? false);
 
   // Substitution picker (same out/in model as the scorer's SubPanel). Liberos
   // are excluded — they use a libero replacement, not a substitution.

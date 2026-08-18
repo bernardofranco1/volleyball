@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useIndoorMatch } from "@/lib/indoor-match-context";
 import { timeoutCapForSet } from "@/engine/config";
+import { VCS_UI_ENABLED } from "@/lib/features";
 import { useT } from "@/lib/i18n/client";
 import { courtRoster } from "@/lib/roster";
 import {
@@ -197,7 +198,7 @@ export function IndoorActionBar({
                 {t("scoring.libero")}
               </SecondaryButton>
             ) : null}
-            {config.vcsEnabled ? (
+            {VCS_UI_ENABLED && config.vcsEnabled ? (
               <SecondaryButton
                 disabled={
                   (team === "A"

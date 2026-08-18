@@ -24,6 +24,7 @@ import {
 } from "@/lib/board-theme";
 import type { Discipline } from "@/engine/types";
 import { NEXT_STATUS, PLAYERS_PER_SIDE } from "@/lib/domain";
+import { VCS_UI_ENABLED } from "@/lib/features";
 import { getT } from "@/lib/i18n/server";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { CompetitionHeader } from "@/components/admin/CompetitionHeader";
@@ -57,8 +58,14 @@ const OVERRIDE_LABELS: { key: string; labelKey: string }[] = [
   { key: "ttoDurationSecs", labelKey: "comp.ttoDuration" },
   { key: "resultSignatures", labelKey: "comp.resultSignatures" },
   { key: "sanctionAutoPoint", labelKey: "comp.sanctionAutoPoint" },
-  { key: "vcsEnabled", labelKey: "comp.vcs" },
-  { key: "vcsChallengesPerSet", labelKey: "comp.vcsPerSet" },
+  // Listed only while challenges are actually offered — an override the
+  // consoles ignore does not belong in the summary of what differs.
+  ...(VCS_UI_ENABLED
+    ? [
+        { key: "vcsEnabled", labelKey: "comp.vcs" },
+        { key: "vcsChallengesPerSet", labelKey: "comp.vcsPerSet" },
+      ]
+    : []),
   { key: "timeoutsPerSet", labelKey: "comp.timeouts" },
   { key: "timeoutsPerSetTiebreak", labelKey: "comp.timeoutsTiebreak" },
   { key: "timeoutDurationSecs", labelKey: "comp.timeoutDuration" },
@@ -569,41 +576,56 @@ export default async function CompetitionOverviewPage({
             </div>
           </div>
 
-          {/* Challenges (Video Challenge System) */}
-          <div className="mt-4 grid grid-cols-2 gap-4">
-            <div>
-              <label className={ui.label} htmlFor="vcsEnabled">
-                {t("comp.vcs")}
-              </label>
-              <select
-                id="vcsEnabled"
-                name="vcsEnabled"
-                defaultValue={triState(configRow?.vcsEnabled)}
-                className={ui.select}
-              >
-                <option value="">
-                  {t("common.default", { value: resolved.vcsEnabled ? "on" : "off" })}
-                </option>
-                <option value="on">{t("common.on")}</option>
-                <option value="off">{t("common.off")}</option>
-              </select>
+          {/* Challenges (Video Challenge System). Hidden while the request
+              buttons are ([[VCS_UI_ENABLED]]) — a switch that reaches no
+              button is worse than no switch. Whatever the competition already
+              stored rides along in hidden fields, so saving anything else here
+              does not silently clear it. */}
+          {VCS_UI_ENABLED ? (
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div>
+                <label className={ui.label} htmlFor="vcsEnabled">
+                  {t("comp.vcs")}
+                </label>
+                <select
+                  id="vcsEnabled"
+                  name="vcsEnabled"
+                  defaultValue={triState(configRow?.vcsEnabled)}
+                  className={ui.select}
+                >
+                  <option value="">
+                    {t("common.default", { value: resolved.vcsEnabled ? "on" : "off" })}
+                  </option>
+                  <option value="on">{t("common.on")}</option>
+                  <option value="off">{t("common.off")}</option>
+                </select>
+              </div>
+              <div>
+                <label className={ui.label} htmlFor="vcsChallengesPerSet">
+                  {t("comp.vcsPerSet")}
+                </label>
+                <input
+                  id="vcsChallengesPerSet"
+                  name="vcsChallengesPerSet"
+                  type="number"
+                  min={0}
+                  max={9}
+                  defaultValue={configRow?.vcsChallengesPerSet ?? ""}
+                  placeholder={String(resolved.vcsChallengesPerSet)}
+                  className={ui.input}
+                />
+              </div>
             </div>
-            <div>
-              <label className={ui.label} htmlFor="vcsChallengesPerSet">
-                {t("comp.vcsPerSet")}
-              </label>
+          ) : (
+            <>
+              <input type="hidden" name="vcsEnabled" value={triState(configRow?.vcsEnabled)} />
               <input
-                id="vcsChallengesPerSet"
+                type="hidden"
                 name="vcsChallengesPerSet"
-                type="number"
-                min={0}
-                max={9}
-                defaultValue={configRow?.vcsChallengesPerSet ?? ""}
-                placeholder={String(resolved.vcsChallengesPerSet)}
-                className={ui.input}
+                value={configRow?.vcsChallengesPerSet ?? ""}
               />
-            </div>
-          </div>
+            </>
+          )}
 
           {/* Time-outs */}
           <div className="mt-4 grid grid-cols-3 gap-4">
