@@ -382,3 +382,31 @@ during the live break (the rotation trigger), capture a live fixture, record
 the live `Match@Status` enum in the vis-connector ledger. Open with the
 design team: hi-res background artwork (`public/board-bg/<competitionId>.jpg`)
 and the official flag pack to replace the public-source stand-ins.
+
+---
+
+## GO-LIVE EXECUTED 2026-08-18 ~14:25 UTC
+
+Production is ready for the Aug 19 rehearsal. Steps run in order:
+
+1. Preview build of `0bf7c43` verified READY.
+2. `npm run db:migrate:prod` — `vis_tournament_no` now in BOTH schemas
+   (verified via information_schema).
+3. `DB_SCHEMA=public provision-vis-live.ts --execute` — tenant `live-events`
+   + all four competitions live in production.
+4. Promoted `0bf7c43` through the release console (Prepare → READY →
+   Promote; LIVE-match warning acknowledged — the 8 live matches are demo
+   seeds; full 24/24 tenant backup taken by the flow). Driven via the
+   documented QA pattern: throwaway `qa-console-review@` global admin,
+   destroyed immediately after (auth user + rows removed).
+
+Verified on https://volleyball-eight.vercel.app: the day index (200), the
+board API on tomorrow's opener (live VIS data for Argentina–Poland), the
+`/Scoreboard/vis/27547` short URL (307 → tenant board), and a rendered
+production screenshot (Ancorli, flags, kick-off time, Pool C).
+
+Rehearsal URLs (Aug 19, first serve 11:00 Doha / 10:00 CEST):
+- Day index: `/t/live-events/scoreboard/vis/comp_vis_1670`
+- Any board by VIS match number: `/Scoreboard/vis/<matchNo>`
+  (`?layout=ushape` for the U-shape, `?screen=stats` to preview the break
+  screen, `?bg=` for artwork tests)
