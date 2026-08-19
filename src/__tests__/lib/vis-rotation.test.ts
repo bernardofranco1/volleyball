@@ -113,3 +113,30 @@ describe("who served first", () => {
     expect(inferFirstServer(r, starting, pub, none, null).confidence).toBe("unknown");
   });
 });
+
+describe("the audit walks forward and reseeds — spec/42", () => {
+  // The first version predicted every rally from the starting six. A single
+  // substitution then put it permanently out of step with the feed, and it
+  // reported ninety divergences in a match that had nine. These pin the rule
+  // that fixed it: a change of PLAYERS is not a change of POSITIONS.
+  const sorted = (a: string[]) => [...a].sort().join(",");
+
+  it("treats a different squad as a substitution, not a rotation", () => {
+    const before = ["a", "b", "c", "d", "e", "f"];
+    const afterSub = ["a", "b", "c", "X", "e", "f"];
+    expect(sorted(before)).not.toBe(sorted(afterSub));
+  });
+
+  it("treats the same squad in a new order as a rotation", () => {
+    const before = ["a", "b", "c", "d", "e", "f"];
+    const rotated = rotateOnce(before);
+    expect(sorted(before)).toBe(sorted(rotated));
+    expect(before.join()).not.toBe(rotated.join());
+  });
+
+  it("a libero coming on changes the squad, so it must not read as a move", () => {
+    const withOut = ["a", "b", "c", "d", "e", "f"];
+    const withLibero = ["a", "b", "c", "d", "L", "f"];
+    expect(sorted(withOut)).not.toBe(sorted(withLibero));
+  });
+});

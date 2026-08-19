@@ -25,7 +25,6 @@ import { visRotationLog } from "@/db/schema";
 import { newId } from "@/lib/id";
 import { allTagAttrs, num, str, tagBlocks, type Attrs } from "./parse";
 import {
-  canonicalise,
   inferFirstServer,
   ralliesOf,
   rotateOnce,
@@ -109,7 +108,6 @@ export function auditSet(opts: {
     return l ? sixOf(l) : null;
   };
 
-  // The starting six: the lineups the set carries before its rally stream.
   const head = setInner.split("<Events")[0];
   const starting: Record<Side, Six | null> = { A: lineupFor(head, "A"), B: lineupFor(head, "B") };
   if (!starting.A || !starting.B) return [];
@@ -133,24 +131,45 @@ export function auditSet(opts: {
   const out: RotationAuditRow[] = [];
 
   for (const side of ["A", "B"] as const) {
-    const base = canonicalise(starting[side]!, liberos);
-
-    // Every published rally: did the feed put them where the rules say?
+    // Walk the set forward, one rally at a time, rather than predicting each
+    // rally from the starting six.
+    //
+    // The absolute form does not survive contact with a real match: a
+    // substitution or a libero coming on changes WHO is on court, not where
+    // anybody is standing, and a model that only ever rotates the starting
+    // lineup then disagrees with the feed for the rest of the set. The first
+    // version of this did exactly that and reported ninety divergences in a
+    // match with nine.
+    //
+    // So: expect a rotation only when the rules call for one, and whenever the
+    // SET of players changes — a substitution, a libero swapping in or out —
+    // take the feed's word and carry on from there. What remains, and is worth
+    // recording, is the same six standing in a different order.
+    let expect: Six | null = starting[side];
     for (const r of rallies) {
       const seen = published[side][r.index - 1];
       if (!seen) continue;
-      const turns = rotationsBefore(rallies, firstServer, r.index)[side];
-      let expect = base;
-      for (let i = 0; i < turns % 6; i++) expect = rotateOnce(expect);
-      const feed = canonicalise(seen, liberos);
-      if (expect.join() !== feed.join()) {
+      if (!expect) { expect = seen; continue; }
+
+      const sameSquad =
+        [...expect].sort().join(",") === [...seen].sort().join(",");
+      if (!sameSquad) {
+        expect = seen; // a substitution or a libero change: reseed, do not judge
+      } else if (expect.join() !== seen.join()) {
+        const turns = rotationsBefore(rallies, firstServer, r.index)[side];
         out.push({
           matchNo, setNo, rallyNo: r.index, team: side, kind: "rotation",
           firstServer, confidence, expectedTurns: turns,
           feedSix: seen.join(","), modelSix: expect.join(","),
           scoreA: r.scoreA, scoreB: r.scoreB,
         });
+        expect = seen; // reseed so one disagreement does not cascade
       }
+
+      // Advance to the rotation the rules give the NEXT rally.
+      const during = rotationsBefore(rallies, firstServer, r.index);
+      const after = rotationsBefore(rallies, firstServer, r.index + 1);
+      if (after[side] > during[side]) expect = rotateOnce(expect);
     }
 
     // A libero cannot serve (FIVB 19.3.2.1). If the feed has one in position 1

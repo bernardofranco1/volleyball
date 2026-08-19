@@ -60,7 +60,14 @@ showed the outgoing rotation for a whole rally whenever the receiving side won
 the first point, which is about half of all sets.
 
 **An independent rotation model** (`rotation.ts`), derived from the rules and
-the running score, never from the feed's shape. Where the first server was not
+the running score, never from the feed's shape. It walks a set forward one
+rally at a time rather than predicting each rally from the starting six: a
+substitution or a libero coming on changes WHO is on court, not where anybody
+is standing, and an absolute model desynchronises for the rest of the set the
+moment either happens. The first cut did exactly that and reported ninety
+divergences in a match with nine. So a change of players reseeds the model from
+the feed and is never judged; what is recorded is the same six standing in a
+different order. Where the first server was not
 observed — an instance that came up mid-set — it is recovered by running both
 hypotheses and keeping whichever predicts more of the feed's own lineups.
 
