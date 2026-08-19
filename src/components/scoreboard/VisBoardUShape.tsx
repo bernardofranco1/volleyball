@@ -35,6 +35,8 @@ import {
   type VisBoardTheme,
   flagSrc,
 } from "@/components/scoreboard/vis-board-theme";
+import { fitCap } from "@/lib/board-text-fit";
+import { DEFAULT_FLAG_RATIO, FLAG_RATIO } from "@/lib/board-flag-ratios";
 
 const W = 1920;
 const H = 1080;
@@ -45,13 +47,46 @@ const cap = (capPx: number) => f(capPx / 0.72);
 
 const WIN = { left: 192, right: 1728, bottom: 864 };
 const RAIL = { lx: 20, rx: 1748, w: 152, stroke: 7 };
-const CUR = { y: 124, h: 160, cap: 96.5 };
-const SETS = { y: 304, h: 160, labelCap: 30, cap: 82.5 };
-const HIST = { y0: 484, h: 80, pitch: 100, cap: 50 };
+/**
+ * Rail geometry, rebalanced (spec/39). The previous figures overflowed at both
+ * ends: a two-digit score ran past its box on every side, the flag was clipped
+ * by the top of the frame, and the code sat on the score box's border. The
+ * scores and sets boxes each give back 20 px of height, which is what buys the
+ * flag room to show whole; every number is then fitted to its box rather than
+ * set at a fixed cap, so nothing can overflow whatever the score reaches.
+ */
+const HEAD = { y: 10, flagH: 66, keyline: 2.5, codeY: 80, codeH: 48, codeCap: 34 };
+const CUR = { y: 132, h: 140, cap: 70 };
+const SETS = { y: 284, h: 140, labelCap: 26, cap: 62 };
+const HIST = { y0: 442, h: 88, pitch: 108, cap: 56 };
 const SETPLATE = { x: 834, y: 904.5, w: 252, h: 135, labelCap: 44, cap: 86 };
-const BAND = { y: 890, h: 190 };
-/** The requested flag + code head (spec/35 W6). */
-const HEAD = { y: 12, flagH: 74, codeY: 90, codeCap: 34 };
+/**
+ * The interruption band (spec/39). Sized so the three groups clear the centre
+ * set plate at x 834-1086 on both sides: 40 + 756 = 796, and its mirror starts
+ * at 1124. The labels came down from cap 32, which ran "TIME OUT" into the
+ * plate.
+ */
+const BAND = { y: 890, h: 190, margin: 40, w: 756, gap: 24, padTop: 20, labelCap: 24 };
+/** One allowance pip. Two rows of four fit the band at this size. */
+const PIP = { size: 30, gap: 9, stroke: 4 };
+/** Pips drawn per group — the allowance, not what is left. */
+export const ALLOWANCE = { challenges: 2, substitutions: 8, timeouts: 2 };
+/** Usable width inside a rail box, once its stroke and a little air are off. */
+const RAIL_TEXT_W = RAIL.w - 2 * RAIL.stroke - 10;
+
+/**
+ * A cap that keeps `text` inside a rail box, never larger than the design's.
+ *
+ * The caps above are already chosen for the WIDEST string each box can hold —
+ * a two-digit score at CUR.cap measures 125 px in a 128 px interior — because a
+ * size that shrank to fit would make the score visibly jump as it crossed 9 to
+ * 10, and a venue screen that changes type size mid-rally reads as broken. So
+ * this is the safety net, not the normal path: it catches the payload nobody
+ * planned for (a three-digit score, a four-letter code) rather than sizing the
+ * ordinary case.
+ */
+const railCap = (text: string, maxCap: number) =>
+  fitCap(text, RAIL_TEXT_W, maxCap);
 
 interface SideData {
   code: string;
@@ -204,9 +239,15 @@ function Rail({
   const left = side === "left";
   const rx = left ? RAIL.lx : RAIL.rx;
   const src = flagSrc(data.code);
+  // The flag is sized by its own ratio so the keyline wraps the flag itself and
+  // nothing is cropped; the rail's width is the only cap.
+  const ratio = FLAG_RATIO[data.code.toUpperCase()] ?? DEFAULT_FLAG_RATIO;
+  const flagW = Math.min(RAIL.w - 20, HEAD.flagH * ratio);
   return (
     <>
-      {/* Requested head: borderless flag + FIVB code (spec/35 W6). */}
+      {/* Head: the whole flag inside a white keyline, then the code (spec/39).
+          The keyline hugs the FLAG, not a fixed slot, so it reads as a flag on
+          any ratio and against the artwork's dark bands. */}
       <div
         style={{
           position: "absolute",
@@ -216,20 +257,28 @@ function Rail({
           height: y(HEAD.flagH),
           display: "grid",
           placeItems: "center",
-          overflow: "hidden",
         }}
       >
         {src ? (
-          // eslint-disable-next-line @next/next/no-img-element -- board art asset
-          <img
-            src={src}
-            alt={data.code}
-            // `contain`: the whole flag at its own ratio, never cropped (spec/36).
-            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }}
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
+          <span
+            style={{
+              display: "block",
+              width: x(flagW),
+              height: y(HEAD.flagH),
+              border: `${f(HEAD.keyline)} solid ${theme.ink}`,
+              boxSizing: "border-box",
             }}
-          />
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- board art asset */}
+            <img
+              src={src}
+              alt={data.code}
+              style={{ width: "100%", height: "100%", display: "block" }}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          </span>
         ) : null}
       </div>
       <div
@@ -238,8 +287,10 @@ function Rail({
           left: x(rx),
           top: y(HEAD.codeY),
           width: x(RAIL.w),
-          textAlign: "center",
-          fontSize: cap(HEAD.codeCap),
+          height: y(HEAD.codeH),
+          display: "grid",
+          placeItems: "center",
+          fontSize: cap(railCap(data.code, HEAD.codeCap)),
           lineHeight: 1,
           letterSpacing: f(2),
         }}
@@ -258,7 +309,7 @@ function Rail({
           border: `${f(RAIL.stroke)} solid ${theme.accent}`,
           display: "grid",
           placeItems: "center",
-          fontSize: cap(CUR.cap),
+          fontSize: cap(railCap(String(data.score), CUR.cap)),
           lineHeight: 1,
           fontVariantNumeric: "tabular-nums",
         }}
@@ -286,7 +337,7 @@ function Rail({
         </span>
         <span
           style={{
-            fontSize: cap(SETS.cap),
+            fontSize: cap(railCap(String(data.sets), SETS.cap)),
             lineHeight: 1,
             fontVariantNumeric: "tabular-nums",
             alignSelf: "center",
@@ -309,7 +360,7 @@ function Rail({
             border: `${f(RAIL.stroke)} solid ${theme.accent}`,
             display: "grid",
             placeItems: "center",
-            fontSize: cap(HIST.cap),
+            fontSize: cap(railCap(v == null ? "" : String(v), HIST.cap)),
             lineHeight: 1,
             fontVariantNumeric: "tabular-nums",
           }}
@@ -323,7 +374,7 @@ function Rail({
 
 /** Counter dots — one pip per FIVB per-set allowance (challenge 2 / subst 6 /
  *  time-out 2), never showing fewer pips than the allowance. */
-function dots(remaining: number, base: number): boolean[] {
+export function dots(remaining: number, base: number): boolean[] {
   const total = Math.max(base, remaining);
   // Filled = still available. The rail counts DOWN as the set is spent.
   return Array.from({ length: total }, (_, i) => i < remaining);
@@ -333,26 +384,27 @@ function Counters({
   side, data, theme,
 }: { side: "left" | "right"; data: SideData; theme: VisBoardTheme }) {
   const left = side === "left";
-  const groups: { label: string; filled: boolean[] }[] = [
-    // The FIVB indoor per-set allowances (see FIVB_PER_SET): 2 / 6 / 2. The
-    // time-out row used to draw a single pip, which is the BEACH allowance.
-    { label: "CHALLENGE", filled: dots(data.challenges, 2) },
-    { label: "SUBST", filled: dots(data.substitutions, 6) },
-    { label: "TIME OUT", filled: dots(data.timeouts, 2) },
+  const groups: { label: string; filled: boolean[]; perRow: number }[] = [
+    { label: "CHALLENGE", filled: dots(data.challenges, ALLOWANCE.challenges), perRow: 2 },
+    // Eight, in two rows of four (spec/39). Eight is what the feed reports for
+    // these events, and one row of eight forced the pips small enough to be
+    // ambiguous from the stands.
+    { label: "SUBST", filled: dots(data.substitutions, ALLOWANCE.substitutions), perRow: 4 },
+    { label: "TIME OUT", filled: dots(data.timeouts, ALLOWANCE.timeouts), perRow: 2 },
   ];
   return (
     <div
       style={{
         position: "absolute",
-        ...(left ? { left: x(52) } : { right: x(52) }),
+        ...(left ? { left: x(BAND.margin) } : { right: x(BAND.margin) }),
         top: y(BAND.y),
-        width: x(760),
+        width: x(BAND.w),
         height: y(BAND.h),
         display: "grid",
-        gridTemplateColumns: "1fr 1.35fr 1fr",
-        gap: x(20),
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: x(BAND.gap),
         alignContent: "start",
-        paddingTop: y(22),
+        paddingTop: y(BAND.padTop),
       }}
     >
       {groups.map((g) => (
@@ -362,12 +414,12 @@ function Counters({
             display: "grid",
             gridTemplateRows: "auto auto",
             justifyItems: "center",
-            rowGap: y(16),
+            rowGap: y(14),
           }}
         >
           <span
             style={{
-              fontSize: cap(32),
+              fontSize: cap(BAND.labelCap),
               lineHeight: 1,
               letterSpacing: f(1),
               // "TIME OUT" must stay on one line — the master has no wrap.
@@ -376,16 +428,25 @@ function Counters({
           >
             {g.label}
           </span>
-          <span style={{ display: "flex", gap: x(9) }}>
+          <span
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${g.perRow}, ${x(PIP.size)})`,
+              gap: x(PIP.gap),
+              justifyContent: "center",
+            }}
+          >
             {g.filled.map((on, i) => (
               <span
                 key={i}
                 style={{
-                  width: x(34),
-                  height: x(34),
+                  width: x(PIP.size),
+                  height: x(PIP.size),
                   borderRadius: "50%",
-                  border: `${f(4)} solid ${theme.ink}`,
+                  border: `${f(PIP.stroke)} solid ${theme.ink}`,
+                  // Filled = still available; a spent one is left as an outline.
                   background: on ? theme.ink : "transparent",
+                  boxSizing: "border-box",
                 }}
               />
             ))}

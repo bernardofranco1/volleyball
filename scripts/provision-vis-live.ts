@@ -1,7 +1,7 @@
 // Provisioning for the VIS-fed live scoreboard (spec/34): the "Live Events"
-// tenant plus three competitions linked to FIVB VIS tournaments — the Boys'
-// U17 World Championship (dress rehearsal) and the two AVC Asian
-// Championships. These competitions hold NO matches here; they exist to give
+// tenant plus the competitions linked to FIVB VIS tournaments — the two U17
+// World Championships, the two AVC Asian Championships, and VIS's own VNL 2026
+// women's TEST tournament, which is what the dress rehearsal runs on. These competitions hold NO matches here; they exist to give
 // the read-only VIS boards a tenant, branding, and a `vis_tournament_no`.
 //
 // Dry-run by default — prints exactly what it would write and touches nothing.
@@ -70,6 +70,21 @@ const COMPETITIONS = [
     timezone: "Asia/Shanghai",
     startDate: "2026-08-21",
     endDate: "2026-08-30",
+  },
+  {
+    // VIS's own VNL 2026 women's TEST tournament — 116 fixtures with live data
+    // that can be driven on demand, which is what makes it the dress-rehearsal
+    // event (match 27832, CHN v THA, 2026-06-04). Not a real competition.
+    id: "comp_vis_1736",
+    visTournamentNo: 1736,
+    name: "VNL 2026 Women — rehearsal (VIS test data)",
+    gender: "WOMEN" as const,
+    category: "SENIOR" as const,
+    city: "Various",
+    country: "",
+    timezone: "Asia/Shanghai",
+    startDate: "2026-06-03",
+    endDate: "2026-07-26",
   },
   {
     id: "comp_vis_1765",
