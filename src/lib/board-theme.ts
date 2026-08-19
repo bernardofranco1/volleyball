@@ -85,6 +85,25 @@ export interface CompetitionBranding {
   fontColor: string | null;
   fontFamily: string | null;
   logoUrl: string | null;
+  /** Background artwork for this competition's boards (spec/40). */
+  boardBgUrl: string | null;
+}
+
+/**
+ * Is this usable as board background artwork? (spec/40)
+ *
+ * Same-origin paths and https URLs only — the board is a public page on a venue
+ * screen, so an http source is a mixed-content block and any other scheme is
+ * not something to paint. Shared by the board, which applies it, and the
+ * branding form, which must not accept what the board would refuse.
+ */
+export function isBoardBackground(raw: string): boolean {
+  if (raw.startsWith("/") && !raw.startsWith("//")) return true;
+  try {
+    return new URL(raw).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 // Cached across requests (data cache, tag `competition-branding:<id>`); the
@@ -103,6 +122,7 @@ export async function getCompetitionBranding(
           fontColor: competitionBranding.fontColor,
           fontFamily: competitionBranding.fontFamily,
           logoUrl: competitionBranding.logoUrl,
+          boardBgUrl: competitionBranding.boardBgUrl,
         })
         .from(competitionBranding)
         .where(eq(competitionBranding.competitionId, competitionId))

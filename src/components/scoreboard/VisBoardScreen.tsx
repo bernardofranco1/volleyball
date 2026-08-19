@@ -114,8 +114,17 @@ export async function VisBoardScreen({
     ink: branding?.fontColor || VIS_BOARD_THEME.ink,
   };
 
+  // Background artwork, in order of precedence (spec/40):
+  //   ?bg=…                     one screen, for a rehearsal or a sponsor night
+  //   branding.boardBgUrl       the competition's own, set in the admin console
+  //   /board-bg/{id}.jpg        the file convention, still supported
+  // Only the first two can be changed without a commit, which is the point of
+  // the second. A 404 on any of them simply reveals the built-in artwork, since
+  // CSS falls through a background layer it cannot load.
   const backgroundUrl =
-    safeBackground(query.bg) ?? `/board-bg/${encodeURIComponent(competitionId)}.jpg`;
+    safeBackground(query.bg) ??
+    safeBackground(branding?.boardBgUrl ?? undefined) ??
+    `/board-bg/${encodeURIComponent(competitionId)}.jpg`;
 
   const layout = query.layout === "ushape" ? ("ushape" as const) : ("full" as const);
   const screenOverride =

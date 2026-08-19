@@ -43,9 +43,6 @@ const cap = (capPx: number) => f(capPx / 0.72);
 /** Measured from the master by keying the mark layer off the background:
  *  glyph box x 914 -> 1006, y 49 -> 137. */
 const LOGO = { x: 914, y: 49, w: 92, h: 88 };
-/** The set the big plates belong to, named just above them. The master leaves
- *  this band empty because its dummy state has no set to name (spec/37). */
-const SETLABEL = { y: 145, cap: 27 };
 const CLUSTER = { x: 670.5, y: 185.5, w: 579.5, h: 179 };
 const SMALL = { lx: 680.5, rx: 1155, y: 195.5, w: 85, h: 110, cap: 56 };
 const BIG = { lx: 775.5, rx: 965.5, y: 195.5, w: 179, h: 159, cap: 96 };
@@ -77,16 +74,6 @@ export function VisSetStats({
 }) {
   const last = board.lastFinishedSet;
   const stats = board.stats;
-  // Which set the big score belongs to: the one just played. Once the match is
-  // over the plates carry the last set, and FINAL is the truthful label.
-  const setLabel =
-    board.status === "FINISHED"
-      ? "FINAL"
-      : last
-        ? `SET ${last.setNumber}`
-        : board.currentSet
-          ? `SET ${board.currentSet}`
-          : "";
   const rows: { label: string; a: number; b: number }[] = stats
     ? [
         { label: "ATTACKS", a: stats.attacksA, b: stats.attacksB },
@@ -130,24 +117,6 @@ export function VisSetStats({
             objectFit: "contain",
           }}
         />
-
-        {setLabel ? (
-          <div
-            style={{
-              position: "absolute",
-              left: x(960 - 300),
-              width: x(600),
-              top: y(SETLABEL.y),
-              textAlign: "center",
-              fontSize: cap(SETLABEL.cap),
-              lineHeight: 1,
-              letterSpacing: f(2),
-              whiteSpace: "nowrap",
-            }}
-          >
-            {setLabel}
-          </div>
-        ) : null}
 
         <TeamMark side="left" code={board.teamA.code} name={board.teamA.name} geo={MARK} />
         <TeamMark side="right" code={board.teamB.code} name={board.teamB.name} geo={MARK} />

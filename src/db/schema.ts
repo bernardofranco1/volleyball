@@ -87,6 +87,13 @@ export const competitionBranding = pgTable("competition_branding", {
   fontColor: text("font_color"),
   fontFamily: text("font_family"),
   logoUrl: text("logo_url"),
+  /**
+   * Background artwork for this competition's boards (spec/40): an https URL or
+   * a same-origin path. Set from the Scoreboard tab so a competition's artwork
+   * can be changed without a commit and a deploy — the file convention
+   * (`public/board-bg/{competitionId}.jpg`) still works and is the fallback.
+   */
+  boardBgUrl: text("board_bg_url"),
 }).enableRLS();
 
 // ── Users & roles ──────────────────────────────────────────────────────────

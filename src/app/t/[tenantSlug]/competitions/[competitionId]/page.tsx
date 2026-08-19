@@ -782,6 +782,21 @@ export default async function CompetitionOverviewPage({
               className={ui.input}
             />
           </div>
+          <div className="mt-3">
+            <label className={ui.label} htmlFor="board-bg">
+              {t("comp.boardBgUrl")}
+            </label>
+            <input
+              id="board-bg"
+              name="boardBgUrl"
+              defaultValue={boardBranding?.boardBgUrl ?? ""}
+              placeholder="https://…/artwork.jpg  or  /board-bg/avc-cup-pattern.png"
+              className={ui.input}
+            />
+            <p className="mt-1 text-[11px] text-score-dim">
+              {t("comp.boardBgUrlHint")}
+            </p>
+          </div>
             <div className="mt-4">
               <SubmitButton variant="secondary" pendingLabel={t("common.saving")}>
                 {t("comp.saveScoreboard")}

@@ -6,6 +6,7 @@ import { after } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, dbTx } from "@/db";
 import { competitions, competitionBranding, tournamentConfig } from "@/db/schema";
+import { isBoardBackground } from "@/lib/board-theme";
 import { ADMIN_ROLES, requireRole } from "@/lib/authz";
 import { gateCompetition } from "@/lib/action-gate";
 import { scheduleIncrementalBackup } from "@/lib/backup";
@@ -348,7 +349,17 @@ export async function updateCompetitionBranding(
     }
   }
 
-  const values = { bgColor, lineColor, accentColor, fontColor, fontFamily, logoUrl };
+  // Background artwork (spec/40). Same rule the board itself enforces before
+  // painting one: an https URL, or a same-origin path. Anything else is either
+  // a mixed-content warning on a venue screen or an attempt to point the board
+  // at another origin's scheme.
+  const boardBgUrl = str(fd, "boardBgUrl") || null;
+  if (boardBgUrl && !isBoardBackground(boardBgUrl))
+    return fail("Background must be an https:// URL or a path beginning with /.");
+
+  const values = {
+    bgColor, lineColor, accentColor, fontColor, fontFamily, logoUrl, boardBgUrl,
+  };
   await db
     .insert(competitionBranding)
     .values({ competitionId: g.competitionId, ...values })

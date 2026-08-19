@@ -1,0 +1,1 @@
+ALTER TABLE "competition_branding" ADD COLUMN "board_bg_url" text;
