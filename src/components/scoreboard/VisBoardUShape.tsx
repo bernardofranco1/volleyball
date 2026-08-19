@@ -225,7 +225,19 @@ export function VisBoardUShape({
             gap: x(18),
           }}
         >
-          <span style={{ fontSize: cap(SETPLATE.labelCap), lineHeight: 1, letterSpacing: f(1) }}>
+          <span
+            style={{
+              // The plate is 252 px wide and "WARM UP" is three glyphs longer
+              // than "FINAL": fit the label rather than let it wrap out of the
+              // plate. One line always — the master has no second one.
+              fontSize: cap(
+                fitCap(plateLabel, SETPLATE.w - 28 - (plateNumber ? 84 : 0), SETPLATE.labelCap, 1),
+              ),
+              lineHeight: 1,
+              letterSpacing: f(1),
+              whiteSpace: "nowrap",
+            }}
+          >
             {plateLabel}
           </span>
           {plateNumber ? (

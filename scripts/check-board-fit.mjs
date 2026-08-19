@@ -18,7 +18,7 @@ const BASE = process.argv[2] ?? "http://localhost:3313/board-lab";
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1920, height: 1080 } });
 let bad = 0;
-for (const q of ["?state=live&sa=8&sb=9", "?state=live&sa=25&sb=25", "?state=final", "?state=live&sa=33&sb=31"]) {
+for (const q of ["?state=pre", "?state=live", "?state=final"]) {
   await p.goto(`${BASE}${q}`, { waitUntil: "networkidle" });
   await p.evaluate(() => document.fonts.ready);
   await p.waitForTimeout(400);
