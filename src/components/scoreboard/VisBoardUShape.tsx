@@ -282,10 +282,13 @@ function Rail({
   const rx = left ? RAIL.lx : RAIL.rx;
   const src = flagSrc(data.code);
   // The flag is sized by its own ratio so the keyline wraps the flag itself and
-  // nothing is cropped. The rail caps the WIDTH, and when a flag is wide enough
-  // to hit that cap its height comes down with it — the first version clamped
-  // the width and left the height alone, which squashed Qatar (28:11) to 2:1
-  // and was visible on a venue screen.
+  // nothing is cropped or stretched. The rail caps the WIDTH, and when a flag
+  // is wide enough to hit that cap its height comes down with it — the first
+  // version clamped the width and left the height alone, which squashed Qatar
+  // (28:11) to 2:1 and was visible on a venue screen. Qatar therefore sits
+  // shorter than its neighbours in the rail. That is the flag, not a fault:
+  // trimming it to match cost it the white-to-maroon proportion that makes it
+  // recognisable, which read as a broken image rather than a tidy one.
   const ratio = FLAG_RATIO[data.code.toUpperCase()] ?? DEFAULT_FLAG_RATIO;
   const flagW = Math.min(RAIL.w - 20, HEAD.flagH * ratio);
   const flagH = flagW / ratio;
