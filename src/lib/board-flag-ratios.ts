@@ -37,7 +37,7 @@ export const FLAG_RATIO: Record<string, number> = {
   "PHI": 2,
   "POL": 1.6,
   "PUR": 1.4953,
-  "QAT": 2.5397,
+  "QAT": 2,
   "ROU": 1.4953,
   "THA": 1.4953,
   "TPE": 1.497,
