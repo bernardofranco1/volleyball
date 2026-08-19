@@ -36,6 +36,14 @@ const f = (px: number) => `${((px / W) * 100).toFixed(4)}cqw`;
 const cap = (capPx: number) => f(capPx / 0.72);
 /** Same optical-centring correction the boards apply to every measured cap. */
 const NUDGE = 0.087;
+/**
+ * A hairline around the flag. Without it a flag whose edge band is dark (Egypt's
+ * black, Japan's and the USA's white against a pale ground) dissolves into the
+ * artwork and reads as a cropped or broken image — the AVC navy is close enough
+ * to black to swallow a whole stripe. 3 design px: visible from the stands,
+ * far below the master's 5-12 px strokes, and drawn INSIDE the measured box.
+ */
+const FLAG_KEYLINE = 3;
 const nudge = (capPx: number) => `translateY(${y(capPx * NUDGE)})`;
 
 /** Per-board geometry, in design px of the 1920 x 1080 frame. */
@@ -102,7 +110,16 @@ export function TeamMark({
   );
 }
 
-export type FlagFit = "contain" | "height" | "area";
+/**
+ * How a flag meets the slot. The assets carry eight official ratios, so a board
+ * has to choose what "the same size" means:
+ *   area    — same area, own proportions. Shipped in spec/36.
+ *   contain — same slot, own proportions, letterboxed. Outliers sit shorter.
+ *   height  — same height, own proportions. Outliers get very wide.
+ *   fill    — same slot, own proportions, CROPPED to fill it.
+ *   stretch — same slot, whole flag, DISTORTED to fill it.
+ */
+export type FlagFit = "contain" | "height" | "area" | "fill" | "stretch";
 
 /** The rendered size of one flag under the chosen rule, in design px. */
 export function flagBox(
@@ -110,6 +127,9 @@ export function flagBox(
   { w, h, fit }: { w: number; h: number; fit: FlagFit },
 ): { w: number; h: number } {
   const ratio = FLAG_RATIO[code.toUpperCase()] ?? DEFAULT_FLAG_RATIO;
+  // The two uniform-box rules take the slot exactly; the image absorbs the
+  // difference, by crop or by distortion.
+  if (fit === "fill" || fit === "stretch") return { w, h };
   if (fit === "height") return { w: h * ratio, h };
   if (fit === "area") {
     const width = Math.sqrt(w * h * ratio);
@@ -127,8 +147,9 @@ export function TeamFlag({
   theme: VisBoardTheme;
   geo: TeamMarkGeometry;
 }) {
-  const { innerX, y: top, h } = geo.flag;
+  const { innerX, y: top, h, fit } = geo.flag;
   const box = flagBox(code, geo.flag);
+  const objectFit = fit === "fill" ? "cover" : fit === "stretch" ? "fill" : "contain";
   const src = flagSrc(code);
   return (
     <div
@@ -143,6 +164,9 @@ export function TeamFlag({
         height: y(box.h),
         display: "grid",
         placeItems: "center",
+        border: `${f(FLAG_KEYLINE)} solid ${theme.ink}`,
+        // The keyline must not push the flag off its measured edges.
+        boxSizing: "border-box",
         fontSize: cap(40),
         color: theme.ink,
       }}
@@ -152,7 +176,7 @@ export function TeamFlag({
         <img
           src={src}
           alt={code}
-          style={{ width: "100%", height: "100%", display: "block" }}
+          style={{ width: "100%", height: "100%", objectFit, display: "block" }}
           onError={(e) => {
             e.currentTarget.style.display = "none";
             e.currentTarget.parentElement!.textContent = code;

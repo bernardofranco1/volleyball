@@ -33,6 +33,7 @@ import {
   mapVolleyMatchList,
 } from "./board-data";
 import { MOCK_MATCH_NO, mockLiveXml } from "./mock";
+import { pollIntervalMs } from "./cadence";
 
 interface Entry<T> {
   value: T;
@@ -103,7 +104,12 @@ export async function getMatchList(
 /**
  * The board payload for one match. Tries the live feed; falls back to the
  * single-match read for a fixture that has not started (no live row yet).
- * TTL follows the feed's own `PollDelay`.
+ *
+ * The TTL is the cadence for the state the board is IN (spec/37): one second
+ * while a set is being played, backed off otherwise, never below the feed's own
+ * `PollDelay` except during play. Concurrent viewers are collapsed by `dedupe`,
+ * so the TTL is what actually bounds upstream traffic — one call per interval
+ * per match per instance, however many screens are watching.
  */
 export async function getBoard(
   matchNo: number,
@@ -123,7 +129,7 @@ export async function getBoard(
         const entry: Entry<VisBoardData> = {
           value: board,
           at: Date.now(),
-          ttlMs: Math.max(5, board.pollDelaySeconds) * 1000,
+          ttlMs: pollIntervalMs(board),
         };
         boards.set(matchNo, entry);
         return aged(entry, Date.now());

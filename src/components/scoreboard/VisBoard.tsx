@@ -484,20 +484,28 @@ function Ladder({
   );
 }
 
+/**
+ * The three interruption rows. They show what each team has LEFT this set, not
+ * what it has spent (spec/37): a venue board is read to answer "can they still
+ * stop the game", so it counts down from the FIVB per-set allowance — 2
+ * time-outs, 6 substitutions, 2 challenges — and every row starts full at 0-0.
+ */
 function Counters({ board, theme }: { board: VisBoardData; theme: VisBoardTheme }) {
   const rows: { icon: React.ReactNode; a: number; b: number; label: string }[] = [
     {
       icon: <Icon src={COUNTER_ICON.timeout} size={COUNTERS.icon.timeout} />,
-      a: board.teamA.timeouts, b: board.teamB.timeouts, label: "Time-outs this set",
+      a: board.teamA.timeoutsRemaining, b: board.teamB.timeoutsRemaining,
+      label: "Time-outs left this set",
     },
     {
       icon: <Icon src={COUNTER_ICON.subs} size={COUNTERS.icon.subs} />,
-      a: board.teamA.substitutions, b: board.teamB.substitutions,
-      label: "Substitutions this set",
+      a: board.teamA.substitutionsRemaining, b: board.teamB.substitutionsRemaining,
+      label: "Substitutions left this set",
     },
     {
       icon: <Icon src={COUNTER_ICON.challenge} size={COUNTERS.icon.challenge} />,
-      a: board.teamA.challenges, b: board.teamB.challenges, label: "Challenges this set",
+      a: board.teamA.challengesRemaining, b: board.teamB.challengesRemaining,
+      label: "Challenges left this set",
     },
   ];
   return (

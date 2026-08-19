@@ -8,6 +8,7 @@ import {
   volleyMatchListEnvelope,
 } from "@/lib/vis-live/client";
 import {
+  FIVB_PER_SET,
   inferStatus,
   mapVolleyLive,
   mapVolleyMatch,
@@ -124,9 +125,39 @@ describe("mapVolleyLive — finished match", () => {
   });
 
   it("reads the interruption counters of the current set", () => {
-    expect(board.teamA.timeouts).toBeGreaterThanOrEqual(0);
-    expect(board.teamA.timeouts).toBeLessThanOrEqual(2); // FIVB 15.1
-    expect(board.teamB.substitutions).toBeLessThanOrEqual(6); // FIVB 15.1
+    expect(board.teamA.timeoutsTaken).toBeGreaterThanOrEqual(0);
+    expect(board.teamA.timeoutsTaken).toBeLessThanOrEqual(2); // FIVB 15.1
+    expect(board.teamB.substitutionsUsed).toBeLessThanOrEqual(6); // FIVB 15.1
+  });
+
+  it("counts the allowances DOWN, from what VIS says was used", () => {
+    // The fixture's deciding set: both sides spent both time-outs; A made 4
+    // substitutions with 4 still to come, B made 6 with 2 left.
+    expect(board.teamA.timeoutsTaken).toBe(2);
+    expect(board.teamA.timeoutsRemaining).toBe(0);
+    expect(board.teamB.timeoutsRemaining).toBe(0);
+    expect(board.teamA.substitutionsUsed).toBe(4);
+    expect(board.teamA.substitutionsRemaining).toBe(4);
+    expect(board.teamB.substitutionsRemaining).toBe(2);
+  });
+
+  it("takes the feed's own remaining-substitution count, unclamped", () => {
+    // 4 used AND 4 remaining — this event does not run to six, and forcing the
+    // FIVB allowance on it would under-report what the teams actually have.
+    expect(
+      board.teamA.substitutionsUsed + board.teamA.substitutionsRemaining,
+    ).toBeGreaterThan(FIVB_PER_SET.substitutions);
+  });
+
+  it("spends a challenge only when it was REFUSED, never merely requested", () => {
+    // FIVB: a team that wins its challenge keeps the right. B requested two,
+    // had one upheld and one refused, so exactly one is gone.
+    expect(board.teamB.challengesRequested).toBe(2);
+    expect(board.teamB.challengesRefused).toBe(1);
+    expect(board.teamB.challengesRemaining).toBe(1);
+    // A had both of its requests refused and has none left.
+    expect(board.teamA.challengesRefused).toBe(2);
+    expect(board.teamA.challengesRemaining).toBe(0);
   });
 
   it("honours the feed's own poll delay", () => {

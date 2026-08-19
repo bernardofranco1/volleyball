@@ -27,16 +27,33 @@ export interface VisBoardPlayer {
   isLibero: boolean;
 }
 
+/**
+ * The three interruption allowances a team gets per set in official FIVB indoor
+ * competition — the same numbers `src/engine/config.ts` gives our own INDOOR
+ * ruleset, and unchanged in the deciding set. The boards COUNT DOWN from these.
+ */
+export const FIVB_PER_SET = { timeouts: 2, substitutions: 6, challenges: 2 } as const;
+
 export interface VisBoardTeam {
   code: string;
   name: string;
   players: VisBoardPlayer[];
-  /** Team time-outs taken in the current set (FIVB 15.1: max 2). */
-  timeouts: number;
-  /** Substitutions made in the current set (max 6). */
-  substitutions: number;
-  /** Video challenges requested in the current set. */
-  challenges: number;
+  /** Team time-outs TAKEN in the current set (FIVB 15.1: max 2). */
+  timeoutsTaken: number;
+  /** Substitutions MADE in the current set (max 6). */
+  substitutionsUsed: number;
+  /**
+   * Video challenges REFUSED in the current set — not the number requested.
+   * A team that wins its challenge keeps the right, so `NbChallengeRefused*`
+   * is the one that costs an allowance and the only one the countdown may use.
+   */
+  challengesRefused: number;
+  /** Challenges requested, refused or not. Not displayed; kept for the log. */
+  challengesRequested: number;
+  /** What is LEFT this set — what every board actually shows. */
+  timeoutsRemaining: number;
+  substitutionsRemaining: number;
+  challengesRemaining: number;
 }
 
 export interface VisBoardSet {
@@ -202,11 +219,10 @@ function pointsByPlayer(xml: string): Map<number, number> {
  * The six on court for one team, from the set's `LineUp`
  * (`NoPlayer1…NoPlayer6` = court positions 1-6, `NoLibero*` marks liberos).
  *
- * NOTE (honest limitation): VIS carries one LineUp per team per set at this
- * Options level, so the list reflects the set's registered rotation. Rotation
- * and mid-set substitutions inside the set are not tracked here — that needs
- * the rally-by-rally feed, an order of magnitude more payload for information a
- * scoreboard does not show.
+ * The caller passes the LAST LineUp of the current set, not the first: spec/35
+ * turned on Options bit 512 for the per-rally lineup stream, so the six here are
+ * the CURRENT rotation, with position 1 — the server — at index 0. The earlier
+ * limitation note (registered starting six only) no longer holds.
  */
 function lineupPlayers(
   lineup: Attrs | null,
@@ -350,22 +366,16 @@ export function mapVolleyLive(
   return {
     matchNo,
     status,
-    teamA: {
+    teamA: interruptions(latest?.attrs, "A", {
       code: str(blockA?.attrs, "Code") ?? "",
       name: str(blockA?.attrs, "Name") ?? "",
       players: lineupPlayers(lineupA, rosterA, points),
-      timeouts: num(latest?.attrs, "NbTimeoutTeamA"),
-      substitutions: num(latest?.attrs, "NbSubstitutionTeamA"),
-      challenges: num(latest?.attrs, "NbChallengeRequestedTeamA"),
-    },
-    teamB: {
+    }),
+    teamB: interruptions(latest?.attrs, "B", {
       code: str(blockB?.attrs, "Code") ?? "",
       name: str(blockB?.attrs, "Name") ?? "",
       players: lineupPlayers(lineupB, rosterB, points),
-      timeouts: num(latest?.attrs, "NbTimeoutTeamB"),
-      substitutions: num(latest?.attrs, "NbSubstitutionTeamB"),
-      challenges: num(latest?.attrs, "NbChallengeRequestedTeamB"),
-    },
+    }),
     setsWonA: num(match, "MatchPointsA"),
     setsWonB: num(match, "MatchPointsB"),
     scoreA: status === "UPCOMING" ? 0 : num(latest?.attrs, "PointsTeamA"),
@@ -388,6 +398,44 @@ export function mapVolleyLive(
 }
 
 /**
+ * The current set's interruption state for one side, counted DOWN.
+ *
+ * VIS reports what has been USED, and omits an attribute entirely when the
+ * count is zero, so every read defaults to 0. Two of the three are then simple
+ * subtraction; substitutions are not, because VIS publishes
+ * `NbRemainingSubstitutionTeam*` itself and that figure is authoritative — a
+ * team can be left with fewer than 6 minus its substitutions once an
+ * exceptional substitution is involved, and events run under other substitution
+ * rules do exist in the feed — a captured AVC set reports 4 used with 4 still
+ * remaining. So the feed's figure is taken VERBATIM and never clamped to 6;
+ * the FIVB allowance is only the fallback when the attribute is absent.
+ */
+function interruptions(
+  set: Attrs | null | undefined,
+  side: "A" | "B",
+  base: Pick<VisBoardTeam, "code" | "name" | "players">,
+): VisBoardTeam {
+  const taken = num(set, `NbTimeoutTeam${side}`);
+  const used = num(set, `NbSubstitutionTeam${side}`);
+  const refused = num(set, `NbChallengeRefusedTeam${side}`);
+  const requested = num(set, `NbChallengeRequestedTeam${side}`);
+  const remainingSubs = set?.[`NbRemainingSubstitutionTeam${side}`] != null
+    ? num(set, `NbRemainingSubstitutionTeam${side}`)
+    : FIVB_PER_SET.substitutions - used;
+  const clamp = (n: number, max: number) => Math.max(0, Math.min(max, n));
+  return {
+    ...base,
+    timeoutsTaken: taken,
+    substitutionsUsed: used,
+    challengesRefused: refused,
+    challengesRequested: requested,
+    timeoutsRemaining: clamp(FIVB_PER_SET.timeouts - taken, FIVB_PER_SET.timeouts),
+    substitutionsRemaining: Math.max(0, remainingSubs),
+    challengesRemaining: clamp(FIVB_PER_SET.challenges - refused, FIVB_PER_SET.challenges),
+  };
+}
+
+/**
  * `GetVolleyMatch` → an UPCOMING board. The pre-start fallback: a match with no
  * live row yet has no `VolleyLive` payload at all, but the TV still wants the
  * teams, the kick-off time, and a 0-0 frame.
@@ -399,14 +447,9 @@ export function mapVolleyMatch(
 ): VisBoardData | null {
   const attrs = firstAliasAttrs(xml, ...MATCH_ALIASES);
   if (!attrs) return null;
-  const emptyTeam = (code: string | null, name: string | null): VisBoardTeam => ({
-    code: code ?? "",
-    name: name ?? "",
-    players: [],
-    timeouts: 0,
-    substitutions: 0,
-    challenges: 0,
-  });
+  // Nothing has been used before the first whistle, so every allowance is full.
+  const emptyTeam = (code: string | null, name: string | null): VisBoardTeam =>
+    interruptions(null, "A", { code: code ?? "", name: name ?? "", players: [] });
   return {
     matchNo,
     status: inferStatus(attrs, now),

@@ -54,6 +54,14 @@ export const AVC_BACKGROUND = {
  * template, which is the whole reason these exist.
  */
 export const MIKASA_BALL = "/board-art/mikasa-ball.png";
+/**
+ * The AVC event mark, top-centre of the SET master. It sits on its own layer in
+ * the .ai file, so the extracted background does not carry it and the stats
+ * screen was rendering without it (spec/37). Cut at 4x with alpha keyed against
+ * the bare background, so it lifts off the artwork with no seam.
+ */
+export const AVC_MARK = "/board-art/avc-mark.png";
+
 export const COUNTER_ICON = {
   timeout: "/board-art/icon-timeout.png",
   subs: "/board-art/icon-subs.png",

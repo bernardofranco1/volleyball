@@ -15,23 +15,36 @@
  * The U-shape layout never rotates — its centre window frames the TV feed,
  * and covering the feed with a stats card would defeat it.
  *
- * Deliberately dumb data-wise: VIS is the only source, its PollDelay the real
- * cadence, the server store makes viewers cheap. On fetch failure the last
- * good screen stays up — a blank TV in a full arena is the worst outcome —
- * with a small "no signal" note after a minute.
+ * Deliberately dumb data-wise: VIS is the only source and the server store makes
+ * viewers cheap. On fetch failure the last good screen stays up — a blank TV in
+ * a full arena is the worst outcome — with a small "no signal" note after a
+ * minute.
+ *
+ * CADENCE (spec/37): the poll interval is not fixed. While a set is being played
+ * the board asks every second, so a point lands on the screen at about the same
+ * time the crowd reacts to it; in a set break, before the first whistle and
+ * after the match it backs off hard, because nothing changes second to second
+ * and there is no reason to spend either VIS's capacity or ours. The interval
+ * comes from the payload itself (`pollMs`), so the server decides it and all
+ * three caches agree. Polling stops entirely while the tab is hidden and
+ * resumes with an immediate read — a venue TV never hides, an operator's laptop
+ * tab does.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VisBoardData } from "@/lib/vis-live/board-data";
+import { pollIntervalMs } from "@/lib/vis-live/cadence";
 import type { VisBoardTheme } from "@/components/scoreboard/vis-board-theme";
 import { VisBoard } from "@/components/scoreboard/VisBoard";
 import { VisBoardUShape } from "@/components/scoreboard/VisBoardUShape";
 import { VisSetStats } from "@/components/scoreboard/VisSetStats";
 
-const POLL_MS = 10_000;
 const STALE_NOTICE_MS = 60_000;
 /** The final score lingers this long before the stats screen takes over. */
 const STATS_DELAY_MS = 10_000;
+/** Doubling backoff while the board endpoint is failing. */
+const FAIL_BACKOFF_MIN_MS = 3_000;
+const FAIL_BACKOFF_MAX_MS = 30_000;
 
 export type VisLayout = "full" | "ushape";
 export type VisScreenOverride = "board" | "stats" | null;
@@ -70,6 +83,9 @@ export function VisBoardDisplay({
   // when the page loaded into an already-ended state (skip the delay then).
   const [endSeenAt, setEndSeenAt] = useState<number | null>(null);
   const boardRef = useRef(board);
+  // How long to wait before the next read. Seeded from the state the page was
+  // server-rendered in, then replaced by whatever the server last advertised.
+  const nextDelayRef = useRef(pollIntervalMs(initialBoard));
   useEffect(() => {
     boardRef.current = board;
   }, [board]);
@@ -78,27 +94,64 @@ export function VisBoardDisplay({
     try {
       const res = await fetch(`/api/vis/board/${matchNo}`, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
-      const data = (await res.json()) as { board: VisBoardData };
+      const data = (await res.json()) as { board: VisBoardData; pollMs?: number };
       if (data?.board) {
         const prev = boardRef.current;
         const prevEnded = prev.inSetBreak || prev.status === "FINISHED";
         const nowEnded = data.board.inSetBreak || data.board.status === "FINISHED";
         if (!prevEnded && nowEnded) setEndSeenAt(Date.now());
         if (!nowEnded) setEndSeenAt(null);
-        setBoard(data.board);
+        // At one read a second most payloads are byte-identical. Skipping the
+        // state update keeps an idle board from re-rendering 60 times a minute
+        // for nothing; the comparison is a few KB and far cheaper than the DOM
+        // work it avoids.
+        if (JSON.stringify(data.board) !== JSON.stringify(prev)) setBoard(data.board);
         setStaleSince(null);
       }
+      // The server owns the cadence; trust its figure and fall back to our own
+      // reading of the same rule if an older deployment omits it.
+      nextDelayRef.current = data?.pollMs
+        ?? (data?.board ? pollIntervalMs(data.board) : nextDelayRef.current);
     } catch {
       setStaleSince((prev) => prev ?? Date.now());
+      // Back off while the endpoint is down. Polling a failing route once a
+      // second helps nobody and turns one outage into two.
+      nextDelayRef.current = Math.min(
+        FAIL_BACKOFF_MAX_MS,
+        Math.max(FAIL_BACKOFF_MIN_MS, nextDelayRef.current * 2),
+      );
     }
   }, [matchNo]);
 
+  // Self-scheduling timer rather than setInterval: the delay changes with the
+  // match state, and an interval cannot be re-timed without tearing it down.
   useEffect(() => {
-    const first = setTimeout(() => void poll(), 0);
-    const id = setInterval(() => void poll(), POLL_MS);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let stopped = false;
+
+    const tick = async () => {
+      if (stopped) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        // Nothing to show; wake on visibilitychange instead of burning polls.
+        return;
+      }
+      await poll();
+      if (stopped) return;
+      timer = setTimeout(() => void tick(), nextDelayRef.current);
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState !== "visible" || stopped) return;
+      if (timer) clearTimeout(timer);
+      void tick();
+    };
+
+    void tick();
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
-      clearTimeout(first);
-      clearInterval(id);
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [poll]);
 

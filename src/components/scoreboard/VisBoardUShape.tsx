@@ -92,9 +92,9 @@ export function VisBoardUShape({
       score: team === "A" ? board.scoreA : board.scoreB,
       sets: team === "A" ? board.setsWonA : board.setsWonB,
       history: historyOf(team),
-      timeouts: t.timeouts,
-      substitutions: t.substitutions,
-      challenges: t.challenges,
+      timeouts: t.timeoutsRemaining,
+      substitutions: t.substitutionsRemaining,
+      challenges: t.challengesRemaining,
     };
   };
   const leftSide = sideOf(aLeft ? "A" : "B");
@@ -321,12 +321,12 @@ function Rail({
   );
 }
 
-/** Counter dots — the master's counts (challenge 2 / subst 6 / time-out 1),
- *  growing only if the feed reports more used, so the board never
- *  under-reports a taken interruption. */
-function dots(used: number, base: number): boolean[] {
-  const total = Math.max(base, used);
-  return Array.from({ length: total }, (_, i) => i < used);
+/** Counter dots — one pip per FIVB per-set allowance (challenge 2 / subst 6 /
+ *  time-out 2), never showing fewer pips than the allowance. */
+function dots(remaining: number, base: number): boolean[] {
+  const total = Math.max(base, remaining);
+  // Filled = still available. The rail counts DOWN as the set is spent.
+  return Array.from({ length: total }, (_, i) => i < remaining);
 }
 
 function Counters({
@@ -334,9 +334,11 @@ function Counters({
 }: { side: "left" | "right"; data: SideData; theme: VisBoardTheme }) {
   const left = side === "left";
   const groups: { label: string; filled: boolean[] }[] = [
+    // The FIVB indoor per-set allowances (see FIVB_PER_SET): 2 / 6 / 2. The
+    // time-out row used to draw a single pip, which is the BEACH allowance.
     { label: "CHALLENGE", filled: dots(data.challenges, 2) },
     { label: "SUBST", filled: dots(data.substitutions, 6) },
-    { label: "TIME OUT", filled: dots(data.timeouts, 1) },
+    { label: "TIME OUT", filled: dots(data.timeouts, 2) },
   ];
   return (
     <div

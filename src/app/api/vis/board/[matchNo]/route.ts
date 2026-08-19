@@ -8,6 +8,7 @@
 
 import { NextResponse } from "next/server";
 import { getBoard, getMockBoard, isKnownMatch } from "@/lib/vis-live/store";
+import { cdnMaxAgeSeconds, pollIntervalMs } from "@/lib/vis-live/cadence";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export async function GET(
   if (raw === "mock") {
     const { value, ageSeconds } = getMockBoard();
     return NextResponse.json(
-      { board: value, ageSeconds },
+      { board: value, ageSeconds, pollMs: pollIntervalMs(value) },
       { headers: { "Cache-Control": "no-store" } },
     );
   }
@@ -42,13 +43,17 @@ export async function GET(
 
   try {
     const { value, ageSeconds } = await getBoard(matchNo);
+    const interval = pollIntervalMs(value);
+    const maxAge = cdnMaxAgeSeconds(interval);
     return NextResponse.json(
-      { board: value, ageSeconds },
+      { board: value, ageSeconds, pollMs: interval },
       {
         headers: {
-          // The CDN soaks up per-TV polling; the store's own TTL is what
-          // actually bounds upstream calls to one per PollDelay.
-          "Cache-Control": "public, s-maxage=5, stale-while-revalidate=15",
+          // The CDN soaks up per-TV polling; the store's TTL bounds upstream
+          // calls. Both follow the same cadence as the browser's timer, so a
+          // live board is one second behind VIS rather than one second behind a
+          // five-second cache behind a twenty-second TTL (spec/37).
+          "Cache-Control": `public, s-maxage=${maxAge}, stale-while-revalidate=${maxAge * 2}`,
         },
       },
     );
