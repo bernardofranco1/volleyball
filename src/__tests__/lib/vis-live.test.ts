@@ -339,6 +339,66 @@ describe("current rotation from the events stream (spec/35 W3)", () => {
   });
 });
 
+describe("match-list status — regression, spec/38", () => {
+  // Rows copied verbatim from tournaments 1670/1671 on 2026-08-19. The old rule
+  // ("has MatchResultText => finished, else Status 1 => scheduled, else live")
+  // showed scheduled matches as LIVE and live ones as FINISHED, because a live
+  // row DOES carry a result text — the running tally, "0-0" — and a scheduled
+  // row can be Status 2 as easily as 1.
+  const list = `<?xml version="1.0"?><Responses><VolleyballMatches NbItems="5">
+    <VolleyballMatch No="27547" NoTournament="1670" TeamACode="ARG" TeamBCode="POL"
+      TeamAName="Argentina" TeamBName="Poland" DateLocal="2026-08-19" TimeLocal="11:00:00"
+      Status="25" MatchPointsA="0" MatchPointsB="3" MatchResultText="0-3"
+      SetsResultsText="(20-25, 24-26, 19-25)" Hall="Aspire Ladies Hall" City="Doha"/>
+    <VolleyballMatch No="27548" NoTournament="1670" TeamACode="IRI" TeamBCode="ALG"
+      TeamAName="Iran" TeamBName="Algeria" DateLocal="2026-08-19" TimeLocal="14:00:00"
+      Status="5" MatchPointsA="0" MatchPointsB="0" MatchResultText="0-0"
+      SetsResultsText="(12-8)" Hall="Aspire Ladies Hall" City="Doha"/>
+    <VolleyballMatch No="27550" NoTournament="1670" TeamACode="QAT" TeamBCode="VEN"
+      TeamAName="Qatar" TeamBName="Venezuela" DateLocal="2026-08-19" TimeLocal="17:00:00"
+      Status="2" MatchPointsA="0" MatchPointsB="0" Hall="Aspire Ladies Hall" City="Doha"/>
+    <VolleyballMatch No="27552" NoTournament="1670" TeamACode="TUN" TeamBCode="FRA"
+      TeamAName="Tunisia" TeamBName="France" DateLocal="2026-08-20" TimeLocal="11:00:00"
+      Status="1" MatchPointsA="0" MatchPointsB="0" Hall="Aspire Ladies Hall" City="Doha"/>
+    <VolleyballMatch No="27599" NoTournament="1670" TeamACode="BRA" TeamBCode="ITA"
+      TeamAName="Brazil" TeamBName="Italy" DateLocal="2026-08-19" TimeLocal="09:00:00"
+      Status="7" MatchPointsA="3" MatchPointsB="1" MatchResultText="3-1"
+      SetsResultsText="(25-20, 22-25, 25-19, 25-23)" Hall="Al Arabi Sports Hall" City="Doha"/>
+    </VolleyballMatches></Responses>`;
+  const byNo = new Map(mapVolleyMatchList(list).map((m) => [m.matchNo, m]));
+
+  it("calls a match with a running set LIVE, result text and all", () => {
+    expect(byNo.get(27548)!.status).toBe("LIVE");
+    expect(byNo.get(27548)!.resultText).toBe("0-0");
+    expect(byNo.get(27548)!.setsText).toBe("(12-8)");
+  });
+
+  it("calls a completed match FINISHED", () => {
+    expect(byNo.get(27547)!.status).toBe("FINISHED");
+  });
+
+  it("calls an unplayed match UPCOMING whether its status is 1 or 2", () => {
+    expect(byNo.get(27550)!.status).toBe("UPCOMING"); // Status 2, later today
+    expect(byNo.get(27552)!.status).toBe("UPCOMING"); // Status 1, tomorrow
+  });
+
+  it("reads a decided tally as finished even on an unseen status code", () => {
+    // The rule must not depend on knowing every terminal code in the enum.
+    expect(byNo.get(27599)!.status).toBe("FINISHED");
+  });
+
+  it("never reports a scheduled match as started", () => {
+    for (const m of byNo.values()) {
+      if (m.status === "UPCOMING") {
+        expect(m.setsText).toBeNull();
+        expect(m.resultText).toBeNull();
+      } else {
+        expect(m.setsText || m.resultText).toBeTruthy();
+      }
+    }
+  });
+});
+
 describe("rotation after a side-out — regression, spec/37", () => {
   // Modelled on match 27547, 2026-08-19. VIS attaches each rally's OWN rotation
   // and publishes it only once that rally has finished, so the newest lineup is

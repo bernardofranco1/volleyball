@@ -27,6 +27,28 @@ export const metadata: Metadata = {
 
 const RANK = { LIVE: 0, UPCOMING: 1, FINISHED: 2 } as const;
 
+/**
+ * Every match gets a tag, not just the live ones (spec/38): a row with no tag
+ * reads as "no information" rather than "scheduled", and the three states have
+ * to be tellable apart at a glance on a list of forty-six fixtures.
+ */
+function StatusTag({ status }: { status: VisMatchSummary["status"] }) {
+  const style =
+    status === "LIVE"
+      ? "bg-danger text-white"
+      : status === "FINISHED"
+        ? "border border-border text-score-dim"
+        : "border border-border text-foreground";
+  const label = status === "LIVE" ? "Live" : status === "FINISHED" ? "Final" : "Scheduled";
+  return (
+    <span
+      className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${style}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 export default async function BoardHostCompetition({
   params,
 }: {
@@ -98,11 +120,7 @@ export default async function BoardHostCompetition({
                       </span>
                     </Link>
                     <span className="flex items-center gap-3">
-                      {m.status === "LIVE" ? (
-                        <span className="rounded-full bg-danger px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-                          Live
-                        </span>
-                      ) : null}
+                      <StatusTag status={m.status} />
                       <MatchLinkRow matchNo={m.matchNo} />
                     </span>
                   </li>

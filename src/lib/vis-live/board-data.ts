@@ -172,13 +172,55 @@ export function inferStatus(
   return "UPCOMING";
 }
 
-/** Status for a MATCH-LIST row, which has no live timestamps to read. */
+/**
+ * Status for a MATCH-LIST row, which carries no live timestamps to read.
+ *
+ * The rule used to be "has MatchResultText ⇒ finished, else Status 1 ⇒
+ * scheduled, else live". Both halves were wrong, and the index showed scheduled
+ * matches as LIVE and live ones as FINISHED. Measured against tournaments 1670
+ * and 1671 on 2026-08-19:
+ *
+ *   Status  rows  SetsResultsText / MatchResultText   reality
+ *   1        41   absent                              scheduled
+ *   2         2   absent                              scheduled
+ *   5         2   "(12-8)" / "0-0"                    IN PLAY
+ *   25      105   "(20-25, 24-26, 19-25)" / "0-3"     finished
+ *
+ * So a live row DOES carry a MatchResultText — the running sets tally, "0-0" —
+ * and a scheduled row can be Status 2 as easily as 1.
+ *
+ * The rule below leans on the data rather than on the enum wherever it can, so
+ * an unseen status code cannot break it:
+ *   - nothing played AND a known pre-match code ⇒ UPCOMING;
+ *   - nothing played on any OTHER code ⇒ LIVE, because a match that has just
+ *     started may not have a set score for a rally or two, and hiding a live
+ *     match from the index is the worse error of the two;
+ *   - a decided tally, or the terminal status ⇒ FINISHED;
+ *   - anything else that has started ⇒ LIVE.
+ */
 function summaryStatus(attrs: Attrs): VisMatchStatus {
-  if (str(attrs, "MatchResultText")) return "FINISHED";
-  // "1" is the confirmed scheduled code; anything else on a result-less row is
-  // treated as in progress, so a live match is never hidden from the index.
-  return str(attrs, "Status") === "1" ? "UPCOMING" : "LIVE";
+  const sets = str(attrs, "SetsResultsText");
+  const result = str(attrs, "MatchResultText");
+  // Nothing has been played: VIS writes neither field before the first whistle.
+  if (!sets && !result) {
+    return VIS_STATUS_SCHEDULED.has(num(attrs, "Status", -1)) ? "UPCOMING" : "LIVE";
+  }
+  // The one status code observed on a completed match. Kept as a signal rather
+  // than the sole test, because a forfeit or a retirement need not reach the
+  // winning number of sets.
+  if (num(attrs, "Status", -1) === VIS_STATUS_FINISHED) return "FINISHED";
+  // A side has won the match outright (FIVB indoor: best of five).
+  const won = Math.max(num(attrs, "MatchPointsA"), num(attrs, "MatchPointsB"));
+  if (won >= SETS_TO_WIN_MATCH) return "FINISHED";
+  return "LIVE";
 }
+
+/** The list-row status VIS stamps on a completed match (measured, see above). */
+const VIS_STATUS_FINISHED = 25;
+/** List-row statuses observed on matches that have not started (measured). */
+const VIS_STATUS_SCHEDULED = new Set([1, 2]);
+/** FIVB indoor is best of five. */
+const SETS_TO_WIN_MATCH = 3;
 
 /**
  * Roster rows scoped to their team: VIS nests `Player`(No, NoShirt) inside
