@@ -98,9 +98,12 @@ export interface VisBoardData {
    */
   teamAAtLeft: boolean | null;
   /**
-   * The latest set is over but the match is not (VIS stamps `Set@Duration`
-   * when a set completes). This is what flips the venue screen to the
-   * set-break statistics and back (spec/34 set-rotation).
+   * The latest set is over but the match is not — i.e. the match has already
+   * been credited with that set (`Match@MatchPointsA/B`). This is what flips
+   * the venue screen to the set-break statistics and back (spec/34
+   * set-rotation). NOT derived from `Set@Duration`: the feed stamps that while
+   * a set is being played, which used to strand every live board on the
+   * statistics screen (spec/37 fix).
    */
   inSetBreak: boolean;
   /** The set whose result the break screen headlines, or null before any. */
@@ -283,19 +286,30 @@ export function mapVolleyLive(
   );
   const latest = setBlocks[setBlocks.length - 1] ?? null;
 
-  // A set is OVER when VIS has stamped its Duration — the feed's explicit
-  // signal, deliberately preferred over a 25-plus-2 score heuristic: a set the
-  // scorer is still correcting must not be declared done by us.
-  const latestEnded =
-    !!latest && num(latest.attrs, "Duration") > 0 &&
-    num(latest.attrs, "PointsTeamA") + num(latest.attrs, "PointsTeamB") > 0;
+  // A set is OVER when the match has been CREDITED with it.
+  //
+  // This used to read `Set@Duration > 0`, on the assumption that VIS stamps a
+  // duration when a set completes. It does not: the feed stamps elapsed time
+  // while the set is being PLAYED — match 27547 on 2026-08-19 carried
+  // Duration="778" at 12-11 in set one — so every live board declared itself in
+  // a set break within seconds of the first point and sat on the statistics
+  // screen for the whole match.
+  //
+  // `Match@MatchPointsA/B` is the sets each side has WON, so their sum is the
+  // number of sets that are finished. If the latest set's own number is greater
+  // than that, it has not been credited to anybody and is still in play. The
+  // rule is arithmetic on two figures the feed maintains for the result itself,
+  // it needs no score heuristic, and it degrades the safe way: unknown figures
+  // read as zero, which shows the live scoreboard rather than a false break.
+  const setsCompleted = num(match, "MatchPointsA") + num(match, "MatchPointsB");
+  const latestEnded = !!latest && num(latest.attrs, "No", 0) <= setsCompleted;
 
   const sets: VisBoardSet[] = setBlocks.map((s, i) => {
     const scoreA = num(s.attrs, "PointsTeamA");
     const scoreB = num(s.attrs, "PointsTeamB");
     const isLatest = i === setBlocks.length - 1;
     // The set in PLAY has no winner even at 25-23 (VIS may still correct it);
-    // a set with its Duration stamped is over and does.
+    // a set the match has been credited with is over and does.
     const decided = !isLatest || status === "FINISHED" || latestEnded;
     const winner: "A" | "B" | null =
       decided && scoreA !== scoreB ? (scoreA > scoreB ? "A" : "B") : null;

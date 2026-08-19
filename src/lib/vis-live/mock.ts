@@ -22,18 +22,19 @@ const CAPTURED_XML = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\
 
 /**
  * The capture with its two "this match is over" markers stripped:
- * `Match@EndDateTime` (so status infers LIVE) and the LAST set's `Duration`
- * (so that set reads as in play rather than as a completed set break).
- * Everything else — scores, rotations, statistics, sides — is untouched.
+ * `Match@EndDateTime` (so status infers LIVE) and gives the last set back to
+ * nobody, by decrementing the winner's `Match@MatchPointsB` from 3 to 2.
+ *
+ * That second edit is what makes the fiction COHERENT rather than merely
+ * end-stamp-free: a set is in play precisely while the match has not been
+ * credited with it (see mapVolleyLive), so a capture claiming three sets won
+ * AND a third set in progress contradicts itself — which is exactly how the
+ * board came to sit on the statistics screen. Everything else — scores,
+ * rotations, statistics, sides — is untouched.
  */
 export function mockLiveXml(): string {
-  let xml = CAPTURED_XML.replace(/\sEndDateTime="[^"]*"/, "");
-  // Strip only the LAST Set's Duration; the earlier sets stay complete.
-  const lastSet = xml.lastIndexOf("<Set ");
-  if (lastSet >= 0) {
-    const head = xml.slice(0, lastSet);
-    const tail = xml.slice(lastSet).replace(/\sDuration="[^"]*"/, "");
-    xml = head + tail;
-  }
-  return xml;
+  return CAPTURED_XML
+    .replace(/\sEndDateTime="[^"]*"/, "")
+    // Poland took sets one and two; set three is being played at 12-25.
+    .replace(/(<Match\b[^>]*?)\sMatchPointsB="3"/, '$1 MatchPointsB="2"');
 }

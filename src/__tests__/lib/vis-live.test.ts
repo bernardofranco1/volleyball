@@ -211,13 +211,18 @@ describe("mapVolleyLive — set break (set over, match not)", () => {
 });
 
 describe("mapVolleyLive — the same match treated as live", () => {
-  // Strip the match end timestamp AND the last set's Duration: the payload is
-  // then indistinguishable from one arriving MID-SET, which is the state we
-  // cannot capture on demand. (Duration present = the set is over — that case
-  // has its own describe below.)
+  // Strip the match end timestamp AND give the deciding set back to nobody, by
+  // decrementing the winner's MatchPointsA from 3 to 2. The payload is then
+  // indistinguishable from one arriving MID-SET, which is the state we cannot
+  // capture on demand.
+  //
+  // Note what is deliberately NOT stripped: `Set@Duration`. VIS stamps elapsed
+  // time on a set that is being PLAYED, so a live payload carries it — the
+  // assumption that it means "complete" is what stranded every board on the
+  // statistics screen (spec/37).
   const liveXml = BOARD_XML.replace(/\sEndDateTime="[^"]*"/, "").replace(
-    /(<Set [^>]*No="3"[^>]*?)\sDuration="[^"]*"/,
-    "$1",
+    /(<Match\b[^>]*?)\sMatchPointsA="3"/,
+    '$1 MatchPointsA="2"',
   );
   const board = mapVolleyLive(liveXml, 27062, Date.parse("2026-08-17T00:10:00Z"));
 
@@ -334,6 +339,45 @@ describe("current rotation from the events stream (spec/35 W3)", () => {
   });
 });
 
+describe("a set in play carries a Duration — regression, spec/37", () => {
+  // Match 27547 (U17 Boys WCH, 2026-08-19) at 12-11 in set one, straight from
+  // the feed: VIS had ALREADY stamped Duration="778" on the set being played.
+  // Reading that as "the set is over" put every live board on the set-break
+  // statistics screen within seconds of the first point and kept it there.
+  const xml = `<?xml version="1.0" encoding="utf-8" standalone="yes"?><Responses>
+    <VolleyLive PollDelay="20">
+      <Match No="27547" Status="5" NbRallies="23" NoTeamA="8692" NoTeamB="8687"
+             BeginDateTime="2026-08-19T08:00:00Z" MatchPointsA="0" MatchPointsB="0"
+             TimePlayed="333494">
+        <Team No="8692" Code="ARG" Name="Argentina" />
+        <Team No="8687" Code="POL" Name="Poland" />
+        <Set BeginTimeOffset="0" No="1" Duration="778" NbRallies="23"
+             NoServingTeam="8687" NoTeamAtLeft="8692" NoTeamAtRight="8687"
+             PointsTeamA="12" PointsTeamB="11" TimePlayed="333494" />
+      </Match>
+    </VolleyLive></Responses>`;
+  const board = mapVolleyLive(xml, 27547, Date.parse("2026-08-19T08:12:00Z"));
+
+  it("is LIVE and NOT in a set break", () => {
+    expect(board.status).toBe("LIVE");
+    expect(board.inSetBreak).toBe(false);
+  });
+
+  it("leaves the set undecided, because the match has not been credited with it", () => {
+    expect(board.setsWonA + board.setsWonB).toBe(0);
+    expect(board.sets).toHaveLength(1);
+    expect(board.sets[0].winner).toBeNull();
+    expect(board.lastFinishedSet).toBeNull();
+  });
+
+  it("calls the break only once the set is credited to somebody", () => {
+    const credited = xml.replace('MatchPointsA="0"', 'MatchPointsA="1"');
+    const after = mapVolleyLive(credited, 27547, Date.parse("2026-08-19T08:12:00Z"));
+    expect(after.inSetBreak).toBe(true);
+    expect(after.sets[0].winner).toBe("A");
+  });
+});
+
 describe("validation mock — VNL 2025 QF Japan v Poland (spec/35 W9)", () => {
   const board = mapVolleyLive(mockLiveXml(), MOCK_MATCH_NO, Date.parse("2026-08-18T12:00:00Z"));
 
@@ -351,7 +395,9 @@ describe("validation mock — VNL 2025 QF Japan v Poland (spec/35 W9)", () => {
     expect(board.teamA.code).toBe("JPN");
     expect(board.teamB.code).toBe("POL");
     expect(board.setsWonA).toBe(0);
-    expect(board.setsWonB).toBe(3);
+    // Two, not the capture's three: the third set is being played, so the match
+    // has not been credited with it yet.
+    expect(board.setsWonB).toBe(2);
     // Japan stood on the left in set 3 — what the U-shape rails follow.
     expect(board.teamAAtLeft).toBe(true);
     expect(board.serving).toBe("B"); // Poland served the last rally

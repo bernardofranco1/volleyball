@@ -87,3 +87,37 @@ artifact: https://claude.ai/code/artifact/a6460373-e3aa-42a5-844e-52a3a4ef3120
 
 Also still open from spec/36: the `OMA` flag asset is 1.76:1 where Oman's
 official flag is 2:1.
+
+## 6. Set break was being declared on every live set (hotfix)
+
+Found on air, 2026-08-19, match 27547 at 12-11 in set one.
+
+`inSetBreak` read `Set@Duration > 0`, on the assumption — stated in the code —
+that VIS stamps a duration when a set completes. It does not. The feed stamps
+ELAPSED time while the set is being played; that match carried `Duration="778"`
+mid-set. So every live board declared a set break within seconds of the first
+point, rotated to the statistics screen, and stayed there for the whole match.
+The set ladder was wrong the same way: the set in play was credited a winner at
+12-11.
+
+It survived development because every fixture was a finished match. The two
+"treated as live" fixtures were built by stripping `EndDateTime` **and** the last
+set's `Duration` — manufacturing exactly the payload shape a real live match
+never sends.
+
+The rule is now arithmetic on the two figures the feed maintains for the result:
+
+```
+setsCompleted = Match@MatchPointsA + Match@MatchPointsB   // sets WON
+latestEnded   = Set@No <= setsCompleted                   // credited to somebody
+```
+
+A set is in play precisely while the match has not been credited with it. No
+score heuristic, and it degrades the safe way — unknown figures read as zero,
+which shows the live scoreboard rather than a false break.
+
+Both live fixtures were made COHERENT rather than end-stamp-free: they now
+decrement the winner's `MatchPoints` instead of stripping `Duration`, because a
+capture claiming three sets won and a third set in progress contradicts itself.
+`src/__tests__/lib/vis-live.test.ts` pins the real 27547 payload, `Duration` and
+all.
