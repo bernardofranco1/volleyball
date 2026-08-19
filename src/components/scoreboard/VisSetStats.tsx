@@ -25,8 +25,12 @@ import {
   AVC_BACKGROUND,
   VIS_BOARD_THEME,
   type VisBoardTheme,
-  flagSrc,
 } from "@/components/scoreboard/vis-board-theme";
+import {
+  TeamFlag,
+  TeamMark,
+  type TeamMarkGeometry,
+} from "@/components/scoreboard/VisTeamMark";
 
 const W = 1920;
 const H = 1080;
@@ -39,8 +43,14 @@ const LOGO = { x: 890, y: 46, w: 140, h: 96 };
 const CLUSTER = { x: 670.5, y: 185.5, w: 579.5, h: 179 };
 const SMALL = { lx: 680.5, rx: 1155, y: 195.5, w: 85, h: 110, cap: 56 };
 const BIG = { lx: 775.5, rx: 965.5, y: 195.5, w: 179, h: 159, cap: 96 };
-const FLAG = { lx: 489.5, rx: 1300.5, y: 185.5, size: 130 };
-const NAME = { cap: 52, y: 210, lRight: 465, rLeft: 1455, w: 430 };
+/** Head geometry (spec/36) — the scoreboard's rule on this master's numbers:
+ *  the flag slot keeps the measured height, top and inner edge (619.5 / 1300.5)
+ *  and widens outward to 195; the text box keeps the master's 35 px outer
+ *  margin and its 24.5 px gap to the flag. See VisTeamMark. */
+const MARK: TeamMarkGeometry = {
+  text: { margin: 35, w: 306, centerY: 251.6, cap: 72, tracking: 1 },
+  flag: { innerX: 619.5, w: 195, h: 130, y: 185.5, fit: "area" },
+};
 const BLOCK = { x: 80, y: 410, w: 1760.5, h: 586 };
 const VALUE = { lx: 90, rx: 1696.5, size: 134, rowY0: 420, pitch: 144, cap: 46.5 };
 const LABEL_CAP = 43;
@@ -106,10 +116,10 @@ export function VisSetStats({
           />
         ) : null}
 
-        <TeamName side="left" name={board.teamA.name} />
-        <TeamName side="right" name={board.teamB.name} />
-        <Flag side="left" code={board.teamA.code} theme={theme} />
-        <Flag side="right" code={board.teamB.code} theme={theme} />
+        <TeamMark side="left" code={board.teamA.code} name={board.teamA.name} geo={MARK} />
+        <TeamMark side="right" code={board.teamB.code} name={board.teamB.name} geo={MARK} />
+        <TeamFlag side="left" code={board.teamA.code} theme={theme} geo={MARK} />
+        <TeamFlag side="right" code={board.teamB.code} theme={theme} geo={MARK} />
 
         {/* Score cluster: sets won on the small outer plates, the just-ended
             set on the big central pair. */}
@@ -271,66 +281,3 @@ function PlateBox({
   );
 }
 
-function TeamName({ side, name }: { side: "left" | "right"; name: string }) {
-  const left = side === "left";
-  const capPx = name.length > 16 ? 36 : name.length > 12 ? 44 : NAME.cap;
-  return (
-    <div
-      style={{
-        position: "absolute",
-        left: x(left ? NAME.lRight - NAME.w : NAME.rLeft),
-        top: y(NAME.y),
-        width: x(NAME.w),
-        height: y(NAME.cap * 1.6),
-        display: "flex",
-        alignItems: "center",
-        justifyContent: left ? "flex-end" : "flex-start",
-        fontSize: cap(capPx),
-        lineHeight: 1,
-        letterSpacing: f(1),
-        textTransform: "uppercase",
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-      }}
-    >
-      {name}
-    </div>
-  );
-}
-
-function Flag({
-  side, code, theme,
-}: { side: "left" | "right"; code: string; theme: VisBoardTheme }) {
-  const src = flagSrc(code);
-  return (
-    <div
-      style={{
-        position: "absolute",
-        left: x(side === "left" ? FLAG.lx : FLAG.rx),
-        top: y(FLAG.y),
-        width: x(FLAG.size),
-        height: y(FLAG.size),
-        display: "grid",
-        placeItems: "center",
-        overflow: "hidden",
-        fontSize: cap(40),
-        color: theme.ink,
-      }}
-    >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- board art asset
-        <img
-          src={src}
-          alt={code}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-            e.currentTarget.parentElement!.textContent = code;
-          }}
-        />
-      ) : (
-        code
-      )}
-    </div>
-  );
-}

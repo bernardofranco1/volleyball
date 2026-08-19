@@ -17,7 +17,8 @@
  *   big digits       cap 120.5   ·   sets digits cap 78
  *   flags            489.25 & 1301, y 171.5, 130 × 130 — NO plate, NO border
  *   team names       cap 52
- *   SERVE            vertical text at x ≈ 688 / 1213, spans the score frame
+ *   SERVE            vertical text at x ≈ 688 / 1213 — REMOVED, see spec/36:
+ *                    the ball already marks the server, and therefore the team
  *   player rows      jersey plate 73.5 at x 108.75 / 1737.5, y0 457.5,
  *                    pitch 93.2, border 10, name cap 28
  *   serving frame    462 × 98 at x 97 / 1361, stroke 5
@@ -34,8 +35,12 @@ import {
   MIKASA_BALL,
   VIS_BOARD_THEME,
   type VisBoardTheme,
-  flagSrc,
 } from "@/components/scoreboard/vis-board-theme";
+import {
+  TeamFlag,
+  TeamMark,
+  type TeamMarkGeometry,
+} from "@/components/scoreboard/VisTeamMark";
 
 export { VIS_BOARD_THEME, type VisBoardTheme } from "@/components/scoreboard/vis-board-theme";
 
@@ -64,9 +69,20 @@ const SCORE = { x: 726.5, y: 128.25, w: 467, h: 215 };
 const BIG_PLATE = { lx: 738.5, rx: 966.25, y: 140.25, w: 214.75, h: 191, cap: 120.5 };
 const SETS = { x: 800.75, y: 331.25, w: 318.5, h: 157.5 };
 const SETS_PLATE = { lx: 813, rx: 965.25, y: 343.25, w: 140.25, h: 133.5, cap: 78 };
-const FLAG = { lx: 489.25, rx: 1301, y: 171.5, size: 130 };
-const NAME = { cap: 52, y: 196, lRight: 453.5, rLeft: 1466.5, w: 430 };
-const SERVE = { lx: 688.5, rx: 1213.5, w: 18, y: 188.5, h: 87.5, cap: 18 };
+/**
+ * Head geometry (spec/36). The master measures a 130 x 130 flag square at
+ * x 489.25 / 1301 and a cap-52 name box ending 35.75 px before it. Both survive
+ * here: the flag keeps the master's INNER edge (619.25 / 1300.75 — the
+ * flag-to-score-frame gap the composition rests on) and the master's optical
+ * centre, and is drawn WHOLE at its own proportions, sized to cover the
+ * master's 195 x 130 of area. The text box keeps the master's outer margin; it
+ * is narrower only because it now holds a 3-letter code, and it stops clear of
+ * the widest flag we ship (Qatar, 28:11). See VisTeamMark.
+ */
+const MARK: TeamMarkGeometry = {
+  text: { margin: 23.5, w: 306, centerY: 237.6, cap: 72, tracking: 1 },
+  flag: { innerX: 619.25, w: 195, h: 130, y: 171.5, fit: "area" },
+};
 const ROW = { y0: 457.5, pitch: 93.2, plate: 73.5, border: 10, cap: 28 };
 const JERSEY = { lx: 108.75, rx: 1737.5 };
 const NAME_COL = { lx: 203.75, rx: 1690, w: 350 };
@@ -164,31 +180,10 @@ export function VisBoard({
           {setLabel}
         </div>
 
-        <TeamName side="left" name={board.teamA.name} />
-        <TeamName side="right" name={board.teamB.name} />
-        <Flag side="left" code={board.teamA.code} theme={theme} />
-        <Flag side="right" code={board.teamB.code} theme={theme} />
-
-        {/* SERVE: plain vertical lettering, no filled rail (the master has none). */}
-        {live && board.serving ? (
-          <div
-            style={{
-              position: "absolute",
-              left: x(board.serving === "A" ? SERVE.lx : SERVE.rx),
-              width: x(SERVE.w),
-              top: y(SERVE.y),
-              height: y(SERVE.h),
-              display: "grid",
-              placeItems: "center",
-              fontSize: cap(SERVE.cap),
-              lineHeight: 1,
-            }}
-          >
-            <span style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>
-              SERVE
-            </span>
-          </div>
-        ) : null}
+        <TeamMark side="left" code={board.teamA.code} name={board.teamA.name} geo={MARK} />
+        <TeamMark side="right" code={board.teamB.code} name={board.teamB.name} geo={MARK} />
+        <TeamFlag side="left" code={board.teamA.code} theme={theme} geo={MARK} />
+        <TeamFlag side="right" code={board.teamB.code} theme={theme} geo={MARK} />
 
         {/* Score block: one red form with the plates knocked out of it. */}
         <Solid left={SCORE.x} top={SCORE.y} w={SCORE.w} h={SCORE.h} fill={theme.accent} />
@@ -289,74 +284,6 @@ function Plate({
       {/* The nudge goes on the GLYPH: transforming the plate itself would move
           the white box off the master's measured position. */}
       <span style={{ transform: nudge(capPx), display: "block" }}>{value}</span>
-    </div>
-  );
-}
-
-function TeamName({ side, name }: { side: "left" | "right"; name: string }) {
-  const left = side === "left";
-  // Long names shrink rather than truncate — an ellipsis on a venue TV reads
-  // as a fault. The master's own names sit at cap 52.
-  const capPx = name.length > 16 ? 36 : name.length > 12 ? 44 : NAME.cap;
-  return (
-    <div
-      style={{
-        position: "absolute",
-        left: x(left ? NAME.lRight - NAME.w : NAME.rLeft),
-        top: y(NAME.y),
-        width: x(NAME.w),
-        height: y(NAME.cap * 1.6),
-        display: "flex",
-        alignItems: "center",
-        justifyContent: left ? "flex-end" : "flex-start",
-        fontSize: cap(capPx),
-        lineHeight: 1,
-        letterSpacing: f(1),
-        textTransform: "uppercase",
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        transform: nudge(capPx),
-      }}
-    >
-      {name}
-    </div>
-  );
-}
-
-/** 130 × 130, filling its box — no plate, no border (spec/35 W2). */
-function Flag({
-  side, code, theme,
-}: { side: "left" | "right"; code: string; theme: VisBoardTheme }) {
-  const src = flagSrc(code);
-  return (
-    <div
-      style={{
-        position: "absolute",
-        left: x(side === "left" ? FLAG.lx : FLAG.rx),
-        top: y(FLAG.y),
-        width: x(FLAG.size),
-        height: y(FLAG.size),
-        display: "grid",
-        placeItems: "center",
-        overflow: "hidden",
-        fontSize: cap(40),
-        color: theme.ink,
-      }}
-    >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- board art asset
-        <img
-          src={src}
-          alt={code}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-            e.currentTarget.parentElement!.textContent = code;
-          }}
-        />
-      ) : (
-        code
-      )}
     </div>
   );
 }

@@ -224,7 +224,8 @@ function Rail({
           <img
             src={src}
             alt={data.code}
-            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            // `contain`: the whole flag at its own ratio, never cropped (spec/36).
+            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }}
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
