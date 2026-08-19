@@ -339,6 +339,74 @@ describe("current rotation from the events stream (spec/35 W3)", () => {
   });
 });
 
+describe("rotation after a side-out — regression, spec/37", () => {
+  // Modelled on match 27547, 2026-08-19. VIS attaches each rally's OWN rotation
+  // and publishes it only once that rally has finished, so the newest lineup is
+  // always the previous rally's. Argentina won rally 59 on a side-out and
+  // rotated before serving rally 60 — the board had 228085 on serve when the
+  // court had 228081 there.
+  const ARG = [228085, 228081, 232273, 228091, 228090, 228078];
+  const POL = [218115, 218105, 226087, 238071, 226085, 237960];
+  const lu = (l: number[], team: number) =>
+    `<LineUp ${l.map((p, j) => `NoPlayer${j + 1}="${p}"`).join(" ")} NoTeam="${team}" />`;
+
+  /** A whole set's rally stream from 0-0, as the feed always sends it. */
+  const build = (scores: [number, number][]) => {
+    const rallies = scores
+      .map((sc, i) => `<Rally No="${i + 1}" PointsTeamA="${sc[0]}" PointsTeamB="${sc[1]}">
+        ${lu(ARG, 8692)}${lu(POL, 8687)}</Rally>`)
+      .join("");
+    const [a, b] = scores[scores.length - 1];
+    return `<?xml version="1.0"?><Responses><VolleyLive PollDelay="20">
+      <Match No="27547" NoTeamA="8692" NoTeamB="8687" BeginDateTime="2026-08-19T08:00:00Z"
+             MatchPointsA="0" MatchPointsB="0">
+        <Team No="8692" Code="ARG" Name="Argentina" />
+        <Team No="8687" Code="POL" Name="Poland" />
+        <Set No="1" NoServingTeam="8692" NoTeamAtLeft="8692" PointsTeamA="${a}" PointsTeamB="${b}">
+          ${lu(ARG, 8692).replace("NoTeam=", 'NoLibero1="228078" NoTeam=')}
+          <Events>${rallies}</Events>
+        </Set>
+      </Match></VolleyLive></Responses>`;
+  };
+  const at = Date.parse("2026-08-19T08:33:40Z");
+  const names = (ns: number[]) => ns.map((n) => `#${n}`);
+
+  it("advances the serving side one place when the serve has just changed hands", () => {
+    // Poland took the previous rally, Argentina the last one: a side-out, so
+    // Argentina has rotated on court before serving.
+    const board = mapVolleyLive(build([[1, 0], [1, 1], [2, 1]]), 27547, at);
+    expect(board.serving).toBe("A");
+    expect(board.teamA.players.map((p) => p.name)).toEqual(
+      names([228081, 232273, 228091, 228090, 228078, 228085]),
+    );
+    // The receiving side does not rotate.
+    expect(board.teamB.players.map((p) => p.name)).toEqual(names(POL));
+  });
+
+  it("leaves the rotation alone while the same side keeps serving", () => {
+    const board = mapVolleyLive(build([[1, 0], [2, 0], [3, 0]]), 27547, at);
+    expect(board.teamA.players.map((p) => p.name)).toEqual(names(ARG));
+  });
+
+  it("rotates the other side when it is the one that broke serve", () => {
+    const board = mapVolleyLive(build([[1, 0], [2, 0], [2, 1]]), 27547, at);
+    expect(board.teamB.players.map((p) => p.name)).toEqual(
+      names([218105, 226087, 238071, 226085, 237960, 218115]),
+    );
+    expect(board.teamA.players.map((p) => p.name)).toEqual(names(ARG));
+  });
+
+  it("does not guess from a single rally", () => {
+    const board = mapVolleyLive(build([[1, 0]]), 27547, at);
+    expect(board.teamA.players.map((p) => p.name)).toEqual(names(ARG));
+  });
+
+  it("still marks the libero, whose number only the set lineup carries", () => {
+    const board = mapVolleyLive(build([[1, 0], [1, 1], [2, 1]]), 27547, at);
+    expect(board.teamA.players.find((p) => p.name === "#228078")?.isLibero).toBe(true);
+  });
+});
+
 describe("a set in play carries a Duration — regression, spec/37", () => {
   // Match 27547 (U17 Boys WCH, 2026-08-19) at 12-11 in set one, straight from
   // the feed: VIS had ALREADY stamped Duration="778" on the set being played.

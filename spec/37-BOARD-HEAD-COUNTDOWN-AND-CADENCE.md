@@ -121,3 +121,58 @@ decrement the winner's `MatchPoints` instead of stripping `Duration`, because a
 capture claiming three sets won and a third set in progress contradicts itself.
 `src/__tests__/lib/vis-live.test.ts` pins the real 27547 payload, `Duration` and
 all.
+
+## 7. Rotation lagged a rally, so the wrong player was on serve
+
+Reported from a live board, 2026-08-19 (match 27547).
+
+VIS attaches a `LineUp` to each `Rally`, and it is the rotation used DURING that
+rally — published only once the rally has finished. The newest lineup available
+is therefore always the PREVIOUS rally's. That is right while a team serves on,
+and wrong the moment the serve changes hands: the side winning a side-out
+rotates before it serves, so the board showed the outgoing order and highlighted
+the wrong player, on roughly every second rally. Captured live:
+
+```
+08:33:26  7-6  serving POL  ARG lineup 228085 228081 232273 228091 228090 228078
+08:33:38  8-6  serving ARG  ARG lineup 228085 ...   <- unchanged; 228081 is serving
+08:34:02  9-6  serving ARG  ARG lineup 228081 232273 228091 228090 228078 228085
+```
+
+`Set@NoServingTeam` is live and correct throughout — it is the serving PLAYER
+and the six positions that lagged.
+
+The missing step is derivable from the running score each rally stamps. The
+winner of rally N serves rally N+1, so the serve changed hands on the last rally
+exactly when its winner differs from the previous rally's — and that winner, now
+on serve, has rotated once (a left shift: position 1 goes to 6). Fewer than two
+rallies, or a rally that moved neither score, returns "no rotation": the feed's
+own last word beats a guess on top of it.
+
+Also fixed alongside: the libero marker. `NoLibero*` appears only on the
+set-level lineup, never on the per-rally ones, so reading the newest lineup left
+the libero on court unmarked. The registered liberos are now collected from
+every lineup in the set.
+
+**Not addressed, and a decision rather than a bug:** the full board always draws
+team A on the left, while `Set@NoTeamAtLeft` switches ends every set — so in
+even-numbered sets the board is mirrored against the court. Following the court
+would swap both line-ups at every set change. The U-shape board already follows
+physical sides, because it frames the TV picture.
+
+## 8. Artwork was baked into the time-out icon
+
+Reported from the same board. Not the background bleeding through — the three
+row interiors are painted with the theme's flat navy and always were. The icons
+were keyed out of the master by hand, and the time-out cut took a wedge of the
+background swirl with it at ~60/255 alpha: invisible on a light ground,
+a grey chevron on the board's navy.
+
+The alpha histogram is what identifies it. Antialiasing on a glyph edge is a
+thin ramp across the whole range; bled artwork is a wide flat plateau. 4,740 of
+that icon's 5,573 partial pixels sat in the 32-64 band. The other two icons have
+614 and 574, evenly spread — genuine edges.
+
+`scripts/clean-board-icon-alpha.mjs` applies an alpha floor of 96 and doubles as
+the check (it reports without `--write`). Re-run it if the icons are ever re-cut
+from the master.

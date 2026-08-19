@@ -223,36 +223,75 @@ function pointsByPlayer(xml: string): Map<number, number> {
  * (`NoPlayer1…NoPlayer6` = court positions 1-6, `NoLibero*` marks liberos).
  *
  * The caller passes the LAST LineUp of the current set, not the first: spec/35
- * turned on Options bit 512 for the per-rally lineup stream, so the six here are
- * the CURRENT rotation, with position 1 — the server — at index 0. The earlier
- * limitation note (registered starting six only) no longer holds.
+ * turned on Options bit 512 for the per-rally lineup stream, so these six are
+ * the rotation of the newest rally, with position 1 — the server — at index 0.
+ * `rotated` advances it one place when the serve has just changed hands and the
+ * feed has not published the new rotation yet; see sideOutRotation.
  */
 function lineupPlayers(
   lineup: Attrs | null,
   roster: Map<number, { jersey: number | null; name: string }>,
   points: Map<number, number>,
+  liberos: Set<number>,
+  rotated: boolean,
 ): VisBoardPlayer[] {
   if (!lineup) return [];
-  const liberos = new Set(
-    Object.entries(lineup)
-      .filter(([k]) => k.startsWith("NoLibero"))
-      .map(([, v]) => Number(v))
-      .filter((n) => Number.isFinite(n)),
-  );
-  const players: VisBoardPlayer[] = [];
+  const order: number[] = [];
   for (let pos = 1; pos <= 6; pos++) {
     const no = num(lineup, `NoPlayer${pos}`, -1);
-    if (no < 0) continue;
+    if (no >= 0) order.push(no);
+  }
+  // One clockwise rotation = a left shift: position 1 goes to 6 and everyone
+  // else moves up one. Verified against consecutive rally lineups in the feed.
+  const seq =
+    rotated && order.length === 6 ? [...order.slice(1), order[0]] : order;
+  return seq.map((no, i) => {
     const bio = roster.get(no);
-    players.push({
-      position: pos,
+    return {
+      position: i + 1,
       jersey: bio?.jersey ?? null,
       name: bio?.name ?? `#${no}`,
       points: points.get(no) ?? 0,
       isLibero: liberos.has(no),
-    });
-  }
-  return players;
+    };
+  });
+}
+
+/**
+ * Which side has rotated since the newest lineup the feed published, if any.
+ *
+ * VIS attaches a `LineUp` to each `Rally`, and it is the rotation used DURING
+ * that rally — published only once the rally has finished. So the newest
+ * lineup available is always the previous rally's. That is right while a team
+ * serves on, and wrong the moment the serve changes hands: the side winning a
+ * side-out rotates BEFORE it serves, so the board showed the outgoing rotation
+ * and highlighted the wrong server, on roughly every second rally.
+ *
+ * The missing step is derivable from the running score each rally stamps. The
+ * winner of rally N serves rally N+1, so the serve changed hands on the last
+ * rally exactly when its winner differs from the previous rally's — and that
+ * winner, now on serve, has rotated once.
+ *
+ * Returns null when it cannot be known: fewer than two rallies, or a rally that
+ * moved neither score. Not rotating is the safe answer — it is the feed's own
+ * last word rather than a guess on top of it.
+ */
+function sideOutRotation(setInner: string): "A" | "B" | null {
+  const rallies = allTagAttrs(setInner, "Rally");
+  if (rallies.length < 2) return null;
+  const winnerOf = (i: number): "A" | "B" | null => {
+    const a = num(rallies[i], "PointsTeamA");
+    const b = num(rallies[i], "PointsTeamB");
+    const prevA = i > 0 ? num(rallies[i - 1], "PointsTeamA") : 0;
+    const prevB = i > 0 ? num(rallies[i - 1], "PointsTeamB") : 0;
+    if (a > prevA) return "A";
+    if (b > prevB) return "B";
+    return null;
+  };
+  const last = winnerOf(rallies.length - 1);
+  const before = winnerOf(rallies.length - 2);
+  if (!last || !before || last === before) return null;
+  return last;
 }
 
 /** `GetVolleyLive` (Options=BOARD_OPTIONS) → the board's view model. */
@@ -374,6 +413,22 @@ export function mapVolleyLive(
   };
   const lineupA = lastFor(noTeamA);
   const lineupB = lastFor(noTeamB);
+  // Every registered libero of the set, from whichever lineups name them: the
+  // per-rally lineups carry no `NoLibero*`, so reading only the newest one
+  // would leave the libero on court unmarked.
+  const liberosFor = (noTeam: number): Set<number> => {
+    const out = new Set<number>();
+    for (const l of lineups) {
+      if (num(l, "NoTeam", -99) !== noTeam) continue;
+      for (const [k, v] of Object.entries(l)) {
+        if (!k.startsWith("NoLibero")) continue;
+        const no = Number(v);
+        if (Number.isFinite(no)) out.add(no);
+      }
+    }
+    return out;
+  };
+  const rotating = sideOutRotation(latest?.inner ?? "");
 
   const matchRow = firstAliasAttrs(matchBlock?.inner ?? "", ...MATCH_ALIASES);
 
@@ -383,12 +438,16 @@ export function mapVolleyLive(
     teamA: interruptions(latest?.attrs, "A", {
       code: str(blockA?.attrs, "Code") ?? "",
       name: str(blockA?.attrs, "Name") ?? "",
-      players: lineupPlayers(lineupA, rosterA, points),
+      players: lineupPlayers(
+        lineupA, rosterA, points, liberosFor(noTeamA), rotating === "A",
+      ),
     }),
     teamB: interruptions(latest?.attrs, "B", {
       code: str(blockB?.attrs, "Code") ?? "",
       name: str(blockB?.attrs, "Name") ?? "",
-      players: lineupPlayers(lineupB, rosterB, points),
+      players: lineupPlayers(
+        lineupB, rosterB, points, liberosFor(noTeamB), rotating === "B",
+      ),
     }),
     setsWonA: num(match, "MatchPointsA"),
     setsWonB: num(match, "MatchPointsB"),
