@@ -41,6 +41,14 @@ interface Entry<T> {
   at: number;
   /** How long it may be served without a refetch (ms). */
   ttlMs: number;
+  /**
+   * When the payload last actually CHANGED (ms), as opposed to when it was last
+   * re-fetched (spec/41). VIS answering happily while nothing moves is the
+   * failure the status page exists to catch — a board frozen at 12-11 because
+   * the scorer's laptop stopped publishing looks exactly like a board nobody is
+   * watching, and every other check is green throughout.
+   */
+  changedAt: number;
 }
 
 const MATCH_LIST_TTL_MS = 60_000;
@@ -76,6 +84,19 @@ function aged<T>(entry: Entry<T>, now: number): Aged<T> {
   return { value: entry.value, ageSeconds: Math.round((now - entry.at) / 1000) };
 }
 
+/**
+ * What a board looks like to "has anything moved?": the score, the sets, the
+ * set number and who serves. Deliberately not the whole payload — VIS restates
+ * statistics and timestamps that shift without a rally being played, and a
+ * fingerprint that changed on those would report a dead feed as advancing.
+ */
+function boardPulse(b: VisBoardData): string {
+  return [
+    b.scoreA, b.scoreB, b.setsWonA, b.setsWonB, b.currentSet, b.serving, b.status,
+    b.sets.length,
+  ].join("|");
+}
+
 /** Every match of a tournament, cached; serves stale on upstream failure. */
 export async function getMatchList(
   tournamentNo: number,
@@ -91,6 +112,7 @@ export async function getMatchList(
         value: mapVolleyMatchList(xml),
         at: Date.now(),
         ttlMs: MATCH_LIST_TTL_MS,
+        changedAt: Date.now(),
       };
       matchLists.set(tournamentNo, entry);
       return aged(entry, Date.now());
@@ -126,13 +148,19 @@ export async function getBoard(
       // without a Match element; mapVolleyLive then has nothing to say.
       const usable = board.teamA.name || board.teamB.name || board.sets.length > 0;
       if (usable) {
+        const prev = boards.get(matchNo);
+        const stamp = Date.now();
         const entry: Entry<VisBoardData> = {
           value: board,
-          at: Date.now(),
+          at: stamp,
           ttlMs: pollIntervalMs(board),
+          changedAt:
+            prev && boardPulse(prev.value) === boardPulse(board)
+              ? prev.changedAt
+              : stamp,
         };
         boards.set(matchNo, entry);
-        return aged(entry, Date.now());
+        return aged(entry, stamp);
       }
       throw new Error("no live data");
     } catch (liveErr) {
@@ -145,6 +173,7 @@ export async function getBoard(
             value: board,
             at: Date.now(),
             ttlMs: UPCOMING_TTL_MS,
+            changedAt: boards.get(matchNo)?.changedAt ?? Date.now(),
           };
           boards.set(matchNo, entry);
           return aged(entry, Date.now());
@@ -185,7 +214,9 @@ async function getAllowlist(now: number = Date.now()): Promise<Map<number, numbe
         }
       }
     }
-    allowlist = { value: map, at: Date.now(), ttlMs: ALLOWLIST_TTL_MS };
+    allowlist = {
+      value: map, at: Date.now(), ttlMs: ALLOWLIST_TTL_MS, changedAt: Date.now(),
+    };
     return map;
   });
 }
@@ -247,6 +278,64 @@ export function getMockBoard(now: number = Date.now()): Aged<VisBoardData> {
 }
 
 export { MOCK_LABEL, MOCK_MATCH_NO } from "./mock";
+
+/**
+ * A read-only look at what this instance has cached (spec/41).
+ *
+ * The caveat is load-bearing and the status page must say it out loud: these
+ * caches are MODULE-LEVEL, so they belong to one serverless instance. A status
+ * request can land on a different instance than the screen in the hall, and
+ * then this is a true statement about an instance rather than about that TV.
+ */
+export interface VisStoreSnapshot {
+  allowlist: { matches: number; tournaments: number; ageSeconds: number } | null;
+  matchLists: { tournamentNo: number; rows: number; ageSeconds: number }[];
+  boards: {
+    matchNo: number;
+    status: VisBoardData["status"];
+    teamA: string;
+    teamB: string;
+    currentSet: number | null;
+    scoreA: number;
+    scoreB: number;
+    inSetBreak: boolean;
+    /** Age of the underlying VIS read. */
+    ageSeconds: number;
+    /** How long since the score, sets or serve actually moved. */
+    sinceChangeSeconds: number;
+    pollMs: number;
+  }[];
+}
+
+export function visStoreSnapshot(now: number = Date.now()): VisStoreSnapshot {
+  return {
+    allowlist: allowlist
+      ? {
+          matches: allowlist.value.size,
+          tournaments: new Set(allowlist.value.values()).size,
+          ageSeconds: Math.round((now - allowlist.at) / 1000),
+        }
+      : null,
+    matchLists: [...matchLists.entries()].map(([tournamentNo, e]) => ({
+      tournamentNo,
+      rows: e.value.length,
+      ageSeconds: Math.round((now - e.at) / 1000),
+    })),
+    boards: [...boards.entries()].map(([matchNo, e]) => ({
+      matchNo,
+      status: e.value.status,
+      teamA: e.value.teamA.code || e.value.teamA.name,
+      teamB: e.value.teamB.code || e.value.teamB.name,
+      currentSet: e.value.currentSet,
+      scoreA: e.value.scoreA,
+      scoreB: e.value.scoreB,
+      inSetBreak: e.value.inSetBreak,
+      ageSeconds: Math.round((now - e.at) / 1000),
+      sinceChangeSeconds: Math.round((now - e.changedAt) / 1000),
+      pollMs: e.ttlMs,
+    })),
+  };
+}
 
 /** Test seam: drop every cache. */
 export function __resetVisCaches(): void {

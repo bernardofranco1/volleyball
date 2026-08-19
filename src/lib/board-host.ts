@@ -30,6 +30,7 @@ export function boardHostEnabled(): boolean {
 export function isBoardHostPath(pathname: string): boolean {
   return (
     pathname === "/" ||
+    pathname === "/status" ||
     pathname === "/c" ||
     pathname.startsWith("/c/") ||
     pathname.startsWith("/m/") ||
