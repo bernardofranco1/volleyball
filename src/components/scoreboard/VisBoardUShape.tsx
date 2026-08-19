@@ -120,8 +120,24 @@ export function VisBoardUShape({
       done[i] ? (team === "A" ? done[i].scoreA : done[i].scoreB) : null,
     );
   };
+  // Before the first whistle no allowance has been spent, but VIS has no set
+  // row to say so and the board falls back to the FIVB figure — which drew two
+  // substitutions as already used on an event that allows eight. Nothing has
+  // been used yet is the truthful reading (spec/39).
+  const notStarted = board.status === "UPCOMING" || board.sets.length === 0;
   const sideOf = (team: "A" | "B"): SideData => {
     const t = team === "A" ? board.teamA : board.teamB;
+    if (notStarted) {
+      return {
+        code: t.code,
+        score: team === "A" ? board.scoreA : board.scoreB,
+        sets: team === "A" ? board.setsWonA : board.setsWonB,
+        history: historyOf(team),
+        timeouts: ALLOWANCE.timeouts,
+        substitutions: ALLOWANCE.substitutions,
+        challenges: ALLOWANCE.challenges,
+      };
+    }
     return {
       code: t.code,
       score: team === "A" ? board.scoreA : board.scoreB,
@@ -134,6 +150,20 @@ export function VisBoardUShape({
   };
   const leftSide = sideOf(aLeft ? "A" : "B");
   const rightSide = sideOf(aLeft ? "B" : "A");
+
+  // The centre plate must never read as a bare "SET" (spec/39). Before the
+  // first whistle VIS has no set row, so there is no number to show — the plate
+  // says WARM UP, which is what the screen is actually showing at that point.
+  const plateLabel =
+    board.status === "FINISHED"
+      ? "FINAL"
+      : board.status === "UPCOMING" || board.currentSet == null
+        ? "WARM UP"
+        : "SET";
+  const plateNumber =
+    board.status === "FINISHED" || board.status === "UPCOMING"
+      ? null
+      : (board.currentSet ?? null);
 
   // One polygon that IS the frame (outer rect minus the window), so the
   // artwork runs continuously around the cut.
@@ -196,9 +226,9 @@ export function VisBoardUShape({
           }}
         >
           <span style={{ fontSize: cap(SETPLATE.labelCap), lineHeight: 1, letterSpacing: f(1) }}>
-            {board.status === "FINISHED" ? "FINAL" : "SET"}
+            {plateLabel}
           </span>
-          {board.status !== "FINISHED" ? (
+          {plateNumber ? (
             <span
               style={{
                 fontSize: cap(SETPLATE.cap),
@@ -206,7 +236,7 @@ export function VisBoardUShape({
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              {board.currentSet ?? ""}
+              {plateNumber}
             </span>
           ) : null}
         </div>
