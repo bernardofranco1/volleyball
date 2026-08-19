@@ -314,15 +314,22 @@ function Rail({
               display: "block",
               width: x(flagW),
               height: y(flagH),
-              border: `${f(HEAD.keyline)} solid ${theme.ink}`,
-              boxSizing: "border-box",
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- board art asset */}
             <img
               src={src}
               alt={data.code}
-              style={{ width: "100%", height: "100%", display: "block" }}
+              style={{
+                width: "100%",
+                height: "100%",
+                display: "block",
+                // Outline, not border: a border with border-box sizing shrinks
+                // the content area, and this image is stretched to fill it —
+                // which was quietly rendering every flag in the rail a few per
+                // cent too wide. An outline takes no space and covers nothing.
+                outline: `${f(HEAD.keyline)} solid ${theme.ink}`,
+              }}
               onError={(e) => {
                 e.currentTarget.style.display = "none";
               }}

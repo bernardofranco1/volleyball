@@ -164,9 +164,6 @@ export function TeamFlag({
         height: y(box.h),
         display: "grid",
         placeItems: "center",
-        border: `${f(FLAG_KEYLINE)} solid ${theme.ink}`,
-        // The keyline must not push the flag off its measured edges.
-        boxSizing: "border-box",
         fontSize: cap(40),
         color: theme.ink,
       }}
@@ -176,7 +173,21 @@ export function TeamFlag({
         <img
           src={src}
           alt={code}
-          style={{ width: "100%", height: "100%", objectFit, display: "block" }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit,
+            display: "block",
+            // The keyline is an OUTLINE, drawn just outside the image, and not
+            // a border on the box around it. A border participates in the box
+            // model: with border-box sizing it eats into the content area, so
+            // the space left for the flag no longer has the flag's aspect ratio
+            // — which stretched every flag in the U-shape rail and, on this
+            // board, left uneven gaps that sub-pixel rounding then turned into
+            // a missing bottom line. An outline takes no space, covers no pixel
+            // of the flag, and hugs its true rectangle on all four sides.
+            outline: `${f(FLAG_KEYLINE)} solid ${theme.ink}`,
+          }}
           onError={(e) => {
             e.currentTarget.style.display = "none";
             e.currentTarget.parentElement!.textContent = code;
