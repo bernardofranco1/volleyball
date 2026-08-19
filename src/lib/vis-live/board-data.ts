@@ -4,6 +4,7 @@
  * fixtures in src/__tests__/fixtures/vis pin every rule below.
  */
 
+import { rotationsBefore, ralliesOf, type Side } from "./rotation";
 import {
   type Attrs,
   allAliasAttrs,
@@ -318,20 +319,30 @@ function lineupPlayers(
  * moved neither score. Not rotating is the safe answer — it is the feed's own
  * last word rather than a guess on top of it.
  */
-function sideOutRotation(setInner: string): "A" | "B" | null {
-  const rallies = allTagAttrs(setInner, "Rally");
-  if (rallies.length < 2) return null;
-  const winnerOf = (i: number): "A" | "B" | null => {
-    const a = num(rallies[i], "PointsTeamA");
-    const b = num(rallies[i], "PointsTeamB");
-    const prevA = i > 0 ? num(rallies[i - 1], "PointsTeamA") : 0;
-    const prevB = i > 0 ? num(rallies[i - 1], "PointsTeamB") : 0;
-    if (a > prevA) return "A";
-    if (b > prevB) return "B";
+function sideOutRotation(
+  setInner: string,
+  firstServer: Side | null,
+): "A" | "B" | null {
+  const rallies = ralliesOf(setInner);
+  if (rallies.length === 0) return null;
+
+  // With the set's first server known, the rules answer this outright, at any
+  // rally count — including the first, where there is no previous rally to name
+  // the server from and the board used to show the outgoing rotation for a
+  // whole rally whenever the receiving side won the opening point.
+  if (firstServer) {
+    const during = rotationsBefore(rallies, firstServer, rallies.length);
+    const now = rotationsBefore(rallies, firstServer, rallies.length + 1);
+    if (now.A > during.A) return "A";
+    if (now.B > during.B) return "B";
     return null;
-  };
-  const last = winnerOf(rallies.length - 1);
-  const before = winnerOf(rallies.length - 2);
+  }
+
+  // Without it, the serve changed hands on the last rally exactly when its
+  // winner differs from the previous rally's — which needs two rallies.
+  if (rallies.length < 2) return null;
+  const last = rallies[rallies.length - 1].winner;
+  const before = rallies[rallies.length - 2].winner;
   if (!last || !before || last === before) return null;
   return last;
 }
@@ -341,6 +352,13 @@ export function mapVolleyLive(
   xml: string,
   matchNo: number,
   now: number = Date.now(),
+  /**
+   * Who served the set's first rally, when the caller knows (spec/42). Only
+   * observable in the moment before a set has any rallies, so the store
+   * remembers it; without it the first rally of a set cannot be judged a
+   * side-out and the rotation waits one rally to catch up.
+   */
+  firstServer: Side | null = null,
 ): VisBoardData {
   const root = firstTagAttrs(xml, "VolleyLive");
   const matchBlock = tagBlocks(xml, "Match")[0] ?? null;
@@ -470,7 +488,7 @@ export function mapVolleyLive(
     }
     return out;
   };
-  const rotating = sideOutRotation(latest?.inner ?? "");
+  const rotating = sideOutRotation(latest?.inner ?? "", firstServer);
 
   const matchRow = firstAliasAttrs(matchBlock?.inner ?? "", ...MATCH_ALIASES);
 

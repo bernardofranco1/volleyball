@@ -34,6 +34,15 @@ import {
 } from "./board-data";
 import { MOCK_MATCH_NO, mockLiveXml } from "./mock";
 import { pollIntervalMs } from "./cadence";
+import { tagBlocks, num, type Attrs } from "./parse";
+import {
+  auditSet,
+  firstServerFor,
+  liberosOf,
+  noteFirstServer,
+  recordRotationAudit,
+} from "./rotation-audit";
+import { stabiliseLineups } from "./lineup-stability";
 
 interface Entry<T> {
   value: T;
@@ -143,7 +152,28 @@ export async function getBoard(
   return dedupe(`board:${matchNo}`, async () => {
     try {
       const xml = await visRequest(volleyLiveEnvelope(matchNo));
-      const board = mapVolleyLive(xml, matchNo);
+      const sets = tagBlocks(xml, "Set").sort(
+        (a, b) => num(a.attrs, "No") - num(b.attrs, "No"),
+      );
+      const latestSet = sets[sets.length - 1] ?? null;
+      const setNo = num(latestSet?.attrs, "No", 0);
+      const rallyCount = latestSet
+        ? (latestSet.inner.match(/<Rally\b/g) ?? []).length
+        : 0;
+
+      const raw = mapVolleyLive(xml, matchNo);
+      // Only knowable before a set's first rally, and the reason the opening
+      // point of a set can now be judged a side-out (spec/42).
+      noteFirstServer(matchNo, setNo, rallyCount, raw.serving);
+      const board = stabiliseLineups(
+        matchNo,
+        mapVolleyLive(xml, matchNo, Date.now(), firstServerFor(matchNo, setNo)),
+        rallyCount,
+      );
+      // Background only (spec/42): model the rotation independently and record
+      // where VIS differs. Nothing here reaches a screen, and every failure is
+      // swallowed inside — a board must not depend on its own instrumentation.
+      void shadowRotation(xml, matchNo, latestSet);
       // A live envelope for a match VIS has no live store for comes back
       // without a Match element; mapVolleyLive then has nothing to say.
       const usable = board.teamA.name || board.teamB.name || board.sets.length > 0;
@@ -278,6 +308,35 @@ export function getMockBoard(now: number = Date.now()): Aged<VisBoardData> {
 }
 
 export { MOCK_LABEL, MOCK_MATCH_NO } from "./mock";
+
+/**
+ * Run the rotation shadow for the payload just fetched (spec/42).
+ *
+ * Fire-and-forget on purpose: it costs one comparison and, only on a first
+ * divergence, one insert. It also captures the first server of a set, which is
+ * only knowable in the moment before that set's first rally exists.
+ */
+async function shadowRotation(
+  xml: string,
+  matchNo: number,
+  latestSet: { attrs: Attrs; inner: string } | null,
+): Promise<void> {
+  try {
+    if (!latestSet) return;
+    const match = tagBlocks(xml, "Match")[0]?.attrs ?? null;
+    const rows = auditSet({
+      matchNo,
+      setInner: latestSet.inner,
+      setAttrs: latestSet.attrs,
+      noTeamA: num(match, "NoTeamA", -1),
+      noTeamB: num(match, "NoTeamB", -2),
+      liberos: liberosOf(xml),
+    });
+    await recordRotationAudit(rows);
+  } catch {
+    // Instrumentation must never be able to take a board down.
+  }
+}
 
 /**
  * A read-only look at what this instance has cached (spec/41).

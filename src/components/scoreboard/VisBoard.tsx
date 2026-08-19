@@ -306,7 +306,10 @@ function Lineup({
     <>
       {rows.map((p, i) => {
         const top = ROW.y0 + i * ROW.pitch;
-        const isServer = serving && i === 0;
+        // A libero may not serve (FIVB 19.3.2.1), so the ball is never painted
+        // on one — if the feed has a libero in position 1 of the serving side,
+        // it is mid-write, and marking them would be plainly wrong (spec/42).
+        const isServer = serving && i === 0 && !p?.isLibero;
         // The master's dummy state frames BOTH first rows but draws the ball
         // once, on the serving side only.
         const showBall = isServer && !replicaSecond;
@@ -332,6 +335,12 @@ function Lineup({
                 width: x(ROW.plate),
                 height: y(ROW.plate),
                 border: `${f(ROW.border)} solid ${theme.ink}`,
+                // The libero's plate is FILLED, their number knocked out of it
+                // (spec/42). The master already distinguishes filled plates
+                // from outlined ones, so this adds no new device — and it reads
+                // from the back of a hall, which a small letter would not.
+                background: p?.isLibero ? theme.ink : "transparent",
+                color: p?.isLibero ? theme.bg : theme.ink,
                 display: "grid",
                 placeItems: "center",
                 fontSize: cap(ROW.cap),

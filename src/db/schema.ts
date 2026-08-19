@@ -96,6 +96,47 @@ export const competitionBranding = pgTable("competition_branding", {
   boardBgUrl: text("board_bg_url"),
 }).enableRLS();
 
+/**
+ * Rotation divergences between VIS and our own model (spec/42).
+ *
+ * Written by the board host in the background and shown nowhere: the boards
+ * keep taking the feed's word. This exists so a day of matches can be read back
+ * afterwards and the feed judged on evidence — how often it disagrees, in which
+ * direction, and whether the disagreement is ours or theirs.
+ *
+ * One row per (match, set, rally, team) at most: the poller dedupes in memory,
+ * and the unique index makes a second instance's duplicate a no-op rather than
+ * a second row.
+ */
+export const visRotationLog = pgTable(
+  "vis_rotation_log",
+  {
+    id: text("id").primaryKey(),
+    matchNo: integer("match_no").notNull(),
+    setNo: integer("set_no").notNull(),
+    /** Rally index within the set; 0 for the rally in progress. */
+    rallyNo: integer("rally_no").notNull(),
+    team: text("team", { enum: ["A", "B"] }).notNull(),
+    /** "observed" | "inferred" | "unknown" — how we knew the first server. */
+    firstServer: text("first_server"),
+    confidence: text("confidence"),
+    /** Rotations our model says this side has made in the set. */
+    expectedTurns: integer("expected_turns"),
+    /** The six as VIS published them, and as our model expects them. */
+    feedSix: text("feed_six"),
+    modelSix: text("model_six"),
+    /** Short machine-readable reason, e.g. "rotation" or "libero-serving". */
+    kind: text("kind").notNull(),
+    scoreA: integer("score_a"),
+    scoreB: integer("score_b"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("vis_rotation_log_once").on(t.matchNo, t.setNo, t.rallyNo, t.team, t.kind),
+    index("vis_rotation_log_recent").on(t.createdAt),
+  ],
+).enableRLS();
+
 // ── Users & roles ──────────────────────────────────────────────────────────
 
 export const users = pgTable("users", {
