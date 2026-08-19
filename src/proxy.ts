@@ -21,6 +21,7 @@ import {
   routeSubdomainPath,
   subdomainFromHost,
 } from "@/lib/subdomain";
+import { boardHostEnabled, isBoardHostPath } from "@/lib/board-host";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -54,6 +55,29 @@ async function resolveSubdomain(
 
 export async function proxy(request: NextRequest) {
   let { pathname } = request.nextUrl;
+
+  // ── Board-only deployment (spec/38) ──────────────────────────────────────
+  // A second deployment of this codebase serves the VIS boards on their own
+  // hostname, so a link handed to competition staff never lands on a scoring
+  // sign-in page. Everything but the board routes is 404 there, and `/` is the
+  // competition index rather than the platform's front page.
+  //
+  // First in the function on purpose: none of the tenant, session or
+  // last-tenant work below has any meaning on a host with no accounts.
+  if (boardHostEnabled()) {
+    if (!isBoardHostPath(pathname)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/not-found";
+      return NextResponse.rewrite(url, { status: 404 });
+    }
+    if (pathname === "/") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/c";
+      return NextResponse.rewrite(url);
+    }
+    return NextResponse.next({ request });
+  }
+
   // Set when a subdomain host maps this request into /t/{slug}/… — every exit
   // path below must then send a rewrite response instead of a plain next().
   let rewriteUrl: URL | null = null;
