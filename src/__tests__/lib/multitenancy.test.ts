@@ -226,6 +226,26 @@ describe("backup export coverage (spec/23 §7.1)", () => {
     const latest = Math.max(...journal.entries.map((e) => e.idx));
     expect(MIGRATION_JOURNAL_IDX).toBe(latest);
   });
+
+  it("the RESTORE script knows the same journal index the exporter stamps", () => {
+    // The exporter stamps `MIGRATION_JOURNAL_IDX` into every backup, and
+    // restore-backup.mts REFUSES any backup stamped higher than the index it
+    // knows. So the two constants drifting apart does not break a test or a
+    // build — it quietly makes every new backup unrestorable, which is only
+    // discovered on the day someone needs one.
+    //
+    // It has now drifted twice: to 8 against an exporter at 14, and to 23
+    // against 25 (spec/42 bumped one constant and not the other). The first
+    // test above pinned only the exporter's half, which is why the second drift
+    // went through it. This pins the other half.
+    const script = readFileSync(
+      join(process.cwd(), "scripts/restore-backup.mts"),
+      "utf8",
+    );
+    const known = /const KNOWN_JOURNAL_IDX = (\d+);/.exec(script)?.[1];
+    expect(known).toBeDefined();
+    expect(Number(known)).toBe(MIGRATION_JOURNAL_IDX);
+  });
 });
 
 describe("backup retention (spec/23 §7.2)", () => {
