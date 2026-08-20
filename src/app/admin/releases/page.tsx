@@ -19,6 +19,7 @@ import {
   setHomolog,
 } from "@/lib/release-actions";
 import { ActionForm } from "@/components/admin/ActionForm";
+import { BoardReleasePanel } from "@/components/admin/BoardReleasePanel";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { LocalTime, SWISS_TIME_ZONE } from "@/components/LocalTime";
 import { LiveRefresh } from "@/components/LiveRefresh";
@@ -453,6 +454,13 @@ export default async function ReleasesPage() {
           </div>
         )}
       </Panel>
+
+      {/* The venue screens are a second deployment of this codebase (spec/38)
+          and are promoted independently of the scoring app (spec/45 W7). */}
+      <div className="mt-8 border-t border-border pt-6">
+        <h2 className="mb-3 text-lg font-semibold">Scoreboard host</h2>
+        <BoardReleasePanel />
+      </div>
     </Page>
   );
 }

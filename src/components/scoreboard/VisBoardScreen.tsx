@@ -41,6 +41,8 @@ export interface VisBoardQuery {
   screen?: string;
   window?: string;
   replica?: string;
+  /** `vis` | `vs` — pin this screen to one feed (spec/45 §6bis). */
+  source?: string;
 }
 
 /** Only same-origin paths or https URLs may be painted onto a board. */
@@ -80,6 +82,12 @@ export async function VisBoardScreen({
       ? REPLAY_MATCH_NO
       : Number(rawMatchNo);
 
+  // A screen pinned to one feed stays on it whatever the competition default
+  // is — that is what makes two TVs on one match a comparison rather than a
+  // coincidence (spec/45 §6bis).
+  const forcedSource =
+    query.source === "vs" ? "vs" : query.source === "vis" ? "vis" : null;
+
   const comp = await getVisCompetition(tenantId, competitionId);
   if (!comp) notFound();
 
@@ -98,7 +106,7 @@ export async function VisBoardScreen({
       ? Promise.resolve(getMockBoard())
       : isReplay
         ? Promise.resolve(getReplayBoard())
-        : getBoard(matchNo)
+        : getBoard(matchNo, undefined, forcedSource)
     ).then(
       (r) => ({ ok: true as const, board: r.value }),
       (err: unknown) => ({ ok: false as const, err }),
@@ -162,6 +170,7 @@ export async function VisBoardScreen({
       <VisBoardDisplay
         matchNo={matchNo}
         boardId={synthetic ? rawMatchNo : undefined}
+        sourceParam={forcedSource}
         initialBoard={boardResult.board}
         layout={layout}
         screenOverride={screenOverride}
@@ -170,7 +179,15 @@ export async function VisBoardScreen({
         logoUrl={branding?.logoUrl ?? null}
         windowFill={windowFill}
         replica={query.replica === "1"}
-        notice={isMock ? MOCK_LABEL : isReplay ? REPLAY_LABEL : null}
+        notice={
+          isMock
+            ? MOCK_LABEL
+            : isReplay
+              ? REPLAY_LABEL
+              : forcedSource
+                ? `SOURCE · ${forcedSource === "vs" ? "VolleyStation" : "VIS"}`
+                : null
+        }
       />
     </>
   );

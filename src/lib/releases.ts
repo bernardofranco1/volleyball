@@ -5,7 +5,7 @@
  * release-actions.ts. Platform-level throughout — a release is the whole
  * deployment, not one tenant's data.
  */
-import { desc, isNull, sql } from "drizzle-orm";
+import { desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { DB_SCHEMA } from "@/db/env";
 import { releases, tenants } from "@/db/schema";
@@ -15,14 +15,32 @@ export type ReleaseRow = typeof releases.$inferSelect;
 
 export { MIGRATIONS_IN_REPO };
 
-export async function listReleases(limit = 25): Promise<ReleaseRow[]> {
-  return db.select().from(releases).orderBy(desc(releases.createdAt)).limit(limit);
+/**
+ * Release history for ONE deployment (spec/45 W7).
+ *
+ * The scoring app and the scoreboard host are promoted independently and both
+ * write here, so every read says which it means. Rows written before the board
+ * host had a release flow default to `scoring`, which is what they were.
+ */
+export async function listReleases(
+  limit = 25,
+  project: "scoring" | "board" = "scoring",
+): Promise<ReleaseRow[]> {
+  return db
+    .select()
+    .from(releases)
+    .where(eq(releases.project, project))
+    .orderBy(desc(releases.createdAt))
+    .limit(limit);
 }
 
-export async function latestRelease(): Promise<ReleaseRow | null> {
+export async function latestRelease(
+  project: "scoring" | "board" = "scoring",
+): Promise<ReleaseRow | null> {
   const rows = await db
     .select()
     .from(releases)
+    .where(eq(releases.project, project))
     .orderBy(desc(releases.createdAt))
     .limit(1);
   return rows[0] ?? null;

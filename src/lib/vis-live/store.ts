@@ -49,6 +49,12 @@ import { stabiliseLineups } from "./lineup-stability";
 import { designatedLiberos, parseSetEvents, playerSides } from "./events";
 import { enforceLineups, type EnforcedLineups } from "./serve-succession";
 import { sixOf } from "./rotation";
+import { sourceFor, rosterFor, type BoardSource, type VsTarget } from "@/lib/vs-live/resolve";
+import { vsMatch, vsStats } from "@/lib/vs-live/client";
+import { mapVsBoard } from "@/lib/vs-live/board-data";
+import type { VsStatsRow } from "@/lib/vs-live/types";
+
+type VsStatsRowList = VsStatsRow[];
 
 interface Entry<T> {
   value: T;
@@ -78,6 +84,15 @@ const ALLOWLIST_TTL_MS = 10 * 60_000;
 
 const matchLists = new Map<number, Entry<VisMatchSummary[]>>();
 const boards = new Map<number, Entry<VisBoardData>>();
+/**
+ * Boards built from VolleyStation, keyed by the same VIS match number as
+ * `boards` (spec/45 §6bis). A separate map on purpose: during an event the same
+ * match is deliberately served from BOTH feeds, to two different screens.
+ */
+const vsBoards = new Map<number, Entry<VisBoardData>>();
+/** Per-player stats, which change per rally rather than per poll. */
+const vsStatsCache = new Map<number, { value: VsStatsRowList; at: number }>();
+const VS_STATS_TTL_MS = 12_000;
 let allowlist: Entry<Map<number, number>> | null = null; // matchNo → tournamentNo
 
 /** In-flight de-duplication: concurrent viewers share one upstream call. */
@@ -157,6 +172,30 @@ export async function getMatchList(
 export async function getBoard(
   matchNo: number,
   now: number = Date.now(),
+  /**
+   * A per-SCREEN source override (`?source=`), which beats the competition's
+   * own setting (spec/45 §6bis). This is what lets one match be watched from
+   * both feeds at once, on two TVs, during an event.
+   */
+  requested?: BoardSource | null,
+): Promise<Aged<VisBoardData> & { source: BoardSource }> {
+  // Deliberately not inside the try: a failure to work out the source must not
+  // be able to stop a board that VIS could have served.
+  const chosen = await sourceFor(matchNo, requested ?? null).catch(() => null);
+  if (chosen?.source === "vs" && chosen.target) {
+    try {
+      return { ...(await getVsBoard(matchNo, chosen.target, now)), source: "vs" };
+    } catch {
+      // Stale VolleyStation never beats live VIS: fall through in the SAME
+      // request rather than serving something old or an error.
+    }
+  }
+  return { ...(await getVisBoard(matchNo, now)), source: "vis" };
+}
+
+async function getVisBoard(
+  matchNo: number,
+  now: number = Date.now(),
 ): Promise<Aged<VisBoardData>> {
   const hit = boards.get(matchNo);
   if (fresh(hit, now)) return aged(hit!, now);
@@ -230,6 +269,64 @@ export async function getBoard(
       if (hit) return aged(hit, Date.now());
       throw liveErr;
     }
+  });
+}
+
+/**
+ * A board built from VolleyStation (spec/45 W3).
+ *
+ * Cached in its OWN map, keyed by the same VIS match number, so one match can
+ * be held from both feeds simultaneously — which is the point of §6bis: two
+ * screens, two sources, one match, compared live.
+ *
+ * Stats and rosters move far more slowly than the score, so they are fetched on
+ * their own cadence and reused; a stats fetch that fails costs the points
+ * column, never the board.
+ */
+async function getVsBoard(
+  matchNo: number,
+  target: VsTarget,
+  now: number = Date.now(),
+): Promise<Aged<VisBoardData>> {
+  const hit = vsBoards.get(matchNo);
+  if (fresh(hit, now)) return aged(hit!, now);
+
+  return dedupe(`vs-board:${matchNo}`, async () => {
+    const id = target.championshipMatchId;
+    const match = await vsMatch(id);
+
+    const statsHit = vsStatsCache.get(id);
+    let stats = statsHit?.value ?? null;
+    if (!statsHit || Date.now() - statsHit.at > VS_STATS_TTL_MS) {
+      try {
+        stats = await vsStats(id);
+        vsStatsCache.set(id, { value: stats, at: Date.now() });
+      } catch {
+        // Keep whatever we had; the points column is not worth a blank board.
+      }
+    }
+
+    const sides = target.mapping.rosters.get(id) ?? null;
+    const board = mapVsBoard({
+      match,
+      stats,
+      config: target.mapping.config,
+      rosterHome: sides ? rosterFor(target.mapping.championshipId, sides.home) : null,
+      rosterGuest: sides ? rosterFor(target.mapping.championshipId, sides.guest) : null,
+      matchNo,
+    });
+
+    const prev = vsBoards.get(matchNo);
+    const stamp = Date.now();
+    const entry: Entry<VisBoardData> = {
+      value: board,
+      at: stamp,
+      ttlMs: pollIntervalMs(board),
+      changedAt:
+        prev && boardPulse(prev.value) === boardPulse(board) ? prev.changedAt : stamp,
+    };
+    vsBoards.set(matchNo, entry);
+    return aged(entry, stamp);
   });
 }
 
@@ -531,6 +628,8 @@ export interface VisStoreSnapshot {
     pollMs: number;
     /** The feed version this instance holds — what the next poll asks past. */
     visVersion: number;
+    /** Which feed built this entry (spec/45). */
+    source: BoardSource;
   }[];
 }
 
@@ -548,7 +647,7 @@ export function visStoreSnapshot(now: number = Date.now()): VisStoreSnapshot {
       rows: e.value.length,
       ageSeconds: Math.round((now - e.at) / 1000),
     })),
-    boards: [...boards.entries()].map(([matchNo, e]) => ({
+    boards: [...boards.entries(), ...vsBoards.entries()].map(([matchNo, e]) => ({
       matchNo,
       status: e.value.status,
       teamA: e.value.teamA.code || e.value.teamA.name,
@@ -561,6 +660,7 @@ export function visStoreSnapshot(now: number = Date.now()): VisStoreSnapshot {
       sinceChangeSeconds: Math.round((now - e.changedAt) / 1000),
       pollMs: e.ttlMs,
       visVersion: e.visVersion ?? 0,
+      source: (vsBoards.get(matchNo) === e ? "vs" : "vis") as BoardSource,
     })),
   };
 }
@@ -569,6 +669,8 @@ export function visStoreSnapshot(now: number = Date.now()): VisStoreSnapshot {
 export function __resetVisCaches(): void {
   matchLists.clear();
   boards.clear();
+  vsBoards.clear();
+  vsStatsCache.clear();
   inFlight.clear();
   allowlist = null;
 }

@@ -280,7 +280,9 @@ export async function readBoardStatus(opts: {
         matchNo: b.matchNo,
         label: isReplay ? `REPLAY · ${b.teamA} v ${b.teamB}` : `${b.teamA} v ${b.teamB}`,
         detail: [
-          isReplay ? "validation loop · never touches VIS" : `#${b.matchNo}`,
+          isReplay
+            ? "validation loop · never touches VIS"
+            : `#${b.matchNo} · via ${b.source === "vs" ? "VolleyStation" : "VIS"}`,
           live ? (b.inSetBreak ? "set break" : `set ${b.currentSet ?? "—"}`) : b.status.toLowerCase(),
           live ? `${b.scoreA}-${b.scoreB}` : null,
         ].filter(Boolean).join(" · "),

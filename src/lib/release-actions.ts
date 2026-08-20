@@ -37,6 +37,7 @@ import {
   promoteDeployment,
   setHomologAlias,
   vercelConfig,
+  boardVercelConfig,
 } from "@/lib/vercel";
 
 const PATH = "/admin/releases";
@@ -251,5 +252,186 @@ export async function promoteRelease(
     action === "ROLLBACK"
       ? `Rolled back to ${dep.shortSha}.${suffix}`
       : `Promoted ${dep.shortSha}. The domain is serving it now.${suffix}`,
+  );
+}
+
+// ── The SCOREBOARD host (spec/45 W7) ────────────────────────────────────────
+//
+// The board host is a second deployment of this same codebase (spec/38) serving
+// the venue screens. Until now a push to `main` went straight to its production
+// domain unattended — acceptable while the boards were the only thing changing,
+// and not acceptable while their DATA SOURCE is being swapped under live
+// events. So it gets the same two-step discipline as the scoring app.
+//
+// Two deliberate differences from the scoring promote, both because the board
+// host owns no tenant data:
+//
+//   * NO tenant backups. There is nothing of the tenants' on that deployment to
+//     back up, and a backup run here would be theatre — it would report success
+//     for work that protects nothing, which is worse than not running it.
+//   * The migration guard is kept, in its rollback-safe form: refuse a build
+//     that expects MORE migrations than the shared database has applied. The
+//     board host reads the same schema as production, so shipping it ahead of
+//     the schema breaks it exactly as it would break the scoring app.
+//
+// It has no console of its own and must never grow one: it has no sessions, and
+// the whole point of BOARD_ONLY is that nothing but boards is reachable there.
+
+type BoardGate =
+  | { ok: true; ctx: { user: { id: string; email: string | null } }; cfg: NonNullable<ReturnType<typeof boardVercelConfig>> }
+  | { ok: false; error: string };
+
+async function boardGate(): Promise<BoardGate> {
+  const ctx = await requireGlobalAdmin(PATH);
+  const cfg = boardVercelConfig();
+  if (!cfg)
+    return {
+      ok: false,
+      error:
+        "The scoreboard release console is not configured (BOARD_RELEASE_PROJECT_ID).",
+    };
+  // Same reasoning as the scoring promote: from a homologation build the
+  // release row and the audit entry would be written into `homolog.*`, where
+  // the production console cannot see them — while the domain moved anyway.
+  if (!IS_PROD_SCHEMA)
+    return {
+      ok: false,
+      error: `This console is serving the \`${DB_SCHEMA}\` tables. Promote the scoreboard host from the production console.`,
+    };
+  return { ok: true, ctx, cfg };
+}
+
+/** Start a production-configured build of a commit for the board host. */
+export async function prepareBoardRelease(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await boardGate();
+  if (!g.ok) return fail(g.error);
+  const sha = str(fd, "sha");
+  const ref = str(fd, "ref") || "main";
+  if (!sha) return fail("Missing commit.");
+
+  const dep = await createProductionBuild(g.cfg, sha, ref);
+  await recordAudit({
+    tenantId: null,
+    actor: { userId: g.ctx.user.id, email: g.ctx.user.email },
+    action: "release.prepare",
+    entityType: "deployment",
+    entityId: dep.id,
+    summary: `Started the scoreboard production build of ${sha.slice(0, 7)}`,
+    metadata: { sha, ref, project: "board" },
+  });
+  revalidatePath(PATH);
+  return ok(`Building ${sha.slice(0, 7)} for the scoreboard host — promote it when green.`);
+}
+
+/** Point the scoreboard homologation hostname at a candidate. */
+export async function setBoardHomolog(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await boardGate();
+  if (!g.ok) return fail(g.error);
+  const deploymentId = str(fd, "deploymentId");
+  if (!deploymentId) return fail("Missing deployment.");
+
+  const dep = await getDeployment(g.cfg, deploymentId);
+  const alias = await setHomologAlias(g.cfg, deploymentId);
+  await recordAudit({
+    tenantId: null,
+    actor: { userId: g.ctx.user.id, email: g.ctx.user.email },
+    action: "release.homolog",
+    entityType: "deployment",
+    entityId: deploymentId,
+    summary: `Scoreboard homologation now serves ${dep.shortSha}`,
+    metadata: { sha: dep.sha, alias, project: "board" },
+  });
+  revalidatePath(PATH);
+  return ok(`Scoreboard homologation now serves ${dep.shortSha} (${alias})`);
+}
+
+/**
+ * Move the scoreboard production domain onto a build that is ready.
+ *
+ * Rollback is the same call with an older build — instant, no rebuild, and the
+ * reason this exists: if a board release misbehaves mid-event in a way the
+ * per-competition source lever cannot fix, the previous build comes back
+ * without touching the scoring app.
+ */
+export async function promoteBoardRelease(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  const g = await boardGate();
+  if (!g.ok) return fail(g.error);
+
+  const deploymentId = str(fd, "deploymentId");
+  const action = str(fd, "action") === "ROLLBACK" ? "ROLLBACK" : "PROMOTE";
+  const note = str(fd, "note") || null;
+  if (!deploymentId) return fail("Missing deployment.");
+
+  const dep = await getDeployment(g.cfg, deploymentId);
+  if (dep.target !== "production")
+    return fail(
+      "That build was configured for homologation. Prepare a production build of the same commit instead.",
+    );
+  if (dep.state !== "READY") return fail(`That build is ${dep.state}, not READY.`);
+
+  const [previous, migrations, candidate] = await Promise.all([
+    currentProduction(g.cfg),
+    migrationState(),
+    fetchDeployedVersion(dep),
+  ]);
+  if (previous?.id === deploymentId)
+    return fail("That build is already serving the scoreboard host.");
+
+  // Ask the CANDIDATE what it needs, not this console — the console is
+  // routinely the older build, which is exactly when the numbers differ.
+  const required = candidate?.migrations ?? null;
+  const applied = migrations.appliedProd;
+  const verdict = migrationVerdict({ required, applied, action });
+  if (!verdict.ok) return fail(verdict.error);
+  const migrationWarning = verdict.warning ? ` (warning: ${verdict.warning})` : "";
+
+  await promoteDeployment(g.cfg, deploymentId);
+
+  await db.insert(releases).values({
+    id: newId("rel"),
+    deploymentId,
+    sha: dep.sha,
+    message: dep.message,
+    branch: dep.branch,
+    previousDeploymentId: previous?.id ?? null,
+    migrationsInRepo: required,
+    migrationsApplied: applied,
+    action,
+    promotedBy: g.ctx.user.email,
+    note,
+    project: "board",
+  });
+  await recordAudit({
+    tenantId: null,
+    actor: { userId: g.ctx.user.id, email: g.ctx.user.email },
+    action: action === "ROLLBACK" ? "release.rollback" : "release.promote",
+    entityType: "deployment",
+    entityId: deploymentId,
+    summary:
+      action === "ROLLBACK"
+        ? `Rolled the scoreboard host back to ${dep.shortSha}`
+        : `Promoted ${dep.shortSha} to the scoreboard host`,
+    metadata: {
+      sha: dep.sha,
+      previous: previous?.shortSha ?? null,
+      project: "board",
+      note,
+    },
+  });
+
+  revalidatePath(PATH);
+  return ok(
+    action === "ROLLBACK"
+      ? `Scoreboard host rolled back to ${dep.shortSha}.${migrationWarning}`
+      : `Scoreboard host now serves ${dep.shortSha}.${migrationWarning}`,
   );
 }

@@ -211,6 +211,24 @@ export const competitions = pgTable(
     // scored in VIS so the read-only live scoreboard can serve its matches.
     // Nullable — almost every competition is scored here, not mirrored.
     visTournamentNo: integer("vis_tournament_no"),
+    // VolleyStation championship id (spec/45): the same event as seen by the
+    // system that FEEDS VIS. Nullable — null means "no VS source exists", which
+    // is true of every competition scored here and of VIS events outside the
+    // FIVB panel (the U17 Worlds among them).
+    vsChampionshipId: integer("vs_championship_id"),
+    /**
+     * Which feed this competition's boards SERVE by default (spec/45 §6bis):
+     *   vis  — the VIS live feed (today's behaviour, and the default so that
+     *          migrating changes nothing)
+     *   vs   — VolleyStation, falling back to VIS on any failure
+     *   auto — VolleyStation when mapped and healthy, else VIS
+     * An individual screen always overrides this with `?source=`; this is the
+     * lever that moves every OTHER screen, from the console, mid-event and
+     * without a deploy.
+     */
+    boardSource: text("board_source", { enum: ["vis", "vs", "auto"] })
+      .default("vis")
+      .notNull(),
     status: text("status", { enum: ["DRAFT", "ACTIVE", "FINISHED"] })
       .default("DRAFT")
       .notNull(),
@@ -1018,6 +1036,15 @@ export const releases = pgTable(
       .notNull(),
     promotedBy: text("promoted_by"),
     note: text("note"),
+    /**
+     * WHICH deployment this release is about (spec/45 W7). The scoring app and
+     * the scoreboard host are promoted independently; both write here, and the
+     * console filters by this. Defaults to `scoring`, which backfills every row
+     * written before the board host had a release flow.
+     */
+    project: text("project", { enum: ["scoring", "board"] })
+      .default("scoring")
+      .notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("releases_created_idx").on(t.createdAt)],

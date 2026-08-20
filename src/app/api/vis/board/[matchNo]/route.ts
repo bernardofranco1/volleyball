@@ -66,17 +66,25 @@ export async function GET(
   }
 
   try {
-    const { value, ageSeconds } = await getBoard(matchNo);
+    // A per-screen source override (spec/45 §6bis): two TVs on the same match,
+    // one per feed, is how the two are compared during an event.
+    const raw = new URL(req.url).searchParams.get("source");
+    const requested = raw === "vs" ? "vs" : raw === "vis" ? "vis" : null;
+    const { value, ageSeconds, source } = await getBoard(matchNo, Date.now(), requested);
     const interval = pollIntervalMs(value);
     const maxAge = cdnMaxAgeSeconds(interval);
     return NextResponse.json(
-      { board: value, ageSeconds, pollMs: interval },
+      { board: value, ageSeconds, pollMs: interval, source },
       {
         headers: {
           // The CDN soaks up per-TV polling; the store's TTL bounds upstream
           // calls. Both follow the same cadence as the browser's timer, so a
           // live board is one second behind VIS rather than one second behind a
           // five-second cache behind a twenty-second TTL (spec/37).
+          //
+          // `?source=` is part of the cache key on Vercel, so the two variants
+          // of one match cache independently — which is what makes the
+          // side-by-side comparison cheap rather than cache-thrashing.
           "Cache-Control": `public, s-maxage=${maxAge}, stale-while-revalidate=${maxAge * 2}`,
         },
       },

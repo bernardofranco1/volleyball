@@ -20,6 +20,8 @@ export interface VercelConfig {
   repoId: number;
   /** Stable hostname the homologation alias points at. */
   homologAlias: string | null;
+  /** Vercel project NAME, which a deployment creation must carry. */
+  projectName: string;
 }
 
 /**
@@ -54,6 +56,37 @@ export function vercelConfig(): VercelConfig | null {
     teamId,
     repoId,
     homologAlias: env("HOMOLOG_ALIAS"),
+    projectName: env("RELEASE_PROJECT_NAME") ?? "volleyball",
+  };
+}
+
+/**
+ * The same console, pointed at the SCOREBOARD host (spec/45 W7).
+ *
+ * Same team, same token, same repository — the board host is a second
+ * deployment of this codebase (spec/38), so only the project id and the alias
+ * differ. Null when the board project has not been configured, which is how a
+ * deployment that predates W7 renders a setup notice rather than a broken
+ * panel.
+ *
+ * Deliberately a separate function rather than a parameter on `vercelConfig`:
+ * every call site then has to say WHICH deployment it means, and "promote"
+ * without an object is exactly the ambiguity worth designing out.
+ */
+export function boardVercelConfig(): VercelConfig | null {
+  const base = vercelConfig();
+  if (!base) return null;
+  const env = (name: string): string | null => {
+    const v = process.env[name]?.trim();
+    return v ? v : null;
+  };
+  const projectId = env("BOARD_RELEASE_PROJECT_ID");
+  if (!projectId) return null;
+  return {
+    ...base,
+    projectId,
+    homologAlias: env("BOARD_HOMOLOG_ALIAS"),
+    projectName: env("BOARD_RELEASE_PROJECT_NAME") ?? "fivb-live-scoreboards",
   };
 }
 
@@ -240,7 +273,7 @@ export async function createProductionBuild(
     "POST",
     `/v13/deployments?skipAutoDetectionConfirmation=1`,
     {
-      name: "volleyball",
+      name: cfg.projectName,
       project: cfg.projectId,
       target: "production",
       gitSource: { type: "github", repoId: cfg.repoId, ref, sha },

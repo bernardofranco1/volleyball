@@ -52,6 +52,7 @@ export type VisScreenOverride = "board" | "stats" | null;
 export function VisBoardDisplay({
   matchNo,
   boardId,
+  sourceParam = null,
   initialBoard,
   layout = "full",
   screenOverride = null,
@@ -70,6 +71,13 @@ export function VisBoardDisplay({
    * which is not what spec/35 W9 promises.
    */
   boardId?: string;
+  /**
+   * `vis` | `vs` when this screen is pinned to one feed (spec/45 §6bis). It is
+   * carried on every poll, and shown as a small tag — a screen deliberately
+   * running the other source should say so, or a comparison becomes an
+   * argument about which window was which.
+   */
+  sourceParam?: "vis" | "vs" | null;
   initialBoard: VisBoardData;
   layout?: VisLayout;
   /** Pin one screen (?screen=board|stats) — overrides the rotation. */
@@ -100,9 +108,10 @@ export function VisBoardDisplay({
 
   const poll = useCallback(async () => {
     try {
-      const res = await fetch(`/api/vis/board/${boardId ?? matchNo}`, {
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `/api/vis/board/${boardId ?? matchNo}${sourceParam ? `?source=${sourceParam}` : ""}`,
+        { cache: "no-store" },
+      );
       if (!res.ok) throw new Error(String(res.status));
       const data = (await res.json()) as { board: VisBoardData; pollMs?: number };
       if (data?.board) {
@@ -131,7 +140,7 @@ export function VisBoardDisplay({
         Math.max(FAIL_BACKOFF_MIN_MS, nextDelayRef.current * 2),
       );
     }
-  }, [boardId, matchNo]);
+  }, [boardId, matchNo, sourceParam]);
 
   // Self-scheduling timer rather than setInterval: the delay changes with the
   // match state, and an interval cannot be re-timed without tearing it down.

@@ -121,6 +121,7 @@ beforeEach(() => {
     teamId: "team",
     repoId: 1,
     homologAlias: "homolog.example",
+    projectName: "volleyball",
   });
   vi.mocked(getDeployment).mockResolvedValue(readyProduction);
   vi.mocked(currentProduction).mockResolvedValue({
