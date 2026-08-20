@@ -179,15 +179,13 @@ export async function VisBoardScreen({
         logoUrl={branding?.logoUrl ?? null}
         windowFill={windowFill}
         replica={query.replica === "1"}
-        notice={
-          isMock
-            ? MOCK_LABEL
-            : isReplay
-              ? REPLAY_LABEL
-              : forcedSource
-                ? `SOURCE · ${forcedSource === "vs" ? "VolleyStation" : "VIS"}`
-                : null
-        }
+        // No source watermark. A VolleyStation-sourced board is the OFFICIAL
+        // board, not a variant of one, and a venue screen must not carry a
+        // caption about where the platform read its data. The mock and the
+        // replay keep their marks because those really are not live matches.
+        // Which source served a board is still visible where it belongs — the
+        // status page, and the `source` field on the API response.
+        notice={isMock ? MOCK_LABEL : isReplay ? REPLAY_LABEL : null}
       />
     </>
   );

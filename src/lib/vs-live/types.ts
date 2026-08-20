@@ -94,13 +94,19 @@ export interface VsTeam {
   PlayerList: VsPlayerEntry[] | null;
 }
 
-/** Per-player, per-match aggregates. `Points` ≈ VIS `TotalPoints`. */
+/** Per-player, per-match aggregates. NB: `Points` is only HALF the total. */
 export interface VsStatsRow {
   PlayerID: number;
   Number: string | null;
   Libero: number | null;
   is_home: boolean;
+  /**
+   * Points won while this player's team was SERVING — the break points only.
+   * A player's match total is `Points + SideOut`; see `pointsBySide`.
+   */
   Points: string | null;
+  /** Points won in side-out. The other half of the total. */
+  SideOut: string | null;
   SpikeWin: string | null;
   BlockWin: string | null;
   ServeWin: string | null;

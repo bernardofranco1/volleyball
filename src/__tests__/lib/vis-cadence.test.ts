@@ -5,14 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-  BREAK_MS,
-  FINISHED_MS,
-  LIVE_MS,
-  UPCOMING_MS,
-  cdnMaxAgeSeconds,
-  pollIntervalMs,
-} from "@/lib/vis-live/cadence";
+import { BREAK_MS, FINISHED_MS, LIVE_MS, UPCOMING_MS, cdnMaxAgeSeconds, pollIntervalMs, boardCacheControl, VS_IN_RALLY_MS } from "@/lib/vis-live/cadence";
 
 const state = (
   status: "UPCOMING" | "LIVE" | "FINISHED",
@@ -51,5 +44,40 @@ describe("poll cadence", () => {
     expect(cdnMaxAgeSeconds(500)).toBe(1);
     expect(cdnMaxAgeSeconds(BREAK_MS)).toBe(5);
     expect(cdnMaxAgeSeconds(FINISHED_MS)).toBe(30);
+  });
+});
+
+describe("what the CDN may serve while a set is being played", () => {
+  const live = { status: "LIVE" as const, inSetBreak: false };
+  const breakTime = { status: "LIVE" as const, inSetBreak: true };
+  const finished = { status: "FINISHED" as const, inSetBreak: false };
+
+  it("allows no stale window during live play", () => {
+    // Measured on a live board: the edge answered STALE on four reads in six,
+    // and s-maxage=1 + stale-while-revalidate=2 entitles it to hand a venue
+    // screen a score three seconds old. That was the biggest single slice of
+    // the delay from a point being scored to the number changing in the hall.
+    expect(boardCacheControl(live, 1_000)).toBe(
+      "public, s-maxage=1, stale-while-revalidate=0",
+    );
+  });
+
+  it("keeps the stale window when nothing is moving", () => {
+    // Between sets, before the whistle and after the match, a stale response is
+    // free — nothing has changed for it to be wrong about.
+    expect(boardCacheControl(breakTime, 5_000)).toBe(
+      "public, s-maxage=5, stale-while-revalidate=10",
+    );
+    expect(boardCacheControl(finished, 30_000)).toBe(
+      "public, s-maxage=30, stale-while-revalidate=60",
+    );
+  });
+
+  it("asks more often while a VolleyStation rally is in progress", () => {
+    // VolleyStation says `in_rally` outright, so the board can ask more often
+    // for exactly the seconds a point is imminent. VIS has no such signal, and
+    // its one-request-per-second agreement is not ours to change.
+    expect(VS_IN_RALLY_MS).toBeLessThan(LIVE_MS);
+    expect(VS_IN_RALLY_MS).toBeGreaterThanOrEqual(250);
   });
 });

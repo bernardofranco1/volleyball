@@ -36,7 +36,7 @@ import {
 } from "./board-data";
 import { MOCK_MATCH_NO, mockLiveXml } from "./mock";
 import { REPLAY_MATCH_NO, replayXml } from "./replay";
-import { pollIntervalMs } from "./cadence";
+import { pollIntervalMs, VS_IN_RALLY_MS } from "./cadence";
 import { allTagAttrs, tagBlocks, num, type Attrs } from "./parse";
 import {
   auditSet,
@@ -184,13 +184,14 @@ export async function getBoard(
    * both feeds at once, on two TVs, during an event.
    */
   requested?: BoardSource | null,
-): Promise<Aged<VisBoardData> & { source: BoardSource }> {
+): Promise<Aged<VisBoardData> & { source: BoardSource; pollMs: number }> {
   // Deliberately not inside the try: a failure to work out the source must not
   // be able to stop a board that VIS could have served.
   const chosen = await sourceFor(matchNo, requested ?? null).catch(() => null);
   if (chosen?.source === "vs" && chosen.target) {
     try {
-      return { ...(await getVsBoard(matchNo, chosen.target, now)), source: "vs" };
+      const served = await getVsBoard(matchNo, chosen.target, now);
+      return { ...served, source: "vs" };
     } catch {
       // Stale VolleyStation never beats live VIS: fall through in the SAME
       // request rather than serving something old or an error.
@@ -199,12 +200,21 @@ export async function getBoard(
   return { ...(await getVisBoard(matchNo, now)), source: "vis" };
 }
 
+/**
+ * The cadence an entry was actually stored with, which is what the browser
+ * should poll at. Recomputing it in the route instead would ignore anything the
+ * store knew and the mapper did not — the in-rally cadence, for one.
+ */
+function withPoll(a: Aged<VisBoardData>, entry: Entry<VisBoardData>) {
+  return { ...a, pollMs: entry.ttlMs };
+}
+
 async function getVisBoard(
   matchNo: number,
   now: number = Date.now(),
-): Promise<Aged<VisBoardData>> {
+): Promise<Aged<VisBoardData> & { pollMs: number }> {
   const hit = boards.get(matchNo);
-  if (fresh(hit, now)) return aged(hit!, now);
+  if (fresh(hit, now)) return withPoll(aged(hit!, now), hit!);
 
   return dedupe(`board:${matchNo}`, async () => {
     try {
@@ -226,7 +236,7 @@ async function getVisBoard(
             ttlMs: pollIntervalMs(hit.value),
           };
           boards.set(matchNo, entry);
-          return aged(entry, stamp);
+          return withPoll(aged(entry, stamp), entry);
         }
         // A version we cannot have come by honestly, or a cache dropped under
         // us mid-flight: ask again for everything.
@@ -251,7 +261,7 @@ async function getVisBoard(
           visVersion: payloadVersion(xml),
         };
         boards.set(matchNo, entry);
-        return aged(entry, stamp);
+        return withPoll(aged(entry, stamp), entry);
       }
       throw new Error("no live data");
     } catch (liveErr) {
@@ -263,7 +273,7 @@ async function getVisBoard(
       // again. A slightly stale score is always better than a wrong one, and
       // the status page's `changedAt` is what surfaces a feed that has stopped.
       if (hit && (hit.value.sets.length > 0 || hit.value.status !== "UPCOMING")) {
-        return aged(hit, Date.now());
+        return withPoll(aged(hit, Date.now()), hit);
       }
       // Pre-start fallback: teams + kick-off time, refreshed slowly.
       try {
@@ -277,12 +287,12 @@ async function getVisBoard(
             changedAt: boards.get(matchNo)?.changedAt ?? Date.now(),
           };
           boards.set(matchNo, entry);
-          return aged(entry, Date.now());
+          return withPoll(aged(entry, Date.now()), entry);
         }
       } catch {
         /* fall through to stale/throw */
       }
-      if (hit) return aged(hit, Date.now());
+      if (hit) return withPoll(aged(hit, Date.now()), hit);
       throw liveErr;
     }
   });
@@ -303,9 +313,9 @@ async function getVsBoard(
   matchNo: number,
   target: VsTarget,
   now: number = Date.now(),
-): Promise<Aged<VisBoardData>> {
+): Promise<Aged<VisBoardData> & { pollMs: number }> {
   const hit = vsBoards.get(matchNo);
-  if (fresh(hit, now)) return aged(hit!, now);
+  if (fresh(hit, now)) return withPoll(aged(hit!, now), hit!);
 
   return dedupe(`vs-board:${matchNo}`, async () => {
     const { link } = target;
@@ -340,27 +350,54 @@ async function getVsBoard(
       }
     }
 
+    // The VIS schedule row is already cached (the route builds the allowlist
+    // from it), and it is the better source for two things VolleyStation states
+    // differently: the kick-off in VENUE-local time, and the pool.
+    const summary = await visSummaryFor(matchNo).catch(() => null);
+
     const board = mapVsBoard({
       match,
       stats,
       config: link.config,
       rosterHome: rosterOf(home),
       rosterGuest: rosterOf(guest),
+      codeHome: home?.ShortCodeName ?? summary?.teamACode ?? null,
+      codeGuest: guest?.ShortCodeName ?? summary?.teamBCode ?? null,
+      scheduledLocal:
+        summary?.dateLocal
+          ? `${summary.dateLocal}${summary.timeLocal ? ` ${summary.timeLocal}` : ""}`
+          : null,
       matchNo,
     });
 
     const prev = vsBoards.get(matchNo);
     const stamp = Date.now();
+    // A rally is in progress: a point is seconds away, so ask more often for
+    // exactly as long as that is true (spec/45 — VolleyStation tells us, VIS
+    // cannot).
+    const inRally = match.widget?.in_rally === true && board.status === "LIVE";
     const entry: Entry<VisBoardData> = {
       value: board,
       at: stamp,
-      ttlMs: pollIntervalMs(board),
+      ttlMs: Math.min(pollIntervalMs(board), inRally ? VS_IN_RALLY_MS : Infinity),
       changedAt:
         prev && boardPulse(prev.value) === boardPulse(board) ? prev.changedAt : stamp,
     };
     vsBoards.set(matchNo, entry);
-    return aged(entry, stamp);
+    return withPoll(aged(entry, stamp), entry);
   });
+}
+
+/**
+ * The VIS schedule row for a match, from the list this instance already holds.
+ * Never fetches on its own: if the allowlist has not been built here yet, the
+ * VolleyStation board simply goes without the venue-local kick-off.
+ */
+async function visSummaryFor(matchNo: number): Promise<VisMatchSummary | null> {
+  const tournamentNo = await tournamentOfMatch(matchNo);
+  if (tournamentNo == null) return null;
+  const list = matchLists.get(tournamentNo);
+  return list?.value.find((m) => m.matchNo === matchNo) ?? null;
 }
 
 /**

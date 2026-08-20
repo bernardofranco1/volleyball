@@ -32,6 +32,22 @@ export const BREAK_MS = 5_000;
 export const UPCOMING_MS = 10_000;
 /** Match over. The board still refreshes in case a result is corrected. */
 export const FINISHED_MS = 30_000;
+/**
+ * While a rally is IN PROGRESS on a VolleyStation-sourced board.
+ *
+ * VolleyStation says `widget.in_rally` outright, so we know a point is about to
+ * land and can ask more often for the seconds it matters, then fall back to the
+ * ordinary live cadence between rallies. The average request rate barely moves;
+ * what moves is the delay at the only moment anyone is watching the number.
+ *
+ * Applied to VolleyStation only. VIS has no equivalent signal, and spec/37
+ * records FIVB confirming ONE request per second per match — an agreement that
+ * is not ours to change unilaterally, however cheap the Version handshake has
+ * since made a quiet poll (114 bytes). If they are willing, `LIVE_MS` is the
+ * single lever, and the payload cost would still be lower than it was before
+ * the handshake existed.
+ */
+export const VS_IN_RALLY_MS = 400;
 
 /**
  * The poll interval for a board in this state, in milliseconds.
@@ -64,4 +80,31 @@ function atLeastFeedDelay(
  */
 export function cdnMaxAgeSeconds(intervalMs: number): number {
   return Math.max(1, Math.floor(intervalMs / 1000));
+}
+
+/**
+ * The `Cache-Control` a board response carries.
+ *
+ * `stale-while-revalidate` is the right tool for a quiet board and the wrong
+ * one for a live set. Measured on a live match on 2026-08-20, the edge answered
+ * `x-vercel-cache: STALE` on four reads out of six — and at
+ * `s-maxage=1, stale-while-revalidate=2` it is entitled to hand a venue screen
+ * a score up to THREE seconds old while it refreshes behind. That was the
+ * largest single slice of the delay between a point being scored and the number
+ * changing in the hall.
+ *
+ * So while a set is being played there is no stale window: the edge revalidates
+ * on expiry, which costs that one request our own ~50-200 ms instead of seconds
+ * of wrong score. Everywhere else — upcoming, between sets, finished — nothing
+ * is moving and the stale window is free, so it stays.
+ */
+export function boardCacheControl(
+  board: Pick<VisBoardData, "status" | "inSetBreak">,
+  intervalMs: number,
+): string {
+  const maxAge = cdnMaxAgeSeconds(intervalMs);
+  const live = board.status === "LIVE" && !board.inSetBreak;
+  return live
+    ? `public, s-maxage=${maxAge}, stale-while-revalidate=0`
+    : `public, s-maxage=${maxAge}, stale-while-revalidate=${maxAge * 2}`;
 }

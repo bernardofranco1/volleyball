@@ -21,6 +21,7 @@ vi.mock("@/db", () => {
 });
 
 import { getBoard, __resetVisCaches } from "@/lib/vis-live/store";
+import { VS_IN_RALLY_MS, LIVE_MS } from "@/lib/vis-live/cadence";
 import { __resetVsResolve, ensureMapping } from "@/lib/vs-live/resolve";
 import { __resetLineupStability } from "@/lib/vis-live/lineup-stability";
 
@@ -208,6 +209,86 @@ describe("a cold instance", () => {
     expect(board.source).toBe("vis");
     expect(board.value.teamA.name).not.toBe("");
   }, 20_000);
+});
+
+describe("the cadence follows the rally", () => {
+  /** The live fixture, with the widget saying a rally is or is not in flight. */
+  function stubWithRally(inRally: boolean) {
+    const base = JSON.parse(JSON.stringify(VS_MATCHES["2504876"])) as {
+      widget: Record<string, unknown>;
+    };
+    base.widget.in_rally = inRally;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      const u = String(url);
+      if (u.includes("fivb.org")) {
+        const body = String((init as RequestInit | undefined)?.body ?? "");
+        return new Response(
+          body.includes("GetVolleyMatchList") ? VIS_LIST_XML : VIS_XML,
+          { status: 200 },
+        );
+      }
+      if (u.includes("/Championships/")) return new Response(VS_CHAMPS, { status: 200 });
+      if (/\/Teams\/\d+\//.test(u)) {
+        const id = Number(/\/Teams\/(\d+)\//.exec(u)![1]);
+        const team = (JSON.parse(VS_TEAMS) as { Team_ID: number }[]).find(
+          (t) => t.Team_ID === id,
+        );
+        return new Response(JSON.stringify(team ?? {}), { status: 200 });
+      }
+      if (/\/Matches\/\d+\//.test(u)) return new Response(JSON.stringify(base), { status: 200 });
+      if (u.includes("/Matches/?")) {
+        return new Response(
+          JSON.stringify([
+            {
+              ChampionshipMatch_ID: 999,
+              Championship_ID: 6181,
+              MatchNumber: "4",
+              HomeTeam: "Chinese Taipei",
+              GuestTeam: "Iran",
+              HomeTeam_ID: 2248114,
+              GuestTeam_ID: 2248115,
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      if (u.includes("/MatchStatsSheet/")) return new Response("[]", { status: 200 });
+      return new Response("{}", { status: 200 });
+    });
+  }
+
+  it("asks more often while a rally is in progress", async () => {
+    // VolleyStation says a point is imminent; that is the one moment the delay
+    // between the feed and the hall is worth paying for.
+    dbRows.competitions = competitionRow("vs");
+    stubWithRally(true);
+    await ensureMapping();
+    const board = await getBoard(27550);
+    expect(board.source).toBe("vs");
+    expect(board.pollMs).toBe(VS_IN_RALLY_MS);
+    expect(board.pollMs).toBeLessThan(LIVE_MS);
+  });
+
+  it("falls back to the ordinary live cadence between rallies", async () => {
+    dbRows.competitions = competitionRow("vs");
+    stubWithRally(false);
+    await ensureMapping();
+    const board = await getBoard(27550);
+    expect(board.source).toBe("vs");
+    expect(board.pollMs).toBe(LIVE_MS);
+  });
+
+  it("tells the browser the cadence the STORE used, not a recomputed guess", async () => {
+    // The route forwards this straight to the poll timer. Recomputing the rule
+    // from the board alone would lose the in-rally cadence entirely, because
+    // `in_rally` never reaches the board view model.
+    dbRows.competitions = competitionRow("vs");
+    stubWithRally(true);
+    await ensureMapping();
+    const board = await getBoard(27550);
+    expect(board.value.status).toBe("LIVE");
+    expect(board.pollMs).not.toBe(LIVE_MS);
+  });
 });
 
 describe("VolleyStation can never cost a board", () => {

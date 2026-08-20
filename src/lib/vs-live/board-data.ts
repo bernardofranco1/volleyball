@@ -43,6 +43,14 @@ export interface VsBoardInput {
   /** Shirt number → display name, per side. */
   rosterHome: Map<number, string> | null;
   rosterGuest: Map<number, string> | null;
+  /**
+   * The three-letter federation codes (`VS.Team.ShortCodeName`). Load-bearing,
+   * not decoration: the board resolves its FLAG from this — `flagSrc` accepts
+   * exactly `[A-Z]{3}` — and the U-shape prints it on the rail. A VS-sourced
+   * board left these empty and lost both.
+   */
+  codeHome?: string | null;
+  codeGuest?: string | null;
   /** The VIS match number — the board's public identity stays VIS's. */
   matchNo: number;
   poolName?: string | null;
@@ -83,15 +91,32 @@ function sixOnCourt(
   return out;
 }
 
-/** Shirt number → match points, for one side of the stats sheet. */
+/**
+ * Shirt number → the player's MATCH POINTS, for one side of the stats sheet.
+ *
+ * `Points` alone is not it, which is the trap: VolleyStation splits a player's
+ * points by PHASE, and `Points` counts only those won while their own team was
+ * serving — the break points. The rest are in `SideOut`. Reading `Points` as
+ * the total under-reports every player by their side-out points, which on the
+ * match measured was 8 against a true 13.
+ *
+ * Verified two ways on 2026-08-20. Across all 28 rows of the reference sheet,
+ * `Points + SideOut === SpikeWin + BlockWin + ServeWin` — the three ways a
+ * player can score — with no exceptions. And summed over a whole match, that
+ * total equals VIS's own `TotalPoints` exactly (13 = 13), which is the figure
+ * the VIS-sourced board has always shown. The two sources now agree.
+ */
 function pointsBySide(rows: VsStatsRow[] | null, home: boolean): Map<number, number> {
   const out = new Map<number, number>();
   for (const r of rows ?? []) {
     if (r.is_home !== home) continue;
     const shirt = Number(r.Number);
     if (!Number.isFinite(shirt)) continue;
-    const pts = Number(r.Points ?? 0);
-    out.set(shirt, Number.isFinite(pts) ? pts : 0);
+    const num = (v: string | null | undefined) => {
+      const n = Number(v ?? 0);
+      return Number.isFinite(n) ? n : 0;
+    };
+    out.set(shirt, num(r.Points) + num(r.SideOut));
   }
   return out;
 }
@@ -237,16 +262,18 @@ export function mapVsBoard(input: VsBoardInput): VisBoardData {
 
   const hasStats = (stats?.length ?? 0) > 0;
 
+  const code = (raw: string | null | undefined) => (raw ?? "").trim().toUpperCase();
+
   return {
     matchNo,
     status,
     teamA: interruptions(match, config, 0, {
-      code: "",
+      code: code(input.codeHome),
       name: match.HomeTeam ?? "",
       players: playersA,
     }),
     teamB: interruptions(match, config, 1, {
-      code: "",
+      code: code(input.codeGuest),
       name: match.GuestTeam ?? "",
       players: playersB,
     }),
@@ -275,7 +302,7 @@ export function mapVsBoard(input: VsBoardInput): VisBoardData {
         }
       : null,
     poolName: input.poolName ?? null,
-    tournamentName: input.tournamentName ?? null,
+    tournamentName: input.tournamentName ?? config?.Name ?? null,
     scheduledLocal: input.scheduledLocal ?? null,
     // No advisory delay in this API; the cadence uses this only as a non-live
     // floor, and 5 s keeps a finished board from polling needlessly.

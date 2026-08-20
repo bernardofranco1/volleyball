@@ -228,6 +228,58 @@ describe("allowances count DOWN from what the feed reports as remaining", () => 
   });
 });
 
+describe("the team code — which is the flag", () => {
+  it("carries the federation code so the flag and the rail label resolve", () => {
+    // `flagSrc` accepts exactly /^[A-Z]{3}$/ and returns null otherwise, and the
+    // U-shape prints the same string on its rail. A VolleyStation board left
+    // this empty and silently lost both — no flag, no code, on a venue screen.
+    const b = mapVsBoard({
+      match: MATCHES["2504876"],
+      stats: null,
+      config: champ(6005),
+      rosterHome: null,
+      rosterGuest: null,
+      codeHome: "bra",
+      codeGuest: "BEL",
+      matchNo: 1,
+    });
+    expect(b.teamA.code).toBe("BRA");
+    expect(b.teamB.code).toBe("BEL");
+    for (const c of [b.teamA.code, b.teamB.code]) expect(c).toMatch(/^[A-Z]{3}$/);
+  });
+
+  it("leaves the code empty rather than inventing one", () => {
+    const b = mapVsBoard({
+      match: MATCHES["2504876"],
+      stats: null,
+      config: champ(6005),
+      rosterHome: null,
+      rosterGuest: null,
+      matchNo: 1,
+    });
+    expect(b.teamA.code).toBe("");
+  });
+
+  it("takes the code from the team record the belt already fetched", () => {
+    // The verification belt resolves both teams by id; ShortCodeName is the
+    // same three letters VIS uses, so the flag comes free with the check.
+    const tpe = TEAMS.find((t) => t.ShortCodeName === "TPE")!;
+    expect(tpe.ShortCodeName).toMatch(/^[A-Z]{3}$/);
+  });
+
+  it("names the tournament from the championship when nothing else does", () => {
+    const b = mapVsBoard({
+      match: MATCHES["2504876"],
+      stats: null,
+      config: champ(6005),
+      rosterHome: null,
+      rosterGuest: null,
+      matchNo: 1,
+    });
+    expect(b.tournamentName).toBe(champ(6005)?.Name);
+  });
+});
+
 describe("the rest of the board", () => {
   const board = () =>
     mapVsBoard({
@@ -305,6 +357,51 @@ describe("the rest of the board", () => {
       matchNo: 1,
     });
     expect(b.stats).toBeNull();
+  });
+});
+
+describe("a player's points are BOTH phases, not one", () => {
+  const n = (v: unknown) => Number(v ?? 0) || 0;
+
+  it("never treats Points as the total — it is the break points only", () => {
+    // VolleyStation splits a player's points by phase: `Points` are those won
+    // while their own team served, `SideOut` the rest. Reading `Points` as the
+    // total under-reported every player on the board by their side-out points.
+    const total = STATS.reduce((t, r) => t + n(r.Points) + n(r.SideOut), 0);
+    const breakOnly = STATS.reduce((t, r) => t + n(r.Points), 0);
+    expect(breakOnly).toBeLessThan(total);
+    expect(breakOnly).toBeGreaterThan(0); // ...so the old bug looked plausible
+  });
+
+  it("agrees with the three ways a player can score, on every row", () => {
+    // The independent check: attack + block + ace. If this identity ever broke,
+    // the phase split would have changed meaning and the board would drift.
+    for (const r of STATS) {
+      expect(n(r.Points) + n(r.SideOut)).toBe(
+        n(r.SpikeWin) + n(r.BlockWin) + n(r.ServeWin),
+      );
+    }
+    expect(STATS.length).toBeGreaterThan(20);
+  });
+
+  it("puts the full total on the board", () => {
+    const board = mapVsBoard({
+      match: MATCHES["2491233"],
+      stats: STATS,
+      config: champ(6004),
+      rosterHome: null,
+      rosterGuest: null,
+      matchNo: 1,
+    });
+    // Sum what the board would show for the shirts it knows, against the sheet.
+    const shown = new Map<number, number>();
+    for (const p of [...board.teamA.players, ...board.teamB.players])
+      if (p.jersey != null) shown.set(p.jersey, p.points);
+    for (const r of STATS) {
+      const shirt = Number(r.Number);
+      if (!shown.has(shirt)) continue;
+      expect(shown.get(shirt)).toBe(n(r.Points) + n(r.SideOut));
+    }
   });
 });
 
