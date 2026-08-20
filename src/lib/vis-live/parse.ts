@@ -31,7 +31,12 @@ export function decodeXml(value: string): string {
 
 export type Attrs = Record<string, string>;
 
-function parseAttrs(raw: string): Attrs {
+/**
+ * The attributes of ONE opening tag, from its raw attribute text (everything
+ * between the tag name and the closing bracket). Exported for callers that do
+ * their own document-order scanning and so cannot go through `allTagAttrs`.
+ */
+export function parseAttrs(raw: string): Attrs {
   const out: Attrs = {};
   for (const m of raw.matchAll(/([A-Za-z0-9_]+)\s*=\s*"([^"]*)"/g)) {
     out[m[1]] = decodeXml(m[2]);

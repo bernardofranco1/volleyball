@@ -1,9 +1,20 @@
 /**
- * Read back the rotation shadow (spec/42).
+ * Read back the rotation shadow (spec/42) and the enforced rotation's own
+ * findings (spec/43).
  *
- * The boards take VIS at its word; this is the record of where our own model
- * disagreed, written in the background and surfaced nowhere. Run it after a
- * day's play to judge the feed on evidence.
+ * Since spec/43 the boards no longer take VIS at its word for the rotation, so
+ * this has two kinds of row in it:
+ *
+ *  - the spec/42 shadow — `rotation`, `libero-serving` — the feed's published
+ *    lineup against an independent model, with no verdict either way;
+ *  - the spec/43 enforcement — everything else — where the rally's own SERVE
+ *    ACTION adjudicates, so `feed-wrong-confirmed` and `model-wrong-confirmed`
+ *    are judgements rather than observations.
+ *
+ * `serve-anomaly` is the interesting one to watch: a serve that the rules and
+ * the feed's own lineup both say should not have happened. One of those is a
+ * wrong-server fault on court (real, and rare); a run of them in one match is
+ * more likely a scouting problem worth reporting upstream.
  *
  *   DB_SCHEMA=public npx tsx --env-file=.env.local scripts/rotation-log.ts
  *   DB_SCHEMA=public npx tsx --env-file=.env.local scripts/rotation-log.ts --match 27550
@@ -57,14 +68,27 @@ async function main() {
       `match ${no}: ${list.length} divergence(s) across set(s) ${[...sets].sort().join(",")} — ` +
         [...kinds].map(([k, n]) => `${k} ${n}`).join(", "),
     );
-    const confidences = new Set(list.map((r) => r.confidence));
+    // `confidence` packs how the first server was known and, for spec/43 rows,
+    // the disagreement itself as "observed|<served>≠<predicted>".
+    const confidences = new Set(
+      list.map((r) => (r.confidence ?? "-").split("|")[0]),
+    );
     console.log(`   first server known by: ${[...confidences].join(", ")}`);
+    const overrides = list.filter((r) => r.kind.startsWith("reanchor")).length;
+    const anomalies = list.filter((r) => r.kind === "serve-anomaly").length;
+    if (overrides || anomalies) {
+      console.log(
+        `   enforced overrides: ${overrides} · serves against the rules: ${anomalies}`,
+      );
+    }
     if (process.argv.includes("--full")) {
       for (const r of list.slice().reverse()) {
+        const servers = (r.confidence ?? "").split("|")[1];
         console.log(
           `   set ${r.setNo} rally ${r.rallyNo} team ${r.team} [${r.kind}] ` +
-            `${r.scoreA}-${r.scoreB} turns=${r.expectedTurns ?? "-"}\n` +
-            `      feed  ${r.feedSix}\n` +
+            `${r.scoreA}-${r.scoreB} turns=${r.expectedTurns ?? "-"}` +
+            (servers ? ` served≠predicted ${servers}` : "") +
+            `\n      feed  ${r.feedSix}\n` +
             (r.modelSix ? `      model ${r.modelSix}\n` : ""),
         );
       }

@@ -86,28 +86,62 @@ export async function visRequest(envelope: string): Promise<string> {
 
 /**
  * `Options` bitmask for the board's live request, mapped empirically against
- * production on 2026-08-18 (the SDK does not publish the flag values):
+ * production on 2026-08-18 and completed on 2026-08-20 (the SDK does not
+ * publish the flag values). Sizes are for a 3-set indoor match:
  *
  *     2 → Match/Team/Set/Tournament/Pool only ......... ~2 KB
  *     8 → + team rosters (Player/VolleyballPlayer) ... ~13 KB
  *    16 → + LineUp (court positions 1-6 per set) ..... ~5 KB
  *  2048 → + Player/TeamStatistics, match totals ...... ~25 KB
  *   256 → + Player/TeamStatistics, per-set rows ...... ~58 KB (not needed)
- *     1 → + Rally/Action play-by-play ................ ~66 KB (not needed)
- * 65535 → everything ............................... ~284 KB (not needed)
+ *   512 → + the Events/Rally stream, a LineUp PER RALLY ~60 KB
+ *     1 → + Action play-by-play inside each Rally ..... ~66 KB
+ *  8192 → actions but no interruptions ............... (subsumed by 1)
+ * 65535 → everything ............................... ~292 KB (not needed)
  *
- *   512 → + the Events/Rally stream, which carries a LineUp PER RALLY ..~60 KB
+ * Bits 4, 32, 64, 128, 1024 and 4096 were probed on 2026-08-20 and add nothing
+ * for indoor: there is no further payload to fetch.
  *
- * 8|16|512|2048 = 2584 → ~95 KB carrying exactly what the board renders:
- * score, sets, serving side, timeouts/subs/challenges, each player's point
- * total, and — the reason for bit 512 — the CURRENT rotation rather than only
- * the registered starting six (spec/35 W3). Polled once per PollDelay per
- * match and cached server-side, so the extra payload costs nothing per viewer.
+ * 1|8|16|512|2048 = 2585 → ~160 KB carrying exactly what the board renders and
+ * what the rotation must be proved against: score, sets, serving side,
+ * timeouts/subs/challenges, each player's point total, the CURRENT rotation
+ * rather than the registered starting six (bit 512, spec/35 W3), and — the
+ * reason for bit 1 — every rally's `<Action>` rows and `<Substitution>` events.
+ * The first Action of a rally is its SERVE, which names the player who actually
+ * served: the ground truth the enforced rotation is anchored to (spec/43).
+ *
+ * The extra ~65 KB over spec/35's 2584 is paid back by the `Version` handshake
+ * below, which answers every poll that changed nothing in ~0.1 KB. Polled once
+ * per cadence interval per match and cached server-side, so no per-viewer cost.
  */
-export const BOARD_OPTIONS = 2584;
+export const BOARD_OPTIONS = 2585;
 
-export function volleyLiveEnvelope(matchNo: number, options = BOARD_OPTIONS): string {
-  return `<Requests><Request Type="GetVolleyLive" No="${matchNo}" Options="${options}" Version="0"></Request></Requests>`;
+/**
+ * `Version` handshake (verified 2026-08-20): send back the root `Version` of
+ * the payload you last received and VIS answers `<NoChanges />` instead of
+ * repeating ~91 KB. An OLDER version returns the full snapshot — there is no
+ * delta format, so a stale version costs nothing but a normal reply.
+ *
+ * Beyond the bandwidth this is a SIGNAL: a version bump with an unchanged rally
+ * count is the feed rewriting an already-recorded rally, which is the flicker
+ * spec/42's stabiliser exists to absorb. Observed rather than guessed at last.
+ */
+export function isNoChanges(xml: string): boolean {
+  return /<NoChanges\s*\/>/.test(xml);
+}
+
+export function volleyLiveEnvelope(
+  matchNo: number,
+  options = BOARD_OPTIONS,
+  version = 0,
+): string {
+  return `<Requests><Request Type="GetVolleyLive" No="${matchNo}" Options="${options}" Version="${version}"></Request></Requests>`;
+}
+
+/** The root `VolleyLive@Version` of a payload, or 0 when absent. */
+export function payloadVersion(xml: string): number {
+  const m = /<VolleyLive\b[^>]*\bVersion="(\d+)"/.exec(xml);
+  return m ? Number(m[1]) : 0;
 }
 
 /** Single match — the pre-start fallback, when no live row exists yet. */

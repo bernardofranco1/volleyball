@@ -23,7 +23,8 @@
 import { db } from "@/db";
 import { visRotationLog } from "@/db/schema";
 import { newId } from "@/lib/id";
-import { allTagAttrs, num, str, tagBlocks, type Attrs } from "./parse";
+import { allTagAttrs, num, type Attrs } from "./parse";
+import type { EnforcedLineups, EnforcementKind } from "./serve-succession";
 import {
   inferFirstServer,
   ralliesOf,
@@ -75,7 +76,7 @@ export interface RotationAuditRow {
   setNo: number;
   rallyNo: number;
   team: Side;
-  kind: "rotation" | "libero-serving";
+  kind: "rotation" | "libero-serving" | EnforcementKind;
   firstServer: Side | null;
   confidence: string;
   expectedTurns: number | null;
@@ -190,6 +191,40 @@ export function auditSet(opts: {
   return out;
 }
 
+/**
+ * The enforced rotation's own findings, as log rows (spec/43).
+ *
+ * Where `auditSet` above reports only THAT the feed and a model differ, these
+ * rows carry a verdict: the rally's recorded serve action says which of the two
+ * had the server in position 1, so `feed-wrong-confirmed` and
+ * `model-wrong-confirmed` are judgements rather than observations. That is the
+ * evidence base spec/42 asked for before anything overrode the feed on screen.
+ *
+ * `confidence` packs two things the table has no columns for and does not need
+ * them for: how the set's first server was known, and the disagreement itself,
+ * as `"<first-server confidence>|<observed>≠<predicted>"`.
+ */
+export function enforcementRows(
+  matchNo: number,
+  setNo: number,
+  enforced: Pick<EnforcedLineups, "firstServer" | "confidence" | "notes">,
+): RotationAuditRow[] {
+  return enforced.notes.map((n) => ({
+    matchNo,
+    setNo,
+    rallyNo: n.rallyNo,
+    team: n.side,
+    kind: n.kind,
+    firstServer: enforced.firstServer,
+    confidence: `${enforced.confidence}|${n.observedServer ?? "-"}≠${n.predictedServer ?? "-"}`,
+    expectedTurns: null,
+    feedSix: n.feedSix,
+    modelSix: n.modelSix,
+    scoreA: n.scoreA,
+    scoreB: n.scoreB,
+  }));
+}
+
 /** Write anything new. Never throws — a board must not depend on this. */
 export async function recordRotationAudit(rows: RotationAuditRow[]): Promise<void> {
   const fresh = rows.filter((r) => {
@@ -210,16 +245,10 @@ export async function recordRotationAudit(rows: RotationAuditRow[]): Promise<voi
   }
 }
 
-/** Liberos of both teams, from the roster's own flag. */
-export function liberosOf(xml: string): Set<string> {
-  const out = new Set<string>();
-  for (const t of tagBlocks(xml, "Team")) {
-    for (const v of allTagAttrs(t.inner, "VolleyballPlayer")) {
-      if (str(v, "IsLibero") === "true") {
-        const no = str(v, "NoPlayer");
-        if (no) out.add(no);
-      }
-    }
-  }
-  return out;
-}
+/*
+ * The liberos of a set used to be read here from the roster's
+ * `VolleyballPlayer@IsLibero` flag. That flag is a player's listed POSITION and
+ * says nothing about this set: `events.ts` `designatedLiberos` reads the set's
+ * own `NoLibero1/2` instead, and is the single source now. See its comment for
+ * the match that proved the difference.
+ */

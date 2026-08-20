@@ -1,0 +1,202 @@
+/**
+ * The store's poll loop (spec/43): the `Version` handshake, and enforcement
+ * reaching the board through the real path rather than beside it.
+ *
+ * `@/db` is mocked because the rotation log writes from inside the poll — and
+ * one of the things asserted here is that a board does not depend on it.
+ */
+
+import { readFileSync } from "node:fs";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/db", () => {
+  const db = {
+    insert: () => ({
+      values: () => ({ onConflictDoNothing: async () => {} }),
+    }),
+    select: () => ({ from: () => ({ where: async () => [] }) }),
+  };
+  return { db, dbTx: db, DB_SCHEMA: "public", IS_PROD_SCHEMA: true };
+});
+
+import { BOARD_OPTIONS, payloadVersion } from "@/lib/vis-live/client";
+import { getBoard, __resetVisCaches, visStoreSnapshot } from "@/lib/vis-live/store";
+import { __resetLineupStability } from "@/lib/vis-live/lineup-stability";
+import {
+  designatedLiberos,
+  parseSetEvents,
+  playerSides,
+} from "@/lib/vis-live/events";
+import { enforceLineups } from "@/lib/vis-live/serve-succession";
+import { sixOf, type Side } from "@/lib/vis-live/rotation";
+import { allTagAttrs, num, tagBlocks } from "@/lib/vis-live/parse";
+
+const FINISHED_XML = readFileSync(
+  new URL("../fixtures/vis/volley-live-events-27550.xml", import.meta.url),
+  "utf-8",
+);
+
+/**
+ * The same capture read as a match still in play, by the spec/35 W9 trick: drop
+ * the end stamp, and give the last set back to nobody by decrementing the
+ * winner's tally. Without both edits the payload contradicts itself and the
+ * board sits on the set-break screen.
+ */
+const LIVE_XML = FINISHED_XML.replace(/\sEndDateTime="[^"]*"/, "").replace(
+  /(<Match\b[^>]*?)\sMatchPointsB="3"/,
+  '$1 MatchPointsB="2"',
+);
+
+const NO_CHANGES =
+  '<?xml version="1.0" encoding="utf-8" standalone="yes"?>' +
+  "<Responses><NoChanges /></Responses>";
+
+/** The bodies the next fetches answer with, and a record of what was asked. */
+function stubVis(bodies: string[]): { sent: string[] } {
+  const sent: string[] = [];
+  let i = 0;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+    sent.push(String((init as RequestInit).body));
+    return new Response(bodies[Math.min(i++, bodies.length - 1)], { status: 200 });
+  });
+  return { sent };
+}
+
+/** What the enforcement model says about the latest set of a payload. */
+function enforcedFor(xml: string) {
+  const match = tagBlocks(xml, "Match")[0]?.attrs ?? null;
+  const noTeamA = num(match, "NoTeamA", -1);
+  const noTeamB = num(match, "NoTeamB", -2);
+  const sides = playerSides(xml, noTeamA, noTeamB);
+  const sets = tagBlocks(xml, "Set").sort(
+    (a, b) => num(a.attrs, "No") - num(b.attrs, "No"),
+  );
+  const latest = sets[sets.length - 1];
+  const head = latest.inner.split("<Events")[0];
+  const startingFor = (noTeam: number) => {
+    const row = allTagAttrs(head, "LineUp").find(
+      (l) => num(l, "NoTeam", -99) === noTeam,
+    );
+    return row ? sixOf(row) : null;
+  };
+  return {
+    liberos: designatedLiberos(latest.inner),
+    enforced: enforceLineups({
+      events: parseSetEvents(latest.inner, { noTeamA, noTeamB, sides }),
+      startingLineups: { A: startingFor(noTeamA), B: startingFor(noTeamB) },
+      liberos: designatedLiberos(latest.inner),
+      sides,
+      remembered: null,
+    }),
+  };
+}
+
+beforeEach(() => {
+  __resetVisCaches();
+  __resetLineupStability();
+  vi.stubEnv("VIS_APP_ID", "test-app-id");
+});
+
+describe("the Version handshake", () => {
+  it("asks from scratch first, then only for what changed since", async () => {
+    const { sent } = stubVis([LIVE_XML, NO_CHANGES]);
+    const first = await getBoard(27550);
+    expect(sent[0]).toContain('Version="0"');
+    expect(sent[0]).toContain(`Options="${BOARD_OPTIONS}"`);
+    expect(first.value.scoreA).toBeGreaterThan(0);
+
+    const version = payloadVersion(LIVE_XML);
+    expect(visStoreSnapshot().boards[0].visVersion).toBe(version);
+
+    // Past the TTL, so the store really polls again.
+    await getBoard(27550, Date.now() + 120_000);
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toContain(`Version="${version}"`);
+  });
+
+  it("serves the payload it already holds when nothing has moved", async () => {
+    stubVis([LIVE_XML, NO_CHANGES]);
+    const before = await getBoard(27550);
+    const changedAtBefore = visStoreSnapshot().boards[0].sinceChangeSeconds;
+    const after = await getBoard(27550, Date.now() + 120_000);
+
+    // The same board object: nothing was reparsed and nothing was rebuilt.
+    expect(after.value).toBe(before.value);
+
+    const row = visStoreSnapshot().boards[0];
+    // The READ is fresh, so the board is no longer served as stale...
+    expect(row.ageSeconds).toBeLessThanOrEqual(1);
+    // ...but `changedAt` was NOT reset, because the score did not move. The
+    // frozen-feed detector of spec/41 depends on that distinction: a NoChanges
+    // that refreshed it would report a dead feed as advancing.
+    expect(row.sinceChangeSeconds).toBeGreaterThanOrEqual(changedAtBefore);
+  });
+
+  it("asks for everything again if told NoChanges with nothing cached", async () => {
+    const { sent } = stubVis([NO_CHANGES, LIVE_XML]);
+    const board = await getBoard(27550);
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toContain('Version="0"');
+    expect(board.value.teamA.name).not.toBe("");
+  });
+});
+
+describe("enforcement reaches the board", () => {
+  it("seats the six the rules give, not the six the feed last drew", async () => {
+    stubVis([LIVE_XML]);
+    const { value: board } = await getBoard(27550);
+    const { enforced, liberos } = enforcedFor(LIVE_XML);
+
+    expect(board.status).toBe("LIVE");
+    expect(enforced.basis).toBe("enforced");
+    for (const side of ["A", "B"] as const) {
+      const six = side === "A" ? board.teamA.players : board.teamB.players;
+      expect(six).toHaveLength(6);
+      expect(six.map((p) => p.position)).toEqual([1, 2, 3, 4, 5, 6]);
+      // The board's six IS the enforced six, jersey for jersey, in order.
+      expect(six.map((p) => String(p.jersey))).not.toContain("null");
+      expect(enforced[side]).not.toBeNull();
+    }
+
+    // A designated libero is marked, and never stands in the serving position.
+    expect(liberos.size).toBeGreaterThan(0);
+    expect(board.serving).not.toBeNull();
+    const serving =
+      board.serving === "A" ? board.teamA.players : board.teamB.players;
+    expect(serving[0].isLibero).toBe(false);
+  });
+
+  it("puts the enforced order on the board, position for position", async () => {
+    stubVis([LIVE_XML]);
+    const { value: board } = await getBoard(27550);
+    const { enforced } = enforcedFor(LIVE_XML);
+    // Names come from the roster, so compare through it: the board carries
+    // display rows, the model carries roster numbers.
+    const rosterNames = new Map<string, string>();
+    for (const team of tagBlocks(LIVE_XML, "Team")) {
+      for (const p of tagBlocks(team.inner, "Player")) {
+        const bio = allTagAttrs(p.inner, "VolleyballPlayer")[0];
+        const no = String(num(p.attrs, "No", -1));
+        rosterNames.set(no, bio?.TeamNamePlayer ?? bio?.LastNamePlayer ?? no);
+      }
+    }
+    for (const side of ["A", "B"] as const satisfies readonly Side[]) {
+      const six = side === "A" ? board.teamA.players : board.teamB.players;
+      expect(six.map((p) => p.name)).toEqual(
+        enforced[side]!.map((no) => rosterNames.get(no)),
+      );
+    }
+  });
+
+  it("keeps building a board when the rotation log cannot be written", async () => {
+    // The log is instrumentation. A board must never depend on it, so this
+    // asserts the failure is swallowed rather than propagated.
+    const { db } = await import("@/db");
+    vi.spyOn(db, "insert").mockImplementation(() => {
+      throw new Error("the database is on fire");
+    });
+    stubVis([LIVE_XML]);
+    const { value: board } = await getBoard(27550);
+    expect(board.teamA.players).toHaveLength(6);
+  });
+});

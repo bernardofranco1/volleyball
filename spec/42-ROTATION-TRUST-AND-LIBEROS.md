@@ -2,6 +2,32 @@
 
 Shipped 2026-08-19. Migration 0025 (one table, platform-level, no tenant data).
 
+> **Correction, 2026-08-20 (spec/43).** Two conclusions below did not survive
+> the serve-by-serve evidence that `GetVolleyLive` Options bit 1 provides.
+>
+> 1. **"Match 27550's feed is genuinely imperfect — nine rotations it never
+>    applied. Upstream, not ours."** It is not upstream. Re-run against the
+>    completed payload, this document's own `auditSet` reports **zero**
+>    divergences for 27550, and the enforced model of spec/43 reproduces the
+>    feed's published six on all 540 rallies of all four matches, position for
+>    position. All nine logged rows are in set 3, all carry
+>    `confidence: inferred`, and every one is an off-by-one rotation with one
+>    team a place ahead and the other a place behind — the exact signature of
+>    `inferFirstServer` choosing the wrong side on an instance that came up
+>    mid-set. **The nine were ours.** spec/43 removes the cause rather than
+>    patching it: rally 1's serve action names the first server outright, so it
+>    is read, never inferred.
+> 2. **The libero source.** `liberosOf` read the roster's
+>    `VolleyballPlayer@IsLibero`, which is a player's listed POSITION, not a
+>    designation for the set. Teams register 3-4 such players and designate 1-2
+>    per set; an undesignated one plays as an ordinary substitute and may serve
+>    — 27547's 228092 did exactly that, and rotated to position 1 to do it. The
+>    set's own `NoLibero1/2` is now the single source (`designatedLiberos`).
+>
+> What stands, and is why the stabiliser still exists: the feed **rewrites a
+> rally's lineup for some seconds after that rally**, measured live. Everything
+> below about that is unchanged.
+
 ## What was reported
 
 "A player served, they won the point, their team rotated, and he disappeared as

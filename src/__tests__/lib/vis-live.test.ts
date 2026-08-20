@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   BOARD_OPTIONS,
+  isNoChanges,
+  payloadVersion,
   visRequest,
   volleyLiveEnvelope,
   volleyMatchEnvelope,
@@ -60,9 +62,46 @@ describe("vis parse helpers", () => {
 
 describe("vis client envelopes", () => {
   it("asks for the lean board bitmask, not the whole live store", () => {
-    expect(BOARD_OPTIONS).toBe(2584); // 8 rosters | 16 line-ups | 512 events | 2048 stats
+    // 1 actions | 8 rosters | 16 line-ups | 512 events | 2048 stats (spec/43
+    // added bit 1: the serve action the enforced rotation is anchored on).
+    expect(BOARD_OPTIONS).toBe(2585);
     expect(volleyLiveEnvelope(27062)).toContain('Type="GetVolleyLive"');
-    expect(volleyLiveEnvelope(27062)).toContain('Options="2584"');
+    expect(volleyLiveEnvelope(27062)).toContain('Options="2585"');
+  });
+
+  it("carries the version it last saw, so VIS can answer NoChanges", () => {
+    expect(volleyLiveEnvelope(27062)).toContain('Version="0"');
+    expect(volleyLiveEnvelope(27062, BOARD_OPTIONS, 57020230)).toContain(
+      'Version="57020230"',
+    );
+  });
+
+  it("reads the payload version back, and recognises NoChanges", () => {
+    const noChanges =
+      '<?xml version="1.0" encoding="utf-8" standalone="yes"?>' +
+      "<Responses><NoChanges /></Responses>";
+    expect(isNoChanges(noChanges)).toBe(true);
+    expect(isNoChanges(BOARD_XML)).toBe(false);
+    expect(payloadVersion(BOARD_XML)).toBeGreaterThan(0);
+    expect(payloadVersion("<Responses/>")).toBe(0);
+  });
+
+  it("does not mistake NoChanges for a soft error", async () => {
+    // VIS reports genuine failures as HTTP-200 bodies, so the client scans for
+    // them. `<NoChanges/>` is a SUCCESS, and reading it as an error would take
+    // every quiet board straight to the stale-payload path.
+    const body =
+      '<?xml version="1.0"?><Responses><NoChanges /></Responses>';
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(body, { status: 200 }));
+    vi.stubEnv("VIS_APP_ID", "test-app-id");
+    try {
+      await expect(visRequest(volleyLiveEnvelope(27062))).resolves.toBe(body);
+    } finally {
+      fetchMock.mockRestore();
+      vi.unstubAllEnvs();
+    }
   });
 
   it("builds read-only envelopes for every request it makes", () => {

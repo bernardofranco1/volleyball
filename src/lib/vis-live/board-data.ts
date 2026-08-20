@@ -288,7 +288,17 @@ function lineupPlayers(
   // else moves up one. Verified against consecutive rally lineups in the feed.
   const seq =
     rotated && order.length === 6 ? [...order.slice(1), order[0]] : order;
-  return seq.map((no, i) => {
+  return playersFrom(seq, roster, points, liberos);
+}
+
+/** An ordered six (position 1 first) dressed with roster names and points. */
+function playersFrom(
+  order: number[],
+  roster: Map<number, { jersey: number | null; name: string }>,
+  points: Map<number, number>,
+  liberos: Set<number>,
+): VisBoardPlayer[] {
+  return order.map((no, i) => {
     const bio = roster.get(no);
     return {
       position: i + 1,
@@ -298,6 +308,16 @@ function lineupPlayers(
       isLibero: liberos.has(no),
     };
   });
+}
+
+/**
+ * The six each side is standing in, when the caller has worked it out from the
+ * rules rather than reading it off the feed (spec/43). Roster numbers as
+ * strings, position 1 first; a null side means "no answer, use the feed".
+ */
+export interface LineupOverride {
+  A: string[] | null;
+  B: string[] | null;
 }
 
 /**
@@ -359,6 +379,14 @@ export function mapVolleyLive(
    * side-out and the rotation waits one rally to catch up.
    */
   firstServer: Side | null = null,
+  /**
+   * The enforced rotation (spec/43). When a side is present it REPLACES the
+   * order and membership the feed published for that side — the feed's own
+   * lineup is stale or wrong often enough to matter, and the rules plus the
+   * recorded serve actions are the better authority. A null side keeps the
+   * pre-spec/43 behaviour for that side, side-out rotation included.
+   */
+  lineupOverride: LineupOverride | null = null,
 ): VisBoardData {
   const root = firstTagAttrs(xml, "VolleyLive");
   const matchBlock = tagBlocks(xml, "Match")[0] ?? null;
@@ -490,6 +518,31 @@ export function mapVolleyLive(
   };
   const rotating = sideOutRotation(latest?.inner ?? "", firstServer);
 
+  /**
+   * The six for one side: the enforced rotation when there is one, otherwise
+   * the feed's newest lineup with the side-out step applied. An enforced six is
+   * already the rotation for the rally in progress, so `rotating` must NOT be
+   * applied on top of it — that would advance it a second time.
+   */
+  const sixFor = (
+    side: "A" | "B",
+    lineup: Attrs | null,
+    noTeam: number,
+    roster: Map<number, { jersey: number | null; name: string }>,
+  ): VisBoardPlayer[] => {
+    const liberos = liberosFor(noTeam);
+    const enforced = lineupOverride?.[side];
+    if (enforced && enforced.length > 0) {
+      return playersFrom(
+        enforced.map((no) => Number(no)).filter((no) => Number.isFinite(no)),
+        roster,
+        points,
+        liberos,
+      );
+    }
+    return lineupPlayers(lineup, roster, points, liberos, rotating === side);
+  };
+
   const matchRow = firstAliasAttrs(matchBlock?.inner ?? "", ...MATCH_ALIASES);
 
   return {
@@ -498,16 +551,12 @@ export function mapVolleyLive(
     teamA: interruptions(latest?.attrs, "A", {
       code: str(blockA?.attrs, "Code") ?? "",
       name: str(blockA?.attrs, "Name") ?? "",
-      players: lineupPlayers(
-        lineupA, rosterA, points, liberosFor(noTeamA), rotating === "A",
-      ),
+      players: sixFor("A", lineupA, noTeamA, rosterA),
     }),
     teamB: interruptions(latest?.attrs, "B", {
       code: str(blockB?.attrs, "Code") ?? "",
       name: str(blockB?.attrs, "Name") ?? "",
-      players: lineupPlayers(
-        lineupB, rosterB, points, liberosFor(noTeamB), rotating === "B",
-      ),
+      players: sixFor("B", lineupB, noTeamB, rosterB),
     }),
     setsWonA: num(match, "MatchPointsA"),
     setsWonB: num(match, "MatchPointsB"),

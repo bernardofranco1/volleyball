@@ -1,0 +1,1634 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><Responses><VolleyLive PollDelay="20" Version="56827946">
+  <Match No="26959" Status="25" NbRallies="128" NbSpectators="456" NoReferee1="152743" NoReferee2="159072" NoTeamA="8707" NoTeamB="8713" BeginDateTime="2026-08-06T18:00:00Z" MatchPointsA="0" MatchPointsB="3" EndDateTime="2026-08-06T19:21:04Z" ResultType="0" TimePlayed="1745214">
+    <PlayerStatistics NoPlayer="227301" NoShirt="1" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227302" NoShirt="2" NoTeam="8707" TotalPoints="3" />
+    <PlayerStatistics NoPlayer="233156" NoShirt="4" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="233157" NoShirt="6" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227311" NoShirt="7" NoTeam="8707" TotalPoints="3" />
+    <PlayerStatistics NoPlayer="240838" NoShirt="8" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227315" NoShirt="11" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227317" NoShirt="13" NoTeam="8707" TotalPoints="14" />
+    <PlayerStatistics NoPlayer="227318" NoShirt="14" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227321" NoShirt="17" NoTeam="8707" TotalPoints="4" />
+    <PlayerStatistics NoPlayer="227488" NoShirt="18" NoTeam="8707" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="238958" NoShirt="20" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227325" NoShirt="22" NoTeam="8707" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="206801" NoShirt="23" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="229656" NoShirt="3" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229342" NoShirt="5" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229343" NoShirt="6" NoTeam="8713" TotalPoints="3" />
+    <PlayerStatistics NoPlayer="229658" NoShirt="7" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="223514" NoShirt="8" NoTeam="8713" TotalPoints="13" />
+    <PlayerStatistics NoPlayer="229344" NoShirt="9" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229346" NoShirt="11" NoTeam="8713" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="229657" NoShirt="13" NoTeam="8713" TotalPoints="17" />
+    <PlayerStatistics NoPlayer="229349" NoShirt="15" NoTeam="8713" TotalPoints="5" />
+    <PlayerStatistics NoPlayer="229350" NoShirt="16" NoTeam="8713" TotalPoints="15" />
+    <PlayerStatistics NoPlayer="234263" NoShirt="19" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="233926" NoShirt="24" NoTeam="8713" TotalPoints="7" />
+    <PlayerStatistics NoPlayer="233928" NoShirt="26" NoTeam="8713" TotalPoints="2" />
+    <PlayerStatistics NoPlayer="215821" NoShirt="28" NoTeam="8713" />
+    
+    
+    <VolleyballMatch No="26959" City="Santiago" CountryCode="CL" DateTimeLocal="2026-08-06T14:00:00" DateTimeUtc="2026-08-06T18:00:00Z" Format="1" Hall="National Stadium Park court 1" LiveStreamUri="https://www.youtube.com/@volleyballworld" NbSpectators="456" NoDocumentP2="256903692" NoInTournament="1" />
+  </Match>
+  <Tournament Code="GU172026" Name="FIVB Volleyball Girls' U17 World Championship 2026" No="1671">
+    <VolleyballTournament No="1671" City="Santiago" CountryCode="CL" EndDate="2026-08-16" Gender="1" Name="FIVB Volleyball Girls' U17 World Championship 2026" NoEvent="1821" Season="2026" ShortName="GU17 WCH" ShortNameOrName="GU17 WCH" StartDate="2026-08-06" Logos="&lt;Logos Competition=&quot;202302382&quot; CompetitionHighRes=&quot;202302382&quot; CompetitionMobile=&quot;202302382&quot; CompetitionWeb=&quot;202302382&quot; Organizer=&quot;201451877&quot; Publicity=&quot;201451880&quot; /&gt;" />
+  </Tournament>
+  <Pool Code="A" Name="Pool A" No="5787">
+    <VolleyballPool No="5787" NoRound="320" RoundCode="P" RoundName="Preliminary phase" TechnicalInfo="&lt;TechnicalInfo&gt;&#xD;&#xA;  &lt;Teams&gt;&#xD;&#xA;    &lt;Team No=&quot;8707&quot; /&gt;&#xD;&#xA;    &lt;Team No=&quot;8713&quot; /&gt;&#xD;&#xA;    &lt;Team No=&quot;8720&quot; /&gt;&#xD;&#xA;    &lt;Team No=&quot;8722&quot; /&gt;&#xD;&#xA;    &lt;Team No=&quot;8704&quot; /&gt;&#xD;&#xA;    &lt;Team No=&quot;8717&quot; /&gt;&#xD;&#xA;  &lt;/Teams&gt;&#xD;&#xA;&lt;/TechnicalInfo&gt;" Type="1" />
+  </Pool>
+  <Team Code="EGY" Name="Egypt" No="8707">
+    <Player No="227301" NoShirt="1">
+      <VolleyballPlayer No="1022349" NoPlayer="227301" Birthdate="2010-09-04" Block="2750000" ClubName="SMOUHA" FirstNamePlayer="Rodina" Height="1740000" LastNamePlayer="Elsendy" NbSelOther="1" Position="3" Spike="2750000" TeamNamePlayer="Sendy" Weight="70000000" />
+    </Player>
+    <Player No="227302" NoShirt="2">
+      <VolleyballPlayer No="1022354" NoPlayer="227302" Birthdate="2011-12-14" Block="2550000" ClubName="SPORTING" FirstNamePlayer="Fatma" Height="650000" LastNamePlayer="Shousha" NbSelOther="1" Position="2" Spike="2600000" TeamNamePlayer="Shousha" Weight="169000000" />
+    </Player>
+    <Player No="233156" NoShirt="4">
+      <VolleyballPlayer No="1022347" NoPlayer="233156" Birthdate="2010-12-05" Block="2380000" ClubName="SPORTING" FirstNamePlayer="Mariam" Height="1810000" LastNamePlayer="Accoush" Position="3" Spike="2700000" TeamNamePlayer="Mika" Weight="68000000" />
+    </Player>
+    <Player No="233157" NoShirt="6" IsLibero="true">
+      <VolleyballPlayer No="1022357" NoPlayer="233157" Birthdate="2011-08-03" Block="2200000" ClubName="DELPHY" FirstNamePlayer="Yasmin" Height="1610000" IsLibero="true" LastNamePlayer="Salem" Position="4" Spike="2500000" TeamNamePlayer="Yasmine" Weight="70000000" />
+    </Player>
+    <Player No="227311" NoShirt="7">
+      <VolleyballPlayer No="1022358" NoPlayer="227311" Birthdate="2010-01-13" Block="2700000" ClubName="ALAHLY" FirstNamePlayer="Haya" Height="1730000" LastNamePlayer="Elmanawy" NbSelOther="1" Position="6" Spike="2730000" TeamNamePlayer="Almanawy" Weight="70000000" />
+    </Player>
+    <Player No="240838" NoShirt="8">
+      <VolleyballPlayer No="1022344" NoPlayer="240838" Birthdate="2010-01-25" Block="2160000" ClubName="ALAHLY" FirstNamePlayer="Nour" Height="1670000" LastNamePlayer="Mostafa" Position="1" Spike="2360000" TeamNamePlayer="N. Ashraf" Weight="65000000" />
+    </Player>
+    <Player No="227315" NoShirt="11" IsLibero="true">
+      <VolleyballPlayer No="1022362" NoPlayer="227315" Birthdate="2010-08-01" Block="2200000" ClubName="SMOUHA" FirstNamePlayer="Farah " Height="1670000" IsLibero="true" LastNamePlayer="Moukhtar" NbSelOther="1" Position="4" Spike="2250000" TeamNamePlayer="Farah" Weight="65000000" />
+    </Player>
+    <Player No="227317" NoShirt="13">
+      <VolleyballPlayer No="1021911" NoPlayer="227317" Birthdate="2011-09-10" Block="2830000" ClubName="ALAHLY" FirstNamePlayer="Karma" Height="1840000" LastNamePlayer="Badawy" NbSelOther="1" Position="2" Spike="2870000" TeamNamePlayer="Mon3em" Weight="80000000" />
+    </Player>
+    <Player No="227318" NoShirt="14">
+      <VolleyballPlayer No="1022356" NoPlayer="227318" Birthdate="2010-02-20" Block="2630000" ClubName="HORSE OWNER" FirstNamePlayer="Fatima" Height="1690000" LastNamePlayer="Soliman" NbSelOther="1" Position="2" Spike="2730000" TeamNamePlayer="Soliman" Weight="60000000" />
+    </Player>
+    <Player No="227321" NoShirt="17">
+      <VolleyballPlayer No="1022346" NoPlayer="227321" Birthdate="2010-05-20" Block="2770000" ClubName="WADI DEGLA" FirstNamePlayer="Carla" Height="1810000" LastNamePlayer="Botros" NbSelOther="1" Position="3" Spike="2770000" TeamNamePlayer="Tata" Weight="75000000" />
+    </Player>
+    <Player No="227488" NoShirt="18">
+      <VolleyballPlayer No="1022345" NoPlayer="227488" Birthdate="2010-02-04" Block="2760000" ClubName="ALAHLY" FirstNamePlayer="Rinad" Height="1850000" LastNamePlayer="Aboueladl " NbSelOther="1" Position="3" Spike="2800000" TeamNamePlayer="Rere" Weight="85000000" />
+    </Player>
+    <Player No="238958" NoShirt="20">
+      <VolleyballPlayer No="1022359" NoPlayer="238958" Birthdate="2010-08-25" Block="2350000" ClubName="SHOOTING " FirstNamePlayer="Maryam" Height="1810000" LastNamePlayer="Abdelaal" Position="6" Spike="2700000" TeamNamePlayer="Husseiny" Weight="65000000" />
+    </Player>
+    <Player No="227325" NoShirt="22">
+      <VolleyballPlayer No="1022342" NoPlayer="227325" Birthdate="2010-07-01" Block="2640000" ClubName="WADI DEGLA" FirstNamePlayer="Marim" Height="1690000" LastNamePlayer="Ahmed" NbSelOther="1" Position="1" Spike="2650000" TeamNamePlayer="El Beltagy" Weight="60000000" />
+    </Player>
+    <Player No="206801" NoShirt="23" IsCaptain="true">
+      <VolleyballPlayer No="1021890" NoPlayer="206801" Birthdate="2010-09-20" Block="2640000" ClubName="ALAHLY" FirstNamePlayer="Joud" Height="1710000" IsCaptain="true" LastNamePlayer="Abdelrahim" NbSelOther="1" Position="2" Spike="2740000" TeamNamePlayer="Joud" Weight="68000000" />
+    </Player>
+    <VolleyballTeam No="8707" LiberoUniformColor1="White" LiberoUniformColor2="Red" LiberoUniformColor3="Black" ShirtColor1="Red" ShirtColor2="Black" ShirtColor3="White" />
+  </Team>
+  <Team Code="USA" Name="United States" No="8713">
+    <Player No="229656" NoShirt="3">
+      <VolleyballPlayer No="1019039" NoPlayer="229656" Birthdate="2010-08-13" Block="2950000" ClubName="Legacy Volleyball Club" FirstNamePlayer="Lexi" Height="1850000" LastNamePlayer="Coleman" NbSelOther="5" Position="2" Spike="3120000" TeamNamePlayer="Coleman" Weight="64000000" />
+    </Player>
+    <Player No="229342" NoShirt="5">
+      <VolleyballPlayer No="1019045" NoPlayer="229342" Birthdate="2011-01-09" Block="2790000" ClubName="Legacy Volleyball Club" FirstNamePlayer="Kaelyn" Height="1800000" LastNamePlayer="Easton" NbSelOther="5" Position="1" Spike="2900000" TeamNamePlayer="Easton" Weight="68000000" />
+    </Player>
+    <Player No="229343" NoShirt="6" IsCaptain="true">
+      <VolleyballPlayer No="1019186" NoPlayer="229343" Birthdate="2010-09-30" Block="2920000" ClubName="Winter Park VB Club" FirstNamePlayer="Ellie" Height="1850000" IsCaptain="true" LastNamePlayer="Enger" NbSelOther="5" Position="1" Spike="3050000" TeamNamePlayer="Enger" Weight="75000000" />
+    </Player>
+    <Player No="229658" NoShirt="7">
+      <VolleyballPlayer No="1019040" NoPlayer="229658" Birthdate="2010-07-09" Block="3050000" ClubName="Norco Volleyball Club" FirstNamePlayer="Madlen" Height="1960000" LastNamePlayer="Gloessner" NbSelOther="9" Position="3" Spike="3150000" TeamNamePlayer="Gloessner" Weight="76000000" />
+    </Player>
+    <Player No="223514" NoShirt="8">
+      <VolleyballPlayer No="1019185" NoPlayer="223514" Birthdate="2010-11-01" Block="3110000" ClubName="A5 Volleyball Club" FirstNamePlayer="Kari" Height="1930000" LastNamePlayer="Knotts" NbSelOther="5" Position="6" Spike="3320000" TeamNamePlayer="Knotts" Weight="67000000" />
+    </Player>
+    <Player No="229344" NoShirt="9">
+      <VolleyballPlayer No="1019047" NoPlayer="229344" Birthdate="2010-05-30" Block="2790000" ClubName="MadFrog Volleyball" FirstNamePlayer="Grace" Height="1630000" IsLibero="true" LastNamePlayer="Hengler" Position="4" Spike="2900000" TeamNamePlayer="Hengler" Weight="68000000" />
+    </Player>
+    <Player No="229346" NoShirt="11">
+      <VolleyballPlayer No="1019049" NoPlayer="229346" Birthdate="2010-04-01" Block="2870000" ClubName="Dallas Skyline Juniors" FirstNamePlayer="Taylor" Height="1520000" LastNamePlayer="Johnson" NbSelOther="5" Position="2" Spike="3150000" TeamNamePlayer="Johnson" Weight="66000000" />
+    </Player>
+    <Player No="229657" NoShirt="13">
+      <VolleyballPlayer No="1019059" NoPlayer="229657" Birthdate="2010-07-06" Block="2950000" ClubName="Kairos Elite Volleyball Club" FirstNamePlayer="Julia" Height="1880000" LastNamePlayer="Masselink" NbSelOther="5" Position="2" Spike="3100000" TeamNamePlayer="Masselink" Weight="68000000" />
+    </Player>
+    <Player No="229349" NoShirt="15">
+      <VolleyballPlayer No="1019051" NoPlayer="229349" Birthdate="2010-12-08" Block="3050000" ClubName="A5 Volleyball Club" FirstNamePlayer="Madison" Height="1850000" LastNamePlayer="Middleton" NbSelOther="5" Position="3" Spike="3120000" TeamNamePlayer="Middleton" Weight="59000000" />
+    </Player>
+    <Player No="229350" NoShirt="16">
+      <VolleyballPlayer No="1019187" NoPlayer="229350" Birthdate="2010-03-16" Block="3020000" ClubName="Texas Advantage Volleyball" FirstNamePlayer="Maya" Height="1830000" LastNamePlayer="Ogbogu" NbSelOther="5" Position="2" Spike="3230000" TeamNamePlayer="Ogbogu" Weight="69000000" />
+    </Player>
+    <Player No="234263" NoShirt="19" IsLibero="true">
+      <VolleyballPlayer No="1019052" NoPlayer="234263" Birthdate="2010-10-11" Block="2540000" ClubName="Dallas Skyline Juniors" FirstNamePlayer="Brynli" Height="1750000" IsLibero="true" LastNamePlayer="Burgess" Position="4" Spike="2690000" TeamNamePlayer="Burgess" Weight="72000000" />
+    </Player>
+    <Player No="233926" NoShirt="24">
+      <VolleyballPlayer No="1019058" NoPlayer="233926" Birthdate="2010-04-19" Block="2970000" ClubName="South County Volleyball Club" FirstNamePlayer="Maija" Height="1930000" LastNamePlayer="Mortensen" Position="3" Spike="3150000" TeamNamePlayer="Mortensen" Weight="75000000" />
+    </Player>
+    <Player No="233928" NoShirt="26">
+      <VolleyballPlayer No="1019056" NoPlayer="233928" Birthdate="2011-04-25" Block="2870000" ClubName="MadFrog Volleyball" FirstNamePlayer="Peyton" Height="1830000" LastNamePlayer="Smith" Position="2" Spike="3120000" TeamNamePlayer="Smith" Weight="73000000" />
+    </Player>
+    <Player No="215821" NoShirt="28">
+      <VolleyballPlayer No="1019061" NoPlayer="215821" Birthdate="2011-06-03" Block="3020000" ClubName="Sunshine Volleyball Club" FirstNamePlayer="Kaya" Height="1930000" LastNamePlayer="Young" Position="3" Spike="3180000" TeamNamePlayer="Young  " Weight="88000000" />
+    </Player>
+    <VolleyballTeam No="8713" LiberoUniformColor1="Red" LiberoUniformColor2="White" LiberoUniformColor3="Navy" ShirtColor1="Navy" ShirtColor2="Red" ShirtColor3="White" />
+  </Team>
+  <Referee FederationCode="POR" FirstName="Pedro Miguel" Gender="0" LastName="Pereira Lopes Pinto" No="152743" />
+  <Referee FederationCode="TUN" FirstName="Chebil" Gender="1" LastName="Rym" No="159072" />
+  <Set BeginTimeOffset="0" No="1" Duration="1260" NbRallies="38" NbRemainingSubstitutionTeamA="7" NbRemainingSubstitutionTeamB="6" NbSetPointsTeamB="1" NbSubstitutionTeamA="1" NbSubstitutionTeamB="2" NbTimeoutTeamA="2" NoServingTeam="8713" NoTeamAtLeft="8713" NoTeamAtRight="8707" PointsTeamA="13" PointsTeamB="25" TimePlayed="494419">
+    <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227318" NoPlayer6="227488" NoLibero2="233157" NoSubstitute5="227302" NoTeam="8707" />
+    <LineUp NoPlayer1="229349" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoLibero1="234263" NoSubstitute4="229344" NoTeam="8713" />
+    <Events>
+      <Substitution TimeOffset="114630" NoPlayerIn="233157" NoPlayerOut="227488" />
+      <Substitution TimeOffset="122716" NoPlayerIn="234263" NoPlayerOut="229349" />
+      <Rally TimeOffset="158034" No="1" Duration="15739" FaultAdmission="0" PointsTeamA="0" PointsTeamB="1" EndTimeOffset="173773" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227318" NoPlayer6="233157" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="0" NoPlayer="227325" Skill="4" />
+        <Action TimeOffset="2100" NoPlayer="229657" Skill="3" />
+        <Action TimeOffset="3700" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="6300" NoPlayer="229350" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="184890" No="2" Duration="14975" FaultAdmission="0" PointsTeamA="1" PointsTeamB="1" EndTimeOffset="199865" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227318" NoPlayer6="233157" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="18800" NoPlayer="229343" Skill="4" />
+        <Action TimeOffset="21100" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="22900" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="26000" NoPlayer="227317" Note="3" Skill="6" />
+        <Action TimeOffset="28600" NoPlayer="229350" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="212025" No="3" Duration="19084" FaultAdmission="0" PointsTeamA="1" PointsTeamB="2" EndTimeOffset="231109" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227318" NoPlayer5="233157" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="45000" NoPlayer="227317" Skill="4" />
+        <Action TimeOffset="49000" NoPlayer="234263" Note="1" Skill="3" />
+        <Action TimeOffset="50700" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="52900" NoPlayer="233926" Skill="6" />
+        <Action TimeOffset="56500" NoPlayer="227325" Skill="2" />
+        <Action TimeOffset="59800" NoPlayer="229657" Note="1" Skill="2" />
+        <Action TimeOffset="60600" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="63100" NoPlayer="223514" Note="3" Skill="6" />
+        <Action TimeOffset="64400" NoPlayer="227318" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="242221" No="4" Duration="17005" FaultAdmission="0" PointsTeamA="1" PointsTeamB="3" EndTimeOffset="259226" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227318" NoPlayer5="233157" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="89000" NoPlayer="229350" Skill="4" />
+        <Action TimeOffset="91900" NoPlayer="233157" Skill="3" />
+        <Action TimeOffset="97700" NoPlayer="229350" Note="1" Skill="2" />
+        <Action TimeOffset="99100" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="104000" NoPlayer="229657" Note="3" Skill="6" />
+        <Action TimeOffset="105100" NoPlayer="227317" Note="2" Skill="2" />
+      </Rally>
+      <Rally TimeOffset="270937" No="5" Duration="9050" FaultAdmission="0" PointsTeamA="1" PointsTeamB="4" EndTimeOffset="279987" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227318" NoPlayer5="233157" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="118300" NoPlayer="229350" Note="3" Skill="4" />
+        <Action TimeOffset="120000" NoPlayer="233157" Note="2" Skill="3" />
+      </Rally>
+      <Rally TimeOffset="291020" No="6" Duration="17419" FaultAdmission="0" PointsTeamA="1" PointsTeamB="5" EndTimeOffset="308439" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227318" NoPlayer5="233157" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="127900" NoPlayer="229350" Skill="4" />
+        <Action TimeOffset="129600" NoPlayer="233157" Skill="3" />
+        <Action TimeOffset="133300" NoPlayer="234263" Note="1" Skill="2" />
+        <Action TimeOffset="134700" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="136000" NoPlayer="229657" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="321583" No="7" Duration="5425" FaultAdmission="0" PointsTeamA="2" PointsTeamB="5" EndTimeOffset="327008" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227318" NoPlayer5="233157" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="147800" NoPlayer="229350" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="327017" NoPlayerIn="227488" NoPlayerOut="233157" />
+      <Rally TimeOffset="342770" No="8" Duration="22860" FaultAdmission="0" PointsTeamA="3" PointsTeamB="5" EndTimeOffset="365630" UserSetsScore="true">
+        <LineUp NoPlayer1="227321" NoPlayer2="227311" NoPlayer3="227318" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="182200" NoPlayer="227321" Skill="4" />
+        <Action TimeOffset="186000" NoPlayer="229350" Skill="3" />
+        <Action TimeOffset="186600" NoPlayer="223514" Skill="5" />
+        <Action TimeOffset="190800" NoPlayer="227488" Note="1" Skill="2" />
+        <Action TimeOffset="191700" NoPlayer="227325" Note="1" Skill="5" />
+        <Action TimeOffset="196500" NoPlayer="227318" Skill="6" />
+        <Action TimeOffset="198900" NoPlayer="223514" Skill="1" />
+        <Action TimeOffset="201100" NoPlayer="227318" Skill="2" />
+        <Action TimeOffset="202700" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="205800" NoPlayer="227311" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8713" Note="2" />
+      </Rally>
+      <Rally TimeOffset="377577" No="9" Duration="14337" FaultAdmission="0" PointsTeamA="4" PointsTeamB="5" EndTimeOffset="391914" UserSetsScore="true">
+        <LineUp NoPlayer1="227321" NoPlayer2="227311" NoPlayer3="227318" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="227800" NoPlayer="227321" Skill="4" />
+        <Action TimeOffset="230000" NoPlayer="229350" Skill="3" />
+        <Action TimeOffset="234900" NoPlayer="223514" Skill="5" />
+        <Action TimeOffset="237200" NoPlayer="229657" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Rally TimeOffset="402455" No="10" Duration="14246" FaultAdmission="0" PointsTeamA="4" PointsTeamB="6" EndTimeOffset="416701" UserSetsScore="true">
+        <LineUp NoPlayer1="227321" NoPlayer2="227311" NoPlayer3="227318" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="252600" NoPlayer="227321" Skill="4" />
+        <Action TimeOffset="255300" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="256300" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="257600" NoPlayer="229657" Note="3" Skill="6" />
+        <Action TimeOffset="261300" NoPlayer="227488" Note="2" Skill="1" />
+      </Rally>
+      <Substitution TimeOffset="416706" NoPlayerIn="229349" NoPlayerOut="234263" />
+      <Substitution TimeOffset="422664" NoPlayerIn="233157" NoPlayerOut="227321" />
+      <Rally TimeOffset="427730" No="11" Duration="16297" FaultAdmission="0" PointsTeamA="4" PointsTeamB="7" EndTimeOffset="444027" UserSetsScore="true">
+        <LineUp NoPlayer1="233157" NoPlayer2="227311" NoPlayer3="227318" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="272300" NoPlayer="233926" Skill="4" />
+        <Action TimeOffset="273900" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="276400" NoPlayer="227325" Note="1" Skill="5" />
+        <Action TimeOffset="280400" NoPlayer="227488" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8713" Note="3" />
+      </Rally>
+      <Rally TimeOffset="452660" No="12" Duration="17922" FaultAdmission="0" PointsTeamA="4" PointsTeamB="8" EndTimeOffset="470582" UserSetsScore="true">
+        <LineUp NoPlayer1="233157" NoPlayer2="227311" NoPlayer3="227318" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="304300" NoPlayer="233926" Skill="4" />
+        <Action TimeOffset="306300" NoPlayer="227318" Skill="3" />
+        <Action TimeOffset="307600" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="310300" NoPlayer="227318" Skill="6" />
+        <Action TimeOffset="311500" NoPlayer="223514" Skill="1" />
+        <Action TimeOffset="315900" NoPlayer="233157" Skill="2" />
+        <Action TimeOffset="319000" NoPlayer="227318" Skill="5" />
+        <Action TimeOffset="320100" NoPlayer="227317" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8713" Note="3" />
+      </Rally>
+      <Rally TimeOffset="480868" No="13" Duration="9497" FaultAdmission="0" PointsTeamA="5" PointsTeamB="8" EndTimeOffset="490365" UserSetsScore="true">
+        <LineUp NoPlayer1="233157" NoPlayer2="227311" NoPlayer3="227318" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="345600" NoPlayer="233926" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="494139" NoPlayerIn="234263" NoPlayerOut="233926" />
+      <Rally TimeOffset="502932" No="14" Duration="8630" FaultAdmission="0" PointsTeamA="5" PointsTeamB="9" EndTimeOffset="511562" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="227318" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="233157" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="351900" NoPlayer="227311" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8713" Note="3" />
+      </Rally>
+      <Rally TimeOffset="521958" No="15" Duration="6222" FaultAdmission="0" PointsTeamA="6" PointsTeamB="9" EndTimeOffset="528180" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="227318" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="233157" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="364700" NoPlayer="223514" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Rally TimeOffset="537615" No="16" Duration="12210" FaultAdmission="0" PointsTeamA="6" PointsTeamB="10" EndTimeOffset="549825" UserSetsScore="true">
+        <LineUp NoPlayer1="227318" NoPlayer2="227488" NoPlayer3="227325" NoPlayer4="227317" NoPlayer5="233157" NoPlayer6="227311" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="375900" NoPlayer="227318" Skill="4" />
+        <Action TimeOffset="377900" NoPlayer="229350" Skill="3" />
+        <Action TimeOffset="379400" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="380200" NoPlayer="229657" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="562904" No="17" Duration="8732" FaultAdmission="0" PointsTeamA="6" PointsTeamB="11" EndTimeOffset="571636" UserSetsScore="true">
+        <LineUp NoPlayer1="227318" NoPlayer2="227488" NoPlayer3="227325" NoPlayer4="227317" NoPlayer5="233157" NoPlayer6="227311" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="395300" NoPlayer="229657" Note="3" Skill="4" />
+        <Action TimeOffset="397000" NoPlayer="227318" Note="2" Skill="3" />
+      </Rally>
+      <Timeout TimeOffset="579799" NoTeam="8707" />
+      <EndTimeout TimeOffset="609799" />
+      <Rally TimeOffset="637363" No="18" Duration="16132" FaultAdmission="0" PointsTeamA="7" PointsTeamB="11" EndTimeOffset="653495" UserSetsScore="true">
+        <LineUp NoPlayer1="227318" NoPlayer2="227488" NoPlayer3="227325" NoPlayer4="227317" NoPlayer5="233157" NoPlayer6="227311" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="472000" NoPlayer="229657" Skill="4" />
+        <Action TimeOffset="476900" NoPlayer="233157" Skill="3" />
+        <Action TimeOffset="477800" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="481300" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="483700" NoPlayer="229349" Skill="1" />
+        <Action TimeOffset="485300" NoPlayer="229350" Skill="2" />
+        <Action TimeOffset="490500" NoPlayer="227325" Note="3" Skill="6" />
+        <Action TimeOffset="493400" NoPlayer="229350" Note="2" Skill="2" />
+      </Rally>
+      <Substitution TimeOffset="653502" NoPlayerIn="227321" NoPlayerOut="233157" />
+      <Rally TimeOffset="667614" No="19" Duration="18518" FaultAdmission="0" PointsTeamA="7" PointsTeamB="12" EndTimeOffset="686132" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="227318" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="522500" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="524700" NoPlayer="229350" Skill="3" />
+        <Action TimeOffset="525900" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="528800" NoPlayer="229349" Skill="6" />
+        <Action TimeOffset="530000" NoPlayer="227318" Note="1" Skill="2" />
+        <Action TimeOffset="530900" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="534000" NoPlayer="227311" Skill="6" />
+        <Action TimeOffset="535200" NoPlayer="223514" Note="1" Skill="2" />
+        <Action TimeOffset="535500" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="540000" NoPlayer="229349" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="686139" NoPlayerIn="233926" NoPlayerOut="234263" />
+      <Substitution TimeOffset="688894" NoPlayerIn="233157" NoPlayerOut="227488" />
+      <Rally TimeOffset="700706" No="20" Duration="8863" FaultAdmission="0" PointsTeamA="8" PointsTeamB="12" EndTimeOffset="709569" UserSetsScore="true">
+        <LineUp NoPlayer1="233157" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="227318" NoTeam="8707" />
+        <LineUp NoPlayer1="229349" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="560600" NoPlayer="229349" Skill="4" />
+        <Action TimeOffset="562900" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="563600" NoPlayer="227325" Note="1" Skill="5" />
+        <Action TimeOffset="565800" NoPlayer="227321" Note="3" Skill="6" />
+        <Action TimeOffset="567800" NoPlayer="229349" Note="2" Skill="2" />
+      </Rally>
+      <Substitution TimeOffset="713335" NoPlayerIn="234263" NoPlayerOut="229349" />
+      <Rally TimeOffset="721314" No="21" Duration="18526" FaultAdmission="0" PointsTeamA="8" PointsTeamB="13" EndTimeOffset="739840" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227318" NoPlayer6="233157" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="581100" NoPlayer="227325" Skill="4" />
+        <Action TimeOffset="583500" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="584800" NoPlayer="229350" Skill="5" />
+        <Action TimeOffset="587300" NoPlayer="227321" Note="1" Skill="2" />
+        <Action TimeOffset="589500" NoPlayer="227325" Note="2" Skill="5" />
+        <TeamPoint NoTeam="8713" Note="3" />
+      </Rally>
+      <Rally TimeOffset="752248" No="22" Duration="8299" FaultAdmission="0" PointsTeamA="8" PointsTeamB="14" EndTimeOffset="760547" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227318" NoPlayer6="233157" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="610500" NoPlayer="229343" Note="3" Skill="4" />
+        <Action TimeOffset="613500" NoPlayer="227321" Note="2" Skill="3" />
+      </Rally>
+      <Rally TimeOffset="772404" No="23" Duration="13471" FaultAdmission="0" PointsTeamA="9" PointsTeamB="14" EndTimeOffset="785875" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227318" NoPlayer6="233157" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="619600" NoPlayer="229343" Skill="4" />
+        <Action TimeOffset="622100" NoPlayer="227318" Skill="3" />
+        <Action TimeOffset="622900" NoPlayer="227325" Note="1" Skill="5" />
+        <Action TimeOffset="625500" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="628900" NoPlayer="229350" Note="2" Skill="1" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Rally TimeOffset="805933" No="24" Duration="14958" FaultAdmission="0" PointsTeamA="9" PointsTeamB="15" EndTimeOffset="820891" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227318" NoPlayer5="233157" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="653000" NoPlayer="227317" Skill="4" />
+        <Action TimeOffset="656100" NoPlayer="229657" Skill="3" />
+        <Action TimeOffset="656500" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="659400" NoPlayer="223514" Skill="6" />
+        <Action TimeOffset="660400" NoPlayer="227325" Note="1" Skill="2" />
+        <Action TimeOffset="666300" NoPlayer="227321" Skill="5" />
+        <Action TimeOffset="668500" NoPlayer="227311" Skill="6" />
+        <Action TimeOffset="669600" NoPlayer="229350" Skill="1" />
+        <Action TimeOffset="670100" NoPlayer="229657" Note="1" Skill="2" />
+        <Action TimeOffset="670700" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="671100" NoPlayer="229350" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="832733" No="25" Duration="13854" FaultAdmission="0" PointsTeamA="9" PointsTeamB="16" EndTimeOffset="846587" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227318" NoPlayer5="233157" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="696900" NoPlayer="229350" Skill="4" />
+        <Action TimeOffset="701200" NoPlayer="233157" Skill="3" />
+        <Action TimeOffset="701900" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="703900" NoPlayer="229350" Note="1" Skill="2" />
+        <Action TimeOffset="705400" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="707100" NoPlayer="233926" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="858627" No="26" Duration="14371" FaultAdmission="0" PointsTeamA="9" PointsTeamB="17" EndTimeOffset="872998" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227318" NoPlayer5="233157" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="724900" NoPlayer="229350" Skill="4" />
+        <Action TimeOffset="726600" NoPlayer="233157" Skill="3" />
+        <Action TimeOffset="728400" NoPlayer="227317" Skill="5" />
+        <Action TimeOffset="730000" NoPlayer="229350" Note="1" Skill="2" />
+        <Action TimeOffset="731400" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="732600" NoPlayer="223514" Note="3" Skill="6" />
+        <Action TimeOffset="733600" NoPlayer="227318" Note="2" Skill="1" />
+      </Rally>
+      <Timeout TimeOffset="888035" NoTeam="8707" />
+      <EndTimeout TimeOffset="918035" />
+      <Rally TimeOffset="942699" No="27" Duration="10588" FaultAdmission="0" PointsTeamA="9" PointsTeamB="18" EndTimeOffset="953287" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227318" NoPlayer5="233157" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="820100" NoPlayer="229350" Note="3" Skill="4" />
+        <Action TimeOffset="823900" NoPlayer="227318" Note="2" Skill="3" />
+      </Rally>
+      <Rally TimeOffset="967310" No="28" Duration="25397" FaultAdmission="0" PointsTeamA="9" PointsTeamB="19" EndTimeOffset="992707" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227318" NoPlayer5="233157" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="830100" NoPlayer="229350" Skill="4" />
+        <Action TimeOffset="832200" NoPlayer="233157" Skill="3" />
+        <Action TimeOffset="832900" NoPlayer="227318" Skill="5" />
+        <Action TimeOffset="833700" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="837500" NoPlayer="229343" Note="1" Skill="2" />
+        <Action TimeOffset="840500" NoPlayer="234263" Skill="5" />
+        <Action TimeOffset="842600" NoPlayer="229657" Skill="6" />
+        <Action TimeOffset="844500" NoPlayer="233157" Skill="2" />
+        <Action TimeOffset="845500" NoPlayer="234263" Note="1" Skill="2" />
+        <Action TimeOffset="847200" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="849100" NoPlayer="229350" Skill="6" />
+        <Action TimeOffset="850700" NoPlayer="227311" Skill="1" />
+        <Action TimeOffset="852400" NoPlayer="227311" Skill="2" />
+        <Action TimeOffset="854500" NoPlayer="229350" Note="1" Skill="2" />
+        <Action TimeOffset="856400" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="858200" NoPlayer="223514" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="1004447" No="29" Duration="6769" FaultAdmission="0" PointsTeamA="10" PointsTeamB="19" EndTimeOffset="1011216" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227318" NoPlayer5="233157" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="897500" NoPlayer="229350" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="1011221" NoPlayerIn="227488" NoPlayerOut="233157" />
+      <Rally TimeOffset="1022175" No="30" Duration="20684" FaultAdmission="0" PointsTeamA="10" PointsTeamB="20" EndTimeOffset="1042859" UserSetsScore="true">
+        <LineUp NoPlayer1="227321" NoPlayer2="227311" NoPlayer3="227318" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="906600" NoPlayer="227321" Skill="4" />
+        <Action TimeOffset="907900" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="908700" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="909500" NoPlayer="229657" Skill="6" />
+        <Action TimeOffset="911500" NoPlayer="227325" Skill="2" />
+        <Action TimeOffset="914000" NoPlayer="229350" Note="1" Skill="2" />
+        <Action TimeOffset="915300" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="916600" NoPlayer="233926" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="1042864" NoPlayerIn="229349" NoPlayerOut="234263" />
+      <Substitution TimeOffset="1048052" NoPlayerIn="233157" NoPlayerOut="227321" />
+      <Substitution TimeOffset="1061663" NoPlayerIn="229344" NoPlayerOut="233926" />
+      <Rally TimeOffset="1070444" No="31" Duration="6047" FaultAdmission="0" PointsTeamA="11" PointsTeamB="20" EndTimeOffset="1076491" UserSetsScore="true">
+        <LineUp NoPlayer1="233157" NoPlayer2="227311" NoPlayer3="227318" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="229344" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="941400" NoPlayer="229344" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="1086329" NoPlayerIn="233926" NoPlayerOut="229344" />
+      <Substitution TimeOffset="1091022" NoPlayerIn="234263" NoPlayerOut="233926" />
+      <Rally TimeOffset="1102894" No="32" Duration="9883" FaultAdmission="0" PointsTeamA="11" PointsTeamB="21" EndTimeOffset="1112777" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="227318" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="233157" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="950300" NoPlayer="227311" Skill="4" />
+        <Action TimeOffset="951600" NoPlayer="229350" Skill="3" />
+        <Action TimeOffset="953200" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="955300" NoPlayer="223514" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="1124281" No="33" Duration="12867" FaultAdmission="0" PointsTeamA="11" PointsTeamB="22" EndTimeOffset="1137148" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="227318" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="233157" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="971800" NoPlayer="223514" Skill="4" />
+        <Action TimeOffset="973200" NoPlayer="233157" Skill="3" />
+        <Action TimeOffset="974800" NoPlayer="227325" Note="1" Skill="5" />
+        <Action TimeOffset="977500" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="978800" NoPlayer="234263" Note="1" Skill="2" />
+        <Action TimeOffset="980400" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="981700" NoPlayer="229657" Note="3" Skill="6" />
+        <Action TimeOffset="983300" NoPlayer="227325" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="1148274" No="34" Duration="7082" FaultAdmission="0" PointsTeamA="12" PointsTeamB="22" EndTimeOffset="1155356" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="227318" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="233157" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="1003800" NoPlayer="223514" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Rally TimeOffset="1166054" No="35" Duration="11179" FaultAdmission="0" PointsTeamA="12" PointsTeamB="23" EndTimeOffset="1177233" UserSetsScore="true">
+        <LineUp NoPlayer1="227318" NoPlayer2="227488" NoPlayer3="227325" NoPlayer4="227317" NoPlayer5="233157" NoPlayer6="227311" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="1010100" NoPlayer="227318" Skill="4" />
+        <Action TimeOffset="1012000" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="1013100" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="1015700" NoPlayer="223514" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="1206020" No="36" Duration="8328" FaultAdmission="0" PointsTeamA="13" PointsTeamB="23" EndTimeOffset="1214348" UserSetsScore="true">
+        <LineUp NoPlayer1="227318" NoPlayer2="227488" NoPlayer3="227325" NoPlayer4="227317" NoPlayer5="233157" NoPlayer6="227311" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="1037600" NoPlayer="229657" Skill="4" />
+        <Action TimeOffset="1040000" NoPlayer="227318" Skill="3" />
+        <Action TimeOffset="1041600" NoPlayer="229349" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="1214356" NoPlayerIn="227321" NoPlayerOut="233157" />
+      <Substitution TimeOffset="1226912" NoPlayerIn="227302" NoPlayerOut="227318" />
+      <Rally TimeOffset="1234786" No="37" Duration="10829" FaultAdmission="0" PointsTeamA="13" PointsTeamB="24" EndTimeOffset="1245615" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="1070800" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="1073400" NoPlayer="234263" Note="1" Skill="3" />
+        <Action TimeOffset="1074800" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="1075700" NoPlayer="229350" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="1245620" NoPlayerIn="233926" NoPlayerOut="234263" />
+      <Substitution TimeOffset="1248507" NoPlayerIn="233157" NoPlayerOut="227488" />
+      <Rally TimeOffset="1258360" No="38" Duration="8124" FaultAdmission="0" PointsTeamA="13" PointsTeamB="25" EndTimeOffset="1266484" UserSetsScore="true">
+        <LineUp NoPlayer1="233157" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="229349" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="1092100" NoPlayer="229349" Skill="4" />
+        <Action TimeOffset="1095200" NoPlayer="227317" Note="1" Skill="3" />
+        <Action TimeOffset="1097500" NoPlayer="227325" Note="1" Skill="5" />
+        <Action TimeOffset="1100600" NoPlayer="227321" Note="2" Skill="6" />
+        <Action TimeOffset="1101900" NoPlayer="233926" Note="3" Skill="1" />
+      </Rally>
+    </Events>
+    <PlayerStatistics NoPlayer="227301" NoShirt="1" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227302" NoShirt="2" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="233156" NoShirt="4" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="233157" NoShirt="6" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227311" NoShirt="7" NoTeam="8707" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="240838" NoShirt="8" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227315" NoShirt="11" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227317" NoShirt="13" NoTeam="8707" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="227318" NoShirt="14" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227321" NoShirt="17" NoTeam="8707" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="227488" NoShirt="18" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="238958" NoShirt="20" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227325" NoShirt="22" NoTeam="8707" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="206801" NoShirt="23" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="229656" NoShirt="3" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229342" NoShirt="5" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229343" NoShirt="6" NoTeam="8713" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="229658" NoShirt="7" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="223514" NoShirt="8" NoTeam="8713" TotalPoints="5" />
+    <PlayerStatistics NoPlayer="229344" NoShirt="9" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229346" NoShirt="11" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229657" NoShirt="13" NoTeam="8713" TotalPoints="6" />
+    <PlayerStatistics NoPlayer="229349" NoShirt="15" NoTeam="8713" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="229350" NoShirt="16" NoTeam="8713" TotalPoints="5" />
+    <PlayerStatistics NoPlayer="234263" NoShirt="19" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="233926" NoShirt="24" NoTeam="8713" TotalPoints="3" />
+    <PlayerStatistics NoPlayer="233928" NoShirt="26" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="215821" NoShirt="28" NoTeam="8713" />
+    
+    
+  </Set>
+  <Set BeginTimeOffset="1440000" No="2" Duration="1620" NbRallies="48" NbRemainingSubstitutionTeamA="7" NbRemainingSubstitutionTeamB="2" NbSetPointsTeamB="2" NbSubstitutionTeamA="1" NbSubstitutionTeamB="6" NbTimeoutTeamA="2" NbTimeoutTeamB="1" NoServingTeam="8713" NoTeamAtLeft="8707" NoTeamAtRight="8713" PointsTeamA="23" PointsTeamB="25" TimePlayed="673584">
+    <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="227302" NoLibero1="227315" NoLibero2="233157" NoSubstitute5="206801" NoTeam="8707" />
+    <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="229349" NoLibero1="234263" NoSubstitute1="233928" NoSubstitute3="229656" NoSubstitute4="229342" NoTeam="8713" />
+    <Events>
+      <Substitution TimeOffset="1558777" NoPlayerIn="234263" NoPlayerOut="229349" />
+      <Substitution TimeOffset="1582144" NoPlayerIn="233157" NoPlayerOut="227488" />
+      <Rally TimeOffset="1591357" No="39" Duration="8487" FaultAdmission="0" PointsTeamA="1" PointsTeamB="0" EndTimeOffset="1599844" UserSetsScore="true">
+        <LineUp NoPlayer1="233157" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="1421200" NoPlayer="229343" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="1606694" NoPlayerIn="227315" NoPlayerOut="233157" />
+      <Rally TimeOffset="1612596" No="40" Duration="13667" FaultAdmission="0" PointsTeamA="1" PointsTeamB="1" EndTimeOffset="1626263" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="1445700" NoPlayer="227325" Skill="4" />
+        <Action TimeOffset="1448500" NoPlayer="229350" Note="1" Skill="3" />
+        <Action TimeOffset="1449000" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="1450500" NoPlayer="229350" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="1630720" NoPlayerIn="233157" NoPlayerOut="227315" />
+      <Rally TimeOffset="1642662" No="41" Duration="4673" FaultAdmission="0" PointsTeamA="1" PointsTeamB="2" EndTimeOffset="1647335" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="233157" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="1465400" NoPlayer="229350" Note="3" Skill="4" />
+        <Action TimeOffset="1474800" NoPlayer="233157" Note="2" Skill="3" />
+      </Rally>
+      <Substitution TimeOffset="1653342" NoPlayerIn="227315" NoPlayerOut="233157" />
+      <Rally TimeOffset="1659986" No="42" Duration="15963" FaultAdmission="0" PointsTeamA="2" PointsTeamB="2" EndTimeOffset="1675949" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="1488800" NoPlayer="229350" Skill="4" />
+        <Action TimeOffset="1493400" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="1495300" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="1499800" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="1501300" NoPlayer="234263" Skill="2" />
+        <Action TimeOffset="1506600" NoPlayer="227321" Note="1" Skill="2" />
+        <Action TimeOffset="1509200" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="1513500" NoPlayer="227317" Note="3" Skill="6" />
+        <Action TimeOffset="1515000" NoPlayer="223514" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="1690424" No="43" Duration="12879" FaultAdmission="0" PointsTeamA="2" PointsTeamB="3" EndTimeOffset="1703303" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="1541700" NoPlayer="227317" Skill="4" />
+        <Action TimeOffset="1543000" NoPlayer="229657" Skill="3" />
+        <Action TimeOffset="1545900" NoPlayer="227302" Skill="6" />
+        <Action TimeOffset="1547100" NoPlayer="234263" Note="1" Skill="2" />
+        <Action TimeOffset="1548100" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="1548900" NoPlayer="229657" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="1703311" NoPlayerIn="229349" NoPlayerOut="234263" />
+      <Rally TimeOffset="1714460" No="44" Duration="14883" FaultAdmission="0" PointsTeamA="2" PointsTeamB="4" EndTimeOffset="1729343" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="1571200" NoPlayer="233926" Skill="4" />
+        <Action TimeOffset="1579200" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="1580600" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="1581400" NoPlayer="227302" Note="2" Skill="6" />
+        <Action TimeOffset="1583200" NoPlayer="223514" Note="3" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="1739306" No="45" Duration="9150" FaultAdmission="0" PointsTeamA="3" PointsTeamB="4" EndTimeOffset="1748456" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="1597000" NoPlayer="233926" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="1748463" NoPlayerIn="227488" NoPlayerOut="227315" />
+      <Substitution TimeOffset="1752041" NoPlayerIn="234263" NoPlayerOut="233926" />
+      <Rally TimeOffset="1764229" No="46" Duration="12396" FaultAdmission="0" PointsTeamA="3" PointsTeamB="5" EndTimeOffset="1776625" UserSetsScore="true">
+        <LineUp NoPlayer1="227321" NoPlayer2="227311" NoPlayer3="227302" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="1607600" NoPlayer="227321" Skill="4" />
+        <Action TimeOffset="1609200" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="1610400" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="1611700" NoPlayer="229349" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="1780766" NoPlayerIn="227315" NoPlayerOut="227321" />
+      <Rally TimeOffset="1788978" No="47" Duration="14776" FaultAdmission="0" PointsTeamA="4" PointsTeamB="5" EndTimeOffset="1803754" UserSetsScore="true">
+        <LineUp NoPlayer1="227315" NoPlayer2="227311" NoPlayer3="227302" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="1621800" NoPlayer="223514" Skill="4" />
+        <Action TimeOffset="1625600" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="1626000" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="1627700" NoPlayer="227311" Note="3" Skill="6" />
+        <Action TimeOffset="1631800" NoPlayer="229349" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="1818491" No="48" Duration="8175" FaultAdmission="0" PointsTeamA="4" PointsTeamB="6" EndTimeOffset="1826666" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="227302" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="1654600" NoPlayer="227311" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8713" Note="3" />
+      </Rally>
+      <Rally TimeOffset="1839645" No="49" Duration="10864" FaultAdmission="0" PointsTeamA="4" PointsTeamB="7" EndTimeOffset="1850509" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="227302" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="1667000" NoPlayer="229657" Skill="4" />
+        <Action TimeOffset="1671600" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="1675200" NoPlayer="227315" Note="2" Skill="5" />
+        <TeamPoint NoTeam="8713" Note="3" />
+      </Rally>
+      <Rally TimeOffset="1860656" No="50" Duration="10239" FaultAdmission="0" PointsTeamA="5" PointsTeamB="7" EndTimeOffset="1870895" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="227302" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="1688500" NoPlayer="229657" Skill="4" />
+        <Action TimeOffset="1692100" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="1692700" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="1698500" NoPlayer="227488" Note="3" Skill="6" />
+        <Action TimeOffset="1700800" NoPlayer="229343" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="1892922" No="51" Duration="12288" FaultAdmission="0" PointsTeamA="5" PointsTeamB="8" EndTimeOffset="1905210" UserSetsScore="true">
+        <LineUp NoPlayer1="227302" NoPlayer2="227488" NoPlayer3="227325" NoPlayer4="227317" NoPlayer5="227315" NoPlayer6="227311" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="1725300" NoPlayer="227302" Skill="4" />
+        <Action TimeOffset="1727600" NoPlayer="234263" Note="1" Skill="3" />
+        <Action TimeOffset="1729400" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="1730700" NoPlayer="223514" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="1905219" NoPlayerIn="233926" NoPlayerOut="234263" />
+      <Rally TimeOffset="1916041" No="52" Duration="17247" FaultAdmission="0" PointsTeamA="6" PointsTeamB="8" EndTimeOffset="1933288" UserSetsScore="true">
+        <LineUp NoPlayer1="227302" NoPlayer2="227488" NoPlayer3="227325" NoPlayer4="227317" NoPlayer5="227315" NoPlayer6="227311" NoTeam="8707" />
+        <LineUp NoPlayer1="229349" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="1745000" NoPlayer="229349" Skill="4" />
+        <Action TimeOffset="1747100" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="1748900" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="1751400" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="1752700" NoPlayer="233926" Skill="1" />
+        <Action TimeOffset="1757100" NoPlayer="227302" Skill="2" />
+        <Action TimeOffset="1761100" NoPlayer="223514" Note="1" Skill="2" />
+        <Action TimeOffset="1762300" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="1763500" NoPlayer="229343" Note="2" Skill="6" />
+        <Action TimeOffset="1765600" NoPlayer="227317" Note="3" Skill="1" />
+      </Rally>
+      <Substitution TimeOffset="1933293" NoPlayerIn="227321" NoPlayerOut="227315" />
+      <Substitution TimeOffset="1938516" NoPlayerIn="234263" NoPlayerOut="229349" />
+      <Rally TimeOffset="1954871" No="53" Duration="19609" FaultAdmission="0" PointsTeamA="6" PointsTeamB="9" EndTimeOffset="1974480" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="1789300" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="1791300" NoPlayer="229350" Skill="3" />
+        <Action TimeOffset="1792200" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="1793100" NoPlayer="223514" Skill="6" />
+        <Action TimeOffset="1795200" NoPlayer="227317" Skill="1" />
+        <Action TimeOffset="1797100" NoPlayer="227488" Note="1" Skill="2" />
+        <Action TimeOffset="1797500" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="1800600" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="1802600" NoPlayer="233926" Skill="1" />
+        <Action TimeOffset="1803200" NoPlayer="234263" Note="1" Skill="2" />
+        <Action TimeOffset="1804100" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="1814000" NoPlayer="233926" Skill="6" />
+        <Action TimeOffset="1816300" NoPlayer="227321" Note="2" Skill="1" />
+        <TeamPoint NoTeam="8713" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="1980292" NoPlayerIn="227315" NoPlayerOut="227488" />
+      <Rally TimeOffset="1989714" No="54" Duration="12357" FaultAdmission="0" PointsTeamA="6" PointsTeamB="10" EndTimeOffset="2002071" UserSetsScore="true">
+        <LineUp NoPlayer1="227315" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="1842500" NoPlayer="229343" Skill="4" />
+        <Action TimeOffset="1846500" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="1849100" NoPlayer="227325" Note="1" Skill="5" />
+        <Action TimeOffset="1850800" NoPlayer="227325" Skill="6" />
+        <Action TimeOffset="1853200" NoPlayer="233926" Skill="1" />
+        <Action TimeOffset="1854800" NoPlayer="229343" Note="1" Skill="2" />
+        <Action TimeOffset="1856400" NoPlayer="229350" Note="3" Skill="6" />
+        <Action TimeOffset="1860600" NoPlayer="227321" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="2015245" No="55" Duration="11049" FaultAdmission="0" PointsTeamA="7" PointsTeamB="10" EndTimeOffset="2026294" UserSetsScore="true">
+        <LineUp NoPlayer1="227315" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="1876100" NoPlayer="229343" Skill="4" />
+        <Action TimeOffset="1877400" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="1880600" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="1883800" NoPlayer="227317" Note="3" Skill="6" />
+        <Action TimeOffset="1884500" NoPlayer="233926" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="2039419" No="56" Duration="15192" FaultAdmission="0" PointsTeamA="8" PointsTeamB="10" EndTimeOffset="2054611" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="1895700" NoPlayer="227325" Skill="4" />
+        <Action TimeOffset="1896800" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="1898400" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="1899300" NoPlayer="223514" Note="2" Skill="6" />
+        <Action TimeOffset="1901300" NoPlayer="227317" Note="3" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="2072765" No="57" Duration="12669" FaultAdmission="0" PointsTeamA="8" PointsTeamB="11" EndTimeOffset="2085434" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="1916300" NoPlayer="227325" Skill="4" />
+        <Action TimeOffset="1918400" NoPlayer="229350" Skill="3" />
+        <Action TimeOffset="1919900" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="1920400" NoPlayer="229350" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="2097530" No="58" Duration="16382" FaultAdmission="0" PointsTeamA="9" PointsTeamB="11" EndTimeOffset="2113912" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="1931200" NoPlayer="229350" Skill="4" />
+        <Action TimeOffset="1933000" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="1936500" NoPlayer="227315" Skill="5" />
+        <Action TimeOffset="1949300" NoPlayer="227311" Skill="6" />
+        <Action TimeOffset="1950600" NoPlayer="234263" Skill="2" />
+        <Action TimeOffset="1956700" NoPlayer="227321" Note="1" Skill="2" />
+        <Action TimeOffset="1957800" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="1961400" NoPlayer="227317" Note="3" Skill="6" />
+        <Action TimeOffset="1963700" NoPlayer="223514" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="2126848" No="59" Duration="12606" FaultAdmission="0" PointsTeamA="9" PointsTeamB="12" EndTimeOffset="2139454" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="1980100" NoPlayer="227317" Skill="4" />
+        <Action TimeOffset="1982900" NoPlayer="229350" Skill="3" />
+        <Action TimeOffset="1983300" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="1984400" NoPlayer="233926" Skill="6" />
+        <Action TimeOffset="1986800" NoPlayer="227311" Note="1" Skill="2" />
+        <Action TimeOffset="1995600" NoPlayer="227315" Skill="5" />
+        <Action TimeOffset="1996200" NoPlayer="227302" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8713" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="2139468" NoPlayerIn="229349" NoPlayerOut="234263" />
+      <Rally TimeOffset="2155311" No="60" Duration="17751" FaultAdmission="0" PointsTeamA="9" PointsTeamB="13" EndTimeOffset="2173062" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="2014000" NoPlayer="233926" Skill="4" />
+        <Action TimeOffset="2017000" NoPlayer="227315" Skill="3" />
+        <Action TimeOffset="2020600" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="2023200" NoPlayer="227302" Skill="6" />
+        <Action TimeOffset="2025900" NoPlayer="229349" Note="1" Skill="2" />
+        <Action TimeOffset="2026600" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="2027200" NoPlayer="229657" Note="3" Skill="6" />
+        <Action TimeOffset="2029600" NoPlayer="227321" Note="2" Skill="1" />
+      </Rally>
+      <Timeout TimeOffset="2177577" NoTeam="8707" />
+      <EndTimeout TimeOffset="2207577" />
+      <Rally TimeOffset="2230158" No="61" Duration="23544" FaultAdmission="0" PointsTeamA="9" PointsTeamB="14" EndTimeOffset="2253702" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="2061100" NoPlayer="233926" Skill="4" />
+        <Action TimeOffset="2065200" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="2065600" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="2067600" NoPlayer="227311" Skill="6" />
+        <Action TimeOffset="2068600" NoPlayer="223514" Note="1" Skill="2" />
+        <Action TimeOffset="2069000" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="2069600" NoPlayer="229349" Skill="6" />
+        <Action TimeOffset="2071200" NoPlayer="227325" Note="1" Skill="2" />
+        <Action TimeOffset="2072700" NoPlayer="227321" Skill="5" />
+        <Action TimeOffset="2073300" NoPlayer="227311" Skill="6" />
+        <Action TimeOffset="2074500" NoPlayer="233926" Note="1" Skill="2" />
+        <Action TimeOffset="2075000" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="2075600" NoPlayer="223514" Note="3" Skill="6" />
+        <Action TimeOffset="2079400" NoPlayer="227317" Note="2" Skill="2" />
+      </Rally>
+      <Rally TimeOffset="2267313" No="62" Duration="12206" FaultAdmission="0" PointsTeamA="10" PointsTeamB="14" EndTimeOffset="2279519" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="2109600" NoPlayer="233926" Skill="4" />
+        <Action TimeOffset="2111400" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="2112600" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="2113100" NoPlayer="227302" Note="3" Skill="6" />
+        <Action TimeOffset="2117400" NoPlayer="229349" Note="2" Skill="1" />
+      </Rally>
+      <Substitution TimeOffset="2279524" NoPlayerIn="227488" NoPlayerOut="227315" />
+      <Substitution TimeOffset="2282885" NoPlayerIn="234263" NoPlayerOut="233926" />
+      <Rally TimeOffset="2295854" No="63" Duration="12621" FaultAdmission="0" PointsTeamA="11" PointsTeamB="14" EndTimeOffset="2308475" UserSetsScore="true">
+        <LineUp NoPlayer1="227321" NoPlayer2="227311" NoPlayer3="227302" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="2130900" NoPlayer="227321" Skill="4" />
+        <Action TimeOffset="2133000" NoPlayer="234263" Note="1" Skill="3" />
+        <Action TimeOffset="2134200" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="2135500" NoPlayer="229350" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Rally TimeOffset="2320893" No="64" Duration="11926" FaultAdmission="0" PointsTeamA="11" PointsTeamB="15" EndTimeOffset="2332819" UserSetsScore="true">
+        <LineUp NoPlayer1="227321" NoPlayer2="227311" NoPlayer3="227302" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="2151800" NoPlayer="227321" Skill="4" />
+        <Action TimeOffset="2153200" NoPlayer="229350" Skill="3" />
+        <Action TimeOffset="2154500" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="2155600" NoPlayer="229657" Note="3" Skill="6" />
+        <Action TimeOffset="2157700" NoPlayer="227325" Note="2" Skill="2" />
+      </Rally>
+      <Substitution TimeOffset="2338274" NoPlayerIn="227315" NoPlayerOut="227321" />
+      <Substitution TimeOffset="2344309" NoPlayerIn="229342" NoPlayerOut="223514" />
+      <Substitution TimeOffset="2349197" NoPlayerIn="233928" NoPlayerOut="229343" />
+      <Rally TimeOffset="2367480" No="65" Duration="16784" FaultAdmission="0" PointsTeamA="11" PointsTeamB="16" EndTimeOffset="2384264" UserSetsScore="true">
+        <LineUp NoPlayer1="227315" NoPlayer2="227311" NoPlayer3="227302" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="229342" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="233928" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="2185500" NoPlayer="229342" Skill="4" />
+        <Action TimeOffset="2200300" NoPlayer="227315" Skill="3" />
+        <Action TimeOffset="2203600" NoPlayer="234263" Note="1" Skill="2" />
+        <Action TimeOffset="2210300" NoPlayer="229342" Note="1" Skill="5" />
+        <Action TimeOffset="2212000" NoPlayer="233928" Note="3" Skill="6" />
+        <Action TimeOffset="2216600" NoPlayer="227317" Note="2" Skill="2" />
+      </Rally>
+      <Rally TimeOffset="2396659" No="66" Duration="8110" FaultAdmission="0" PointsTeamA="12" PointsTeamB="16" EndTimeOffset="2404769" UserSetsScore="true">
+        <LineUp NoPlayer1="227315" NoPlayer2="227311" NoPlayer3="227302" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="229342" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="233928" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="2234800" NoPlayer="229342" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="2414221" NoPlayerIn="206801" NoPlayerOut="227311" />
+      <Rally TimeOffset="2424978" No="67" Duration="18543" FaultAdmission="0" PointsTeamA="12" PointsTeamB="17" EndTimeOffset="2443521" UserSetsScore="true">
+        <LineUp NoPlayer1="206801" NoPlayer2="227302" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229342" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="233928" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="2265500" NoPlayer="206801" Skill="4" />
+        <Action TimeOffset="2265700" NoPlayer="229657" Skill="3" />
+        <Action TimeOffset="2266000" NoPlayer="229342" Skill="5" />
+        <Action TimeOffset="2267000" NoPlayer="233928" Skill="6" />
+        <Action TimeOffset="2270100" NoPlayer="227325" Skill="1" />
+        <Action TimeOffset="2272300" NoPlayer="206801" Note="1" Skill="2" />
+        <Action TimeOffset="2273100" NoPlayer="227325" Note="1" Skill="5" />
+        <Action TimeOffset="2275900" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="2277300" NoPlayer="229350" Note="1" Skill="2" />
+        <Action TimeOffset="2279000" NoPlayer="229342" Note="1" Skill="5" />
+        <Action TimeOffset="2279800" NoPlayer="229349" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="2462218" No="68" Duration="10720" FaultAdmission="0" PointsTeamA="13" PointsTeamB="17" EndTimeOffset="2472938" UserSetsScore="true">
+        <LineUp NoPlayer1="206801" NoPlayer2="227302" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="233928" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="229342" NoTeam="8713" />
+        <Action TimeOffset="2314300" NoPlayer="229657" Skill="4" />
+        <Action TimeOffset="2316800" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="2317400" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="2318300" NoPlayer="227302" Note="3" Skill="6" />
+        <Action TimeOffset="2319100" NoPlayer="233928" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="2490852" No="69" Duration="12508" FaultAdmission="0" PointsTeamA="13" PointsTeamB="18" EndTimeOffset="2503360" UserSetsScore="true">
+        <LineUp NoPlayer1="227302" NoPlayer2="227488" NoPlayer3="227325" NoPlayer4="227317" NoPlayer5="227315" NoPlayer6="206801" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="233928" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="229342" NoTeam="8713" />
+        <Action TimeOffset="2329200" NoPlayer="227302" Skill="4" />
+        <Action TimeOffset="2331900" NoPlayer="229350" Skill="3" />
+        <Action TimeOffset="2332600" NoPlayer="229342" Skill="5" />
+        <Action TimeOffset="2333100" NoPlayer="233928" Note="3" Skill="6" />
+        <Action TimeOffset="2340200" NoPlayer="227317" Note="2" Skill="1" />
+      </Rally>
+      <Substitution TimeOffset="2503365" NoPlayerIn="233926" NoPlayerOut="234263" />
+      <Rally TimeOffset="2516649" No="70" Duration="20784" FaultAdmission="0" PointsTeamA="14" PointsTeamB="18" EndTimeOffset="2537433" UserSetsScore="true">
+        <LineUp NoPlayer1="227302" NoPlayer2="227488" NoPlayer3="227325" NoPlayer4="227317" NoPlayer5="227315" NoPlayer6="206801" NoTeam="8707" />
+        <LineUp NoPlayer1="229349" NoPlayer2="233928" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="229342" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="2351600" NoPlayer="229349" Skill="4" />
+        <Action TimeOffset="2354400" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="2355300" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="2358000" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="2360500" NoPlayer="229657" Skill="2" />
+        <Action TimeOffset="2363400" NoPlayer="227325" Skill="2" />
+        <Action TimeOffset="2364800" NoPlayer="227488" Skill="5" />
+        <Action TimeOffset="2366000" NoPlayer="227302" Skill="6" />
+        <Action TimeOffset="2367700" NoPlayer="229350" Skill="1" />
+        <Action TimeOffset="2369300" NoPlayer="229657" Note="1" Skill="2" />
+        <Action TimeOffset="2370000" NoPlayer="229342" Note="2" Skill="5" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="2537439" NoPlayerIn="227321" NoPlayerOut="227315" />
+      <Substitution TimeOffset="2541176" NoPlayerIn="234263" NoPlayerOut="229349" />
+      <Rally TimeOffset="2555773" No="71" Duration="41384" FaultAdmission="0" PointsTeamA="15" PointsTeamB="18" EndTimeOffset="2597157" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="206801" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="233928" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="229342" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="2399500" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="2401100" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="2402400" NoPlayer="229342" Skill="5" />
+        <Action TimeOffset="2404300" NoPlayer="229350" Skill="6" />
+        <Action TimeOffset="2406300" NoPlayer="227325" Note="1" Skill="2" />
+        <Action TimeOffset="2407400" NoPlayer="227321" Skill="5" />
+        <Action TimeOffset="2409700" NoPlayer="227302" Skill="6" />
+        <Action TimeOffset="2412600" NoPlayer="229350" Skill="1" />
+        <Action TimeOffset="2413100" NoPlayer="227325" Skill="2" />
+        <Action TimeOffset="2416700" NoPlayer="227317" Skill="5" />
+        <Action TimeOffset="2417100" NoPlayer="227302" Skill="6" />
+        <Action TimeOffset="2418500" NoPlayer="229342" Skill="2" />
+        <Action TimeOffset="2422300" NoPlayer="227488" Note="1" Skill="2" />
+        <Action TimeOffset="2423300" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="2428000" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="2429900" NoPlayer="234263" Skill="2" />
+        <Action TimeOffset="2433300" NoPlayer="227302" Note="1" Skill="2" />
+        <Action TimeOffset="2434100" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="2436700" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="2438600" NoPlayer="233926" Skill="1" />
+        <Action TimeOffset="2439200" NoPlayer="229342" Note="1" Skill="2" />
+        <Action TimeOffset="2440200" NoPlayer="234263" Skill="5" />
+        <Action TimeOffset="2440900" NoPlayer="233928" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Rally TimeOffset="2612047" No="72" Duration="16847" FaultAdmission="0" PointsTeamA="16" PointsTeamB="18" EndTimeOffset="2628894" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="206801" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="233928" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="229342" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="2497100" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="2498400" NoPlayer="234263" Note="1" Skill="3" />
+        <Action TimeOffset="2499600" NoPlayer="229342" Skill="5" />
+        <Action TimeOffset="2501300" NoPlayer="229350" Skill="6" />
+        <Action TimeOffset="2502900" NoPlayer="227302" Note="1" Skill="2" />
+        <Action TimeOffset="2503300" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="2504400" NoPlayer="227317" Note="3" Skill="6" />
+        <Action TimeOffset="2505300" NoPlayer="233926" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="2642521" No="73" Duration="15076" FaultAdmission="0" PointsTeamA="17" PointsTeamB="18" EndTimeOffset="2657597" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="206801" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="233928" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="229342" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="2522900" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="2525500" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="2526200" NoPlayer="229342" Skill="5" />
+        <Action TimeOffset="2526600" NoPlayer="229350" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Timeout TimeOffset="2663709" NoTeam="8713" />
+      <EndTimeout TimeOffset="2693709" />
+      <Rally TimeOffset="2716187" No="74" Duration="26798" FaultAdmission="0" PointsTeamA="18" PointsTeamB="18" EndTimeOffset="2742985" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="206801" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="233928" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="229342" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="2577500" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="2578900" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="2580300" NoPlayer="229342" Note="1" Skill="5" />
+        <Action TimeOffset="2582500" NoPlayer="233928" Skill="6" />
+        <Action TimeOffset="2590200" NoPlayer="227325" Note="1" Skill="2" />
+        <Action TimeOffset="2590900" NoPlayer="227302" Skill="5" />
+        <Action TimeOffset="2592100" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="2594400" NoPlayer="229350" Skill="2" />
+        <Action TimeOffset="2603500" NoPlayer="206801" Note="1" Skill="2" />
+        <Action TimeOffset="2604500" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="2608100" NoPlayer="227321" Skill="6" />
+        <Action TimeOffset="2609200" NoPlayer="234263" Note="1" Skill="2" />
+        <Action TimeOffset="2611000" NoPlayer="229342" Skill="5" />
+        <Action TimeOffset="2612400" NoPlayer="229350" Note="2" Skill="6" />
+        <Action TimeOffset="2614000" NoPlayer="227321" Note="3" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="2758675" No="75" Duration="18146" FaultAdmission="0" PointsTeamA="19" PointsTeamB="18" EndTimeOffset="2776821" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="206801" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="233928" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="229342" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="2649100" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="2650700" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="2654900" NoPlayer="227321" Note="1" Skill="2" />
+        <Action TimeOffset="2656100" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="2659200" NoPlayer="227317" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8713" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="2785357" NoPlayerIn="229343" NoPlayerOut="233928" />
+      <Substitution TimeOffset="2786844" NoPlayerIn="223514" NoPlayerOut="229342" />
+      <Rally TimeOffset="2818558" No="76" Duration="13666" FaultAdmission="0" PointsTeamA="20" PointsTeamB="18" EndTimeOffset="2832224" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="206801" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="2680700" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="2682500" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="2683800" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="2684900" NoPlayer="223514" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Rally TimeOffset="2846408" No="77" Duration="12237" FaultAdmission="0" PointsTeamA="20" PointsTeamB="19" EndTimeOffset="2858645" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="206801" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="2696200" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="2698100" NoPlayer="234263" Note="1" Skill="3" />
+        <Action TimeOffset="2699600" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="2701300" NoPlayer="229350" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="2861731" NoPlayerIn="227315" NoPlayerOut="227488" />
+      <Rally TimeOffset="2873181" No="78" Duration="13198" FaultAdmission="0" PointsTeamA="21" PointsTeamB="19" EndTimeOffset="2886379" UserSetsScore="true">
+        <LineUp NoPlayer1="227315" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="206801" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="2713800" NoPlayer="229343" Skill="4" />
+        <Action TimeOffset="2723600" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="2725000" NoPlayer="227325" Note="1" Skill="5" />
+        <Action TimeOffset="2727100" NoPlayer="227317" Note="3" Skill="6" />
+        <Action TimeOffset="2727900" NoPlayer="233926" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="2898964" No="79" Duration="10584" FaultAdmission="0" PointsTeamA="21" PointsTeamB="20" EndTimeOffset="2909548" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="206801" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="2742000" NoPlayer="227325" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8713" Note="3" />
+      </Rally>
+      <Rally TimeOffset="2921305" No="80" Duration="10608" FaultAdmission="0" PointsTeamA="21" PointsTeamB="21" EndTimeOffset="2931913" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="206801" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="2750900" NoPlayer="229350" Skill="4" />
+        <Action TimeOffset="2757300" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="2757900" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="2760100" NoPlayer="227317" Note="2" Skill="6" />
+        <Action TimeOffset="2761800" NoPlayer="229657" Note="3" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="2943909" No="81" Duration="16340" FaultAdmission="0" PointsTeamA="21" PointsTeamB="22" EndTimeOffset="2960249" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="206801" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="2781300" NoPlayer="229350" Skill="4" />
+        <Action TimeOffset="2783200" NoPlayer="227315" Skill="3" />
+        <Action TimeOffset="2787600" NoPlayer="234263" Note="1" Skill="2" />
+        <Action TimeOffset="2788600" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="2789500" NoPlayer="229657" Note="3" Skill="6" />
+        <Action TimeOffset="2791100" NoPlayer="227325" Note="2" Skill="2" />
+      </Rally>
+      <Rally TimeOffset="2979995" No="82" Duration="12520" FaultAdmission="0" PointsTeamA="22" PointsTeamB="22" EndTimeOffset="2992515" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="206801" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="2809800" NoPlayer="229350" Skill="4" />
+        <Action TimeOffset="2815700" NoPlayer="206801" Note="1" Skill="3" />
+        <Action TimeOffset="2817600" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="2819900" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="2821800" NoPlayer="229657" Skill="1" />
+        <Action TimeOffset="2824400" NoPlayer="223514" Note="1" Skill="2" />
+        <Action TimeOffset="2825000" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="2825500" NoPlayer="229657" Note="2" Skill="6" />
+        <Action TimeOffset="2832700" NoPlayer="227321" Note="3" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="3005933" No="83" Duration="9690" FaultAdmission="0" PointsTeamA="22" PointsTeamB="23" EndTimeOffset="3015623" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="206801" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="2849100" NoPlayer="227317" Skill="4" />
+        <Action TimeOffset="2851200" NoPlayer="234263" Note="1" Skill="3" />
+        <Action TimeOffset="2852200" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="2853400" NoPlayer="223514" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="3015628" NoPlayerIn="229349" NoPlayerOut="234263" />
+      <Substitution TimeOffset="3024076" NoPlayerIn="229656" NoPlayerOut="233926" />
+      <Timeout TimeOffset="3029449" NoTeam="8707" />
+      <EndTimeout TimeOffset="3059449" />
+      <Rally TimeOffset="3081765" No="84" Duration="7519" FaultAdmission="0" PointsTeamA="23" PointsTeamB="23" EndTimeOffset="3089284" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="206801" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229656" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="2914700" NoPlayer="229656" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="3089292" NoPlayerIn="227488" NoPlayerOut="227315" />
+      <Substitution TimeOffset="3096570" NoPlayerIn="233926" NoPlayerOut="229656" />
+      <Substitution TimeOffset="3100322" NoPlayerIn="234263" NoPlayerOut="233926" />
+      <Rally TimeOffset="3110073" No="85" Duration="9056" FaultAdmission="0" PointsTeamA="23" PointsTeamB="24" EndTimeOffset="3119129" UserSetsScore="true">
+        <LineUp NoPlayer1="227321" NoPlayer2="206801" NoPlayer3="227302" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="2932600" NoPlayer="227321" Skill="4" />
+        <Action TimeOffset="2940200" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="2941700" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="2943900" NoPlayer="223514" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="3124473" NoPlayerIn="227315" NoPlayerOut="227321" />
+      <Rally TimeOffset="3138938" No="86" Duration="8867" FaultAdmission="0" PointsTeamA="23" PointsTeamB="25" EndTimeOffset="3147805" UserSetsScore="true">
+        <LineUp NoPlayer1="227315" NoPlayer2="206801" NoPlayer3="227302" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="2963100" NoPlayer="223514" Skill="4" />
+        <Action TimeOffset="2969700" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="2970500" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="2971700" NoPlayer="227302" Note="2" Skill="6" />
+        <Action TimeOffset="2972800" NoPlayer="229343" Note="3" Skill="1" />
+      </Rally>
+    </Events>
+    <PlayerStatistics NoPlayer="227301" NoShirt="1" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227302" NoShirt="2" NoTeam="8707" TotalPoints="2" />
+    <PlayerStatistics NoPlayer="233156" NoShirt="4" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="233157" NoShirt="6" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227311" NoShirt="7" NoTeam="8707" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="240838" NoShirt="8" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227315" NoShirt="11" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227317" NoShirt="13" NoTeam="8707" TotalPoints="8" />
+    <PlayerStatistics NoPlayer="227318" NoShirt="14" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227321" NoShirt="17" NoTeam="8707" TotalPoints="2" />
+    <PlayerStatistics NoPlayer="227488" NoShirt="18" NoTeam="8707" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="238958" NoShirt="20" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227325" NoShirt="22" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="206801" NoShirt="23" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="229656" NoShirt="3" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229342" NoShirt="5" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229343" NoShirt="6" NoTeam="8713" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="229658" NoShirt="7" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="223514" NoShirt="8" NoTeam="8713" TotalPoints="5" />
+    <PlayerStatistics NoPlayer="229344" NoShirt="9" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229346" NoShirt="11" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229657" NoShirt="13" NoTeam="8713" TotalPoints="5" />
+    <PlayerStatistics NoPlayer="229349" NoShirt="15" NoTeam="8713" TotalPoints="2" />
+    <PlayerStatistics NoPlayer="229350" NoShirt="16" NoTeam="8713" TotalPoints="5" />
+    <PlayerStatistics NoPlayer="234263" NoShirt="19" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="233926" NoShirt="24" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="233928" NoShirt="26" NoTeam="8713" TotalPoints="2" />
+    <PlayerStatistics NoPlayer="215821" NoShirt="28" NoTeam="8713" />
+    
+    
+  </Set>
+  <Set BeginTimeOffset="3300000" No="3" Duration="1260" NbRallies="42" NbRemainingSubstitutionTeamA="7" NbRemainingSubstitutionTeamB="7" NbSetPointsTeamB="3" NbSubstitutionTeamA="1" NbSubstitutionTeamB="1" NbTimeoutTeamA="2" NoServingTeam="8713" NoTeamAtLeft="8713" NoTeamAtRight="8707" PointsTeamA="17" PointsTeamB="25" TimePlayed="577211">
+    <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="227488" NoLibero1="227315" NoSubstitute5="206801" NoTeam="8707" />
+    <LineUp NoPlayer1="229349" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoLibero1="234263" NoSubstitute3="229346" NoTeam="8713" />
+    <Events>
+      <Substitution TimeOffset="3352420" NoPlayerIn="234263" NoPlayerOut="229349" />
+      <Substitution TimeOffset="3370414" NoPlayerIn="227315" NoPlayerOut="227488" />
+      <Rally TimeOffset="3382516" No="87" Duration="12814" FaultAdmission="0" PointsTeamA="0" PointsTeamB="1" EndTimeOffset="3395330" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="3215300" NoPlayer="227325" Skill="4" />
+        <Action TimeOffset="3216800" NoPlayer="229657" Skill="3" />
+        <Action TimeOffset="3218300" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="3219900" NoPlayer="233926" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="3407396" No="88" Duration="15429" FaultAdmission="0" PointsTeamA="0" PointsTeamB="2" EndTimeOffset="3422825" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="3237500" NoPlayer="229343" Skill="4" />
+        <Action TimeOffset="3240100" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="3241700" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="3245200" NoPlayer="227311" Skill="6" />
+        <Action TimeOffset="3249000" NoPlayer="233926" Skill="1" />
+        <Action TimeOffset="3249500" NoPlayer="229350" Note="1" Skill="2" />
+        <Action TimeOffset="3251500" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="3253100" NoPlayer="229657" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="3433808" No="89" Duration="22534" FaultAdmission="0" PointsTeamA="0" PointsTeamB="3" EndTimeOffset="3456342" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="3268800" NoPlayer="229343" Skill="4" />
+        <Action TimeOffset="3270900" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="3272500" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="3273500" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="3277300" NoPlayer="223514" Note="1" Skill="2" />
+        <Action TimeOffset="3278500" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="3281800" NoPlayer="229350" Skill="6" />
+        <Action TimeOffset="3284500" NoPlayer="227315" Note="1" Skill="2" />
+        <Action TimeOffset="3285000" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="3286200" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="3287600" NoPlayer="229657" Note="1" Skill="2" />
+        <Action TimeOffset="3289300" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="3289800" NoPlayer="229350" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="3469986" No="90" Duration="17244" FaultAdmission="0" PointsTeamA="0" PointsTeamB="4" EndTimeOffset="3487230" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="3311700" NoPlayer="229343" Skill="4" />
+        <Action TimeOffset="3313300" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="3315400" NoPlayer="227325" Note="1" Skill="5" />
+        <Action TimeOffset="3317900" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="3318500" NoPlayer="229657" Note="1" Skill="2" />
+        <Action TimeOffset="3319200" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="3319700" NoPlayer="229350" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="3499199" No="91" Duration="15131" FaultAdmission="0" PointsTeamA="1" PointsTeamB="4" EndTimeOffset="3514330" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="3337300" NoPlayer="229343" Skill="4" />
+        <Action TimeOffset="3338400" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="3339200" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="3340300" NoPlayer="227321" Skill="6" />
+        <Action TimeOffset="3342100" NoPlayer="223514" Skill="2" />
+        <Action TimeOffset="3347900" NoPlayer="227321" Note="3" Skill="6" />
+        <Action TimeOffset="3349800" NoPlayer="223514" Note="2" Skill="2" />
+      </Rally>
+      <Rally TimeOffset="3527528" No="92" Duration="7256" FaultAdmission="0" PointsTeamA="1" PointsTeamB="5" EndTimeOffset="3534784" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="3362900" NoPlayer="227317" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8713" Note="3" />
+      </Rally>
+      <Rally TimeOffset="3552115" No="93" Duration="13314" FaultAdmission="0" PointsTeamA="2" PointsTeamB="5" EndTimeOffset="3565429" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="3375000" NoPlayer="229350" Skill="4" />
+        <Action TimeOffset="3384500" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="3386200" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="3387000" NoPlayer="227302" Note="3" Skill="6" />
+        <Action TimeOffset="3393600" NoPlayer="223514" Note="2" Skill="1" />
+      </Rally>
+      <Substitution TimeOffset="3565434" NoPlayerIn="227488" NoPlayerOut="227315" />
+      <Rally TimeOffset="3579936" No="94" Duration="14667" FaultAdmission="0" PointsTeamA="2" PointsTeamB="6" EndTimeOffset="3594603" UserSetsScore="true">
+        <LineUp NoPlayer1="227321" NoPlayer2="227311" NoPlayer3="227302" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="3410000" NoPlayer="227321" Skill="4" />
+        <Action TimeOffset="3413600" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="3414800" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="3420500" NoPlayer="229657" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="3594610" NoPlayerIn="229349" NoPlayerOut="234263" />
+      <Substitution TimeOffset="3596914" NoPlayerIn="227315" NoPlayerOut="227321" />
+      <Rally TimeOffset="3604974" No="95" Duration="13554" FaultAdmission="0" PointsTeamA="2" PointsTeamB="7" EndTimeOffset="3618528" UserSetsScore="true">
+        <LineUp NoPlayer1="227315" NoPlayer2="227311" NoPlayer3="227302" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="3437000" NoPlayer="233926" Skill="4" />
+        <Action TimeOffset="3439200" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="3440600" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="3445200" NoPlayer="227488" Note="2" Skill="6" />
+        <Action TimeOffset="3447700" NoPlayer="223514" Note="3" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="3630328" No="96" Duration="14467" FaultAdmission="0" PointsTeamA="3" PointsTeamB="7" EndTimeOffset="3644795" UserSetsScore="true">
+        <LineUp NoPlayer1="227315" NoPlayer2="227311" NoPlayer3="227302" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="3463500" NoPlayer="233926" Skill="4" />
+        <Action TimeOffset="3465000" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="3466300" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="3471300" NoPlayer="227311" Note="3" Skill="6" />
+        <Action TimeOffset="3474200" NoPlayer="229343" Note="2" Skill="2" />
+      </Rally>
+      <Substitution TimeOffset="3647953" NoPlayerIn="234263" NoPlayerOut="233926" />
+      <Rally TimeOffset="3657527" No="97" Duration="14595" FaultAdmission="0" PointsTeamA="4" PointsTeamB="7" EndTimeOffset="3672122" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="227302" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="3490900" NoPlayer="227311" Skill="4" />
+        <Action TimeOffset="3491700" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="3492500" NoPlayer="229350" Skill="5" />
+        <Action TimeOffset="3493600" NoPlayer="223514" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Rally TimeOffset="3682516" No="98" Duration="9665" FaultAdmission="0" PointsTeamA="4" PointsTeamB="8" EndTimeOffset="3692181" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="227302" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="3512600" NoPlayer="227311" Skill="4" />
+        <Action TimeOffset="3515800" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="3520100" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="3522400" NoPlayer="229349" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="3703513" No="99" Duration="6134" FaultAdmission="0" PointsTeamA="5" PointsTeamB="8" EndTimeOffset="3709647" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="227302" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="3534000" NoPlayer="223514" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Rally TimeOffset="3721271" No="100" Duration="12610" FaultAdmission="0" PointsTeamA="5" PointsTeamB="9" EndTimeOffset="3733881" UserSetsScore="true">
+        <LineUp NoPlayer1="227302" NoPlayer2="227488" NoPlayer3="227325" NoPlayer4="227317" NoPlayer5="227315" NoPlayer6="227311" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="3554000" NoPlayer="227302" Skill="4" />
+        <Action TimeOffset="3555500" NoPlayer="229350" Skill="3" />
+        <Action TimeOffset="3556500" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="3557500" NoPlayer="229657" Note="3" Skill="6" />
+        <Action TimeOffset="3558500" NoPlayer="227325" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="3748422" No="101" Duration="8728" FaultAdmission="0" PointsTeamA="6" PointsTeamB="9" EndTimeOffset="3757150" UserSetsScore="true">
+        <LineUp NoPlayer1="227302" NoPlayer2="227488" NoPlayer3="227325" NoPlayer4="227317" NoPlayer5="227315" NoPlayer6="227311" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="3576300" NoPlayer="229657" Skill="4" />
+        <Action TimeOffset="3578200" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="3579700" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="3583600" NoPlayer="227317" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8713" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="3757156" NoPlayerIn="227321" NoPlayerOut="227315" />
+      <Rally TimeOffset="3770678" No="102" Duration="13257" FaultAdmission="0" PointsTeamA="7" PointsTeamB="9" EndTimeOffset="3783935" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="3605000" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="3606400" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="3608100" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="3610500" NoPlayer="229349" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Rally TimeOffset="3793974" No="103" Duration="12190" FaultAdmission="0" PointsTeamA="7" PointsTeamB="10" EndTimeOffset="3806164" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229350" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="3625000" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="3626800" NoPlayer="234263" Note="1" Skill="3" />
+        <Action TimeOffset="3628300" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="3629600" NoPlayer="229350" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="3806169" NoPlayerIn="233926" NoPlayerOut="234263" />
+      <Substitution TimeOffset="3809899" NoPlayerIn="227315" NoPlayerOut="227488" />
+      <Rally TimeOffset="3824213" No="104" Duration="6495" FaultAdmission="0" PointsTeamA="8" PointsTeamB="10" EndTimeOffset="3830708" UserSetsScore="true">
+        <LineUp NoPlayer1="227315" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="227302" NoTeam="8707" />
+        <LineUp NoPlayer1="229349" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="3658800" NoPlayer="229349" Skill="4" />
+        <Action TimeOffset="3660500" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="3662900" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="3665600" NoPlayer="227317" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8713" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="3837815" NoPlayerIn="234263" NoPlayerOut="229349" />
+      <Rally TimeOffset="3845869" No="105" Duration="11838" FaultAdmission="0" PointsTeamA="8" PointsTeamB="11" EndTimeOffset="3857707" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229350" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="3715200" NoPlayer="227325" Skill="4" />
+        <Action TimeOffset="3716600" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="3717800" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="3718600" NoPlayer="229350" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="3872493" No="106" Duration="17333" FaultAdmission="0" PointsTeamA="9" PointsTeamB="11" EndTimeOffset="3889826" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="227302" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="3729100" NoPlayer="229343" Skill="4" />
+        <Action TimeOffset="3730700" NoPlayer="227302" Skill="3" />
+        <Action TimeOffset="3732600" NoPlayer="227325" Note="1" Skill="5" />
+        <Action TimeOffset="3733900" NoPlayer="227317" Skill="6" />
+        <Action TimeOffset="3734900" NoPlayer="229657" Note="1" Skill="2" />
+        <Action TimeOffset="3735700" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="3736800" NoPlayer="229350" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Rally TimeOffset="3902877" No="107" Duration="20542" FaultAdmission="0" PointsTeamA="9" PointsTeamB="12" EndTimeOffset="3923419" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229350" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="3755000" NoPlayer="227317" Skill="4" />
+        <Action TimeOffset="3756500" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="3758000" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="3759300" NoPlayer="223514" Skill="6" />
+        <Action TimeOffset="3760500" NoPlayer="227315" Note="1" Skill="2" />
+        <Action TimeOffset="3762700" NoPlayer="227321" Skill="5" />
+        <Action TimeOffset="3764300" NoPlayer="227302" Skill="6" />
+        <Action TimeOffset="3765400" NoPlayer="229343" Note="1" Skill="2" />
+        <Action TimeOffset="3766100" NoPlayer="234263" Skill="5" />
+        <Action TimeOffset="3766700" NoPlayer="229350" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="3934274" No="108" Duration="11787" FaultAdmission="0" PointsTeamA="9" PointsTeamB="13" EndTimeOffset="3946061" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="3789600" NoPlayer="229350" Skill="4" />
+        <Action TimeOffset="3791100" NoPlayer="227315" Skill="3" />
+        <Action TimeOffset="3792400" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="3793100" NoPlayer="227302" Note="2" Skill="6" />
+        <Action TimeOffset="3794600" NoPlayer="233926" Note="3" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="3959533" No="109" Duration="23042" FaultAdmission="0" PointsTeamA="10" PointsTeamB="13" EndTimeOffset="3982575" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="227302" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="3813600" NoPlayer="229350" Skill="4" />
+        <Action TimeOffset="3815500" NoPlayer="227315" Skill="3" />
+        <Action TimeOffset="3817500" NoPlayer="227317" Skill="5" />
+        <Action TimeOffset="3818000" NoPlayer="227302" Skill="6" />
+        <Action TimeOffset="3819600" NoPlayer="229343" Note="1" Skill="2" />
+        <Action TimeOffset="3820200" NoPlayer="234263" Skill="5" />
+        <Action TimeOffset="3821100" NoPlayer="229657" Skill="6" />
+        <Action TimeOffset="3826000" NoPlayer="227302" Skill="2" />
+        <Action TimeOffset="3827100" NoPlayer="234263" Note="1" Skill="2" />
+        <Action TimeOffset="3827900" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="3830000" NoPlayer="229657" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="3982580" NoPlayerIn="227488" NoPlayerOut="227315" />
+      <Rally TimeOffset="3996571" No="110" Duration="9497" FaultAdmission="0" PointsTeamA="10" PointsTeamB="14" EndTimeOffset="4006068" UserSetsScore="true">
+        <LineUp NoPlayer1="227321" NoPlayer2="227311" NoPlayer3="227302" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="229350" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="3850200" NoPlayer="227321" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8713" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="4006075" NoPlayerIn="229349" NoPlayerOut="234263" />
+      <Substitution TimeOffset="4009916" NoPlayerIn="227315" NoPlayerOut="227321" />
+      <Rally TimeOffset="4019033" No="111" Duration="8886" FaultAdmission="0" PointsTeamA="11" PointsTeamB="14" EndTimeOffset="4027919" UserSetsScore="true">
+        <LineUp NoPlayer1="227315" NoPlayer2="227311" NoPlayer3="227302" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="233926" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="3859100" NoPlayer="233926" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="4030385" NoPlayerIn="234263" NoPlayerOut="233926" />
+      <Rally TimeOffset="4040534" No="112" Duration="23207" FaultAdmission="0" PointsTeamA="11" PointsTeamB="15" EndTimeOffset="4063741" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="227302" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="223514" NoPlayer3="229657" NoPlayer4="229349" NoPlayer5="229343" NoPlayer6="229350" NoTeam="8713" />
+        <Action TimeOffset="3868400" NoPlayer="227311" Skill="4" />
+        <Action TimeOffset="3877200" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="3878000" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="3879500" NoPlayer="229349" Skill="6" />
+        <Action TimeOffset="3883100" NoPlayer="227488" Skill="1" />
+        <Action TimeOffset="3884500" NoPlayer="227317" Note="1" Skill="2" />
+        <Action TimeOffset="3884900" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="3887600" NoPlayer="227311" Skill="6" />
+        <Action TimeOffset="3888400" NoPlayer="229350" Note="1" Skill="2" />
+        <Action TimeOffset="3889200" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="3889700" NoPlayer="223514" Skill="6" />
+        <Action TimeOffset="3891700" NoPlayer="227488" Skill="1" />
+        <Action TimeOffset="3894000" NoPlayer="227311" Note="1" Skill="2" />
+        <Action TimeOffset="3894400" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="3895600" NoPlayer="227317" Note="2" Skill="6" />
+        <Action TimeOffset="3896300" NoPlayer="229657" Note="3" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="4085081" No="113" Duration="19141" FaultAdmission="0" PointsTeamA="11" PointsTeamB="16" EndTimeOffset="4104222" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="227302" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="3922800" NoPlayer="223514" Skill="4" />
+        <Action TimeOffset="3925200" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="3925900" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="3927000" NoPlayer="227302" Skill="6" />
+        <Action TimeOffset="3929200" NoPlayer="229349" Skill="1" />
+        <Action TimeOffset="3930100" NoPlayer="227302" Skill="2" />
+        <Action TimeOffset="3931400" NoPlayer="223514" Note="1" Skill="2" />
+        <Action TimeOffset="3932400" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="3934000" NoPlayer="229657" Note="3" Skill="6" />
+        <Action TimeOffset="3935500" NoPlayer="227317" Note="2" Skill="2" />
+      </Rally>
+      <Timeout TimeOffset="4113541" NoTeam="8707" />
+      <EndTimeout TimeOffset="4143541" />
+      <Substitution TimeOffset="4171497" NoPlayerIn="206801" NoPlayerOut="227302" />
+      <Rally TimeOffset="4181267" No="114" Duration="8882" FaultAdmission="0" PointsTeamA="11" PointsTeamB="17" EndTimeOffset="4190149" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="206801" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="4009800" NoPlayer="223514" Skill="4" />
+        <Action TimeOffset="4012000" NoPlayer="206801" Skill="3" />
+        <Action TimeOffset="4013600" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="4015100" NoPlayer="227488" Note="2" Skill="6" />
+        <Action TimeOffset="4016800" NoPlayer="229657" Note="3" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="4202912" No="115" Duration="15060" FaultAdmission="0" PointsTeamA="11" PointsTeamB="18" EndTimeOffset="4217972" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="206801" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="4029500" NoPlayer="223514" Skill="4" />
+        <Action TimeOffset="4032100" NoPlayer="206801" Skill="3" />
+        <Action TimeOffset="4032900" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="4035400" NoPlayer="227311" Skill="6" />
+        <Action TimeOffset="4035900" NoPlayer="229349" Skill="1" />
+        <Action TimeOffset="4036500" NoPlayer="229350" Note="1" Skill="2" />
+        <Action TimeOffset="4037400" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="4037900" NoPlayer="223514" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="4227448" No="116" Duration="25569" FaultAdmission="0" PointsTeamA="11" PointsTeamB="19" EndTimeOffset="4253017" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="206801" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="4055100" NoPlayer="223514" Skill="4" />
+        <Action TimeOffset="4058800" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="4059500" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="4060000" NoPlayer="206801" Skill="6" />
+        <Action TimeOffset="4061700" NoPlayer="234263" Note="1" Skill="2" />
+        <Action TimeOffset="4062800" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="4064200" NoPlayer="229657" Skill="6" />
+        <Action TimeOffset="4066000" NoPlayer="227311" Note="1" Skill="2" />
+        <Action TimeOffset="4066700" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="4067400" NoPlayer="206801" Skill="6" />
+        <Action TimeOffset="4070300" NoPlayer="223514" Skill="2" />
+        <Action TimeOffset="4071900" NoPlayer="227488" Skill="6" />
+        <Action TimeOffset="4073800" NoPlayer="229657" Skill="2" />
+        <Action TimeOffset="4074900" NoPlayer="227315" Note="1" Skill="2" />
+        <Action TimeOffset="4075600" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="4076800" NoPlayer="206801" Note="2" Skill="6" />
+        <Action TimeOffset="4078100" NoPlayer="229343" Note="3" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="4269925" No="117" Duration="9646" FaultAdmission="0" PointsTeamA="12" PointsTeamB="19" EndTimeOffset="4279571" UserSetsScore="true">
+        <LineUp NoPlayer1="227311" NoPlayer2="206801" NoPlayer3="227488" NoPlayer4="227325" NoPlayer5="227317" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="4105400" NoPlayer="223514" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Rally TimeOffset="4292375" No="118" Duration="11346" FaultAdmission="0" PointsTeamA="12" PointsTeamB="20" EndTimeOffset="4303721" UserSetsScore="true">
+        <LineUp NoPlayer1="206801" NoPlayer2="227488" NoPlayer3="227325" NoPlayer4="227317" NoPlayer5="227315" NoPlayer6="227311" NoTeam="8707" />
+        <LineUp NoPlayer1="223514" NoPlayer2="229657" NoPlayer3="229349" NoPlayer4="229343" NoPlayer5="229350" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="4120700" NoPlayer="206801" Skill="4" />
+        <Action TimeOffset="4124300" NoPlayer="229350" Skill="3" />
+        <Action TimeOffset="4125700" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="4127100" NoPlayer="229349" Note="3" Skill="6" />
+        <Action TimeOffset="4128900" NoPlayer="227317" Note="2" Skill="1" />
+      </Rally>
+      <Timeout TimeOffset="4313109" NoTeam="8707" />
+      <EndTimeout TimeOffset="4343109" />
+      <Substitution TimeOffset="4364431" NoPlayerIn="229346" NoPlayerOut="229350" />
+      <Rally TimeOffset="4372657" No="119" Duration="14003" FaultAdmission="0" PointsTeamA="13" PointsTeamB="20" EndTimeOffset="4386660" UserSetsScore="true">
+        <LineUp NoPlayer1="206801" NoPlayer2="227488" NoPlayer3="227325" NoPlayer4="227317" NoPlayer5="227315" NoPlayer6="227311" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229346" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="4202500" NoPlayer="229657" Skill="4" />
+        <Action TimeOffset="4204700" NoPlayer="206801" Skill="3" />
+        <Action TimeOffset="4206400" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="4207800" NoPlayer="227317" Note="3" Skill="6" />
+        <Action TimeOffset="4211600" NoPlayer="229349" Note="2" Skill="1" />
+      </Rally>
+      <Substitution TimeOffset="4386665" NoPlayerIn="227321" NoPlayerOut="227315" />
+      <Rally TimeOffset="4398199" No="120" Duration="19298" FaultAdmission="0" PointsTeamA="14" PointsTeamB="20" EndTimeOffset="4417497" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="206801" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229346" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="4229300" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="4233100" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="4235200" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="4236200" NoPlayer="229346" Skill="6" />
+        <Action TimeOffset="4237800" NoPlayer="227311" Note="1" Skill="2" />
+        <Action TimeOffset="4238400" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="4239000" NoPlayer="227317" Note="3" Skill="6" />
+        <Action TimeOffset="4240200" NoPlayer="229349" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="4429260" No="121" Duration="15906" FaultAdmission="0" PointsTeamA="14" PointsTeamB="21" EndTimeOffset="4445166" UserSetsScore="true">
+        <LineUp NoPlayer1="227488" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="206801" NoTeam="8707" />
+        <LineUp NoPlayer1="229657" NoPlayer2="229349" NoPlayer3="229343" NoPlayer4="229346" NoPlayer5="234263" NoPlayer6="223514" NoTeam="8713" />
+        <Action TimeOffset="4261400" NoPlayer="227488" Skill="4" />
+        <Action TimeOffset="4265200" NoPlayer="234263" Skill="3" />
+        <Action TimeOffset="4266400" NoPlayer="229343" Skill="5" />
+        <Action TimeOffset="4267100" NoPlayer="229346" Note="3" Skill="6" />
+        <Action TimeOffset="4269300" NoPlayer="206801" Note="2" Skill="2" />
+      </Rally>
+      <Substitution TimeOffset="4445171" NoPlayerIn="233926" NoPlayerOut="234263" />
+      <Substitution TimeOffset="4449382" NoPlayerIn="227315" NoPlayerOut="227488" />
+      <Rally TimeOffset="4458537" No="122" Duration="4870" FaultAdmission="0" PointsTeamA="15" PointsTeamB="21" EndTimeOffset="4463407" UserSetsScore="true">
+        <LineUp NoPlayer1="227315" NoPlayer2="227325" NoPlayer3="227317" NoPlayer4="227321" NoPlayer5="227311" NoPlayer6="206801" NoTeam="8707" />
+        <LineUp NoPlayer1="229349" NoPlayer2="229343" NoPlayer3="229346" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="4285600" NoPlayer="229349" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="4465834" NoPlayerIn="234263" NoPlayerOut="229349" />
+      <Rally TimeOffset="4476896" No="123" Duration="15656" FaultAdmission="0" PointsTeamA="15" PointsTeamB="22" EndTimeOffset="4492552" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="206801" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="234263" NoPlayer2="229343" NoPlayer3="229346" NoPlayer4="233926" NoPlayer5="223514" NoPlayer6="229657" NoTeam="8713" />
+        <Action TimeOffset="4308600" NoPlayer="227325" Skill="4" />
+        <Action TimeOffset="4310200" NoPlayer="229657" Skill="3" />
+        <Action TimeOffset="4312700" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="4313700" NoPlayer="229343" Skill="6" />
+        <Action TimeOffset="4315100" NoPlayer="227321" Note="1" Skill="2" />
+        <Action TimeOffset="4316500" NoPlayer="206801" Skill="5" />
+        <Action TimeOffset="4316800" NoPlayer="227317" Note="2" Skill="6" />
+        <Action TimeOffset="4318000" NoPlayer="233926" Note="3" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="4506942" No="124" Duration="12873" FaultAdmission="0" PointsTeamA="16" PointsTeamB="22" EndTimeOffset="4519815" UserSetsScore="true">
+        <LineUp NoPlayer1="227325" NoPlayer2="227317" NoPlayer3="227321" NoPlayer4="227311" NoPlayer5="206801" NoPlayer6="227315" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229346" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="4336700" NoPlayer="229343" Skill="4" />
+        <Action TimeOffset="4339300" NoPlayer="227317" Skill="3" />
+        <Action TimeOffset="4341900" NoPlayer="227325" Note="1" Skill="5" />
+        <Action TimeOffset="4342500" NoPlayer="227317" Note="3" Skill="6" />
+        <Action TimeOffset="4343500" NoPlayer="229346" Note="2" Skill="1" />
+      </Rally>
+      <Rally TimeOffset="4532759" No="125" Duration="6596" FaultAdmission="0" PointsTeamA="16" PointsTeamB="23" EndTimeOffset="4539355" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="206801" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229343" NoPlayer2="229346" NoPlayer3="233926" NoPlayer4="223514" NoPlayer5="229657" NoPlayer6="234263" NoTeam="8713" />
+        <Action TimeOffset="4361200" NoPlayer="227317" Note="2" Skill="4" />
+        <TeamPoint NoTeam="8713" Note="3" />
+      </Rally>
+      <Rally TimeOffset="4550688" No="126" Duration="14333" FaultAdmission="0" PointsTeamA="16" PointsTeamB="24" EndTimeOffset="4565021" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="206801" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229346" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="4384300" NoPlayer="229346" Skill="4" />
+        <Action TimeOffset="4386700" NoPlayer="227315" Skill="3" />
+        <Action TimeOffset="4388200" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="4390600" NoPlayer="227311" Skill="6" />
+        <Action TimeOffset="4391500" NoPlayer="223514" Note="1" Skill="2" />
+        <Action TimeOffset="4391900" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="4392900" NoPlayer="233926" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Rally TimeOffset="4577874" No="127" Duration="14420" FaultAdmission="0" PointsTeamA="17" PointsTeamB="24" EndTimeOffset="4592294" UserSetsScore="true">
+        <LineUp NoPlayer1="227317" NoPlayer2="227321" NoPlayer3="227311" NoPlayer4="206801" NoPlayer5="227315" NoPlayer6="227325" NoTeam="8707" />
+        <LineUp NoPlayer1="229346" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="4406600" NoPlayer="229346" Skill="4" />
+        <Action TimeOffset="4408900" NoPlayer="206801" Skill="3" />
+        <Action TimeOffset="4410900" NoPlayer="227325" Skill="5" />
+        <Action TimeOffset="4412600" NoPlayer="206801" Skill="6" />
+        <Action TimeOffset="4414000" NoPlayer="229343" Note="1" Skill="2" />
+        <Action TimeOffset="4414400" NoPlayer="234263" Skill="5" />
+        <Action TimeOffset="4415400" NoPlayer="229657" Note="2" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="3" />
+      </Rally>
+      <Substitution TimeOffset="4592299" NoPlayerIn="227488" NoPlayerOut="227315" />
+      <Rally TimeOffset="4605461" No="128" Duration="13396" FaultAdmission="0" PointsTeamA="17" PointsTeamB="25" EndTimeOffset="4618857" UserSetsScore="true">
+        <LineUp NoPlayer1="227321" NoPlayer2="227311" NoPlayer3="206801" NoPlayer4="227488" NoPlayer5="227325" NoPlayer6="227317" NoTeam="8707" />
+        <LineUp NoPlayer1="229346" NoPlayer2="233926" NoPlayer3="223514" NoPlayer4="229657" NoPlayer5="234263" NoPlayer6="229343" NoTeam="8713" />
+        <Action TimeOffset="4438500" NoPlayer="227321" Skill="4" />
+        <Action TimeOffset="4440100" NoPlayer="234263" Note="1" Skill="3" />
+        <Action TimeOffset="4442000" NoPlayer="229343" Note="1" Skill="5" />
+        <Action TimeOffset="4443400" NoPlayer="223514" Note="3" Skill="6" />
+        <TeamPoint NoTeam="8707" Note="2" />
+      </Rally>
+      <Substitution TimeOffset="4618863" NoPlayerIn="229349" NoPlayerOut="234263" />
+    </Events>
+    <PlayerStatistics NoPlayer="227301" NoShirt="1" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227302" NoShirt="2" NoTeam="8707" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="233156" NoShirt="4" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="233157" NoShirt="6" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227311" NoShirt="7" NoTeam="8707" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="240838" NoShirt="8" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227315" NoShirt="11" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227317" NoShirt="13" NoTeam="8707" TotalPoints="5" />
+    <PlayerStatistics NoPlayer="227318" NoShirt="14" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227321" NoShirt="17" NoTeam="8707" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="227488" NoShirt="18" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="238958" NoShirt="20" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="227325" NoShirt="22" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="206801" NoShirt="23" NoTeam="8707" />
+    <PlayerStatistics NoPlayer="229656" NoShirt="3" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229342" NoShirt="5" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229343" NoShirt="6" NoTeam="8713" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="229658" NoShirt="7" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="223514" NoShirt="8" NoTeam="8713" TotalPoints="3" />
+    <PlayerStatistics NoPlayer="229344" NoShirt="9" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="229346" NoShirt="11" NoTeam="8713" TotalPoints="1" />
+    <PlayerStatistics NoPlayer="229657" NoShirt="13" NoTeam="8713" TotalPoints="6" />
+    <PlayerStatistics NoPlayer="229349" NoShirt="15" NoTeam="8713" TotalPoints="2" />
+    <PlayerStatistics NoPlayer="229350" NoShirt="16" NoTeam="8713" TotalPoints="5" />
+    <PlayerStatistics NoPlayer="234263" NoShirt="19" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="233926" NoShirt="24" NoTeam="8713" TotalPoints="4" />
+    <PlayerStatistics NoPlayer="233928" NoShirt="26" NoTeam="8713" />
+    <PlayerStatistics NoPlayer="215821" NoShirt="28" NoTeam="8713" />
+    
+    
+  </Set>
+</VolleyLive></Responses>

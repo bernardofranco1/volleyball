@@ -51,6 +51,15 @@ export function stabiliseLineups(
   matchNo: number,
   board: VisBoardData,
   rallies: number,
+  /**
+   * Sides whose six was ENFORCED from the rules rather than read off the feed
+   * (spec/43). Those need no steadying — they are not the feed's opinion, they
+   * are derived from the score and the recorded serves, so holding them back
+   * would only add a poll of latency to a rotation that is already correct.
+   * They are still recorded as shown, so that if enforcement later loses its
+   * inputs and this side falls back to the feed, it falls back to the present.
+   */
+  enforced: { A: boolean; B: boolean } = { A: false, B: false },
 ): VisBoardData {
   const prev = held.get(matchNo);
   const fresh: Held = {
@@ -59,11 +68,18 @@ export function stabiliseLineups(
     pending: { A: null, B: null },
   };
 
+  if (enforced.A && enforced.B) {
+    if (held.size > MAX_TRACKED) held.clear();
+    held.set(matchNo, fresh);
+    return board;
+  }
+
   if (!prev || rallies !== prev.rallies) {
     // A new rally (or a new match, or a new set): the feed is describing
     // something that just happened, so take it — unless it is telling us a
     // libero is about to serve, which is never true.
     for (const side of ["A", "B"] as const) {
+      if (enforced[side]) continue;
       const six = side === "A" ? board.teamA.players : board.teamB.players;
       if (prev && six.length > 0 && liberoOnServe(board, side, six)) {
         fresh.shown[side] = prev.shown[side];
@@ -77,6 +93,7 @@ export function stabiliseLineups(
   // Same rally: only adopt a change once it has repeated, and never adopt a
   // libero into the serving position.
   for (const side of ["A", "B"] as const) {
+    if (enforced[side]) continue;
     const incoming = side === "A" ? board.teamA.players : board.teamB.players;
     const shown = prev.shown[side];
     if (incoming.length === 0) {

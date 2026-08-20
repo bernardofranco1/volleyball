@@ -20,6 +20,8 @@ import { eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { competitions } from "@/db/schema";
 import {
+  isNoChanges,
+  payloadVersion,
   visRequest,
   volleyLiveEnvelope,
   volleyMatchEnvelope,
@@ -34,15 +36,18 @@ import {
 } from "./board-data";
 import { MOCK_MATCH_NO, mockLiveXml } from "./mock";
 import { pollIntervalMs } from "./cadence";
-import { tagBlocks, num, type Attrs } from "./parse";
+import { allTagAttrs, tagBlocks, num, type Attrs } from "./parse";
 import {
   auditSet,
+  enforcementRows,
   firstServerFor,
-  liberosOf,
   noteFirstServer,
   recordRotationAudit,
 } from "./rotation-audit";
 import { stabiliseLineups } from "./lineup-stability";
+import { designatedLiberos, parseSetEvents, playerSides } from "./events";
+import { enforceLineups, type EnforcedLineups } from "./serve-succession";
+import { sixOf } from "./rotation";
 
 interface Entry<T> {
   value: T;
@@ -58,6 +63,12 @@ interface Entry<T> {
    * watching, and every other check is green throughout.
    */
   changedAt: number;
+  /**
+   * The feed's own `VolleyLive@Version` for this payload (spec/43). Sent back
+   * on the next poll: VIS answers `<NoChanges/>` when nothing has moved, which
+   * is most polls of a match that is not in a rally.
+   */
+  visVersion?: number;
 }
 
 const MATCH_LIST_TTL_MS = 60_000;
@@ -151,29 +162,32 @@ export async function getBoard(
 
   return dedupe(`board:${matchNo}`, async () => {
     try {
-      const xml = await visRequest(volleyLiveEnvelope(matchNo));
-      const sets = tagBlocks(xml, "Set").sort(
-        (a, b) => num(a.attrs, "No") - num(b.attrs, "No"),
+      // The Version handshake (spec/43): ask only for what has changed since
+      // the payload we already hold.
+      let xml = await visRequest(
+        volleyLiveEnvelope(matchNo, undefined, hit?.visVersion ?? 0),
       );
-      const latestSet = sets[sets.length - 1] ?? null;
-      const setNo = num(latestSet?.attrs, "No", 0);
-      const rallyCount = latestSet
-        ? (latestSet.inner.match(/<Rally\b/g) ?? []).length
-        : 0;
+      if (isNoChanges(xml)) {
+        if (hit) {
+          // Nothing moved. The READ is fresh — so `at` advances and the board
+          // stops being served as stale — but the payload, and therefore
+          // `changedAt`, is untouched: spec/41's frozen-feed detector depends
+          // on `changedAt` meaning "the score actually moved".
+          const stamp = Date.now();
+          const entry: Entry<VisBoardData> = {
+            ...hit,
+            at: stamp,
+            ttlMs: pollIntervalMs(hit.value),
+          };
+          boards.set(matchNo, entry);
+          return aged(entry, stamp);
+        }
+        // A version we cannot have come by honestly, or a cache dropped under
+        // us mid-flight: ask again for everything.
+        xml = await visRequest(volleyLiveEnvelope(matchNo, undefined, 0));
+      }
 
-      const raw = mapVolleyLive(xml, matchNo);
-      // Only knowable before a set's first rally, and the reason the opening
-      // point of a set can now be judged a side-out (spec/42).
-      noteFirstServer(matchNo, setNo, rallyCount, raw.serving);
-      const board = stabiliseLineups(
-        matchNo,
-        mapVolleyLive(xml, matchNo, Date.now(), firstServerFor(matchNo, setNo)),
-        rallyCount,
-      );
-      // Background only (spec/42): model the rotation independently and record
-      // where VIS differs. Nothing here reaches a screen, and every failure is
-      // swallowed inside — a board must not depend on its own instrumentation.
-      void shadowRotation(xml, matchNo, latestSet);
+      const board = buildBoardFromXml(matchNo, xml, { audit: true });
       // A live envelope for a match VIS has no live store for comes back
       // without a Match element; mapVolleyLive then has nothing to say.
       const usable = board.teamA.name || board.teamB.name || board.sets.length > 0;
@@ -188,6 +202,7 @@ export async function getBoard(
             prev && boardPulse(prev.value) === boardPulse(board)
               ? prev.changedAt
               : stamp,
+          visVersion: payloadVersion(xml),
         };
         boards.set(matchNo, entry);
         return aged(entry, stamp);
@@ -310,16 +325,115 @@ export function getMockBoard(now: number = Date.now()): Aged<VisBoardData> {
 export { MOCK_LABEL, MOCK_MATCH_NO } from "./mock";
 
 /**
- * Run the rotation shadow for the payload just fetched (spec/42).
+ * One VIS live payload → the board it renders (spec/43 §7.1).
+ *
+ * Everything between "XML in hand" and "board built" lives here, so that the
+ * live path and the replay board (spec/44) go through IDENTICAL machinery
+ * rather than two implementations that drift. `audit` is the only difference
+ * between them: a replayed match must not write rows into the evidence table.
+ */
+export function buildBoardFromXml(
+  matchNo: number,
+  xml: string,
+  opts: { audit: boolean },
+): VisBoardData {
+  const sets = tagBlocks(xml, "Set").sort(
+    (a, b) => num(a.attrs, "No") - num(b.attrs, "No"),
+  );
+  const latestSet = sets[sets.length - 1] ?? null;
+  const setNo = num(latestSet?.attrs, "No", 0);
+  const rallyCount = latestSet
+    ? (latestSet.inner.match(/<Rally\b/g) ?? []).length
+    : 0;
+
+  // Only knowable before a set's first rally, and the reason the opening
+  // point of a set can be judged a side-out (spec/42).
+  noteFirstServer(matchNo, setNo, rallyCount, mapVolleyLive(xml, matchNo).serving);
+  const firstServer = firstServerFor(matchNo, setNo);
+
+  // The rules decide where the six are standing (spec/43); the feed decides
+  // everything else on the board.
+  const enforced = enforceRotation(xml, latestSet, firstServer);
+  const board = stabiliseLineups(
+    matchNo,
+    mapVolleyLive(xml, matchNo, Date.now(), firstServer, {
+      A: enforced.A,
+      B: enforced.B,
+    }),
+    rallyCount,
+    { A: !!enforced.A, B: !!enforced.B },
+  );
+
+  if (opts.audit) {
+    // Background only: record where the feed and the rules part company, with
+    // the verdict the serve action gives. Nothing here reaches a screen, and
+    // every failure is swallowed inside — a board must not depend on its own
+    // instrumentation.
+    void shadowRotation(xml, matchNo, latestSet, setNo, enforced);
+  }
+  return board;
+}
+
+const NO_ENFORCEMENT: EnforcedLineups = {
+  A: null,
+  B: null,
+  basis: "fallback",
+  firstServer: null,
+  confidence: "unknown",
+  notes: [],
+};
+
+/**
+ * The enforced rotation for the set in play, or nothing at all.
+ *
+ * Defensive by construction: this runs in the request path of a live board, so
+ * any failure to work it out degrades to the feed's own lineup (spec/43 §6
+ * fallback) rather than to a blank screen.
+ */
+function enforceRotation(
+  xml: string,
+  latestSet: { attrs: Attrs; inner: string } | null,
+  remembered: ReturnType<typeof firstServerFor>,
+): EnforcedLineups {
+  try {
+    if (!latestSet) return NO_ENFORCEMENT;
+    const match = tagBlocks(xml, "Match")[0]?.attrs ?? null;
+    const noTeamA = num(match, "NoTeamA", -1);
+    const noTeamB = num(match, "NoTeamB", -2);
+    const sides = playerSides(xml, noTeamA, noTeamB);
+    // The set's OWN lineups — the registered starting six — are the rows before
+    // its `Events`; everything after belongs to a rally.
+    const head = latestSet.inner.split("<Events")[0];
+    const startingFor = (noTeam: number) => {
+      const row = allTagAttrs(head, "LineUp").find(
+        (l) => num(l, "NoTeam", -99) === noTeam,
+      );
+      return row ? sixOf(row) : null;
+    };
+    return enforceLineups({
+      events: parseSetEvents(latestSet.inner, { noTeamA, noTeamB, sides }),
+      startingLineups: { A: startingFor(noTeamA), B: startingFor(noTeamB) },
+      liberos: designatedLiberos(latestSet.inner),
+      sides,
+      remembered,
+    });
+  } catch {
+    return NO_ENFORCEMENT;
+  }
+}
+
+/**
+ * Run the rotation shadow for the payload just fetched (spec/42, spec/43).
  *
  * Fire-and-forget on purpose: it costs one comparison and, only on a first
- * divergence, one insert. It also captures the first server of a set, which is
- * only knowable in the moment before that set's first rally exists.
+ * divergence, one insert.
  */
 async function shadowRotation(
   xml: string,
   matchNo: number,
   latestSet: { attrs: Attrs; inner: string } | null,
+  setNo: number,
+  enforced: EnforcedLineups,
 ): Promise<void> {
   try {
     if (!latestSet) return;
@@ -330,9 +444,12 @@ async function shadowRotation(
       setAttrs: latestSet.attrs,
       noTeamA: num(match, "NoTeamA", -1),
       noTeamB: num(match, "NoTeamB", -2),
-      liberos: liberosOf(xml),
+      liberos: designatedLiberos(latestSet.inner),
     });
-    await recordRotationAudit(rows);
+    await recordRotationAudit([
+      ...rows,
+      ...enforcementRows(matchNo, setNo, enforced),
+    ]);
   } catch {
     // Instrumentation must never be able to take a board down.
   }
@@ -363,6 +480,8 @@ export interface VisStoreSnapshot {
     /** How long since the score, sets or serve actually moved. */
     sinceChangeSeconds: number;
     pollMs: number;
+    /** The feed version this instance holds — what the next poll asks past. */
+    visVersion: number;
   }[];
 }
 
@@ -392,6 +511,7 @@ export function visStoreSnapshot(now: number = Date.now()): VisStoreSnapshot {
       ageSeconds: Math.round((now - e.at) / 1000),
       sinceChangeSeconds: Math.round((now - e.changedAt) / 1000),
       pollMs: e.ttlMs,
+      visVersion: e.visVersion ?? 0,
     })),
   };
 }
