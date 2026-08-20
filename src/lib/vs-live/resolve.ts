@@ -169,18 +169,34 @@ async function rebuild(): Promise<void> {
 }
 
 /**
- * The mapping as it stands, refreshing it in the BACKGROUND when stale.
+ * How long a board will wait for the mapping before giving up and using VIS.
  *
- * Deliberately synchronous in effect: a board never waits for VolleyStation to
- * be enumerated. The first request after a cold start is served from VIS and
- * the one a moment later from VolleyStation, which is the right trade for a
- * screen in a hall.
+ * A background-only refresh sounds safer and is not: serverless instances are
+ * short-lived and numerous, so "the next request will have it" is usually a
+ * DIFFERENT instance starting cold, and VolleyStation would never be reached at
+ * all. So the first request on an instance does wait — but never longer than
+ * this, whatever the upstream is doing. A rebuild costs one cached
+ * championships read plus one dated match list per competition, ~0.2 s each.
  */
-function currentMapping(now: number = Date.now()): Map<number, VsMatchLink> {
+const MAPPING_WAIT_MS = 2_500;
+
+/**
+ * The mapping, waiting for a rebuild only as long as a board can afford to.
+ *
+ * Whichever way this returns, the rebuild continues in the background, so an
+ * instance that timed out once is serving VolleyStation a moment later.
+ */
+async function currentMapping(now: number = Date.now()): Promise<Map<number, VsMatchLink>> {
   if (now - mappingAt >= MAP_TTL_MS && !building) {
     building = rebuild().finally(() => {
       building = null;
     });
+  }
+  if (building && mapping.size === 0) {
+    await Promise.race([
+      building,
+      new Promise((resolve) => setTimeout(resolve, MAPPING_WAIT_MS)),
+    ]);
   }
   return mapping;
 }
@@ -228,8 +244,8 @@ export interface VsTarget {
 }
 
 /** The VolleyStation match behind a VIS match number, or null. */
-export function vsTargetFor(matchNo: number): VsTarget | null {
-  const link = currentMapping().get(matchNo);
+export async function vsTargetFor(matchNo: number): Promise<VsTarget | null> {
+  const link = (await currentMapping()).get(matchNo);
   return link ? { link } : null;
 }
 
@@ -240,12 +256,13 @@ export function vsTargetFor(matchNo: number): VsTarget | null {
  * `auto` and `vs` both mean "VolleyStation when we can"; keeping them distinct
  * lets `vs` grow a louder failure mode later without re-migrating.
  */
-export function sourceFor(
+export async function sourceFor(
   matchNo: number,
   requested?: BoardSource | null,
-): { source: BoardSource; target: VsTarget | null } {
-  const target = vsTargetFor(matchNo);
+): Promise<{ source: BoardSource; target: VsTarget | null }> {
+  // A screen pinned to VIS must not pay for a mapping it will not use.
   if (requested === "vis") return { source: "vis", target: null };
+  const target = await vsTargetFor(matchNo);
   if (requested === "vs") return { source: target ? "vs" : "vis", target };
   const wants = target?.link.boardSource ?? "vis";
   const useVs = target != null && (wants === "vs" || wants === "auto");

@@ -176,20 +176,38 @@ describe("choosing a source", () => {
   });
 });
 
-describe("the mapping is never built inside a board's request", () => {
-  it("serves VIS on a cold instance, then VolleyStation once warm", async () => {
-    // A board must never wait for VolleyStation to be enumerated: the Teams
-    // list endpoint has been measured hanging for 30 s. So the first request
-    // after a cold start is answered from VIS while the mapping builds behind
-    // it, and the next one is answered from VolleyStation.
+describe("a cold instance", () => {
+  it("builds its mapping and reaches VolleyStation on the first request", async () => {
+    // Serverless instances are short-lived and numerous, so "the next request
+    // will have the mapping" is usually a DIFFERENT instance starting cold —
+    // a background-only refresh would mean VolleyStation was never reached at
+    // all. The first request therefore waits for the build.
     dbRows.competitions = competitionRow("vs");
     stubBoth();
     const cold = await getBoard(27550);
-    expect(cold.source).toBe("vis");
-    await ensureMapping();
-    const warm = await getBoard(27550);
-    expect(warm.source).toBe("vs");
+    expect(cold.source).toBe("vs");
   });
+
+  it("gives up on a hanging upstream and serves VIS instead", async () => {
+    // ...but never waits longer than a board can afford. VolleyStation's Teams
+    // list has been measured hanging for 30 s; a screen in a hall cannot.
+    dbRows.competitions = competitionRow("vs");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      const u = String(url);
+      if (u.includes("fivb.org")) {
+        const body = String((init as RequestInit | undefined)?.body ?? "");
+        return new Response(
+          body.includes("GetVolleyMatchList") ? VIS_LIST_XML : VIS_XML,
+          { status: 200 },
+        );
+      }
+      // VolleyStation never answers.
+      return new Promise<Response>(() => {});
+    });
+    const board = await getBoard(27550);
+    expect(board.source).toBe("vis");
+    expect(board.value.teamA.name).not.toBe("");
+  }, 20_000);
 });
 
 describe("VolleyStation can never cost a board", () => {

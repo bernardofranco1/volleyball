@@ -188,13 +188,24 @@ export function vsStats(championshipMatchId: number): Promise<VsStatsRow[]> {
 }
 
 /**
- * Championships are returned as one un-paged list; there is no per-id detail
- * route, so this fetches all and picks. Cached hard by the caller — the list
- * is ~218 rows and changes when an event is created, not during one.
+ * Championships are returned as one un-paged list (~218 rows, ~890 KB) with no
+ * per-id detail route, so this fetches all and picks — ONCE per hour per
+ * instance. Without the cache a mapping rebuild pays that 890 KB per linked
+ * competition, which is most of the time the rebuild takes.
  */
+let championships: { value: VsChampionship[]; at: number } | null = null;
+const CHAMPIONSHIPS_TTL_MS = 3600_000;
+
 export async function vsChampionship(id: number): Promise<VsChampionship | null> {
-  const all = await vsGet<VsChampionship[]>("Championships/");
-  return all.find((c) => c.Championship_ID === id) ?? null;
+  if (!championships || Date.now() - championships.at > CHAMPIONSHIPS_TTL_MS) {
+    championships = { value: await vsGet<VsChampionship[]>("Championships/"), at: Date.now() };
+  }
+  return championships.value.find((c) => c.Championship_ID === id) ?? null;
+}
+
+/** Test seam. */
+export function __resetVsClientCaches(): void {
+  championships = null;
 }
 
 /** A championship's schedule, widened a day either side of its own dates. */

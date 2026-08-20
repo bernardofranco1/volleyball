@@ -187,8 +187,8 @@ export async function getBoard(
 ): Promise<Aged<VisBoardData> & { source: BoardSource }> {
   // Deliberately not inside the try: a failure to work out the source must not
   // be able to stop a board that VIS could have served.
-  const chosen = sourceFor(matchNo, requested ?? null);
-  if (chosen.source === "vs" && chosen.target) {
+  const chosen = await sourceFor(matchNo, requested ?? null).catch(() => null);
+  if (chosen?.source === "vs" && chosen.target) {
     try {
       return { ...(await getVsBoard(matchNo, chosen.target, now)), source: "vs" };
     } catch {
