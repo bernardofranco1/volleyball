@@ -29,9 +29,9 @@
  * in the background, so VolleyStation's latency can never become the board's.
  */
 
-import { isNotNull } from "drizzle-orm";
+import { eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { competitions } from "@/db/schema";
+import { competitions, vsMatchLinks } from "@/db/schema";
 import {
   vsChampionshipMatches,
   vsChampionshipOwner,
@@ -161,10 +161,89 @@ async function buildOne(comp: LinkedCompetition): Promise<Map<number, VsMatchLin
       });
     }
     console.info(`[vs-live] ${comp.id}: ${out.size}/${vsList.length} matches linked`);
+    // Write the join down, and WAIT for it. It is stable for the life of the
+    // event, and it is what the boards run on the next time VIS cannot be
+    // reached. Fire-and-forget lost the write whenever the process moved on
+    // first — and a resilience path that silently is not there is worse than
+    // none, because it is believed.
+    await persistLinks(comp, out);
   } catch (err) {
+    // One unreachable event must not cost the others their mapping — and if VIS
+    // is what failed, the join written down last time still stands.
     console.warn(
-      `[vs-live] ${comp.id} not mapped: ${err instanceof Error ? err.message.slice(0, 120) : err}`,
+      `[vs-live] ${comp.id} not mapped from upstream: ${err instanceof Error ? err.message.slice(0, 120) : err}`,
     );
+    const stored = await loadLinks(comp).catch(() => new Map<number, VsMatchLink>());
+    if (stored.size > 0) {
+      console.info(`[vs-live] ${comp.id}: ${stored.size} matches from the stored join`);
+      return stored;
+    }
+  }
+  return out;
+}
+
+/** Write the join down, so it outlives a VIS outage. */
+async function persistLinks(
+  comp: LinkedCompetition,
+  links: Map<number, VsMatchLink>,
+): Promise<void> {
+  if (links.size === 0) return;
+  try {
+    await db
+      .insert(vsMatchLinks)
+      .values(
+        [...links.entries()].map(([matchNo, l]) => ({
+          matchNo,
+          competitionId: comp.id,
+          visTournamentNo: comp.visTournamentNo,
+          vsChampionshipId: l.championshipId,
+          vsChampionshipMatchId: l.championshipMatchId,
+          vsHomeTeamId: l.homeTeamId,
+          vsGuestTeamId: l.guestTeamId,
+          visCodeA: l.visCodes[0] ?? null,
+          visCodeB: l.visCodes[1] ?? null,
+          updatedAt: new Date(),
+        })),
+      )
+      .onConflictDoUpdate({
+        target: vsMatchLinks.matchNo,
+        set: {
+          vsChampionshipMatchId: sql`excluded.vs_championship_match_id`,
+          vsHomeTeamId: sql`excluded.vs_home_team_id`,
+          vsGuestTeamId: sql`excluded.vs_guest_team_id`,
+          visCodeA: sql`excluded.vis_code_a`,
+          visCodeB: sql`excluded.vis_code_b`,
+          updatedAt: sql`excluded.updated_at`,
+        },
+      });
+  } catch (err) {
+    // A board must not depend on this having worked — but it must be findable
+    // when it has not, or the outage path silently is not there.
+    console.warn(
+      `[vs-live] could not store the join for ${comp.id}: ${err instanceof Error ? err.message.slice(0, 160) : err}`,
+    );
+  }
+}
+
+/** The join as last written down — the VIS-outage path. */
+async function loadLinks(comp: LinkedCompetition): Promise<Map<number, VsMatchLink>> {
+  const owner = await vsChampionshipOwner(comp.vsChampionshipId).catch(() => null);
+  const rows = await db
+    .select()
+    .from(vsMatchLinks)
+    .where(eq(vsMatchLinks.visTournamentNo, comp.visTournamentNo));
+  const out = new Map<number, VsMatchLink>();
+  for (const r of rows) {
+    out.set(r.matchNo, {
+      championshipMatchId: r.vsChampionshipMatchId,
+      championshipId: r.vsChampionshipId,
+      homeTeamId: r.vsHomeTeamId,
+      guestTeamId: r.vsGuestTeamId,
+      visCodes: [r.visCodeA, r.visCodeB].filter((c): c is string => !!c),
+      config: owner?.config ?? null,
+      boardSource: comp.boardSource,
+      token: owner?.token ?? "",
+    });
   }
   return out;
 }
@@ -215,14 +294,44 @@ async function mappingFor(
   return entry.value;
 }
 
-/** The linked competition that owns this VIS match, if any. */
+/**
+ * The linked competition that owns this VIS match, if any.
+ *
+ * The allowlist answers this instantly once built — but it is built FROM VIS,
+ * so on a cold instance during a VIS outage it knows nothing, and every
+ * VolleyStation board would go down with the feed it exists to replace. The
+ * stored join answers the same question without VIS, so it is the fallback.
+ */
 async function competitionForMatch(matchNo: number): Promise<LinkedCompetition | null> {
   const all = await linkedCompetitions();
   if (all.length === 0) return null;
   const { tournamentOfMatch } = await import("@/lib/vis-live/store");
   const tournamentNo = await tournamentOfMatch(matchNo).catch(() => null);
-  if (tournamentNo == null) return null;
-  return all.find((c) => c.visTournamentNo === tournamentNo) ?? null;
+  if (tournamentNo != null) {
+    return all.find((c) => c.visTournamentNo === tournamentNo) ?? null;
+  }
+  const stored = await db
+    .select({ visTournamentNo: vsMatchLinks.visTournamentNo })
+    .from(vsMatchLinks)
+    .where(eq(vsMatchLinks.matchNo, matchNo))
+    .limit(1)
+    .catch(() => []);
+  const fromStore = stored[0]?.visTournamentNo;
+  return fromStore == null
+    ? null
+    : (all.find((c) => c.visTournamentNo === fromStore) ?? null);
+}
+
+/** Every VIS match number we hold a stored join for — the outage allowlist. */
+export async function storedMatchNumbers(): Promise<Map<number, number>> {
+  try {
+    const rows = await db
+      .select({ matchNo: vsMatchLinks.matchNo, tournamentNo: vsMatchLinks.visTournamentNo })
+      .from(vsMatchLinks);
+    return new Map(rows.map((r) => [r.matchNo, r.tournamentNo]));
+  } catch {
+    return new Map();
+  }
 }
 
 /** Warm every mapping and wait — for scripts and tests, never a board. */

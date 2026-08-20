@@ -44,6 +44,7 @@ import {
   firstServerFor,
   noteFirstServer,
   recordRotationAudit,
+  warmFirstServers,
 } from "./rotation-audit";
 import { stabiliseLineups } from "./lineup-stability";
 import { designatedLiberos, parseSetEvents, playerSides } from "./events";
@@ -52,6 +53,7 @@ import { sixOf } from "./rotation";
 import {
   sourceFor,
   rosterOf,
+  storedMatchNumbers,
   teamOf,
   type BoardSource,
   type VsTarget,
@@ -436,6 +438,18 @@ async function getAllowlist(now: number = Date.now()): Promise<Map<number, numbe
         }
       }
     }
+    // VIS builds this list, so a cold instance during a VIS outage would know
+    // no match numbers at all and the route would 404 every board — including
+    // the VolleyStation ones, which do not need VIS to render. The stored join
+    // (spec/45) is the same question answered without VIS, so it fills the gap.
+    if (map.size === 0) {
+      for (const [matchNo, tournamentNo] of await storedMatchNumbers()) {
+        map.set(matchNo, tournamentNo);
+      }
+      if (map.size > 0) {
+        console.info(`[vis-live] allowlist built from the stored join: ${map.size} matches`);
+      }
+    }
     allowlist = {
       value: map, at: Date.now(), ttlMs: ALLOWLIST_TTL_MS, changedAt: Date.now(),
     };
@@ -569,7 +583,9 @@ export function buildBoardFromXml(
     : 0;
 
   // Only knowable before a set's first rally, and the reason the opening
-  // point of a set can be judged a side-out (spec/42).
+  // point of a set can be judged a side-out (spec/42). Persisted since
+  // spec/45, so a cold instance inherits it rather than falling back.
+  warmFirstServers(matchNo);
   noteFirstServer(matchNo, setNo, rallyCount, mapVolleyLive(xml, matchNo).serving);
   const firstServer = firstServerFor(matchNo, setNo);
 

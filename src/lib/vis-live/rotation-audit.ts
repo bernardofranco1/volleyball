@@ -20,8 +20,9 @@
  *    no-op rather than a second row.
  */
 
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { visRotationLog } from "@/db/schema";
+import { visFirstServers, visRotationLog } from "@/db/schema";
 import { newId } from "@/lib/id";
 import { allTagAttrs, num, type Attrs } from "./parse";
 import type { EnforcedLineups, EnforcementKind } from "./serve-succession";
@@ -63,7 +64,59 @@ export function noteFirstServer(
   servingSide: Side | null,
 ): void {
   if (rallies > 0 || !servingSide) return;
-  remember(firstServers, `${matchNo}:${setNo}`, servingSide);
+  const key = `${matchNo}:${setNo}`;
+  const known = firstServers.get(key);
+  remember(firstServers, key, servingSide);
+  // Write it down as well as remember it. The memo belongs to ONE serverless
+  // instance; the next one starts blank, and without this the enforced rotation
+  // is unavailable there for any set whose feed carries no serve actions —
+  // which is exactly when the board falls back to following the feed and its
+  // rewrite window shows as a flicker.
+  if (known !== servingSide) void persistFirstServer(matchNo, setNo, servingSide);
+}
+
+async function persistFirstServer(
+  matchNo: number,
+  setNo: number,
+  side: Side,
+): Promise<void> {
+  try {
+    await db
+      .insert(visFirstServers)
+      .values({ matchNo, setNo, side })
+      .onConflictDoNothing();
+  } catch {
+    // Instrumentation-grade: a board must not depend on this having worked.
+  }
+}
+
+/** Sets whose first server has been read back from the database. */
+const loadedFirstServers = new Set<string>();
+
+/**
+ * Load what was written down for this match, once per instance.
+ *
+ * Fire-and-forget on purpose: the first board of a cold instance may be built
+ * before it lands, and that board simply falls back for one poll, exactly as it
+ * does today. Every board after it has the deterministic rotation.
+ */
+export function warmFirstServers(matchNo: number): void {
+  if (loadedFirstServers.has(String(matchNo))) return;
+  loadedFirstServers.add(String(matchNo));
+  void (async () => {
+    try {
+      const rows = await db
+        .select()
+        .from(visFirstServers)
+        .where(eq(visFirstServers.matchNo, matchNo));
+      for (const r of rows) {
+        const key = `${matchNo}:${r.setNo}`;
+        if (!firstServers.has(key)) remember(firstServers, key, r.side as Side);
+      }
+    } catch {
+      /* the memo simply stays as it was */
+    }
+  })();
 }
 
 /** What we know about who served this set's first rally, if anything. */

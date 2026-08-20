@@ -256,3 +256,53 @@ describe("a momentary VIS failure must not blank a live board", () => {
     expect(board.value.scoreA).toBe(0);
   });
 });
+
+describe("the first server outlives the instance that saw it", () => {
+  it("is written down only in the moment it MEANS first server", async () => {
+    // `Set@NoServingTeam` names the first server only while the set has no
+    // rallies; one rally later it means "whoever won that". Persisting the
+    // later value would be persisting a different fact under the same name.
+    const { noteFirstServer, firstServerFor } = await import(
+      "@/lib/vis-live/rotation-audit"
+    );
+    noteFirstServer(910001, 1, 0, "B");
+    expect(firstServerFor(910001, 1)).toBe("B");
+    noteFirstServer(910002, 1, 9, "A");
+    expect(firstServerFor(910002, 1)).toBeNull();
+  });
+
+  it("is what keeps the enforced rotation available without serve actions", async () => {
+    // Enforcement reads the first server from rally one's serve action. A feed
+    // with no action stream — VIS test data, and any scout that publishes none —
+    // leaves it unknowable, enforcement falls back to following the feed, and
+    // the feed's rewrite window then shows on screen as a rotation flickering
+    // between two readings. Measured at the 2026-08-20 rehearsal: 0 actions on
+    // the rehearsal match, 729 on a real one.
+    const { enforceLineups } = await import("@/lib/vis-live/serve-succession");
+    const six = { A: ["1", "2", "3", "4", "5", "6"], B: ["20", "21", "22", "23", "24", "25"] };
+    const events = {
+      rallies: [
+        {
+          index: 1, scoreA: 0, scoreB: 1, winner: "B" as const,
+          server: null, // no action stream
+          lineup: { A: null, B: null }, subsBefore: [],
+        },
+      ],
+      trailingSubs: [],
+    };
+    const sides = new Map<string, "A" | "B">([["1", "A"], ["20", "B"]]);
+
+    const blind = enforceLineups({
+      events, startingLineups: six, liberos: new Set(), sides, remembered: null,
+    });
+    expect(blind.basis).toBe("fallback");
+
+    const told = enforceLineups({
+      events, startingLineups: six, liberos: new Set(), sides, remembered: "A",
+    });
+    expect(told.basis).toBe("enforced");
+    expect(told.confidence).toBe("observed");
+    // B received and won, so B rotates and its position 2 serves next.
+    expect(told.B?.[0]).toBe("21");
+  });
+});

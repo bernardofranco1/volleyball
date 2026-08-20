@@ -108,6 +108,68 @@ export const competitionBranding = pgTable("competition_branding", {
  * and the unique index makes a second instance's duplicate a no-op rather than
  * a second row.
  */
+/**
+ * The VIS↔VolleyStation match join, PERSISTED (spec/45).
+ *
+ * Working it out needs VIS: the join is `VS.MatchNumber == VIS.NoInTournament`
+ * within an event, and only VIS knows which of its match numbers that is. So a
+ * cold instance could not map anything while VIS was unreachable — and every
+ * VolleyStation board died with VIS, which is the opposite of why a second
+ * source exists. Measured: a warm instance rode out a simulated outage, a cold
+ * one threw.
+ *
+ * The join is stable for the life of an event, so it is written down. VIS
+ * refreshes it whenever it can be reached; when it cannot, this is what the
+ * boards run on, and VolleyStation carries the match on its own.
+ */
+export const vsMatchLinks = pgTable(
+  "vs_match_links",
+  {
+    /** The VIS match number — the board's public identity. */
+    matchNo: integer("match_no").primaryKey(),
+    competitionId: text("competition_id").notNull(),
+    visTournamentNo: integer("vis_tournament_no").notNull(),
+    vsChampionshipId: integer("vs_championship_id").notNull(),
+    vsChampionshipMatchId: integer("vs_championship_match_id").notNull(),
+    vsHomeTeamId: integer("vs_home_team_id"),
+    vsGuestTeamId: integer("vs_guest_team_id"),
+    /** The two VIS team codes, for the verification belt at board time. */
+    visCodeA: text("vis_code_a"),
+    visCodeB: text("vis_code_b"),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("vs_match_links_tournament_idx").on(t.visTournamentNo)],
+).enableRLS();
+
+/**
+ * Who served the first rally of a set, PERSISTED (spec/43, spec/45).
+ *
+ * The enforced rotation needs this, and reads it from the first rally's serve
+ * action. A payload with no action stream — VIS test data, and any event whose
+ * scout does not publish actions — leaves it unknowable, enforcement falls back
+ * to following the feed's own line-up, and the feed's rewrite window then shows
+ * on screen as a rotation that flickers between two readings. Observed during
+ * the 2026-08-20 dress rehearsal.
+ *
+ * It IS observable, but only in the moment before a set's first rally exists,
+ * when `Set@NoServingTeam` means "first server" rather than "last winner". The
+ * store has always noticed that instant — into a per-instance memo, which the
+ * next serverless instance does not share. Writing it down makes the
+ * deterministic path available to every instance, for every set we watched
+ * begin, whether or not the scout publishes actions.
+ */
+export const visFirstServers = pgTable(
+  "vis_first_servers",
+  {
+    matchNo: integer("match_no").notNull(),
+    setNo: integer("set_no").notNull(),
+    /** "A" or "B", as the board names the sides. */
+    side: text("side", { enum: ["A", "B"] }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.matchNo, t.setNo] })],
+).enableRLS();
+
 export const visRotationLog = pgTable(
   "vis_rotation_log",
   {
