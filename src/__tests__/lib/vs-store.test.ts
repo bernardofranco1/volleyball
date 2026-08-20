@@ -21,7 +21,7 @@ vi.mock("@/db", () => {
 });
 
 import { getBoard, __resetVisCaches } from "@/lib/vis-live/store";
-import { __resetVsResolve } from "@/lib/vs-live/resolve";
+import { __resetVsResolve, ensureMapping } from "@/lib/vs-live/resolve";
 import { __resetLineupStability } from "@/lib/vis-live/lineup-stability";
 
 const VIS_XML = readFileSync(
@@ -67,7 +67,6 @@ function stubBoth(opts: { vsFails?: boolean } = {}) {
     }
     if (opts.vsFails) return new Response("upstream is unwell", { status: 502 });
     if (u.includes("/Championships/")) return new Response(VS_CHAMPS, { status: 200 });
-    if (u.includes("/Teams/")) return new Response(VS_TEAMS, { status: 200 });
     if (/\/Matches\/\d+\//.test(u)) {
       return new Response(JSON.stringify(VS_MATCHES["2504876"]), { status: 200 });
     }
@@ -89,6 +88,13 @@ function stubBoth(opts: { vsFails?: boolean } = {}) {
         ]),
         { status: 200 },
       );
+    }
+    if (/\/Teams\/\d+\//.test(u)) {
+      const id = Number(/\/Teams\/(\d+)\//.exec(u)![1]);
+      const team = (JSON.parse(VS_TEAMS) as { Team_ID: number }[]).find(
+        (t) => t.Team_ID === id,
+      );
+      return new Response(JSON.stringify(team ?? {}), { status: 200 });
     }
     if (u.includes("/MatchStatsSheet/")) return new Response("[]", { status: 200 });
     return new Response("{}", { status: 200 });
@@ -138,6 +144,7 @@ describe("choosing a source", () => {
   it("serves VolleyStation when a screen asks for it, whatever the default", async () => {
     dbRows.competitions = competitionRow("vis");
     stubBoth();
+    await ensureMapping();
     const board = await getBoard(27550, Date.now(), "vs");
     expect(board.source).toBe("vs");
     // The fixture is a real VS payload: Brazil v Belgium, 11-11 in set two.
@@ -156,6 +163,7 @@ describe("choosing a source", () => {
     // caches. Neither read may evict or overwrite the other.
     dbRows.competitions = competitionRow("auto");
     stubBoth();
+    await ensureMapping();
     const vs = await getBoard(27550, Date.now(), "vs");
     const vis = await getBoard(27550, Date.now(), "vis");
     expect(vs.source).toBe("vs");
@@ -168,9 +176,28 @@ describe("choosing a source", () => {
   });
 });
 
+describe("the mapping is never built inside a board's request", () => {
+  it("serves VIS on a cold instance, then VolleyStation once warm", async () => {
+    // A board must never wait for VolleyStation to be enumerated: the Teams
+    // list endpoint has been measured hanging for 30 s. So the first request
+    // after a cold start is answered from VIS while the mapping builds behind
+    // it, and the next one is answered from VolleyStation.
+    dbRows.competitions = competitionRow("vs");
+    stubBoth();
+    const cold = await getBoard(27550);
+    expect(cold.source).toBe("vis");
+    await ensureMapping();
+    const warm = await getBoard(27550);
+    expect(warm.source).toBe("vs");
+  });
+});
+
 describe("VolleyStation can never cost a board", () => {
   it("falls back to VIS in the same request when VolleyStation errors", async () => {
     dbRows.competitions = competitionRow("vs");
+    stubBoth();
+    await ensureMapping();
+    // Now break VolleyStation, with the mapping already in hand.
     stubBoth({ vsFails: true });
     const board = await getBoard(27550);
     expect(board.source).toBe("vis");

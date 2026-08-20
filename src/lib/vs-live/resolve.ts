@@ -9,57 +9,61 @@
  *
  * A number join alone would be reckless — the number is only unique inside its
  * own event, and a mis-mapped board puts one match's score on another match's
- * screen. So every pair is VERIFIED against a second, independent fact before
- * it is trusted: the two systems' team ids are the same ids
- * (`VS.Team.Code === VIS.NoTeam`, e.g. 9310 = Chinese Taipei). A pair whose
- * teams do not agree is DROPPED, not mapped.
+ * screen. So every board VERIFIES its pair against a second, independent fact
+ * before rendering it: the two systems' team codes are the same codes
+ * (`VS.Team.ShortCodeName === VIS.TeamACode`, e.g. TPE). That check lives at
+ * BOARD time rather than at map time, for two reasons — it is then made against
+ * the exact match being shown, and it uses the two team records the board needs
+ * for its player names anyway.
  *
- * Compared as a SET, because home/guest need not be VIS's A/B, and because a
- * bracket placeholder ("TBD v TBD") resolves to no teams at all and must fall
- * out silently rather than map by number.
+ * TWO shapes of upstream failure this module is built around, both measured:
+ *
+ *  - `Teams/?Championship_ID=N` answers instantly at times and HANGS at others
+ *    (three consecutive 25-30 s timeouts on a query that had been fast an hour
+ *    earlier). Nothing here calls it: teams are fetched one at a time by id,
+ *    which stayed at ~176 ms throughout, and cached for hours.
+ *  - Undated `Matches/` list queries are rate-limited with HTTP 429.
+ *
+ * And one rule that follows from them: **the mapping is never built inside a
+ * board's request.** A cold instance answers from VIS and refreshes the mapping
+ * in the background, so VolleyStation's latency can never become the board's.
  */
 
-import { eq, isNotNull } from "drizzle-orm";
+import { isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { competitions } from "@/db/schema";
-import { getMatchList } from "@/lib/vis-live/store";
-import { vsChampionship, vsChampionshipMatches, vsConfigured, vsTeams } from "./client";
-import type { VsChampionship } from "./types";
+import {
+  vsChampionship,
+  vsChampionshipMatches,
+  vsConfigured,
+  vsTeam,
+} from "./client";
+import type { VsChampionship, VsTeam } from "./types";
 
 export type BoardSource = "vis" | "vs";
 
-export interface VsMapping {
-  /** VIS match number → VolleyStation ChampionshipMatch_ID. */
-  matches: Map<number, number>;
+export interface VsMatchLink {
+  championshipMatchId: number;
   championshipId: number;
-  /** The regulation config the board counts allowances down from. */
+  /** VS team ids, for the roster fetch and the verification. */
+  homeTeamId: number | null;
+  guestTeamId: number | null;
+  /** The VIS three-letter codes for this match — what the codes must equal. */
+  visCodes: string[];
   config: VsChampionship | null;
-  /** Shirt number → display name, per side of the VS match (home/guest). */
-  rosters: Map<number, { home: number; guest: number }>;
-  /** What the competition serves by default. */
   boardSource: "vis" | "vs" | "auto";
 }
 
-interface Entry {
-  value: VsMapping | null;
-  at: number;
-}
+const MAP_TTL_MS = 10 * 60_000;
+/** Rosters change per event, not per rally. */
+const TEAM_TTL_MS = 6 * 3600_000;
 
-const TTL_MS = 10 * 60_000;
-/** competitionId → mapping. Module-level, so per serverless instance. */
-const cache = new Map<string, Entry>();
-/** VIS match number → the mapping that owns it, for the hot path. */
-let byMatchNo: Map<number, VsMapping> | null = null;
-let byMatchNoAt = 0;
+let mapping: Map<number, VsMatchLink> = new Map();
+let mappingAt = 0;
+let building: Promise<void> | null = null;
 
-const inFlight = new Map<string, Promise<unknown>>();
-function dedupe<T>(key: string, work: () => Promise<T>): Promise<T> {
-  const running = inFlight.get(key) as Promise<T> | undefined;
-  if (running) return running;
-  const p = work().finally(() => inFlight.delete(key));
-  inFlight.set(key, p);
-  return p;
-}
+const teamCache = new Map<number, { value: VsTeam; at: number }>();
+const teamInFlight = new Map<number, Promise<VsTeam>>();
 
 interface LinkedCompetition {
   id: string;
@@ -92,199 +96,167 @@ async function linkedCompetitions(): Promise<LinkedCompetition[]> {
   );
 }
 
-/**
- * Build one competition's mapping. Never throws: a competition whose VS side is
- * unreachable simply has no mapping, and every board of it stays on VIS.
- */
-async function buildMapping(comp: LinkedCompetition): Promise<VsMapping | null> {
+/** Rebuild every competition's mapping. Never throws. */
+async function rebuild(): Promise<void> {
+  const next = new Map<number, VsMatchLink>();
   try {
-    const config = await vsChampionship(comp.vsChampionshipId);
-    const [visList, vsList, teams] = await Promise.all([
-      getMatchList(comp.visTournamentNo),
-      vsChampionshipMatches(
-        comp.vsChampionshipId,
-        // The championship's own window, so the mandatory date filter is
-        // derived rather than guessed (spec/45 §2 — undated lists are 429'd).
-        (config as unknown as { DateFrom?: string })?.DateFrom ?? null,
-        (config as unknown as { DateTo?: string })?.DateTo ?? null,
-      ),
-      vsTeams(comp.vsChampionshipId),
-    ]);
+    if (!vsConfigured()) {
+      mapping = next;
+      mappingAt = Date.now();
+      return;
+    }
+    for (const comp of await linkedCompetitions()) {
+      try {
+        const config = await vsChampionship(comp.vsChampionshipId);
+        // Imported HERE rather than at the top of the file: the store imports
+        // this module to choose a source, so a static import back into it is a
+        // cycle. Under the app's load order the store is mid-initialisation
+        // when this module is evaluated, and `getMatchList` would be undefined
+        // — every mapping silently empty, every board quietly on VIS. It cost
+        // an afternoon; a dynamic import is resolved at call time and cannot.
+        const { getMatchList } = await import("@/lib/vis-live/store");
+        const [visList, vsList] = await Promise.all([
+          getMatchList(comp.visTournamentNo),
+          vsChampionshipMatches(
+            comp.vsChampionshipId,
+            (config as unknown as { DateFrom?: string })?.DateFrom ?? null,
+            (config as unknown as { DateTo?: string })?.DateTo ?? null,
+          ),
+        ]);
 
-    /** VS Team_ID → its VIS team number, from the shared id space. */
-    const visTeamOf = new Map<number, number>();
-    const rosterOf = new Map<number, Map<number, string>>();
-    for (const t of teams) {
-      const code = Number(t.Code);
-      if (Number.isFinite(code)) visTeamOf.set(t.Team_ID, code);
-      const byShirt = new Map<number, string>();
-      for (const p of t.PlayerList ?? []) {
-        if (p.Number == null) continue;
-        byShirt.set(
-          p.Number,
-          p.Player_ShirtName || p.Player_Surname || `#${p.Number}`,
+        const visByNumber = new Map(
+          visList.value
+            .filter((m) => m.numberInTournament != null)
+            .map((m) => [String(m.numberInTournament), m]),
+        );
+        let mapped = 0;
+        for (const vm of vsList) {
+          const num = vm.MatchNumber == null ? null : String(vm.MatchNumber);
+          const vis = num ? visByNumber.get(num) : null;
+          if (!vis) continue;
+          const visCodes = [vis.teamACode, vis.teamBCode]
+            .filter((c): c is string => !!c)
+            .map((c) => c.toUpperCase());
+          // A bracket placeholder has no teams on either side; it joins later.
+          if (visCodes.length !== 2) continue;
+          next.set(vis.matchNo, {
+            championshipMatchId: vm.ChampionshipMatch_ID,
+            championshipId: comp.vsChampionshipId,
+            homeTeamId: vm.HomeTeam_ID,
+            guestTeamId: vm.GuestTeam_ID,
+            visCodes,
+            config,
+            boardSource: comp.boardSource,
+          });
+          mapped++;
+        }
+        console.info(
+          `[vs-live] competition ${comp.id}: ${mapped}/${vsList.length} matches linked`,
+        );
+      } catch (err) {
+        // One unreachable event must not cost the others their mapping.
+        console.warn(
+          `[vs-live] competition ${comp.id} not mapped: ${err instanceof Error ? err.message.slice(0, 120) : err}`,
         );
       }
-      rosterOf.set(t.Team_ID, byShirt);
     }
-
-    const visByNumber = new Map<string, { matchNo: number; teams: Set<number> }>();
-    for (const m of visList.value) {
-      if (m.numberInTournament == null) continue;
-      visByNumber.set(String(m.numberInTournament), {
-        matchNo: m.matchNo,
-        teams: new Set<number>(),
-      });
-    }
-    // The list route does not carry NoTeamA/B, so the belt reads them from the
-    // team codes instead: VIS TeamACode ("TPE") is VS ShortCodeName.
-    const visCodeByNumber = new Map<string, Set<string>>();
-    for (const m of visList.value) {
-      if (m.numberInTournament == null) continue;
-      const codes = new Set<string>();
-      if (m.teamACode) codes.add(m.teamACode.toUpperCase());
-      if (m.teamBCode) codes.add(m.teamBCode.toUpperCase());
-      visCodeByNumber.set(String(m.numberInTournament), codes);
-    }
-    const shortCodeOf = new Map<number, string>();
-    for (const t of teams) {
-      if (t.ShortCodeName) shortCodeOf.set(t.Team_ID, t.ShortCodeName.toUpperCase());
-    }
-
-    const matches = new Map<number, number>();
-    const rosters = new Map<number, { home: number; guest: number }>();
-    let dropped = 0;
-    for (const vm of vsList) {
-      const num = vm.MatchNumber == null ? null : String(vm.MatchNumber);
-      if (!num) continue;
-      const vis = visByNumber.get(num);
-      if (!vis) continue;
-
-      // The belt: the two systems must name the same two teams.
-      const vsCodes = new Set(
-        [vm.HomeTeam_ID, vm.GuestTeam_ID]
-          .map((id) => (id == null ? null : shortCodeOf.get(id) ?? null))
-          .filter((c): c is string => !!c),
-      );
-      const visCodes = visCodeByNumber.get(num) ?? new Set<string>();
-      const agree =
-        vsCodes.size === 2 &&
-        visCodes.size === 2 &&
-        [...vsCodes].every((c) => visCodes.has(c));
-      if (!agree) {
-        dropped++;
-        continue;
-      }
-      matches.set(vis.matchNo, vm.ChampionshipMatch_ID);
-      if (vm.HomeTeam_ID != null && vm.GuestTeam_ID != null) {
-        rosters.set(vm.ChampionshipMatch_ID, {
-          home: vm.HomeTeam_ID,
-          guest: vm.GuestTeam_ID,
-        });
-      }
-    }
-    if (dropped > 0) {
-      // Placeholder rows ("TBD v TBD") land here legitimately until a bracket
-      // fills in; a large count on a started event is worth a look.
-      console.warn(
-        `[vs-live] competition ${comp.id}: ${matches.size} matches mapped, ${dropped} dropped (teams did not agree)`,
-      );
-    }
-
-    ROSTER_CACHE.set(comp.vsChampionshipId, rosterOf);
-    return {
-      matches,
-      championshipId: comp.vsChampionshipId,
-      config,
-      rosters,
-      boardSource: comp.boardSource,
-    };
+    mapping = next;
   } catch {
-    return null;
+    // Keep whatever we had rather than dropping every board to VIS.
+  } finally {
+    mappingAt = Date.now();
   }
 }
 
-/** VS championship → (VS Team_ID → shirt number → display name). */
-const ROSTER_CACHE = new Map<number, Map<number, Map<number, string>>>();
-
-export function rosterFor(
-  championshipId: number,
-  teamId: number,
-): Map<number, string> | null {
-  return ROSTER_CACHE.get(championshipId)?.get(teamId) ?? null;
+/**
+ * The mapping as it stands, refreshing it in the BACKGROUND when stale.
+ *
+ * Deliberately synchronous in effect: a board never waits for VolleyStation to
+ * be enumerated. The first request after a cold start is served from VIS and
+ * the one a moment later from VolleyStation, which is the right trade for a
+ * screen in a hall.
+ */
+function currentMapping(now: number = Date.now()): Map<number, VsMatchLink> {
+  if (now - mappingAt >= MAP_TTL_MS && !building) {
+    building = rebuild().finally(() => {
+      building = null;
+    });
+  }
+  return mapping;
 }
 
-/** Every mapping, rebuilt at most every 10 minutes. */
-async function allMappings(now: number = Date.now()): Promise<Map<number, VsMapping>> {
-  if (byMatchNo && now - byMatchNoAt < TTL_MS) return byMatchNo;
-  return dedupe("vs:mappings", async () => {
-    const out = new Map<number, VsMapping>();
-    if (!vsConfigured()) {
-      byMatchNo = out;
-      byMatchNoAt = Date.now();
-      return out;
-    }
-    let comps: LinkedCompetition[] = [];
-    try {
-      comps = await linkedCompetitions();
-    } catch {
-      // No database, no mapping — every board stays on VIS, which is correct.
-      byMatchNo = out;
-      byMatchNoAt = Date.now();
-      return out;
-    }
-    for (const comp of comps) {
-      const hit = cache.get(comp.id);
-      const mapping =
-        hit && Date.now() - hit.at < TTL_MS ? hit.value : await buildMapping(comp);
-      cache.set(comp.id, { value: mapping, at: Date.now() });
-      if (!mapping) continue;
-      for (const matchNo of mapping.matches.keys()) out.set(matchNo, mapping);
-    }
-    byMatchNo = out;
-    byMatchNoAt = Date.now();
-    return out;
-  });
+/** Warm the mapping and wait for it — for scripts and tests, never a board. */
+export async function ensureMapping(): Promise<Map<number, VsMatchLink>> {
+  if (Date.now() - mappingAt >= MAP_TTL_MS || mapping.size === 0) {
+    building = building ?? rebuild().finally(() => (building = null));
+    await building;
+  }
+  return mapping;
+}
+
+/** One team, cached for hours; the last good copy survives an outage. */
+export async function teamOf(teamId: number): Promise<VsTeam | null> {
+  const hit = teamCache.get(teamId);
+  if (hit && Date.now() - hit.at < TEAM_TTL_MS) return hit.value;
+  const running = teamInFlight.get(teamId);
+  if (running) return running.catch(() => hit?.value ?? null);
+  const p = vsTeam(teamId).finally(() => teamInFlight.delete(teamId));
+  teamInFlight.set(teamId, p);
+  try {
+    const value = await p;
+    teamCache.set(teamId, { value, at: Date.now() });
+    return value;
+  } catch {
+    // Stale roster names beat none; no roster at all means the board falls back.
+    return hit?.value ?? null;
+  }
+}
+
+/** Shirt number → display name for one team. */
+export function rosterOf(team: VsTeam | null): Map<number, string> | null {
+  if (!team) return null;
+  const out = new Map<number, string>();
+  for (const p of team.PlayerList ?? []) {
+    if (p.Number == null) continue;
+    out.set(p.Number, p.Player_ShirtName || p.Player_Surname || `#${p.Number}`);
+  }
+  return out;
 }
 
 export interface VsTarget {
-  championshipMatchId: number;
-  mapping: VsMapping;
+  link: VsMatchLink;
 }
 
 /** The VolleyStation match behind a VIS match number, or null. */
-export async function vsTargetFor(matchNo: number): Promise<VsTarget | null> {
-  const all = await allMappings();
-  const mapping = all.get(matchNo);
-  const id = mapping?.matches.get(matchNo);
-  return mapping && id != null ? { championshipMatchId: id, mapping } : null;
+export function vsTargetFor(matchNo: number): VsTarget | null {
+  const link = currentMapping().get(matchNo);
+  return link ? { link } : null;
 }
 
 /**
  * Which source should serve this match, given the competition's setting and an
  * optional per-screen override.
  *
- * `auto` and `vs` both mean "VolleyStation when we can": the difference is
- * intent rather than behaviour today, and keeping them distinct lets `vs` grow
- * a louder failure mode later without re-migrating.
+ * `auto` and `vs` both mean "VolleyStation when we can"; keeping them distinct
+ * lets `vs` grow a louder failure mode later without re-migrating.
  */
-export async function sourceFor(
+export function sourceFor(
   matchNo: number,
   requested?: BoardSource | null,
-): Promise<{ source: BoardSource; target: VsTarget | null }> {
-  const target = await vsTargetFor(matchNo).catch(() => null);
+): { source: BoardSource; target: VsTarget | null } {
+  const target = vsTargetFor(matchNo);
   if (requested === "vis") return { source: "vis", target: null };
   if (requested === "vs") return { source: target ? "vs" : "vis", target };
-  const wants = target?.mapping.boardSource ?? "vis";
+  const wants = target?.link.boardSource ?? "vis";
   const useVs = target != null && (wants === "vs" || wants === "auto");
   return { source: useVs ? "vs" : "vis", target: useVs ? target : null };
 }
 
 /** Test seam. */
 export function __resetVsResolve(): void {
-  cache.clear();
-  byMatchNo = null;
-  byMatchNoAt = 0;
-  inFlight.clear();
-  ROSTER_CACHE.clear();
+  mapping = new Map();
+  mappingAt = 0;
+  building = null;
+  teamCache.clear();
+  teamInFlight.clear();
 }

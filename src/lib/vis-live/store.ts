@@ -49,7 +49,13 @@ import { stabiliseLineups } from "./lineup-stability";
 import { designatedLiberos, parseSetEvents, playerSides } from "./events";
 import { enforceLineups, type EnforcedLineups } from "./serve-succession";
 import { sixOf } from "./rotation";
-import { sourceFor, rosterFor, type BoardSource, type VsTarget } from "@/lib/vs-live/resolve";
+import {
+  sourceFor,
+  rosterOf,
+  teamOf,
+  type BoardSource,
+  type VsTarget,
+} from "@/lib/vs-live/resolve";
 import { vsMatch, vsStats } from "@/lib/vs-live/client";
 import { mapVsBoard } from "@/lib/vs-live/board-data";
 import type { VsStatsRow } from "@/lib/vs-live/types";
@@ -181,8 +187,8 @@ export async function getBoard(
 ): Promise<Aged<VisBoardData> & { source: BoardSource }> {
   // Deliberately not inside the try: a failure to work out the source must not
   // be able to stop a board that VIS could have served.
-  const chosen = await sourceFor(matchNo, requested ?? null).catch(() => null);
-  if (chosen?.source === "vs" && chosen.target) {
+  const chosen = sourceFor(matchNo, requested ?? null);
+  if (chosen.source === "vs" && chosen.target) {
     try {
       return { ...(await getVsBoard(matchNo, chosen.target, now)), source: "vs" };
     } catch {
@@ -292,8 +298,26 @@ async function getVsBoard(
   if (fresh(hit, now)) return aged(hit!, now);
 
   return dedupe(`vs-board:${matchNo}`, async () => {
-    const id = target.championshipMatchId;
-    const match = await vsMatch(id);
+    const { link } = target;
+    const id = link.championshipMatchId;
+    const [match, home, guest] = await Promise.all([
+      vsMatch(id),
+      link.homeTeamId != null ? teamOf(link.homeTeamId) : Promise.resolve(null),
+      link.guestTeamId != null ? teamOf(link.guestTeamId) : Promise.resolve(null),
+    ]);
+
+    // The verification belt (spec/45 W2.3), applied to the exact match about to
+    // be rendered: the two systems must name the same two teams. A number join
+    // alone would put one match's score on another match's screen, so a pair
+    // that cannot be confirmed is refused and the caller falls back to VIS.
+    const vsCodes = [home, guest]
+      .map((t) => t?.ShortCodeName?.toUpperCase())
+      .filter((c): c is string => !!c);
+    if (vsCodes.length !== 2 || !vsCodes.every((c) => link.visCodes.includes(c))) {
+      throw new Error(
+        `VolleyStation match ${id} names [${vsCodes}] where VIS ${matchNo} names [${link.visCodes}]`,
+      );
+    }
 
     const statsHit = vsStatsCache.get(id);
     let stats = statsHit?.value ?? null;
@@ -306,13 +330,12 @@ async function getVsBoard(
       }
     }
 
-    const sides = target.mapping.rosters.get(id) ?? null;
     const board = mapVsBoard({
       match,
       stats,
-      config: target.mapping.config,
-      rosterHome: sides ? rosterFor(target.mapping.championshipId, sides.home) : null,
-      rosterGuest: sides ? rosterFor(target.mapping.championshipId, sides.guest) : null,
+      config: link.config,
+      rosterHome: rosterOf(home),
+      rosterGuest: rosterOf(guest),
       matchNo,
     });
 

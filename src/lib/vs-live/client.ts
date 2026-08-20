@@ -162,6 +162,23 @@ export function vsMatches(
   );
 }
 
+/**
+ * ONE team, by id — the only shape of this endpoint that can be relied on.
+ *
+ * `Teams/?Championship_ID=N` answers in milliseconds sometimes and hangs
+ * indefinitely at others (measured 2026-08-20: three consecutive 25-30 s
+ * timeouts on the same query that had returned instantly an hour earlier),
+ * while `Teams/{id}/` stayed at ~176 ms throughout. A board needs exactly two
+ * teams, and it has both ids on the match row, so it asks for exactly two.
+ */
+export function vsTeam(teamId: number): Promise<VsTeam> {
+  return vsGet<VsTeam>(`Teams/${teamId}/`);
+}
+
+/**
+ * Every team of a championship. Kept for scripts and exploration; NOT used by
+ * the board path, for the reason above.
+ */
 export function vsTeams(championshipId: number): Promise<VsTeam[]> {
   return vsGet<VsTeam[]>(`Teams/?Championship_ID=${championshipId}`);
 }
