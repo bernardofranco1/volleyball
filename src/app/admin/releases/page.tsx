@@ -20,7 +20,7 @@ import {
 } from "@/lib/release-actions";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { SubmitButton } from "@/components/admin/SubmitButton";
-import { LocalTime } from "@/components/LocalTime";
+import { LocalTime, SWISS_TIME_ZONE } from "@/components/LocalTime";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { Page, PageHeader, Panel, StatRow, StatTile } from "@/components/ui/Page";
 import { ui } from "@/components/admin/styles";
@@ -184,7 +184,7 @@ export default async function ReleasesPage() {
           hint={
             current?.createdAt ? (
               <>
-                since <LocalTime date={current.createdAt} />
+                since <LocalTime date={current.createdAt} timeZone={SWISS_TIME_ZONE} />
               </>
             ) : (
               (production?.message ?? "").slice(0, 40) || "unknown"
@@ -296,7 +296,7 @@ export default async function ReleasesPage() {
                     {d.message || d.branch}
                   </span>
                   <span className="whitespace-nowrap text-xs text-score-dim">
-                    <LocalTime date={new Date(d.createdAt)} />
+                    <LocalTime date={new Date(d.createdAt)} timeZone={SWISS_TIME_ZONE} />
                   </span>
                   {d.state === "READY" && (
                     <span className="flex gap-2">
@@ -354,7 +354,7 @@ export default async function ReleasesPage() {
                       {d.message || d.branch}
                     </span>
                     <span className="whitespace-nowrap text-xs text-score-dim">
-                      <LocalTime date={new Date(d.createdAt)} />
+                      <LocalTime date={new Date(d.createdAt)} timeZone={SWISS_TIME_ZONE} />
                     </span>
                     {!serving && d.state === "READY" && (
                       <ActionForm
@@ -423,7 +423,7 @@ export default async function ReleasesPage() {
                 {history.map((r) => (
                   <tr key={r.id} className="border-t border-border">
                     <td className={`${ui.td} whitespace-nowrap text-score-dim`}>
-                      <LocalTime date={r.createdAt} />
+                      <LocalTime date={r.createdAt} timeZone={SWISS_TIME_ZONE} />
                     </td>
                     <td className={`${ui.td} font-mono text-xs`}>
                       {r.sha.slice(0, 7)}
