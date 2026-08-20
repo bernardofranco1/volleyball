@@ -33,8 +33,8 @@ import { isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { competitions } from "@/db/schema";
 import {
-  vsChampionship,
   vsChampionshipMatches,
+  vsChampionshipOwner,
   vsConfigured,
   vsTeam,
 } from "./client";
@@ -52,6 +52,8 @@ export interface VsMatchLink {
   visCodes: string[];
   config: VsChampionship | null;
   boardSource: "vis" | "vs" | "auto";
+  /** The token that can actually read this championship (spec/45 — scopes differ). */
+  token: string;
 }
 
 const MAP_TTL_MS = 10 * 60_000;
@@ -108,7 +110,14 @@ async function linkedCompetitions(): Promise<LinkedCompetition[]> {
 async function buildOne(comp: LinkedCompetition): Promise<Map<number, VsMatchLink>> {
   const out = new Map<number, VsMatchLink>();
   try {
-    const config = await vsChampionship(comp.vsChampionshipId);
+    const owner = await vsChampionshipOwner(comp.vsChampionshipId);
+    if (!owner) {
+      console.warn(
+        `[vs-live] ${comp.id}: no token can see championship ${comp.vsChampionshipId}`,
+      );
+      return out;
+    }
+    const { config, token } = owner;
     // Imported HERE rather than at the top of the file: the store imports this
     // module to choose a source, so a static import back into it is a cycle.
     // Under the app's load order the store is mid-initialisation when this
@@ -122,6 +131,7 @@ async function buildOne(comp: LinkedCompetition): Promise<Map<number, VsMatchLin
         comp.vsChampionshipId,
         (config as unknown as { DateFrom?: string })?.DateFrom ?? null,
         (config as unknown as { DateTo?: string })?.DateTo ?? null,
+        token,
       ),
     ]);
 
@@ -147,6 +157,7 @@ async function buildOne(comp: LinkedCompetition): Promise<Map<number, VsMatchLin
         visCodes,
         config,
         boardSource: comp.boardSource,
+        token,
       });
     }
     console.info(`[vs-live] ${comp.id}: ${out.size}/${vsList.length} matches linked`);
@@ -227,12 +238,12 @@ export async function ensureMapping(): Promise<Map<number, VsMatchLink>> {
 }
 
 /** One team, cached for hours; the last good copy survives an outage. */
-export async function teamOf(teamId: number): Promise<VsTeam | null> {
+export async function teamOf(teamId: number, token?: string): Promise<VsTeam | null> {
   const hit = teamCache.get(teamId);
   if (hit && Date.now() - hit.at < TEAM_TTL_MS) return hit.value;
   const running = teamInFlight.get(teamId);
   if (running) return running.catch(() => hit?.value ?? null);
-  const p = vsTeam(teamId).finally(() => teamInFlight.delete(teamId));
+  const p = vsTeam(teamId, token).finally(() => teamInFlight.delete(teamId));
   teamInFlight.set(teamId, p);
   try {
     const value = await p;

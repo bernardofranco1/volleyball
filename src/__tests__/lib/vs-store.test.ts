@@ -23,6 +23,7 @@ vi.mock("@/db", () => {
 import { getBoard, __resetVisCaches } from "@/lib/vis-live/store";
 import { VS_IN_RALLY_MS, LIVE_MS } from "@/lib/vis-live/cadence";
 import { __resetVsResolve, ensureMapping } from "@/lib/vs-live/resolve";
+import { __resetVsClientCaches } from "@/lib/vs-live/client";
 import { __resetLineupStability } from "@/lib/vis-live/lineup-stability";
 
 const VIS_XML = readFileSync(
@@ -119,6 +120,7 @@ function competitionRow(boardSource: string) {
 beforeEach(() => {
   __resetVisCaches();
   __resetVsResolve();
+  __resetVsClientCaches();
   __resetLineupStability();
   vi.stubEnv("VIS_APP_ID", "test-app-id");
   vi.stubEnv("VOLLEYSTATION_KEY", "test-key");

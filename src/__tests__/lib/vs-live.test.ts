@@ -13,7 +13,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { VsRequestError, vsGet } from "@/lib/vs-live/client";
+import { VsRequestError, vsGet, vsTokens, vsConfigured } from "@/lib/vs-live/client";
 import { mapVsBoard } from "@/lib/vs-live/board-data";
 import type { VsChampionship, VsMatch, VsStatsRow, VsTeam } from "@/lib/vs-live/types";
 
@@ -85,6 +85,37 @@ describe("the client refuses what would hurt", () => {
     ]) {
       await expect(vsGet(p)).rejects.toThrow(/VOLLEYSTATION_KEY is not set/);
     }
+    vi.unstubAllEnvs();
+  });
+});
+
+describe("more than one token, because one does not see all of FIVB", () => {
+  it("reads a comma-separated list", () => {
+    // Measured 2026-08-20: one token sees the AVC championships and the VNL
+    // rehearsal and returns ZERO matches for the U17 World Championships; a
+    // second sees both U17 events and zero for the AVC ones. Replacing one with
+    // the other would have taken the AVC boards off VolleyStation while putting
+    // the U17s on it, so both are held at once.
+    vi.stubEnv("VOLLEYSTATION_KEYS", "aaa, bbb ,ccc");
+    expect(vsTokens()).toEqual(["aaa", "bbb", "ccc"]);
+    expect(vsConfigured()).toBe(true);
+    vi.unstubAllEnvs();
+  });
+
+  it("still accepts a single token under the old name", () => {
+    vi.stubEnv("VOLLEYSTATION_KEYS", "");
+    vi.stubEnv("VOLLEYSTATION_KEY", "solo");
+    expect(vsTokens()).toEqual(["solo"]);
+    vi.unstubAllEnvs();
+  });
+
+  it("de-duplicates, and is not configured when it holds nothing", () => {
+    vi.stubEnv("VOLLEYSTATION_KEYS", "same,same, ,same");
+    expect(vsTokens()).toEqual(["same"]);
+    vi.stubEnv("VOLLEYSTATION_KEYS", " , ");
+    vi.stubEnv("VOLLEYSTATION_KEY", "");
+    expect(vsTokens()).toEqual([]);
+    expect(vsConfigured()).toBe(false);
     vi.unstubAllEnvs();
   });
 });

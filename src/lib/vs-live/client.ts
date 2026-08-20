@@ -46,9 +46,32 @@ export class VsRequestError extends Error {
   }
 }
 
+/**
+ * Every VolleyStation token this deployment holds.
+ *
+ * There is more than one because a token does NOT see all of FIVB: the scopes
+ * are disjoint in practice. Measured 2026-08-20, one token sees the AVC
+ * championships and the VNL rehearsal and returns ZERO matches for the U17
+ * World Championships; a second sees both U17 events and returns zero for the
+ * AVC ones. Swapping one for the other would have taken the AVC boards off
+ * VolleyStation while putting the U17s on it.
+ *
+ * So the tokens are a LIST, and which one serves a championship is discovered
+ * rather than configured — see `championshipIndex`.
+ *
+ * `VOLLEYSTATION_KEYS` is comma-separated; `VOLLEYSTATION_KEY` remains valid
+ * for a single token.
+ */
+export function vsTokens(): string[] {
+  const many = process.env.VOLLEYSTATION_KEYS?.trim();
+  const one = process.env.VOLLEYSTATION_KEY?.trim();
+  const raw = many || one || "";
+  return [...new Set(raw.split(",").map((t) => t.trim()).filter(Boolean))];
+}
+
 /** True when this deployment is configured to talk to VolleyStation at all. */
 export function vsConfigured(): boolean {
-  return !!process.env.VOLLEYSTATION_KEY?.trim();
+  return vsTokens().length > 0;
 }
 
 /**
@@ -96,9 +119,9 @@ function assertAllowed(path: string): void {
  * here, which the store turns into "use VIS instead" rather than a broken
  * board.
  */
-export async function vsGet<T>(path: string): Promise<T> {
+export async function vsGet<T>(path: string, token?: string): Promise<T> {
   assertAllowed(path);
-  const key = process.env.VOLLEYSTATION_KEY?.trim();
+  const key = token?.trim() || vsTokens()[0];
   if (!key) {
     throw new VsRequestError("VOLLEYSTATION_KEY is not set — cannot reach VolleyStation");
   }
@@ -139,8 +162,8 @@ export async function vsGet<T>(path: string): Promise<T> {
 }
 
 /** One match, with its live `widget`. THE live poll: ~1.9 KB, ~120 ms. */
-export function vsMatch(championshipMatchId: number): Promise<VsMatch> {
-  return vsGet<VsMatch>(`Matches/${championshipMatchId}/`);
+export function vsMatch(championshipMatchId: number, token?: string): Promise<VsMatch> {
+  return vsGet<VsMatch>(`Matches/${championshipMatchId}/`, token);
 }
 
 /**
@@ -155,10 +178,12 @@ export function vsMatches(
   championshipId: number,
   fromIso: string,
   toIso?: string,
+  token?: string,
 ): Promise<VsMatch[]> {
   const to = toIso ? `&MatchDateTime__lte=${encodeURIComponent(toIso)}` : "";
   return vsGet<VsMatch[]>(
     `Matches/?Championship_ID=${championshipId}&MatchDateTime__gte=${encodeURIComponent(fromIso)}${to}`,
+    token,
   );
 }
 
@@ -171,8 +196,8 @@ export function vsMatches(
  * while `Teams/{id}/` stayed at ~176 ms throughout. A board needs exactly two
  * teams, and it has both ids on the match row, so it asks for exactly two.
  */
-export function vsTeam(teamId: number): Promise<VsTeam> {
-  return vsGet<VsTeam>(`Teams/${teamId}/`);
+export function vsTeam(teamId: number, token?: string): Promise<VsTeam> {
+  return vsGet<VsTeam>(`Teams/${teamId}/`, token);
 }
 
 /**
@@ -183,29 +208,78 @@ export function vsTeams(championshipId: number): Promise<VsTeam[]> {
   return vsGet<VsTeam[]>(`Teams/?Championship_ID=${championshipId}`);
 }
 
-export function vsStats(championshipMatchId: number): Promise<VsStatsRow[]> {
-  return vsGet<VsStatsRow[]>(`MatchStatsSheet/?ChampionshipMatchID=${championshipMatchId}`);
+export function vsStats(
+  championshipMatchId: number,
+  token?: string,
+): Promise<VsStatsRow[]> {
+  return vsGet<VsStatsRow[]>(
+    `MatchStatsSheet/?ChampionshipMatchID=${championshipMatchId}`,
+    token,
+  );
 }
 
 /**
- * Championships are returned as one un-paged list (~218 rows, ~890 KB) with no
- * per-id detail route, so this fetches all and picks — ONCE per hour per
- * instance. Without the cache a mapping rebuild pays that 890 KB per linked
- * competition, which is most of the time the rebuild takes.
+ * Which token owns which championship, and what that championship says.
+ *
+ * `Championships/` returns exactly the list a token can see, so asking each
+ * token once is a complete and self-maintaining answer to "who serves this
+ * event" — no per-competition token configuration to keep in step with
+ * whatever VolleyStation grants next.
+ *
+ * The list is ~890 KB for a broad token, so it is fetched once an hour per
+ * instance: without that, a mapping rebuild would pay it per linked
+ * competition, which was most of what a rebuild cost.
+ *
+ * A token that fails is skipped rather than fatal — the others still answer,
+ * and their championships still work.
  */
-let championships: { value: VsChampionship[]; at: number } | null = null;
+interface Owned {
+  config: VsChampionship;
+  token: string;
+}
+let index: { value: Map<number, Owned>; at: number } | null = null;
+let indexing: Promise<Map<number, Owned>> | null = null;
 const CHAMPIONSHIPS_TTL_MS = 3600_000;
 
+async function championshipIndex(): Promise<Map<number, Owned>> {
+  if (index && Date.now() - index.at < CHAMPIONSHIPS_TTL_MS) return index.value;
+  if (indexing) return indexing;
+  indexing = (async () => {
+    const map = new Map<number, Owned>();
+    for (const token of vsTokens()) {
+      try {
+        for (const config of await vsGet<VsChampionship[]>("Championships/", token)) {
+          // First token to claim a championship keeps it. Two tokens seeing the
+          // same event is fine; either would serve it.
+          if (!map.has(config.Championship_ID)) map.set(config.Championship_ID, { config, token });
+        }
+      } catch (err) {
+        console.warn(
+          `[vs-live] a VolleyStation token could not list championships: ${err instanceof Error ? err.message.slice(0, 100) : err}`,
+        );
+      }
+    }
+    index = { value: map, at: Date.now() };
+    return map;
+  })().finally(() => {
+    indexing = null;
+  });
+  return indexing;
+}
+
+/** The championship's config and the token that can read it, or null. */
+export async function vsChampionshipOwner(id: number): Promise<Owned | null> {
+  return (await championshipIndex()).get(id) ?? null;
+}
+
 export async function vsChampionship(id: number): Promise<VsChampionship | null> {
-  if (!championships || Date.now() - championships.at > CHAMPIONSHIPS_TTL_MS) {
-    championships = { value: await vsGet<VsChampionship[]>("Championships/"), at: Date.now() };
-  }
-  return championships.value.find((c) => c.Championship_ID === id) ?? null;
+  return (await vsChampionshipOwner(id))?.config ?? null;
 }
 
 /** Test seam. */
 export function __resetVsClientCaches(): void {
-  championships = null;
+  index = null;
+  indexing = null;
 }
 
 /** A championship's schedule, widened a day either side of its own dates. */
@@ -213,6 +287,7 @@ export async function vsChampionshipMatches(
   championshipId: number,
   dateFrom: string | null,
   dateTo: string | null,
+  token?: string,
 ): Promise<VsMatch[]> {
   const day = 86_400_000;
   const from = dateFrom ? new Date(Date.parse(dateFrom) - day) : new Date(Date.now() - 30 * day);
@@ -221,5 +296,6 @@ export async function vsChampionshipMatches(
     championshipId,
     from.toISOString().slice(0, 10),
     to ? to.toISOString().slice(0, 10) : undefined,
+    token,
   );
 }

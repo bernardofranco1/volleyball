@@ -321,9 +321,9 @@ async function getVsBoard(
     const { link } = target;
     const id = link.championshipMatchId;
     const [match, home, guest] = await Promise.all([
-      vsMatch(id),
-      link.homeTeamId != null ? teamOf(link.homeTeamId) : Promise.resolve(null),
-      link.guestTeamId != null ? teamOf(link.guestTeamId) : Promise.resolve(null),
+      vsMatch(id, link.token),
+      link.homeTeamId != null ? teamOf(link.homeTeamId, link.token) : Promise.resolve(null),
+      link.guestTeamId != null ? teamOf(link.guestTeamId, link.token) : Promise.resolve(null),
     ]);
 
     // The verification belt (spec/45 W2.3), applied to the exact match about to
@@ -343,7 +343,7 @@ async function getVsBoard(
     let stats = statsHit?.value ?? null;
     if (!statsHit || Date.now() - statsHit.at > VS_STATS_TTL_MS) {
       try {
-        stats = await vsStats(id);
+        stats = await vsStats(id, link.token);
         vsStatsCache.set(id, { value: stats, at: Date.now() });
       } catch {
         // Keep whatever we had; the points column is not worth a blank board.
