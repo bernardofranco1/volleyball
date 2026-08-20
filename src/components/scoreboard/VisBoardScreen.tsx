@@ -17,9 +17,12 @@ import { notFound } from "next/navigation";
 import { getT } from "@/lib/i18n/server";
 import {
   MOCK_LABEL,
+  REPLAY_LABEL,
+  REPLAY_MATCH_NO,
   getBoard,
   getMatchList,
   getMockBoard,
+  getReplayBoard,
   getVisCompetition,
 } from "@/lib/vis-live/store";
 import { getCompetitionBranding } from "@/lib/board-theme";
@@ -60,14 +63,22 @@ export async function VisBoardScreen({
 }: {
   tenantId: string;
   competitionId: string;
-  /** The path segment: a VIS match number, or "mock". */
+  /** The path segment: a VIS match number, or "mock", or "replay". */
   rawMatchNo: string;
   query: VisBoardQuery;
 }) {
   const { t } = await getT();
   const isMock = rawMatchNo === "mock";
-  if (!isMock && !/^\d{1,9}$/.test(rawMatchNo)) notFound();
-  const matchNo = isMock ? MOCK_BOARD_MATCH_NO : Number(rawMatchNo);
+  // The replay board (spec/44): a real previous match on a permanent loop, so
+  // any screen can be validated at any moment without waiting for a fixture.
+  const isReplay = rawMatchNo === "replay";
+  const synthetic = isMock || isReplay;
+  if (!synthetic && !/^\d{1,9}$/.test(rawMatchNo)) notFound();
+  const matchNo = isMock
+    ? MOCK_BOARD_MATCH_NO
+    : isReplay
+      ? REPLAY_MATCH_NO
+      : Number(rawMatchNo);
 
   const comp = await getVisCompetition(tenantId, competitionId);
   if (!comp) notFound();
@@ -75,15 +86,20 @@ export async function VisBoardScreen({
   // The match must belong to THIS competition's tournament — the URL is public,
   // so it must not be a way to render any VIS match under any competition's
   // branding. This read also warms the allowlist the board API checks.
-  const schedule = isMock
+  const schedule = synthetic
     ? []
     : (await getMatchList(comp.visTournamentNo).catch(() => ({ value: [] }))).value;
-  if (!isMock && schedule.length > 0 && !schedule.some((m) => m.matchNo === matchNo)) {
+  if (!synthetic && schedule.length > 0 && !schedule.some((m) => m.matchNo === matchNo)) {
     notFound();
   }
 
   const [boardResult, branding] = await Promise.all([
-    (isMock ? Promise.resolve(getMockBoard()) : getBoard(matchNo)).then(
+    (isMock
+      ? Promise.resolve(getMockBoard())
+      : isReplay
+        ? Promise.resolve(getReplayBoard())
+        : getBoard(matchNo)
+    ).then(
       (r) => ({ ok: true as const, board: r.value }),
       (err: unknown) => ({ ok: false as const, err }),
     ),
@@ -145,6 +161,7 @@ export async function VisBoardScreen({
       ) : null}
       <VisBoardDisplay
         matchNo={matchNo}
+        boardId={synthetic ? rawMatchNo : undefined}
         initialBoard={boardResult.board}
         layout={layout}
         screenOverride={screenOverride}
@@ -153,7 +170,7 @@ export async function VisBoardScreen({
         logoUrl={branding?.logoUrl ?? null}
         windowFill={windowFill}
         replica={query.replica === "1"}
-        notice={isMock ? MOCK_LABEL : null}
+        notice={isMock ? MOCK_LABEL : isReplay ? REPLAY_LABEL : null}
       />
     </>
   );

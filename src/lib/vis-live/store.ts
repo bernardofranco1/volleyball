@@ -35,6 +35,7 @@ import {
   mapVolleyMatchList,
 } from "./board-data";
 import { MOCK_MATCH_NO, mockLiveXml } from "./mock";
+import { REPLAY_MATCH_NO, replayXml } from "./replay";
 import { pollIntervalMs } from "./cadence";
 import { allTagAttrs, tagBlocks, num, type Attrs } from "./parse";
 import {
@@ -323,6 +324,41 @@ export function getMockBoard(now: number = Date.now()): Aged<VisBoardData> {
 }
 
 export { MOCK_LABEL, MOCK_MATCH_NO } from "./mock";
+export { REPLAY_LABEL, REPLAY_MATCH_NO } from "./replay";
+
+/**
+ * The replay board (spec/44): a real match, always in progress, never VIS.
+ *
+ * Unlike the mock — which bypasses everything to render one frozen frame — this
+ * goes through `buildBoardFromXml`, the same function the live path uses. The
+ * cadence transitions, the stabiliser, spec/43's enforcement and the CDN
+ * headers are therefore all exercised for real, which is the point: it
+ * validates the machinery and not merely the pixels.
+ *
+ * `audit: false` is a hard requirement, not a preference. A replayed match must
+ * never write a row into `vis_rotation_log`: fiction in the evidence table
+ * would poison the very verdicts spec/42 and spec/43 exist to gather.
+ */
+export function getReplayBoard(
+  now: number = Date.now(),
+  opts: { chaos?: boolean; speed?: number } = {},
+): Aged<VisBoardData> {
+  const hit = boards.get(REPLAY_MATCH_NO);
+  if (fresh(hit, now)) return aged(hit!, now);
+
+  const xml = replayXml(now, opts);
+  const board = buildBoardFromXml(REPLAY_MATCH_NO, xml, { audit: false, now });
+  const entry: Entry<VisBoardData> = {
+    value: board,
+    at: now,
+    ttlMs: pollIntervalMs(board),
+    changedAt:
+      hit && boardPulse(hit.value) === boardPulse(board) ? hit.changedAt : now,
+    visVersion: payloadVersion(xml),
+  };
+  boards.set(REPLAY_MATCH_NO, entry);
+  return aged(entry, now);
+}
 
 /**
  * One VIS live payload → the board it renders (spec/43 §7.1).
@@ -335,8 +371,18 @@ export { MOCK_LABEL, MOCK_MATCH_NO } from "./mock";
 export function buildBoardFromXml(
   matchNo: number,
   xml: string,
-  opts: { audit: boolean },
+  opts: {
+    audit: boolean;
+    /**
+     * The instant to read the payload AT. Defaults to the wall clock, which is
+     * what a live poll wants; the replay board (spec/44) passes the frame's own
+     * time so that its UPCOMING/LIVE/FINISHED transitions are judged against
+     * the clock the frame was built for rather than against the real one.
+     */
+    now?: number;
+  },
 ): VisBoardData {
+  const now = opts.now ?? Date.now();
   const sets = tagBlocks(xml, "Set").sort(
     (a, b) => num(a.attrs, "No") - num(b.attrs, "No"),
   );
@@ -356,7 +402,7 @@ export function buildBoardFromXml(
   const enforced = enforceRotation(xml, latestSet, firstServer);
   const board = stabiliseLineups(
     matchNo,
-    mapVolleyLive(xml, matchNo, Date.now(), firstServer, {
+    mapVolleyLive(xml, matchNo, now, firstServer, {
       A: enforced.A,
       B: enforced.B,
     }),
@@ -437,6 +483,9 @@ async function shadowRotation(
 ): Promise<void> {
   try {
     if (!latestSet) return;
+    // Belt and braces beside `audit: false`: a replayed match must never reach
+    // the evidence table, whatever a future caller does (spec/44 §6.2).
+    if (matchNo === REPLAY_MATCH_NO) return;
     const match = tagBlocks(xml, "Match")[0]?.attrs ?? null;
     const rows = auditSet({
       matchNo,

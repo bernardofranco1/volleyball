@@ -1,8 +1,35 @@
 # spec/44 — The replay board: an always-running match for validating any screen
 
-**Status: PLANNED — not yet implemented.** Written 2026-08-20 for an
-implementing agent. **Implement spec/43 first** — this spec consumes its
-event parser and its enforcement property test.
+**Status: SHIPPED 2026-08-20.** No migration, no cron, no new environment
+variable. Live at `/m/replay` on the board host and `/Scoreboard/vis/replay`.
+
+Five things the plan below got wrong or did not know; each is recorded where it
+matters, and all five are worth reading before touching this code.
+
+1. **The capture's clock starts at the SCHEDULED time.** 27550 was scheduled
+   for 13:35 and first served at 14:01, so `Rally@TimeOffset` begins at
+   1 579 497 — twenty-six minutes of nothing. The replay shifts its origin to
+   30 s before the first serve; the pre-roll is deliberate, because that is the
+   only window in which `Set@NoServingTeam` names the first server (spec/42).
+2. **VIS does not count libero exchanges as substitutions.** Set one of 27550
+   contains 28 `<Substitution>` events for Qatar and the feed reports
+   `NbSubstitutionTeamA="2"` — exactly the two involving no designated libero.
+   Counting them all emptied the board's substitution allowance a few rallies
+   in. Verified per set against the capture's own counters.
+3. **Three of the four statistics recompute exactly; the attack bar does not.**
+   Per-player `TotalPoints`, `BlockPoint`, `ServePoint` and team
+   `OpponentErrors` (= `<TeamPoint Note="3">` rows) match VIS's aggregates
+   exactly on 27550 and 27547. Attack points do not: VIS credits a few more
+   than the stream carries as `Skill="6" Note="3"`, so that bar reads slightly
+   low. Known, documented, not a bug to hunt.
+4. **`ChallengeResult` carries no team.** It has an `Outcome` only, so it is
+   paired with the preceding `ChallengeRequest`. `Outcome="2"` is upheld;
+   anything else spends the allowance (mapped against the captured counters).
+5. **`buildBoardFromXml` had to take the frame's clock.** It read `Date.now()`,
+   which makes every replayed UPCOMING frame read LIVE. It now accepts `now`.
+
+**Implement spec/43 first** — this consumes its event parser and its
+enforcement property.
 
 Prerequisite reading: spec/34 (client/store/route), spec/35 W9 (the static
 mock and why it is embedded), spec/37 (cadence), spec/42/43 (rotation).
@@ -170,14 +197,26 @@ All pure and offline; the frame engine takes `t` explicitly so nothing sleeps.
    timeout; the substitution gap before set 1 rally 14; the wrong-server
    rally 15; inside the set 1→2 break (inSetBreak true, MatchPoints credited);
    match end (FINISHED, 0–3); after wrap-around (UPCOMING again).
-2. **Full-cycle sweep**: step `t` through one cycle at 500 ms virtual
-   resolution; assert for every frame — XML parses; scores monotonic within a
-   set; set sequence 1→2→3; `Version` non-decreasing within the cycle;
-   board status matches the phase schedule; **the spec/43 no-exception
-   property holds on the enforced board: the serving side's P1 equals the
-   next recorded serve action's player, every frame, including across the
-   nine feed-missed rotations** — this makes the whole 27550 pathology a
-   permanent regression suite for the rotation stack.
+2. **Full-cycle sweep**: step through one cycle at 500 ms of WALL time; assert
+   for every frame — XML parses; scores monotonic within a set; set sequence
+   1→2→3; `Version` non-decreasing; board status matches the phase schedule;
+   and **the spec/43 property holds on the enforced board: the serving side's
+   P1 equals the next recorded serve action's player**, with the single
+   enumerated exception of 27550's on-court wrong-server.
+
+   One qualification the plan missed: a substitution is published when it is
+   made, and some are recorded INSIDE the rally they precede. At an instant
+   between two rallies the feed may not yet have said that the player about to
+   serve is even on court, and the board cannot know what it has not been told.
+   The sweep therefore skips frames where the substitutions visible do not yet
+   match the next rally's — which is a statement about publication timing, not
+   a tolerance on the rule.
+
+   The sweep runs the frames through the STORE's `buildBoardFromXml`, not
+   through `mapVolleyLive`. Calling the mapper directly tests half the
+   machinery and silently skips enforcement — which is the half these tests
+   exist for, and the first version of the chaos test failed for exactly that
+   reason.
 3. **Chaos sweep**: same sweep with `chaos: true`, asserting the PIPELINE
    output (post-stabiliser/enforcement) is frame-for-frame identical to the
    non-chaos sweep — the rewrite window must be invisible on screen.

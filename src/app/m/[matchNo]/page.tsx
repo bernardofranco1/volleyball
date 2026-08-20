@@ -7,7 +7,8 @@
  * competition behind it is resolved here only to pick up its branding and to
  * keep the allowlist check.
  *
- * `/m/mock` renders the validation capture without touching VIS.
+ * `/m/mock` renders the validation capture, and `/m/replay` a real previous
+ * match on a permanent loop (spec/44) — neither touches VIS.
  */
 
 import type { Metadata } from "next";
@@ -35,7 +36,7 @@ export default async function PublicBoardPage({
 }) {
   const { matchNo } = await params;
   const ref =
-    matchNo === "mock"
+    matchNo === "mock" || matchNo === "replay"
       ? await MOCK_BOARD_TENANT()
       : /^\d{1,9}$/.test(matchNo)
         ? await competitionForMatch(Number(matchNo))

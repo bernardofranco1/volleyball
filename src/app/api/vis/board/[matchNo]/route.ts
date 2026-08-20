@@ -7,14 +7,19 @@
  */
 
 import { NextResponse } from "next/server";
-import { getBoard, getMockBoard, isKnownMatch } from "@/lib/vis-live/store";
+import {
+  getBoard,
+  getMockBoard,
+  getReplayBoard,
+  isKnownMatch,
+} from "@/lib/vis-live/store";
 import { cdnMaxAgeSeconds, pollIntervalMs } from "@/lib/vis-live/cadence";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ matchNo: string }> },
 ) {
   const { matchNo: raw } = await params;
@@ -25,6 +30,25 @@ export async function GET(
     return NextResponse.json(
       { board: value, ageSeconds, pollMs: pollIntervalMs(value) },
       { headers: { "Cache-Control": "no-store" } },
+    );
+  }
+  // The replay board (spec/44): a real match on a loop, also without VIS — but
+  // through the real pipeline, so it carries the real cadence and CDN headers.
+  if (raw === "replay") {
+    const url = new URL(req.url);
+    const speed = Number(url.searchParams.get("speed"));
+    const { value, ageSeconds } = getReplayBoard(Date.now(), {
+      chaos: url.searchParams.has("chaos"),
+      speed: Number.isFinite(speed) && speed > 0 ? speed : undefined,
+    });
+    const interval = pollIntervalMs(value);
+    return NextResponse.json(
+      { board: value, ageSeconds, pollMs: interval },
+      {
+        headers: {
+          "Cache-Control": `public, s-maxage=${cdnMaxAgeSeconds(interval)}, stale-while-revalidate=${cdnMaxAgeSeconds(interval) * 2}`,
+        },
+      },
     );
   }
   if (!/^\d{1,9}$/.test(raw)) {

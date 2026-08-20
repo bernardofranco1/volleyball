@@ -20,12 +20,13 @@ export default async function ShortVisBoard({
 }) {
   const { matchNo } = await params;
   const query = await searchParams;
-  // The validation mock (spec/35 W9) hangs off the U17 competition so it has a
-  // tenant and branding, but its data comes from the embedded capture.
-  const isMock = matchNo === "mock";
-  if (!isMock && !/^\d{1,9}$/.test(matchNo)) notFound();
+  // The validation mock (spec/35 W9) and the replay board (spec/44) hang off
+  // the U17 competition so they have a tenant and branding, but their data
+  // comes from an embedded capture and never from VIS.
+  const synthetic = matchNo === "mock" || matchNo === "replay";
+  if (!synthetic && !/^\d{1,9}$/.test(matchNo)) notFound();
 
-  const tournamentNo = isMock
+  const tournamentNo = synthetic
     ? 1670
     : await tournamentOfMatch(Number(matchNo)).catch(() => null);
   if (tournamentNo == null) notFound();

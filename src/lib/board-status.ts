@@ -37,6 +37,7 @@ import { competitionBranding, competitions, tenants } from "@/db/schema";
 import { eq, isNotNull } from "drizzle-orm";
 import { visRequest, volleyMatchListEnvelope } from "@/lib/vis-live/client";
 import { visStoreSnapshot, type VisStoreSnapshot } from "@/lib/vis-live/store";
+import { REPLAY_MATCH_NO } from "@/lib/vis-live/replay";
 
 export type CheckState = "ok" | "warn" | "down" | "idle";
 
@@ -270,15 +271,20 @@ export async function readBoardStatus(opts: {
     .sort((a, b) => rank(a.status) - rank(b.status) || a.matchNo - b.matchNo)
     .map((b) => {
       const live = b.status === "LIVE";
+      // The replay board (spec/44) is a real previous match on a permanent
+      // loop. It is cached and served like any other, so it belongs in this
+      // list — but it must be impossible to mistake for a fixture being played
+      // tonight, and its "score has not moved" reading means nothing.
+      const isReplay = b.matchNo === REPLAY_MATCH_NO;
       return {
         matchNo: b.matchNo,
-        label: `${b.teamA} v ${b.teamB}`,
+        label: isReplay ? `REPLAY · ${b.teamA} v ${b.teamB}` : `${b.teamA} v ${b.teamB}`,
         detail: [
-          `#${b.matchNo}`,
+          isReplay ? "validation loop · never touches VIS" : `#${b.matchNo}`,
           live ? (b.inSetBreak ? "set break" : `set ${b.currentSet ?? "—"}`) : b.status.toLowerCase(),
           live ? `${b.scoreA}-${b.scoreB}` : null,
         ].filter(Boolean).join(" · "),
-        state: gradeMatch(b),
+        state: isReplay ? "idle" : gradeMatch(b),
         value: live
           ? `poll ${Math.round(b.pollMs / 1000)} s · payload ${b.ageSeconds} s old`
           : `payload ${ago(b.ageSeconds)}`,
