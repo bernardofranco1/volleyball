@@ -152,6 +152,27 @@ async function main() {
     }
   }
 
+  // Warm the build BEFORE the domain moves. Measured on a cold deployment:
+  // the first board request costs ~2.2 s (≈1.2 s runtime boot, ≈0.75 s filling
+  // our allowlist and store) against ~0.2 s warm. A venue screen never blanks
+  // across a promote — it holds the last score and its poll simply lands late —
+  // but this takes that pause from a couple of seconds to imperceptible.
+  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
+  if (bypass && dep.url) {
+    const base = `https://${dep.url}`;
+    const paths = ["/api/version", "/api/vis/board/27547", "/api/vis/board/27547"];
+    for (const path of paths) {
+      const t = Date.now();
+      const res = await fetch(`${base}${path}`, {
+        headers: { "x-vercel-protection-bypass": bypass },
+        cache: "no-store",
+      }).catch(() => null);
+      console.log(`  warm ${path} → ${res?.status ?? "unreachable"} in ${Date.now() - t}ms`);
+    }
+  } else if (!bypass) {
+    console.log("  (no VERCEL_AUTOMATION_BYPASS_SECRET — skipping warm-up)");
+  }
+
   await promoteDeployment(cfg, dep.id);
   await db.insert(releases).values({
     id: newId("rel"),
