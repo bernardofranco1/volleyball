@@ -370,6 +370,15 @@ async function getVsBoard(
       matchNo,
     });
 
+    // A finished match has no live state, so VolleyStation's widget carries no
+    // line-up at all and the six come back empty. VIS keeps the last rally's,
+    // so borrow it rather than show an empty court — visible on the U-shape and
+    // on ?screen=board, where a finished board does not switch to statistics.
+    const borrowed =
+      board.status === "FINISHED" && board.teamA.players.length === 0
+        ? await borrowSixFromVis(matchNo, board)
+        : board;
+
     const prev = vsBoards.get(matchNo);
     const stamp = Date.now();
     // A rally is in progress: a point is seconds away, so ask more often for
@@ -377,11 +386,11 @@ async function getVsBoard(
     // cannot).
     const inRally = match.widget?.in_rally === true && board.status === "LIVE";
     const entry: Entry<VisBoardData> = {
-      value: board,
+      value: borrowed,
       at: stamp,
-      ttlMs: Math.min(pollIntervalMs(board), inRally ? VS_IN_RALLY_MS : Infinity),
+      ttlMs: Math.min(pollIntervalMs(borrowed), inRally ? VS_IN_RALLY_MS : Infinity),
       changedAt:
-        prev && boardPulse(prev.value) === boardPulse(board) ? prev.changedAt : stamp,
+        prev && boardPulse(prev.value) === boardPulse(borrowed) ? prev.changedAt : stamp,
     };
     vsBoards.set(matchNo, entry);
     return withPoll(aged(entry, stamp), entry);
@@ -585,6 +594,42 @@ export function buildBoardFromXml(
     void shadowRotation(xml, matchNo, latestSet, setNo, enforced);
   }
   return board;
+}
+
+/**
+ * Fill a VolleyStation board's empty six from the VIS reading of the same match.
+ *
+ * The sides are matched by TEAM CODE, never by position: VolleyStation's home
+ * and guest need not be VIS's A and B — the mapping's own verification belt
+ * compares the two as a SET for exactly that reason — and getting it backwards
+ * would put one team's players under the other's name.
+ *
+ * Never throws and never blocks: a VIS read that fails simply leaves the board
+ * as it was, which is what it would have been anyway.
+ */
+async function borrowSixFromVis(
+  matchNo: number,
+  board: VisBoardData,
+): Promise<VisBoardData> {
+  try {
+    const vis = (await getVisBoard(matchNo)).value;
+    const pick = (code: string) =>
+      code && vis.teamA.code === code
+        ? vis.teamA.players
+        : code && vis.teamB.code === code
+          ? vis.teamB.players
+          : [];
+    const a = pick(board.teamA.code);
+    const b = pick(board.teamB.code);
+    if (a.length === 0 && b.length === 0) return board;
+    return {
+      ...board,
+      teamA: { ...board.teamA, players: a },
+      teamB: { ...board.teamB, players: b },
+    };
+  } catch {
+    return board;
+  }
 }
 
 const NO_ENFORCEMENT: EnforcedLineups = {

@@ -320,6 +320,90 @@ describe("the cadence follows the rally", () => {
   });
 });
 
+describe("a finished VolleyStation board still shows the six", () => {
+  it("borrows them from VIS, matched by team code", async () => {
+    // VolleyStation's widget is LIVE state: once a match is over it carries no
+    // line-up, so the six come back empty. VIS keeps the last rally's. Matching
+    // by code rather than by position matters — VolleyStation's home need not
+    // be VIS's team A, and getting it backwards puts one team's players under
+    // the other team's name.
+    //
+    // The whole fixture is kept consistent on QAT/VEN, which is what the VIS
+    // live payload actually contains: the list, the team records and the live
+    // read must agree, exactly as they do upstream.
+    dbRows.competitions = competitionRow("vs");
+    const finished = JSON.parse(JSON.stringify(VS_MATCHES["2504876"])) as Record<
+      string,
+      unknown
+    > & { widget: Record<string, unknown> };
+    finished.WonSetHome = 3;
+    finished.WonSetGuest = 0;
+    finished.HomeTeam = "Qatar";
+    finished.GuestTeam = "Venezuela";
+    finished.HomeTeam_ID = 900;
+    finished.GuestTeam_ID = 901;
+    finished.widget.lineup_home = null;
+    finished.widget.lineup_guest = null;
+    finished.widget.in_set = false;
+
+    const listXml =
+      '<?xml version="1.0" encoding="utf-8"?><Responses><VolleyballMatches>' +
+      '<VolleyballMatch No="27550" NoInTournament="4" TeamACode="QAT" TeamBCode="VEN" ' +
+      'TeamAName="Qatar" TeamBName="Venezuela" DateLocal="2026-08-19" Status="25"/>' +
+      "</VolleyballMatches></Responses>";
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      const u = String(url);
+      if (u.includes("fivb.org")) {
+        const body = String((init as RequestInit | undefined)?.body ?? "");
+        return new Response(body.includes("GetVolleyMatchList") ? listXml : VIS_XML, {
+          status: 200,
+        });
+      }
+      if (u.includes("/Championships/")) return new Response(VS_CHAMPS, { status: 200 });
+      if (/\/Teams\/900\//.test(u))
+        return new Response(
+          JSON.stringify({ Team_ID: 900, ShortCodeName: "QAT", Code: "8682", PlayerList: [] }),
+          { status: 200 },
+        );
+      if (/\/Teams\/901\//.test(u))
+        return new Response(
+          JSON.stringify({ Team_ID: 901, ShortCodeName: "VEN", Code: "8689", PlayerList: [] }),
+          { status: 200 },
+        );
+      if (/\/Matches\/\d+\//.test(u))
+        return new Response(JSON.stringify(finished), { status: 200 });
+      if (u.includes("/Matches/?"))
+        return new Response(
+          JSON.stringify([
+            {
+              ChampionshipMatch_ID: 999,
+              Championship_ID: 6181,
+              MatchNumber: "4",
+              HomeTeam: "Qatar",
+              GuestTeam: "Venezuela",
+              HomeTeam_ID: 900,
+              GuestTeam_ID: 901,
+            },
+          ]),
+          { status: 200 },
+        );
+      if (u.includes("/MatchStatsSheet/")) return new Response("[]", { status: 200 });
+      return new Response("{}", { status: 200 });
+    });
+
+    await ensureMapping();
+    const board = await getBoard(27550);
+    expect(board.source).toBe("vs");
+    expect(board.value.status).toBe("FINISHED");
+    expect([board.value.teamA.code, board.value.teamB.code]).toEqual(["QAT", "VEN"]);
+    // The six are back, under the right badge, with names rather than numbers.
+    expect(board.value.teamA.players).toHaveLength(6);
+    expect(board.value.teamB.players).toHaveLength(6);
+    for (const p of board.value.teamA.players) expect(p.name).not.toBe("");
+  });
+});
+
 describe("VolleyStation can never cost a board", () => {
   it("falls back to VIS in the same request when VolleyStation errors", async () => {
     dbRows.competitions = competitionRow("vs");
