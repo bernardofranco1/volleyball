@@ -57,10 +57,15 @@ export interface VsMatchLink {
 const MAP_TTL_MS = 10 * 60_000;
 /** Rosters change per event, not per rally. */
 const TEAM_TTL_MS = 6 * 3600_000;
+/** The linked-competition list is a cheap DB read, but not a per-request one. */
+const LINKS_TTL_MS = 60_000;
 
-let mapping: Map<number, VsMatchLink> = new Map();
-let mappingAt = 0;
-let building: Promise<void> | null = null;
+/** Per COMPETITION, not global: a board must only pay for its own event. */
+const perCompetition = new Map<
+  string,
+  { value: Map<number, VsMatchLink>; at: number; building: Promise<void> | null }
+>();
+let links: { value: LinkedCompetition[]; at: number } | null = null;
 
 const teamCache = new Map<number, { value: VsTeam; at: number }>();
 const teamInFlight = new Map<number, Promise<VsTeam>>();
@@ -73,6 +78,7 @@ interface LinkedCompetition {
 }
 
 async function linkedCompetitions(): Promise<LinkedCompetition[]> {
+  if (links && Date.now() - links.at < LINKS_TTL_MS) return links.value;
   const rows = await db
     .select({
       id: competitions.id,
@@ -82,7 +88,7 @@ async function linkedCompetitions(): Promise<LinkedCompetition[]> {
     })
     .from(competitions)
     .where(isNotNull(competitions.vsChampionshipId));
-  return rows.flatMap((r) =>
+  const value = rows.flatMap((r) =>
     r.visTournamentNo != null && r.vsChampionshipId != null
       ? [
           {
@@ -94,120 +100,130 @@ async function linkedCompetitions(): Promise<LinkedCompetition[]> {
         ]
       : [],
   );
+  links = { value, at: Date.now() };
+  return value;
 }
 
-/** Rebuild every competition's mapping. Never throws. */
-async function rebuild(): Promise<void> {
-  const next = new Map<number, VsMatchLink>();
+/** Build ONE competition's mapping. Never throws — no mapping means VIS. */
+async function buildOne(comp: LinkedCompetition): Promise<Map<number, VsMatchLink>> {
+  const out = new Map<number, VsMatchLink>();
   try {
-    if (!vsConfigured()) {
-      mapping = next;
-      mappingAt = Date.now();
-      return;
-    }
-    for (const comp of await linkedCompetitions()) {
-      try {
-        const config = await vsChampionship(comp.vsChampionshipId);
-        // Imported HERE rather than at the top of the file: the store imports
-        // this module to choose a source, so a static import back into it is a
-        // cycle. Under the app's load order the store is mid-initialisation
-        // when this module is evaluated, and `getMatchList` would be undefined
-        // — every mapping silently empty, every board quietly on VIS. It cost
-        // an afternoon; a dynamic import is resolved at call time and cannot.
-        const { getMatchList } = await import("@/lib/vis-live/store");
-        const [visList, vsList] = await Promise.all([
-          getMatchList(comp.visTournamentNo),
-          vsChampionshipMatches(
-            comp.vsChampionshipId,
-            (config as unknown as { DateFrom?: string })?.DateFrom ?? null,
-            (config as unknown as { DateTo?: string })?.DateTo ?? null,
-          ),
-        ]);
+    const config = await vsChampionship(comp.vsChampionshipId);
+    // Imported HERE rather than at the top of the file: the store imports this
+    // module to choose a source, so a static import back into it is a cycle.
+    // Under the app's load order the store is mid-initialisation when this
+    // module is evaluated, and `getMatchList` would be undefined — every
+    // mapping silently empty, every board quietly on VIS. It cost an afternoon;
+    // a dynamic import is resolved at call time and cannot.
+    const { getMatchList } = await import("@/lib/vis-live/store");
+    const [visList, vsList] = await Promise.all([
+      getMatchList(comp.visTournamentNo),
+      vsChampionshipMatches(
+        comp.vsChampionshipId,
+        (config as unknown as { DateFrom?: string })?.DateFrom ?? null,
+        (config as unknown as { DateTo?: string })?.DateTo ?? null,
+      ),
+    ]);
 
-        const visByNumber = new Map(
-          visList.value
-            .filter((m) => m.numberInTournament != null)
-            .map((m) => [String(m.numberInTournament), m]),
-        );
-        let mapped = 0;
-        for (const vm of vsList) {
-          const num = vm.MatchNumber == null ? null : String(vm.MatchNumber);
-          const vis = num ? visByNumber.get(num) : null;
-          if (!vis) continue;
-          const visCodes = [vis.teamACode, vis.teamBCode]
-            .filter((c): c is string => !!c)
-            .map((c) => c.toUpperCase());
-          // A bracket placeholder has no teams on either side; it joins later.
-          if (visCodes.length !== 2) continue;
-          next.set(vis.matchNo, {
-            championshipMatchId: vm.ChampionshipMatch_ID,
-            championshipId: comp.vsChampionshipId,
-            homeTeamId: vm.HomeTeam_ID,
-            guestTeamId: vm.GuestTeam_ID,
-            visCodes,
-            config,
-            boardSource: comp.boardSource,
-          });
-          mapped++;
-        }
-        console.info(
-          `[vs-live] competition ${comp.id}: ${mapped}/${vsList.length} matches linked`,
-        );
-      } catch (err) {
-        // One unreachable event must not cost the others their mapping.
-        console.warn(
-          `[vs-live] competition ${comp.id} not mapped: ${err instanceof Error ? err.message.slice(0, 120) : err}`,
-        );
-      }
+    const visByNumber = new Map(
+      visList.value
+        .filter((m) => m.numberInTournament != null)
+        .map((m) => [String(m.numberInTournament), m]),
+    );
+    for (const vm of vsList) {
+      const num = vm.MatchNumber == null ? null : String(vm.MatchNumber);
+      const vis = num ? visByNumber.get(num) : null;
+      if (!vis) continue;
+      const visCodes = [vis.teamACode, vis.teamBCode]
+        .filter((c): c is string => !!c)
+        .map((c) => c.toUpperCase());
+      // A bracket placeholder has no teams on either side; it joins later.
+      if (visCodes.length !== 2) continue;
+      out.set(vis.matchNo, {
+        championshipMatchId: vm.ChampionshipMatch_ID,
+        championshipId: comp.vsChampionshipId,
+        homeTeamId: vm.HomeTeam_ID,
+        guestTeamId: vm.GuestTeam_ID,
+        visCodes,
+        config,
+        boardSource: comp.boardSource,
+      });
     }
-    mapping = next;
-  } catch {
-    // Keep whatever we had rather than dropping every board to VIS.
-  } finally {
-    mappingAt = Date.now();
+    console.info(`[vs-live] ${comp.id}: ${out.size}/${vsList.length} matches linked`);
+  } catch (err) {
+    console.warn(
+      `[vs-live] ${comp.id} not mapped: ${err instanceof Error ? err.message.slice(0, 120) : err}`,
+    );
   }
+  return out;
 }
 
 /**
- * How long a board will wait for the mapping before giving up and using VIS.
+ * How long a board will wait for its competition's mapping before using VIS.
  *
  * A background-only refresh sounds safer and is not: serverless instances are
  * short-lived and numerous, so "the next request will have it" is usually a
  * DIFFERENT instance starting cold, and VolleyStation would never be reached at
  * all. So the first request on an instance does wait — but never longer than
- * this, whatever the upstream is doing. A rebuild costs one cached
- * championships read plus one dated match list per competition, ~0.2 s each.
+ * this, whatever the upstream is doing.
+ *
+ * It is affordable because a board maps only ITS OWN event: one cached
+ * championships read, one VIS match list (already warm, the route builds the
+ * allowlist from it before calling us) and one dated VolleyStation list. Mapping
+ * every linked competition instead — which is what this used to do — lost the
+ * race on a cold instance and quietly served VIS all afternoon.
  */
 const MAPPING_WAIT_MS = 2_500;
 
-/**
- * The mapping, waiting for a rebuild only as long as a board can afford to.
- *
- * Whichever way this returns, the rebuild continues in the background, so an
- * instance that timed out once is serving VolleyStation a moment later.
- */
-async function currentMapping(now: number = Date.now()): Promise<Map<number, VsMatchLink>> {
-  if (now - mappingAt >= MAP_TTL_MS && !building) {
-    building = rebuild().finally(() => {
-      building = null;
-    });
+/** The mapping for one competition, waiting only as long as a board can. */
+async function mappingFor(
+  comp: LinkedCompetition,
+): Promise<Map<number, VsMatchLink>> {
+  const hit = perCompetition.get(comp.id);
+  if (hit && Date.now() - hit.at < MAP_TTL_MS) return hit.value;
+
+  const entry = hit ?? { value: new Map<number, VsMatchLink>(), at: 0, building: null };
+  perCompetition.set(comp.id, entry);
+  if (!entry.building) {
+    entry.building = buildOne(comp)
+      .then((value) => {
+        entry.value = value;
+        entry.at = Date.now();
+      })
+      .finally(() => {
+        entry.building = null;
+      });
   }
-  if (building && mapping.size === 0) {
+  // A mapping we already hold is served immediately while it refreshes behind.
+  if (entry.value.size === 0) {
     await Promise.race([
-      building,
+      entry.building,
       new Promise((resolve) => setTimeout(resolve, MAPPING_WAIT_MS)),
     ]);
   }
-  return mapping;
+  return entry.value;
 }
 
-/** Warm the mapping and wait for it — for scripts and tests, never a board. */
+/** The linked competition that owns this VIS match, if any. */
+async function competitionForMatch(matchNo: number): Promise<LinkedCompetition | null> {
+  const all = await linkedCompetitions();
+  if (all.length === 0) return null;
+  const { tournamentOfMatch } = await import("@/lib/vis-live/store");
+  const tournamentNo = await tournamentOfMatch(matchNo).catch(() => null);
+  if (tournamentNo == null) return null;
+  return all.find((c) => c.visTournamentNo === tournamentNo) ?? null;
+}
+
+/** Warm every mapping and wait — for scripts and tests, never a board. */
 export async function ensureMapping(): Promise<Map<number, VsMatchLink>> {
-  if (Date.now() - mappingAt >= MAP_TTL_MS || mapping.size === 0) {
-    building = building ?? rebuild().finally(() => (building = null));
-    await building;
+  const out = new Map<number, VsMatchLink>();
+  if (!vsConfigured()) return out;
+  for (const comp of await linkedCompetitions().catch(() => [])) {
+    const one = await buildOne(comp);
+    perCompetition.set(comp.id, { value: one, at: Date.now(), building: null });
+    for (const [k, v] of one) out.set(k, v);
   }
-  return mapping;
+  return out;
 }
 
 /** One team, cached for hours; the last good copy survives an outage. */
@@ -245,7 +261,9 @@ export interface VsTarget {
 
 /** The VolleyStation match behind a VIS match number, or null. */
 export async function vsTargetFor(matchNo: number): Promise<VsTarget | null> {
-  const link = (await currentMapping()).get(matchNo);
+  const comp = await competitionForMatch(matchNo);
+  if (!comp) return null;
+  const link = (await mappingFor(comp)).get(matchNo);
   return link ? { link } : null;
 }
 
@@ -271,9 +289,8 @@ export async function sourceFor(
 
 /** Test seam. */
 export function __resetVsResolve(): void {
-  mapping = new Map();
-  mappingAt = 0;
-  building = null;
+  perCompetition.clear();
+  links = null;
   teamCache.clear();
   teamInFlight.clear();
 }

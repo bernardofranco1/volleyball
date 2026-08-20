@@ -200,3 +200,59 @@ describe("enforcement reaches the board", () => {
     expect(board.teamA.players).toHaveLength(6);
   });
 });
+
+describe("a momentary VIS failure must not blank a live board", () => {
+  it("keeps the last good score instead of falling back to the pre-start frame", async () => {
+    // Seen in a venue on 2026-08-20, match 27553: the board read 0-0 in the
+    // middle of a set. `mapVolleyMatch` — the pre-start read — carries no score
+    // and no sets by design, and it was being cached OVER the live board on any
+    // live-read failure, before the last good payload was even considered.
+    let live = true;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+      const body = String((init as RequestInit).body ?? "");
+      if (body.includes("GetVolleyLive")) {
+        if (!live) return new Response("upstream is unwell", { status: 503 });
+        return new Response(LIVE_XML, { status: 200 });
+      }
+      // GetVolleyMatch — the pre-start row, which has no score in it at all.
+      return new Response(
+        '<?xml version="1.0"?><Responses><VolleyballMatches><VolleyballMatch ' +
+          'No="27550" TeamACode="QAT" TeamBCode="VEN" TeamAName="Qatar" ' +
+          'TeamBName="Venezuela" DateLocal="2026-08-19" TimeLocal="13:35:00"/>' +
+          "</VolleyballMatches></Responses>",
+        { status: 200 },
+      );
+    });
+
+    const good = await getBoard(27550);
+    expect(good.value.status).toBe("LIVE");
+    expect(good.value.scoreA + good.value.scoreB).toBeGreaterThan(0);
+
+    live = false;
+    const during = await getBoard(27550, Date.now() + 120_000);
+    expect(during.value.status).toBe("LIVE");
+    expect(during.value.scoreA).toBe(good.value.scoreA);
+    expect(during.value.sets.length).toBeGreaterThan(0);
+  });
+
+  it("still uses the pre-start frame for a match that has not started", async () => {
+    // The fallback is not removed — it is the right answer when there is no
+    // live row yet, which is what it was built for.
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+      const body = String((init as RequestInit).body ?? "");
+      if (body.includes("GetVolleyLive")) {
+        return new Response("<Responses></Responses>", { status: 200 });
+      }
+      return new Response(
+        '<?xml version="1.0"?><Responses><VolleyballMatches><VolleyballMatch ' +
+          'No="28803" TeamACode="TPE" TeamBCode="IRI" TeamAName="Chinese Taipei" ' +
+          'TeamBName="Iran" DateLocal="2026-08-21" TimeLocal="10:00:00"/>' +
+          "</VolleyballMatches></Responses>",
+        { status: 200 },
+      );
+    });
+    const board = await getBoard(28803);
+    expect(board.value.teamA.name).toBe("Chinese Taipei");
+    expect(board.value.scoreA).toBe(0);
+  });
+});

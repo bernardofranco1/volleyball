@@ -255,6 +255,16 @@ async function getVisBoard(
       }
       throw new Error("no live data");
     } catch (liveErr) {
+      // A board with PLAY behind it must never be replaced by the pre-start
+      // frame. `mapVolleyMatch` has no score and no sets by design, so caching
+      // it over a live board turns a momentary VIS failure into a scoreboard
+      // reading 0-0 in the middle of a set — which is exactly what a venue saw
+      // on match 27553, 2026-08-20, while VIS itself was answering correctly
+      // again. A slightly stale score is always better than a wrong one, and
+      // the status page's `changedAt` is what surfaces a feed that has stopped.
+      if (hit && (hit.value.sets.length > 0 || hit.value.status !== "UPCOMING")) {
+        return aged(hit, Date.now());
+      }
       // Pre-start fallback: teams + kick-off time, refreshed slowly.
       try {
         const xml = await visRequest(volleyMatchEnvelope(matchNo));
