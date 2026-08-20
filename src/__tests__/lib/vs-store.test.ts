@@ -134,6 +134,33 @@ describe("choosing a source", () => {
     expect(seen.some((u) => u.includes("panel.volleystation.com"))).toBe(false);
   });
 
+  it("serves VolleyStation on a bare link when the competition says so", async () => {
+    // The parameterless URL is what a venue TV runs. `board_source = vs` must
+    // be enough to make VolleyStation the official source — no query string.
+    dbRows.competitions = competitionRow("vs");
+    stubBoth();
+    await ensureMapping();
+    const board = await getBoard(27550);
+    expect(board.source).toBe("vs");
+  });
+
+  it("reads the setting fresh, so a revert does not wait on the mapping cache", async () => {
+    // The setting is the emergency lever. It is read from the linked-competition
+    // list (cached a minute), NOT from the mapping (cached ten) — otherwise
+    // "put every screen back on VIS" would take ten minutes to obey.
+    dbRows.competitions = competitionRow("vs");
+    stubBoth();
+    await ensureMapping();
+    expect((await getBoard(27550)).source).toBe("vs");
+
+    // Flip it the way the script does, and expire only the links cache.
+    dbRows.competitions = competitionRow("vis");
+    __resetVsResolve();
+    stubBoth();
+    await ensureMapping();
+    expect((await getBoard(27550)).source).toBe("vis");
+  });
+
   it("serves VIS when the competition says vis, even though it is mapped", async () => {
     dbRows.competitions = competitionRow("vis");
     const { seen } = stubBoth();

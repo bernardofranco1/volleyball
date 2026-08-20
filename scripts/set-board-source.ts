@@ -100,7 +100,7 @@ async function main() {
   if (!execute) return;
 
   await db.update(competitions).set(changes).where(eq(competitions.id, target.id));
-  console.log("\nWritten. Boards pick it up within one mapping TTL (10 min) or on the next cold start.");
+  console.log("\nWritten. Boards pick it up within ~1 minute (the linked-competition\ncache), without a deploy or a restart.");
 }
 
 main()

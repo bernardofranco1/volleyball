@@ -268,6 +268,21 @@ export async function vsTargetFor(matchNo: number): Promise<VsTarget | null> {
 }
 
 /**
+ * Which feed a competition is set to serve, read as FRESHLY as the lever needs.
+ *
+ * Deliberately not taken from the mapping, even though the mapping carries a
+ * copy: that is cached for ten minutes, and this setting is the emergency
+ * control. "VolleyStation is misbehaving at 18-17 in the fourth, put every
+ * screen back on VIS" cannot mean waiting ten minutes for a cache to turn over.
+ * The linked-competition list is a single indexed read cached for a minute, so
+ * a change lands within about a poll of that.
+ */
+async function configuredSource(matchNo: number): Promise<"vis" | "vs" | "auto"> {
+  const comp = await competitionForMatch(matchNo).catch(() => null);
+  return comp?.boardSource ?? "vis";
+}
+
+/**
  * Which source should serve this match, given the competition's setting and an
  * optional per-screen override.
  *
@@ -280,10 +295,15 @@ export async function sourceFor(
 ): Promise<{ source: BoardSource; target: VsTarget | null }> {
   // A screen pinned to VIS must not pay for a mapping it will not use.
   if (requested === "vis") return { source: "vis", target: null };
+  if (requested === "vs") {
+    const target = await vsTargetFor(matchNo);
+    return { source: target ? "vs" : "vis", target };
+  }
+  // No override: the competition's own setting decides, read fresh (above).
+  const wants = await configuredSource(matchNo);
+  if (wants === "vis") return { source: "vis", target: null };
   const target = await vsTargetFor(matchNo);
-  if (requested === "vs") return { source: target ? "vs" : "vis", target };
-  const wants = target?.link.boardSource ?? "vis";
-  const useVs = target != null && (wants === "vs" || wants === "auto");
+  const useVs = target != null;
   return { source: useVs ? "vs" : "vis", target: useVs ? target : null };
 }
 
