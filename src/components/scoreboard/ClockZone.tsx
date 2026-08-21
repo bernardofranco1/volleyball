@@ -267,15 +267,14 @@ export function ClockZoneToggle({
     venueName && oneVenueOffset
       ? `${venueName} (${oneVenueOffset})`
       : (venueName ?? oneVenueOffset ?? "");
-  // The picker exists ONLY for the honest-GMT state: local mode, device
-  // reporting a placeholder, and no network estimate to lean on (or a manual
-  // choice already made, which must stay changeable). Everyone else gets their
-  // zone automatically and never sees a 400-entry list — the global selector
-  // this feature deliberately is not (spec/46).
+  // The picker shows whenever the zone did NOT come from the device: the
+  // honest-GMT state, a network estimate (which a VPN can put in the wrong
+  // country), or a manual choice already made — all states where the reader
+  // may know better than we do. Only a real device zone hides it: there is
+  // nothing to correct, and nobody browsing normally ever meets a 400-entry
+  // list — the global selector this feature deliberately is not (spec/46).
   const showPicker =
-    zone === "local" &&
-    readerZone != null &&
-    (readerZoneSource === "manual" || readerZoneSource === null);
+    zone === "local" && readerZone != null && readerZoneSource !== "device";
   const zoneOptions = useMemo<string[]>(() => {
     if (!showPicker) return [];
     // Older engines lack supportedValuesOf; the picker simply stays away and

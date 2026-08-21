@@ -200,11 +200,17 @@ fails on the desktop privacy browsers that hit this state, and asks for
 street-level location to recover a ~38-value fact — exactly the trade that
 audience refuses.
 
-Instead: a **"Set my time zone"** `<select>` that renders ONLY in the
-honest-GMT state (local mode, device reporting a placeholder, no network
-estimate) or while a manual choice is active — so it stays changeable. Everyone
-else gets their zone automatically and never sees a 400-entry list; this is
-deliberately not the global selector rejected at the start.
+Instead: a **"Set my time zone"** `<select>` that renders in local mode
+whenever the zone did NOT come from the device — the honest-GMT state, a
+network estimate (which a VPN can put in the wrong country), or a manual choice
+already active. Only a real device zone hides it: nothing to correct, and
+nobody browsing normally ever meets a 400-entry list; this is deliberately not
+the global selector rejected at the start.
+
+(First shipped scoped to the honest-GMT state only. That state cannot occur
+from a geolocatable connection — the estimate always fills the slot first — so
+the picker was invisible from any normal network, including the reporting
+user's, and was widened to all non-device states the same day.)
 
 Resolution order in `resolveReaderZone(device, manual, network)`:
 **real device zone > manual pick > network estimate > honest placeholder.**
@@ -225,10 +231,5 @@ zone."
 
 - The board itself (`/m/{matchNo}`) still shows its kick-off in venue time,
   which is right for a screen hanging in the venue.
-- The picker is not offered when a network ESTIMATE is wrong (VPN through the
-  wrong country): the estimate fills the slot, so the picker never shows. The
-  affected reader can still use the venue/GMT views; widening the picker to the
-  estimated state was deliberately left out to keep it off screens that do not
-  need it.
 - `visBoard.localDate` is now an unused catalogue key, left in place rather
   than swept out of five locales for nothing.
