@@ -127,10 +127,22 @@ export interface VisMatchSummary {
   teamBCode: string | null;
   dateLocal: string | null;
   timeLocal: string | null;
+  /**
+   * Venue-local kick-off with NO offset, exactly as VIS states it
+   * ("2026-08-21T10:00:00"), and the same instant in UTC
+   * ("2026-08-21T02:00:00Z"). Both halves are needed: the pair IS the venue's
+   * UTC offset for that fixture, so the index can show a match in any zone
+   * without a tz database and without guessing at DST. Per MATCH, not per
+   * competition — tournament 1736 spans ten cities and eight offsets.
+   */
+  scheduledVenue: string | null;
+  scheduledUtc: string | null;
   status: VisMatchStatus;
   resultText: string | null;
   setsText: string | null;
   hall: string | null;
+  /** The venue's city as VIS states it — the label for "event location time". */
+  city: string | null;
 }
 
 const MATCH_ALIASES = ["VolleyballMatch", "VolleyMatch", "Match"] as const;
@@ -140,6 +152,20 @@ function hhmm(time: string | null): string | null {
   if (!time) return null;
   const m = /^(\d{1,2}):(\d{2})/.exec(time);
   return m ? `${m[1].padStart(2, "0")}:${m[2]}` : time;
+}
+
+/**
+ * `DateTimeLocal` when VIS sends it, else the date+time pair stitched into the
+ * same shape. Older captures — and any request whose `Fields` predate spec/46 —
+ * carry only the pair, and a row with no venue time at all is possible too.
+ */
+function venueIsoLocal(a: Attrs): string | null {
+  const combined = str(a, "DateTimeLocal");
+  if (combined) return combined;
+  const date = str(a, "DateLocal");
+  if (!date) return null;
+  const time = str(a, "TimeLocal");
+  return `${date}T${time ?? "00:00:00"}`;
 }
 
 function scheduledLocal(date: string | null, time: string | null): string | null {
@@ -668,9 +694,12 @@ export function mapVolleyMatchList(xml: string): VisMatchSummary[] {
       teamBCode: str(a, "TeamBCode"),
       dateLocal: str(a, "DateLocal"),
       timeLocal: hhmm(str(a, "TimeLocal")),
+      scheduledVenue: venueIsoLocal(a),
+      scheduledUtc: str(a, "DateTimeUtc"),
       status: summaryStatus(a),
       resultText: str(a, "MatchResultText"),
       setsText: str(a, "SetsResultsText"),
       hall: str(a, "Hall"),
+      city: str(a, "City"),
     }));
 }

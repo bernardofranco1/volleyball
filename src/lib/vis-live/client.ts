@@ -159,7 +159,11 @@ export function volleyMatchEnvelope(matchNo: number): string {
 export function volleyMatchListEnvelope(tournamentNo: number): string {
   const fields = [
     "No", "NoTournament", "NoInTournament", "TeamACode", "TeamBCode",
-    "TeamAName", "TeamBName", "DateLocal", "TimeLocal", "Status",
+    "TeamAName", "TeamBName", "DateLocal", "TimeLocal",
+    // Both halves of the kick-off: VIS states the venue-local wall time AND the
+    // same instant in UTC, so the index can re-zone a fixture without knowing
+    // the venue's IANA zone — and without guessing at DST (spec/46).
+    "DateTimeLocal", "DateTimeUtc", "Status",
     "MatchPointsA", "MatchPointsB", "MatchResultText", "SetsResultsText",
     "Hall", "City",
   ].join(" ");

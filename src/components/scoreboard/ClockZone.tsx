@@ -1,0 +1,240 @@
+"use client";
+
+/**
+ * The three-way clock choice shared by both fixture indexes (spec/46): the
+ * public board host's `/c/{competitionId}` and the in-app
+ * `/t/{slug}/scoreboard/vis/{competitionId}`.
+ *
+ * Only the machinery is shared, not the markup — the two pages present the same
+ * fixtures to the same people but in different chrome, and forcing one row
+ * layout on both would be a redesign dressed up as reuse. What must not diverge
+ * is the arithmetic, the storage key and the hydration strategy, so those live
+ * here.
+ *
+ * Both client-only facts this needs — the stored preference and the browser's
+ * own zone — are read through `useSyncExternalStore` rather than an effect, so
+ * the server render has one defined answer and React swaps in the real one
+ * after hydration with no mismatch. `venue` is the only choice a server CAN
+ * render: the browser's zone is not knowable there.
+ */
+
+import { useMemo, useSyncExternalStore } from "react";
+import { useT } from "@/lib/i18n/client";
+import {
+  type ClockZone,
+  type ScheduledPair,
+  readerOffsetLabel,
+  venueOffsetLabel,
+} from "@/lib/vis-live/match-times";
+
+const STORAGE_KEY = "fivb.board.clockZone";
+const ZONES: ClockZone[] = ["local", "venue", "gmt"];
+/** What a first-time reader gets: the clock on the device in their hand. */
+const DEFAULT_ZONE: ClockZone = "local";
+/** What the server renders, and the first client render with it. */
+const SERVER_ZONE: ClockZone = "venue";
+
+const KEYS: Record<ClockZone, string> = {
+  local: "clock.local",
+  venue: "clock.venue",
+  gmt: "clock.gmt",
+};
+
+function isZone(value: string | null): value is ClockZone {
+  return value === "local" || value === "venue" || value === "gmt";
+}
+
+// ── the stored choice, as an external store ──────────────────────────────────
+// Module-level so every mount agrees, and so `getSnapshot` can be referentially
+// stable — returning a fresh value on each call would loop.
+
+const listeners = new Set<() => void>();
+let cached: ClockZone | null = null;
+
+function readStored(): ClockZone {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return isZone(raw) ? raw : DEFAULT_ZONE;
+  } catch {
+    // Storage blocked (private mode, or a locked-down venue browser).
+    return DEFAULT_ZONE;
+  }
+}
+
+function subscribeZone(onChange: () => void): () => void {
+  listeners.add(onChange);
+  // Another tab of the same index — venues open several — should follow along.
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === STORAGE_KEY) {
+      cached = null;
+      for (const l of listeners) l();
+    }
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    listeners.delete(onChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+function zoneSnapshot(): ClockZone {
+  if (cached == null) cached = readStored();
+  return cached;
+}
+
+const serverZoneSnapshot = (): ClockZone => SERVER_ZONE;
+
+/** Apply and remember a choice. Exported for tests and for other surfaces. */
+export function setClockZone(next: ClockZone): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, next);
+  } catch {
+    // The choice still applies for this visit.
+  }
+  cached = next;
+  for (const l of listeners) l();
+}
+
+// ── the browser's own zone, likewise ─────────────────────────────────────────
+
+let readerZoneCache: string | null = null;
+/** Never changes within a page's life, so there is nothing to subscribe to. */
+const subscribeNothing = () => () => {};
+
+function readerZoneSnapshot(): string {
+  if (readerZoneCache == null) {
+    try {
+      readerZoneCache = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    } catch {
+      readerZoneCache = "UTC";
+    }
+  }
+  return readerZoneCache;
+}
+
+const serverReaderZoneSnapshot = () => "UTC";
+
+export interface ClockChoice {
+  zone: ClockZone;
+  /** The viewer's IANA zone; "UTC" on the server and until hydration. */
+  readerZone: string;
+  /** The event's single offset label, or null when its venues disagree. */
+  oneVenueOffset: string | null;
+  /** The viewer's offset over the event, or null when there are no fixtures. */
+  readerOffset: string | null;
+}
+
+export function useClockZone(matches: readonly ScheduledPair[]): ClockChoice {
+  const zone = useSyncExternalStore(subscribeZone, zoneSnapshot, serverZoneSnapshot);
+  const readerZone = useSyncExternalStore(
+    subscribeNothing,
+    readerZoneSnapshot,
+    serverReaderZoneSnapshot,
+  );
+
+  const { oneVenueOffset, readerOffset } = useMemo(() => {
+    // One label when the whole event sits in one offset, which is the normal
+    // case; null when it does not — VIS tournament 1736 spans eight — and then
+    // each row carries its own.
+    const offsets = new Set(
+      matches.map(venueOffsetLabel).filter((o): o is string => o != null),
+    );
+    // The reader's offset is read AT the first fixture, not at "now": that is
+    // the offset their schedule will actually be in, and it keeps this render
+    // pure (a clock read during render is neither).
+    const first = matches
+      .map((m) => (m.scheduledUtc ? Date.parse(m.scheduledUtc) : NaN))
+      .filter((ms) => Number.isFinite(ms))
+      .sort((a, b) => a - b)[0];
+    return {
+      oneVenueOffset: offsets.size === 1 ? [...offsets][0] : null,
+      readerOffset: first == null ? null : readerOffsetLabel(readerZone, first),
+    };
+  }, [matches, readerZone]);
+
+  return { zone, readerZone, oneVenueOffset, readerOffset };
+}
+
+/**
+ * Three buttons, not a time-zone picker. Nobody reading a fixture list wants to
+ * *choose* a zone from four hundred; they want the one they are standing in,
+ * the one the match is played in, or the neutral one everyone converts from.
+ */
+export function ClockZoneToggle({
+  choice,
+  venueName,
+  className,
+}: {
+  choice: ClockChoice;
+  /** The venue's city, when the whole event is in one. For the caption. */
+  venueName?: string | null;
+  className?: string;
+}) {
+  const t = useT();
+  const { zone, readerZone, oneVenueOffset, readerOffset } = choice;
+
+  const hints: Record<ClockZone, string | null> = {
+    local: readerOffset,
+    venue: oneVenueOffset,
+    gmt: null,
+  };
+
+  // Assembled here rather than as four more catalogue entries: the pieces are
+  // proper nouns and offsets, which read the same in every language.
+  const venuePlace =
+    venueName && oneVenueOffset
+      ? `${venueName} (${oneVenueOffset})`
+      : (venueName ?? oneVenueOffset ?? "");
+  const caption =
+    zone === "local"
+      ? t("clock.captionLocal", {
+          zone: [readerZone, readerOffset && `(${readerOffset})`].filter(Boolean).join(" "),
+        })
+      : zone === "gmt"
+        ? t("clock.captionGmt")
+        : venuePlace
+          ? t("clock.captionVenue", { zone: venuePlace })
+          : oneVenueOffset === null
+            ? t("clock.captionVenueMulti")
+            : t("clock.captionVenuePlain");
+
+  return (
+    <div className={className}>
+      <div
+        role="group"
+        aria-label={t("clock.groupLabel")}
+        className="inline-flex flex-wrap gap-1 rounded-lg border border-border p-1"
+      >
+        {ZONES.map((z) => {
+          const active = z === zone;
+          const name = t(KEYS[z]);
+          return (
+            <button
+              key={z}
+              type="button"
+              aria-pressed={active}
+              // The offset is decoration on top of the name; without this the
+              // accessible name reads "Local timeGMT+2".
+              aria-label={hints[z] ? `${name} (${hints[z]})` : name}
+              onClick={() => setClockZone(z)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 ${
+                active ? "bg-foreground text-surface" : "text-score-dim hover:text-foreground"
+              }`}
+            >
+              {name}
+              {hints[z] ? (
+                <span
+                  aria-hidden="true"
+                  className={`ml-1.5 font-normal ${active ? "opacity-70" : "opacity-60"}`}
+                >
+                  {hints[z]}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-score-dim">{caption}</p>
+    </div>
+  );
+}

@@ -1,21 +1,24 @@
 /**
  * Day index for a VIS-linked competition (spec/34): every match of the event,
- * grouped by its venue-local date, each linking to its board.
+ * grouped by date, each linking to its board.
  *
  * Public, like the rest of /t/{slug}/scoreboard — venue staff open this on a
  * laptop to send the right court to the right screen.
+ *
+ * Which date, and which time of day, is the reader's choice (spec/46) — their
+ * own zone, the venue's, or GMT. That choice reshapes the grouping, so the list
+ * itself lives in a client component; this page only fetches.
  */
 
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTenantBySlug } from "@/lib/tenant";
 import { getT } from "@/lib/i18n/server";
 import { getMatchList, getVisCompetition } from "@/lib/vis-live/store";
 import type { VisMatchSummary } from "@/lib/vis-live/board-data";
+import { VisIndexDayList } from "@/components/scoreboard/VisIndexDayList";
 
 export const dynamic = "force-dynamic";
-// The index is glanced at, not watched — a plain reload keeps it current
-// without a client bundle.
+// The index is glanced at, not watched — a plain reload keeps it current.
 export const revalidate = 0;
 
 export default async function VisIndexPage({
@@ -41,18 +44,12 @@ export default async function VisIndexPage({
     error = err instanceof Error ? err.message : "VIS unavailable";
   }
 
-  // Group by venue-local date, dates ascending, live matches first within a day.
-  const byDate = new Map<string, VisMatchSummary[]>();
-  for (const m of matches) {
-    const key = m.dateLocal ?? "—";
-    const list = byDate.get(key) ?? [];
-    list.push(m);
-    byDate.set(key, list);
-  }
-  const dates = [...byDate.keys()].sort();
-  const rank = { LIVE: 0, UPCOMING: 1, FINISHED: 2 } as const;
-
   const base = `/t/${tenantSlug}/scoreboard/vis/${competitionId}`;
+
+  // The city as VIS states it on the fixtures, not as the competition record
+  // claims: they disagree (tournament 1671 is filed under Doha and played in
+  // Chile), and the clock caption is about where the clock is.
+  const cities = [...new Set(matches.map((m) => m.city).filter(Boolean))];
 
   return (
     <main className="min-h-screen bg-surface px-6 py-8 text-foreground">
@@ -79,75 +76,12 @@ export default async function VisIndexPage({
       ) : null}
 
       <div className="mx-auto mt-6 max-w-4xl space-y-8">
-        {dates.map((date) => (
-          <section key={date}>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-score-dim">
-              {date}{" "}
-              <span className="font-normal">{t("visBoard.localDate")}</span>
-            </h2>
-            <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-              {byDate
-                .get(date)!
-                .slice()
-                .sort(
-                  (a, b) =>
-                    rank[a.status] - rank[b.status] ||
-                    (a.timeLocal ?? "").localeCompare(b.timeLocal ?? ""),
-                )
-                .map((m) => (
-                  <li key={m.matchNo}>
-                    <Link
-                      href={`${base}/${m.matchNo}`}
-                      className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-raised"
-                    >
-                      <span className="w-12 shrink-0 font-mono text-sm tabular-nums text-score-dim">
-                        {m.timeLocal ?? "—"}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-sm">
-                        {m.teamAName} <span className="text-score-dim">v</span>{" "}
-                        {m.teamBName}
-                      </span>
-                      {m.resultText ? (
-                        <span className="shrink-0 font-mono text-sm tabular-nums">
-                          {m.resultText}
-                        </span>
-                      ) : null}
-                      <StatusChip status={m.status} t={t} />
-                    </Link>
-                  </li>
-                ))}
-            </ul>
-          </section>
-        ))}
+        <VisIndexDayList
+          matches={matches}
+          base={base}
+          venueName={cities.length === 1 ? cities[0] : null}
+        />
       </div>
     </main>
-  );
-}
-
-function StatusChip({
-  status,
-  t,
-}: {
-  status: VisMatchSummary["status"];
-  t: (key: string, params?: Record<string, string | number>) => string;
-}) {
-  const style =
-    status === "LIVE"
-      ? "border-red-400 bg-red-500/15 text-red-300"
-      : status === "FINISHED"
-        ? "border-border bg-surface-raised text-score-dim"
-        : "border-sky-400/60 bg-sky-500/10 text-sky-300";
-  const label =
-    status === "LIVE"
-      ? t("visBoard.statusLive")
-      : status === "FINISHED"
-        ? t("visBoard.statusFinal")
-        : t("visBoard.statusScheduled");
-  return (
-    <span
-      className={`shrink-0 rounded border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${style}`}
-    >
-      {label}
-    </span>
   );
 }

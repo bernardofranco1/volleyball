@@ -1,10 +1,13 @@
 /**
  * Day index for one competition on the public board host (spec/38): every match
- * grouped by its venue-local date, each with its board link and a copy button
- * per layout.
+ * grouped by its date, each with its board link and a copy button per layout.
  *
  * The same data as the in-app index, at a URL with no tenant in it and no
  * scoring-platform chrome around it.
+ *
+ * Which date, and which time of day, is the reader's choice (spec/46) — their
+ * own zone, the venue's, or GMT. That choice reshapes the grouping, so the list
+ * itself lives in a client component; this page only fetches.
  */
 
 import type { Metadata } from "next";
@@ -13,41 +16,16 @@ import { notFound } from "next/navigation";
 import { getMatchList } from "@/lib/vis-live/store";
 import { visCompetitions } from "@/lib/vis-live/resolve";
 import type { VisMatchSummary } from "@/lib/vis-live/board-data";
-import { MatchLinkRow } from "@/components/scoreboard/MatchLinkRow";
+import { MatchDayList } from "@/components/scoreboard/MatchDayList";
 
 export const dynamic = "force-dynamic";
-// Glanced at, not watched — a plain reload keeps it current with no client
-// bundle beyond the copy buttons.
+// Glanced at, not watched — a plain reload keeps it current.
 export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "Match list",
   robots: { index: false, follow: false },
 };
-
-const RANK = { LIVE: 0, UPCOMING: 1, FINISHED: 2 } as const;
-
-/**
- * Every match gets a tag, not just the live ones (spec/38): a row with no tag
- * reads as "no information" rather than "scheduled", and the three states have
- * to be tellable apart at a glance on a list of forty-six fixtures.
- */
-function StatusTag({ status }: { status: VisMatchSummary["status"] }) {
-  const style =
-    status === "LIVE"
-      ? "bg-danger text-white"
-      : status === "FINISHED"
-        ? "border border-border text-score-dim"
-        : "border border-border text-foreground";
-  const label = status === "LIVE" ? "Live" : status === "FINISHED" ? "Final" : "Scheduled";
-  return (
-    <span
-      className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${style}`}
-    >
-      {label}
-    </span>
-  );
-}
 
 export default async function BoardHostCompetition({
   params,
@@ -66,12 +44,10 @@ export default async function BoardHostCompetition({
     error = err instanceof Error ? err.message : "VIS unavailable";
   }
 
-  const byDate = new Map<string, VisMatchSummary[]>();
-  for (const m of matches) {
-    const key = m.dateLocal ?? "—";
-    byDate.set(key, [...(byDate.get(key) ?? []), m]);
-  }
-  const dates = [...byDate.keys()].sort();
+  // The city as VIS states it on the fixtures, not as the competition record
+  // claims: they disagree (tournament 1671 is filed under Doha and played in
+  // Chile), and the caption is about where the clock is.
+  const cities = [...new Set(matches.map((m) => m.city).filter(Boolean))];
 
   return (
     <main className="min-h-screen bg-surface px-6 py-10 text-foreground">
@@ -92,43 +68,10 @@ export default async function BoardHostCompetition({
           </p>
         ) : null}
 
-        {dates.map((date) => {
-          const list = [...byDate.get(date)!].sort(
-            (a, b) =>
-              RANK[a.status] - RANK[b.status] ||
-              (a.timeLocal ?? "").localeCompare(b.timeLocal ?? ""),
-          );
-          return (
-            <section key={date} className="mt-10">
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-score-dim">
-                {date}
-              </h2>
-              <ul className="mt-3 grid gap-2">
-                {list.map((m) => (
-                  <li
-                    key={m.matchNo}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-4 py-3"
-                  >
-                    <Link href={`/m/${m.matchNo}`} className="min-w-0 flex-1">
-                      <span className="block font-medium">
-                        {m.teamACode || m.teamAName} v {m.teamBCode || m.teamBName}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-score-dim">
-                        {[m.timeLocal, m.hall, `#${m.matchNo}`, m.setsText || m.resultText]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                    </Link>
-                    <span className="flex items-center gap-3">
-                      <StatusTag status={m.status} />
-                      <MatchLinkRow matchNo={m.matchNo} />
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          );
-        })}
+        <MatchDayList
+          matches={matches}
+          venueName={cities.length === 1 ? cities[0] : null}
+        />
       </div>
     </main>
   );
