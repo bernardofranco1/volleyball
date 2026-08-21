@@ -190,9 +190,45 @@ server render and at hydration, so the SSR frame's Local-time button now shows
 the estimated offset instead of nothing. Absent in local dev — the fallback is
 simply off there.
 
+## The manual picker: the floor below the floor
+
+User-requested after confirming the LibreWolf case (a privacy browser spoofs the
+zone to UTC by design, and that browser's connection was not geolocatable
+either). Geolocation-API prompting was considered and rejected: it returns
+coordinates rather than a zone, needs a boundary database to convert, mostly
+fails on the desktop privacy browsers that hit this state, and asks for
+street-level location to recover a ~38-value fact — exactly the trade that
+audience refuses.
+
+Instead: a **"Set my time zone"** `<select>` that renders ONLY in the
+honest-GMT state (local mode, device reporting a placeholder, no network
+estimate) or while a manual choice is active — so it stays changeable. Everyone
+else gets their zone automatically and never sees a 400-entry list; this is
+deliberately not the global selector rejected at the start.
+
+Resolution order in `resolveReaderZone(device, manual, network)`:
+**real device zone > manual pick > network estimate > honest placeholder.**
+The device outranking the manual pick is what makes a stale pick harmless: a
+value stored in a privacy-mode session cannot leak into a session where the
+device answers for itself, and the picker vanishes with it. All three fallback
+inputs are `validZoneOrNull`-checked; a corrupted stored value falls through to
+the estimate, not to GMT.
+
+Stored under `fivb.board.readerZone`, cross-tab via the `storage` event, same
+external-store pattern as the mode toggle. "Automatic" clears it. Zone list from
+`Intl.supportedValuesOf("timeZone")` (419 entries); on an engine without it the
+picker simply stays away and the honest caption remains. Caption while active:
+"Times shown in {zone}, as you set it — your device does not report a time
+zone."
+
 ## Not done
 
 - The board itself (`/m/{matchNo}`) still shows its kick-off in venue time,
   which is right for a screen hanging in the venue.
+- The picker is not offered when a network ESTIMATE is wrong (VPN through the
+  wrong country): the estimate fills the slot, so the picker never shows. The
+  affected reader can still use the venue/GMT views; widening the picker to the
+  estimated state was deliberately left out to keep it off screens that do not
+  need it.
 - `visBoard.localDate` is now an unused catalogue key, left in place rather
   than swept out of five locales for nothing.

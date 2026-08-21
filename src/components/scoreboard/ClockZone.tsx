@@ -22,6 +22,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import { useT } from "@/lib/i18n/client";
 import {
   type ClockZone,
+  type ReaderZoneSource,
   type ScheduledPair,
   isPlaceholderZone,
   readerOffsetLabel,
@@ -97,6 +98,56 @@ export function setClockZone(next: ClockZone): void {
   for (const l of listeners) l();
 }
 
+// ── the manually chosen reader zone (spec/46 picker) ─────────────────────────
+// Same shape as the clock-zone store. Only consulted when the device reports a
+// placeholder zone, so a stale value from a privacy-mode session cannot leak
+// into a session where the device answers for itself.
+
+const MANUAL_KEY = "fivb.board.readerZone";
+const manualListeners = new Set<() => void>();
+/** undefined = not read yet; null = read, nothing stored. */
+let manualCached: string | null | undefined;
+
+function subscribeManualZone(onChange: () => void): () => void {
+  manualListeners.add(onChange);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === MANUAL_KEY) {
+      manualCached = undefined;
+      for (const l of manualListeners) l();
+    }
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    manualListeners.delete(onChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+function manualZoneSnapshot(): string | null {
+  if (manualCached === undefined) {
+    try {
+      manualCached = window.localStorage.getItem(MANUAL_KEY);
+    } catch {
+      manualCached = null;
+    }
+  }
+  return manualCached;
+}
+
+const serverManualZoneSnapshot = (): string | null => null;
+
+/** Apply and remember the picker's choice; null clears back to automatic. */
+export function setManualReaderZone(next: string | null): void {
+  try {
+    if (next == null) window.localStorage.removeItem(MANUAL_KEY);
+    else window.localStorage.setItem(MANUAL_KEY, next);
+  } catch {
+    // The choice still applies for this visit.
+  }
+  manualCached = next;
+  for (const l of manualListeners) l();
+}
+
 // ── the browser's own zone, likewise ─────────────────────────────────────────
 
 let readerZoneCache: string | null = null;
@@ -130,8 +181,8 @@ export interface ClockChoice {
   zone: ClockZone;
   /** The viewer's IANA zone; null on the server and until hydration. */
   readerZone: string | null;
-  /** True when `readerZone` is the network estimate, not the device setting. */
-  readerZoneEstimated: boolean;
+  /** Where `readerZone` came from; null = an unfilled placeholder. */
+  readerZoneSource: ReaderZoneSource;
   /** The event's single offset label, or null when its venues disagree. */
   oneVenueOffset: string | null;
   /** The viewer's offset over the event, or null when there are no fixtures. */
@@ -153,9 +204,14 @@ export function useClockZone(
     readerZoneSnapshot,
     serverReaderZoneSnapshot,
   );
-  const { zone: readerZone, estimated: readerZoneEstimated } = useMemo(
-    () => resolveReaderZone(deviceZone, networkZone ?? null),
-    [deviceZone, networkZone],
+  const manualZone = useSyncExternalStore<string | null>(
+    subscribeManualZone,
+    manualZoneSnapshot,
+    serverManualZoneSnapshot,
+  );
+  const { zone: readerZone, source: readerZoneSource } = useMemo(
+    () => resolveReaderZone(deviceZone, manualZone, networkZone ?? null),
+    [deviceZone, manualZone, networkZone],
   );
 
   const { oneVenueOffset, readerOffset } = useMemo(() => {
@@ -178,7 +234,7 @@ export function useClockZone(
     };
   }, [matches, readerZone]);
 
-  return { zone, readerZone, readerZoneEstimated, oneVenueOffset, readerOffset };
+  return { zone, readerZone, readerZoneSource, oneVenueOffset, readerOffset };
 }
 
 /**
@@ -197,7 +253,7 @@ export function ClockZoneToggle({
   className?: string;
 }) {
   const t = useT();
-  const { zone, readerZone, readerZoneEstimated, oneVenueOffset, readerOffset } = choice;
+  const { zone, readerZone, readerZoneSource, oneVenueOffset, readerOffset } = choice;
 
   const hints: Record<ClockZone, string | null> = {
     local: readerOffset,
@@ -211,6 +267,26 @@ export function ClockZoneToggle({
     venueName && oneVenueOffset
       ? `${venueName} (${oneVenueOffset})`
       : (venueName ?? oneVenueOffset ?? "");
+  // The picker exists ONLY for the honest-GMT state: local mode, device
+  // reporting a placeholder, and no network estimate to lean on (or a manual
+  // choice already made, which must stay changeable). Everyone else gets their
+  // zone automatically and never sees a 400-entry list — the global selector
+  // this feature deliberately is not (spec/46).
+  const showPicker =
+    zone === "local" &&
+    readerZone != null &&
+    (readerZoneSource === "manual" || readerZoneSource === null);
+  const zoneOptions = useMemo<string[]>(() => {
+    if (!showPicker) return [];
+    // Older engines lack supportedValuesOf; the picker simply stays away and
+    // the honest caption remains, rather than offering a list we cannot fill.
+    try {
+      return Intl.supportedValuesOf("timeZone");
+    } catch {
+      return [];
+    }
+  }, [showPicker]);
+
   const zoneWithOffset =
     readerZone == null
       ? ""
@@ -221,14 +297,16 @@ export function ClockZoneToggle({
         ? // Pre-hydration only, and pre-hydration the toggle is on venue time,
           // so this is a belt-and-braces case rather than a visible one.
           t("clock.captionLocalUnknown")
-        : readerZoneEstimated
-          ? // The device gave us nothing, so this zone came from the network —
-            // say so, because an estimate presented as a fact is how a reader
-            // on a VPN misses a match.
-            t("clock.captionLocalFromIp", { zone: zoneWithOffset })
-          : isPlaceholderZone(readerZone)
-            ? t("clock.captionLocalIsUtc")
-            : t("clock.captionLocal", { zone: zoneWithOffset })
+        : readerZoneSource === "manual"
+          ? t("clock.captionLocalManual", { zone: zoneWithOffset })
+          : readerZoneSource === "network"
+            ? // The device gave us nothing, so this zone came from the network —
+              // say so, because an estimate presented as a fact is how a reader
+              // on a VPN misses a match.
+              t("clock.captionLocalFromIp", { zone: zoneWithOffset })
+            : isPlaceholderZone(readerZone)
+              ? t("clock.captionLocalIsUtc")
+              : t("clock.captionLocal", { zone: zoneWithOffset })
       : zone === "gmt"
         ? t("clock.captionGmt")
         : venuePlace
@@ -274,6 +352,23 @@ export function ClockZoneToggle({
         })}
       </div>
       <p className="mt-2 text-xs text-score-dim">{caption}</p>
+      {showPicker && zoneOptions.length > 0 ? (
+        <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-score-dim">
+          {t("clock.pickerLabel")}
+          <select
+            value={readerZoneSource === "manual" ? (readerZone ?? "") : ""}
+            onChange={(e) => setManualReaderZone(e.target.value || null)}
+            className="rounded border border-border bg-surface px-2 py-1 text-xs text-foreground focus-visible:outline focus-visible:outline-2"
+          >
+            <option value="">{t("clock.pickerAuto")}</option>
+            {zoneOptions.map((z) => (
+              <option key={z} value={z}>
+                {z}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
     </div>
   );
 }

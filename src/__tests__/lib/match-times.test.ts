@@ -152,36 +152,46 @@ describe("an unknown reader zone is not UTC", () => {
   });
 });
 
-describe("resolveReaderZone — the device wins, the network only fills silence", () => {
-  it("keeps the device's real zone even when a network estimate disagrees", () => {
-    // A deliberate setting is the clock the reader lives by; a VPN endpoint
-    // is not allowed to override it.
-    expect(resolveReaderZone("Europe/Zurich", "America/New_York")).toEqual({
+describe("resolveReaderZone — device, then choice, then estimate, then honesty", () => {
+  it("keeps the device's real zone even when everything else disagrees", () => {
+    // A deliberate device setting is the clock the reader lives by; neither a
+    // VPN endpoint nor a stale manual pick from a privacy-mode session may
+    // override it.
+    expect(resolveReaderZone("Europe/Zurich", "Asia/Tokyo", "America/New_York")).toEqual({
       zone: "Europe/Zurich",
-      estimated: false,
+      source: "device",
+    });
+  });
+
+  it("prefers the reader's explicit pick over the network estimate", () => {
+    expect(resolveReaderZone("UTC", "Europe/Zurich", "America/New_York")).toEqual({
+      zone: "Europe/Zurich",
+      source: "manual",
     });
   });
 
   it("uses the network estimate when the device reports a placeholder", () => {
-    expect(resolveReaderZone("UTC", "Europe/Zurich")).toEqual({
+    expect(resolveReaderZone("UTC", null, "Europe/Zurich")).toEqual({
       zone: "Europe/Zurich",
-      estimated: true,
+      source: "network",
     });
-    expect(resolveReaderZone(null, "Europe/Zurich")).toEqual({
+    expect(resolveReaderZone(null, null, "Europe/Zurich")).toEqual({
       zone: "Europe/Zurich",
-      estimated: true,
+      source: "network",
     });
   });
 
-  it("stays honestly on the placeholder when there is no estimate either", () => {
-    expect(resolveReaderZone("UTC", null)).toEqual({ zone: "UTC", estimated: false });
-    expect(resolveReaderZone(null, null)).toEqual({ zone: null, estimated: false });
+  it("stays honestly on the placeholder when every fallback is silent", () => {
+    expect(resolveReaderZone("UTC", null, null)).toEqual({ zone: "UTC", source: null });
+    expect(resolveReaderZone(null, null, null)).toEqual({ zone: null, source: null });
   });
 
-  it("rejects an estimate the runtime cannot format in — a header is input", () => {
-    expect(resolveReaderZone("UTC", "Fake/Zone")).toEqual({
-      zone: "UTC",
-      estimated: false,
+  it("rejects values the runtime cannot format in — both fallbacks are input", () => {
+    expect(resolveReaderZone("UTC", null, "Fake/Zone")).toEqual({ zone: "UTC", source: null });
+    // A corrupted localStorage value falls through to the estimate, not to GMT.
+    expect(resolveReaderZone("UTC", "Fake/Zone", "Europe/Zurich")).toEqual({
+      zone: "Europe/Zurich",
+      source: "network",
     });
     expect(validZoneOrNull("Europe/Zurich")).toBe("Europe/Zurich");
     expect(validZoneOrNull("Fake/Zone")).toBeNull();
@@ -191,10 +201,10 @@ describe("resolveReaderZone — the device wins, the network only fills silence"
 
   it("a London reader in winter is on GMT and is NOT overridden", () => {
     // isPlaceholderZone matches by name, so a genuine Greenwich-offset zone
-    // keeps beating the network estimate.
-    expect(resolveReaderZone("Europe/London", "Europe/Zurich")).toEqual({
+    // keeps beating every fallback.
+    expect(resolveReaderZone("Europe/London", null, "Europe/Zurich")).toEqual({
       zone: "Europe/London",
-      estimated: false,
+      source: "device",
     });
   });
 });

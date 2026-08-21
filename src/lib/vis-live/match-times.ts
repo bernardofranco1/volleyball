@@ -163,31 +163,37 @@ export function validZoneOrNull(zone: string | null | undefined): string | null 
   }
 }
 
+/** Where the resolved reader zone came from; null = an unfilled placeholder. */
+export type ReaderZoneSource = "device" | "manual" | "network" | null;
+
 export interface ReaderZone {
   zone: string | null;
-  /** True when the zone came from the network estimate, not the device. */
-  estimated: boolean;
+  source: ReaderZoneSource;
 }
 
 /**
  * The zone "Local time" should actually use.
  *
  * The device's own setting wins whenever it is real — it is the clock the
- * reader lives by, and overriding a deliberate setting would be wrong. The
- * network estimate (Vercel's `x-vercel-ip-timezone`, derived from the
- * connection) steps in only when the device claims UTC or nothing at all —
- * a zone unset, or a browser concealing it — where "local" would otherwise
- * silently mean Greenwich. The estimate is validated before use: a header is
- * input, and an unformattable zone name would throw at render time.
+ * reader lives by, and nothing may override a deliberate setting. When the
+ * device claims UTC or nothing at all (zone unset, or a browser concealing it),
+ * the reader's own explicit choice from the picker comes next, then the network
+ * estimate (Vercel's `x-vercel-ip-timezone`); only with all three silent does
+ * "local" honestly mean Greenwich. The manual value and the header are both
+ * validated before use — both are input, and an unformattable zone name would
+ * throw inside `Intl` at render time.
  */
 export function resolveReaderZone(
   deviceZone: string | null,
+  manualZone: string | null,
   networkZone: string | null,
 ): ReaderZone {
-  if (!isPlaceholderZone(deviceZone)) return { zone: deviceZone, estimated: false };
+  if (!isPlaceholderZone(deviceZone)) return { zone: deviceZone, source: "device" };
+  const manual = validZoneOrNull(manualZone);
+  if (manual) return { zone: manual, source: "manual" };
   const network = validZoneOrNull(networkZone);
-  if (network) return { zone: network, estimated: true };
-  return { zone: deviceZone, estimated: false };
+  if (network) return { zone: network, source: "network" };
+  return { zone: deviceZone, source: null };
 }
 
 /**
