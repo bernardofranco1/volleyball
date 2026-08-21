@@ -21,6 +21,15 @@ describe("board host paths", () => {
       "/board-bg/comp_vis_1670.jpg",
       "/board-art/avc-mark.png",
       "/flags/KAZ.png",
+      // The TV broadcast overlay and its own assets (spec/47). It has to live
+      // here: the board host is the deployment a production truck is pointed
+      // at, and without these the route would 404 there while working
+      // perfectly in development.
+      "/tv",
+      "/tv/27547",
+      "/tv/mock",
+      "/tv-gfx/bug-plate.png",
+      "/tv-flags/JPN.webp",
     ]) {
       expect(isBoardHostPath(p), p).toBe(true);
     }

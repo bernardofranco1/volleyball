@@ -50,3 +50,6 @@ export const FLAG_RATIO: Record<string, number> = {
 
 /** 3:2 — what most federations use, and a safe guess for an asset we lack. */
 export const DEFAULT_FLAG_RATIO = 1.5;
+
+/** Federations the AVC TV package supplies a flag for (public/tv-flags). */
+export const TV_FLAG_CODES: ReadonlySet<string> = new Set(["AUS","BRN","CHN","HKG","INA","IND","IRI","IRQ","JPN","KAZ","KOR","NZL","OMA","QAT","THA","TPE","VIE"]);

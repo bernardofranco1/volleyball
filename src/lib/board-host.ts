@@ -34,8 +34,16 @@ export function isBoardHostPath(pathname: string): boolean {
     pathname === "/c" ||
     pathname.startsWith("/c/") ||
     pathname.startsWith("/m/") ||
+    // The TV broadcast overlay (spec/47). It has to live HERE, on the board
+    // host, because that is the deployment a production truck is pointed at —
+    // and without this line the route would 404 there while working perfectly
+    // in development, which is the worst way to find out.
+    pathname === "/tv" ||
+    pathname.startsWith("/tv/") ||
     pathname.startsWith("/board-bg/") ||
     pathname.startsWith("/board-art/") ||
+    pathname.startsWith("/tv-gfx/") ||
+    pathname.startsWith("/tv-flags/") ||
     pathname.startsWith("/flags/")
   );
 }

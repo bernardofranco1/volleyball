@@ -109,6 +109,12 @@ export async function proxy(request: NextRequest) {
       url.hostname = rootDomain()!;
       return NextResponse.redirect(url, 308);
     }
+    if (routed.kind === "passthrough") {
+      // A top-level route that belongs to no tenant (the TV overlay, spec/47).
+      // Serve it as asked: rewriting it into /t/{slug}/… would 404, and
+      // bouncing it to the apex would break a link a truck is already using.
+      return pass();
+    }
     // Internal rewrite: the browser URL stays https://{label}.{root}/…
     rewriteUrl = request.nextUrl.clone();
     rewriteUrl.pathname = routed.path;

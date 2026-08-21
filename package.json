@@ -30,6 +30,7 @@
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "drizzle-orm": "^0.45.2",
+    "hls.js": "^1.7.1",
     "next": "16.2.9",
     "nodemailer": "^9.0.3",
     "pdfkit": "^0.15.2",

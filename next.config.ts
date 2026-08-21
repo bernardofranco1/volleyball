@@ -11,6 +11,15 @@ const csp = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",
+  // The TV overlay (spec/47) plays an arbitrary operator-supplied stream under
+  // its graphics. Without media-src that falls through to default-src 'self'
+  // and the video is blocked outright — the manifest and segments are fetched
+  // by XHR, which connect-src already allows, so the failure looks like a
+  // silent black frame rather than a network error. blob: is hls.js: it feeds
+  // the <video> element through a MediaSource object URL, not the https URL.
+  "media-src 'self' blob: https:",
+  // hls.js parses the transport stream in a worker it spawns from a blob.
+  "worker-src 'self' blob:",
   "connect-src 'self' https: wss:",
   "frame-ancestors 'self'",
   "base-uri 'self'",

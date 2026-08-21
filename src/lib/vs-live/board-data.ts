@@ -307,5 +307,14 @@ export function mapVsBoard(input: VsBoardInput): VisBoardData {
     // No advisory delay in this API; the cadence uses this only as a non-live
     // floor, and 5 s keeps a finished board from polling needlessly.
     pollDelaySeconds: 5,
+    // Both TV signals (spec/47) are left to the store on this source.
+    //
+    // VolleyStation publishes STATE, not events: the widget carries the six on
+    // court right now and the allowances remaining, with no substitution record
+    // and no challenge record. So a substitution here can only be inferred by
+    // watching the six change between two polls, and that needs the previous
+    // board — which the store has and a mapper, by design, does not.
+    recentSubstitutions: [],
+    challenge: null,
   };
 }

@@ -117,13 +117,29 @@ export function legacyDemoPath(pathname: string): string | null {
 export type SubdomainRouting =
   | { kind: "strip"; path: string } // own /t/{slug} path on the subdomain → canonical bare form (308)
   | { kind: "apex" } // another tenant's path or /admin on a subdomain → apex (308)
-  | { kind: "rewrite"; path: string }; // bare path → internal /t/{slug} rewrite
+  | { kind: "rewrite"; path: string } // bare path → internal /t/{slug} rewrite
+  | { kind: "passthrough" }; // a tenant-less route that exists at the top level
+
+/**
+ * Top-level routes that are NOT tenant pages and must survive on a tenant
+ * subdomain host untouched. Everything else bare gets rewritten into
+ * `/t/{slug}/…`, which for these would 404: there is no `/t/{slug}/tv`.
+ *
+ * `/tv` is the TV broadcast overlay (spec/47). It is addressed by VIS match
+ * number, like `/m/…`, and belongs to no tenant.
+ */
+function isTenantLessPath(pathname: string): boolean {
+  return pathname === "/tv" || pathname.startsWith("/tv/");
+}
 
 /** Where a request on a tenant subdomain host should go (spec/23 §6.2). */
 export function routeSubdomainPath(
   pathname: string,
   slug: string,
 ): SubdomainRouting {
+  if (isTenantLessPath(pathname)) {
+    return { kind: "passthrough" };
+  }
   if (pathname === `/t/${slug}` || pathname.startsWith(`/t/${slug}/`)) {
     return {
       kind: "strip",

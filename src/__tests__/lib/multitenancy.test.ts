@@ -188,6 +188,15 @@ describe("routeSubdomainPath (spec/23 §6.2)", () => {
       path: "/t/lisbon/matches",
     });
   });
+
+  it("passes the tenant-less TV overlay through untouched (spec/47)", () => {
+    // /tv belongs to no tenant — it is addressed by VIS match number, like
+    // /m/… — so rewriting it into /t/lisbon/tv would 404, and bouncing it to
+    // the apex would break a link a production truck is already using.
+    for (const p of ["/tv", "/tv/27547", "/tv/mock", "/tv/replay"]) {
+      expect(routeSubdomainPath(p, "lisbon"), p).toEqual({ kind: "passthrough" });
+    }
+  });
 });
 
 describe("backup export coverage (spec/23 §7.1)", () => {

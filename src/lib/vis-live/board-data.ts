@@ -5,6 +5,7 @@
  */
 
 import { rotationsBefore, ralliesOf, type Side } from "./rotation";
+import type { SetEvents, SubstitutionEvent } from "./events";
 import {
   type Attrs,
   allAliasAttrs,
@@ -64,6 +65,56 @@ export interface VisBoardSet {
   winner: "A" | "B" | null;
 }
 
+/**
+ * A substitution, as a TV lower third needs it (spec/47, guidelines item 18).
+ *
+ * The venue boards never needed this — they show the six on court, and a
+ * substitution is just the six changing. A broadcast graphic has to name both
+ * players, so the event itself has to survive into the board payload.
+ */
+export interface VisSubstitution {
+  side: "A" | "B";
+  /** Shirt numbers, when the roster carries them. */
+  outJersey: number | null;
+  inJersey: number | null;
+  /** Shirt names, as a board shows them. */
+  outName: string | null;
+  inName: string | null;
+  setNumber: number;
+  /**
+   * The score it happened at. Not decoration: it is what distinguishes one
+   * substitution from the next when a team makes two in a row with the same
+   * players, and what lets the overlay decide a sub is new rather than
+   * re-announce it every poll.
+   */
+  scoreA: number;
+  scoreB: number;
+}
+
+export type VisChallengeStatus =
+  | "REQUESTED"
+  | "REVIEW"
+  | "SUCCESSFUL"
+  | "UNSUCCESSFUL";
+
+/**
+ * A video challenge in flight (spec/47, guidelines item 21).
+ *
+ * Derived from counter DELTAS across polls, which is why it is filled in by the
+ * store and not by the mapper: one payload cannot tell you that a challenge has
+ * just been requested, only how many have been. `null` is the ordinary state.
+ *
+ * There is no challenge TYPE here, and there is no way to add one: VIS publishes
+ * `NbChallengeRequestedTeam*` and `NbChallengeRefusedTeam*` and nothing else —
+ * no reason, no category. The graphic's category line is operator input.
+ */
+export interface VisChallenge {
+  status: VisChallengeStatus;
+  side: "A" | "B";
+  /** When the store first saw this state, ms epoch. The graphic's own clock. */
+  since: number;
+}
+
 /** Match-total team statistics — the set-break screen's four bars. */
 export interface VisTeamTotals {
   attacksA: number;
@@ -116,6 +167,15 @@ export interface VisBoardData {
   /** Venue-local kick-off as VIS states it ("2026-08-19 11:00"); no offset. */
   scheduledLocal: string | null;
   pollDelaySeconds: number;
+  /**
+   * The current set's substitutions, oldest first, capped (spec/47). Empty on
+   * any payload without the event stream, which every consumer must treat as
+   * "none reported" rather than "none happened" — the venue boards ignore it
+   * entirely and are unaffected.
+   */
+  recentSubstitutions: VisSubstitution[];
+  /** A video challenge in flight, filled in by the store (spec/47). */
+  challenge: VisChallenge | null;
 }
 
 export interface VisMatchSummary {
@@ -393,6 +453,65 @@ function sideOutRotation(
   return last;
 }
 
+/**
+ * How many of the current set's substitutions the payload carries.
+ *
+ * Six is the per-set allowance per team, so twelve is the theoretical maximum
+ * and a cap of eight is enough for any graphic to catch up after a stall while
+ * keeping the payload — which is fetched once a second by every screen on the
+ * match — from growing a list nobody reads.
+ */
+const MAX_SUBSTITUTIONS = 8;
+
+type Roster = Map<number, { jersey: number | null; name: string }>;
+
+/**
+ * The current set's substitutions, dressed with shirt numbers and names.
+ *
+ * A substitution in a rally's `subsBefore` happened at the score BEFORE that
+ * rally, so the running score is carried one rally behind — stamping it with the
+ * rally's own score would report every substitution one point late, which is
+ * exactly the kind of error that survives review because it looks plausible.
+ */
+function substitutionsOf(
+  events: SetEvents,
+  setNumber: number,
+  rosterA: Roster,
+  rosterB: Roster,
+): VisSubstitution[] {
+  const { rallies, trailingSubs } = events;
+  const out: VisSubstitution[] = [];
+  const push = (s: SubstitutionEvent, scoreA: number, scoreB: number) => {
+    // A substitution neither of whose players is on either roster cannot be
+    // attributed to a team, and a lower third that names the wrong team is
+    // worse than one that never appears.
+    if (!s.side) return;
+    const roster = s.side === "A" ? rosterA : rosterB;
+    const outgoing = roster.get(Number(s.out));
+    const incoming = roster.get(Number(s.in));
+    out.push({
+      side: s.side,
+      outJersey: outgoing?.jersey ?? null,
+      inJersey: incoming?.jersey ?? null,
+      outName: outgoing?.name ?? null,
+      inName: incoming?.name ?? null,
+      setNumber,
+      scoreA,
+      scoreB,
+    });
+  };
+
+  let prevA = 0;
+  let prevB = 0;
+  for (const rally of rallies) {
+    for (const s of rally.subsBefore) push(s, prevA, prevB);
+    prevA = rally.scoreA;
+    prevB = rally.scoreB;
+  }
+  for (const s of trailingSubs) push(s, prevA, prevB);
+  return out.slice(-MAX_SUBSTITUTIONS);
+}
+
 /** `GetVolleyLive` (Options=BOARD_OPTIONS) → the board's view model. */
 export function mapVolleyLive(
   xml: string,
@@ -413,6 +532,17 @@ export function mapVolleyLive(
    * pre-spec/43 behaviour for that side, side-out rotation included.
    */
   lineupOverride: LineupOverride | null = null,
+  /**
+   * The current set's already-parsed event stream, when the caller has it
+   * (spec/47). ONLY used to report substitutions, and passed in rather than
+   * parsed here because the caller that needs them — the store, for the serve
+   * succession — has parsed the same events a moment earlier. Parsing twice per
+   * poll cost enough on a long set to time a replay test out.
+   *
+   * Absent means "no substitutions reported", which is also the honest answer
+   * for a payload without the event stream.
+   */
+  events: SetEvents | null = null,
 ): VisBoardData {
   const root = firstTagAttrs(xml, "VolleyLive");
   const matchBlock = tagBlocks(xml, "Match")[0] ?? null;
@@ -602,6 +732,15 @@ export function mapVolleyLive(
       str(matchRow, "TimeLocal"),
     ),
     pollDelaySeconds: Math.max(5, num(root, "PollDelay", 20)),
+    // Only for the set in play. A finished set's substitutions are history, and
+    // announcing one during the interval that follows would put a graphic on air
+    // for a change the viewer saw ten minutes ago.
+    recentSubstitutions:
+      events && latest && !latestEnded
+        ? substitutionsOf(events, num(latest.attrs, "No", 1), rosterA, rosterB)
+        : [],
+    // Needs two payloads to see; the store fills it in (spec/47).
+    challenge: null,
   };
 }
 
@@ -678,6 +817,8 @@ export function mapVolleyMatch(
     tournamentName: null,
     scheduledLocal: scheduledLocal(str(attrs, "DateLocal"), str(attrs, "TimeLocal")),
     pollDelaySeconds: 20,
+    recentSubstitutions: [],
+    challenge: null,
   };
 }
 

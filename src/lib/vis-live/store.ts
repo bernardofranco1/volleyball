@@ -47,7 +47,13 @@ import {
   warmFirstServers,
 } from "./rotation-audit";
 import { stabiliseLineups } from "./lineup-stability";
-import { designatedLiberos, parseSetEvents, playerSides } from "./events";
+import {
+  designatedLiberos,
+  parseSetEvents,
+  playerSides,
+  type SetEvents,
+} from "./events";
+import { tvSignals, type TvSignalState } from "./tv-signals";
 import { enforceLineups, type EnforcedLineups } from "./serve-succession";
 import { sixOf } from "./rotation";
 import {
@@ -101,7 +107,55 @@ const vsBoards = new Map<number, Entry<VisBoardData>>();
 /** Per-player stats, which change per rally rather than per poll. */
 const vsStatsCache = new Map<number, { value: VsStatsRowList; at: number }>();
 const VS_STATS_TTL_MS = 12_000;
+
+/**
+ * TV signal state per match AND per source (spec/47).
+ *
+ * Keyed by both because the two feeds move their challenge counters
+ * independently and are deliberately served side by side during an event; one
+ * shared entry would have each source resetting the other's baseline and firing
+ * challenge graphics at every alternation.
+ *
+ * Only ever written on a successful upstream fetch, so one entry advances one
+ * frame per feed update rather than once per viewer.
+ */
+const tvStates = new Map<string, TvSignalState>();
+/** A cap, because this map has no natural eviction and instances are long-lived. */
+const TV_STATE_MAX = 200;
 let allowlist: Entry<Map<number, number>> | null = null; // matchNo → tournamentNo
+
+/**
+ * Attach the challenge and the substitution list to a freshly fetched board.
+ *
+ * Wrapped in a catch that returns the board untouched: these two fields drive a
+ * broadcast overlay, and no graphic is worth taking a venue scoreboard down for.
+ */
+function withTvSignals(
+  matchNo: number,
+  source: "vis" | "vs",
+  board: VisBoardData,
+  now: number,
+): VisBoardData {
+  try {
+    const key = `${source}:${matchNo}`;
+    const { state, challenge, substitutions } = tvSignals(
+      tvStates.get(key) ?? null,
+      board,
+      now,
+      // VIS publishes real substitution events, with the score they happened
+      // at; VolleyStation publishes only the six on court, so there they have
+      // to be inferred from the six changing.
+      { synthesiseSubs: source === "vs" },
+    );
+    if (tvStates.size > TV_STATE_MAX && !tvStates.has(key)) {
+      tvStates.delete(tvStates.keys().next().value as string);
+    }
+    tvStates.set(key, state);
+    return { ...board, challenge, recentSubstitutions: substitutions };
+  } catch {
+    return board;
+  }
+}
 
 /** In-flight de-duplication: concurrent viewers share one upstream call. */
 const inFlight = new Map<string, Promise<unknown>>();
@@ -253,7 +307,7 @@ async function getVisBoard(
         const prev = boards.get(matchNo);
         const stamp = Date.now();
         const entry: Entry<VisBoardData> = {
-          value: board,
+          value: withTvSignals(matchNo, "vis", board, stamp),
           at: stamp,
           ttlMs: pollIntervalMs(board),
           changedAt:
@@ -388,7 +442,7 @@ async function getVsBoard(
     // cannot).
     const inRally = match.widget?.in_rally === true && board.status === "LIVE";
     const entry: Entry<VisBoardData> = {
-      value: borrowed,
+      value: withTvSignals(matchNo, "vs", borrowed, stamp),
       at: stamp,
       ttlMs: Math.min(pollIntervalMs(borrowed), inRally ? VS_IN_RALLY_MS : Infinity),
       changedAt:
@@ -594,10 +648,17 @@ export function buildBoardFromXml(
   const enforced = enforceRotation(xml, latestSet, firstServer);
   const board = stabiliseLineups(
     matchNo,
-    mapVolleyLive(xml, matchNo, now, firstServer, {
-      A: enforced.A,
-      B: enforced.B,
-    }),
+    mapVolleyLive(
+      xml,
+      matchNo,
+      now,
+      firstServer,
+      { A: enforced.A, B: enforced.B },
+      // Handed on rather than parsed again: enforceRotation has just read this
+      // set's events to work the rotation out, and they are also where the TV
+      // overlay's substitutions come from (spec/47).
+      enforced.events,
+    ),
     rallyCount,
     { A: !!enforced.A, B: !!enforced.B },
   );
@@ -648,14 +709,24 @@ async function borrowSixFromVis(
   }
 }
 
-const NO_ENFORCEMENT: EnforcedLineups = {
+const NO_ENFORCEMENT: EnforcedLineupsWithEvents = {
   A: null,
   B: null,
   basis: "fallback",
   firstServer: null,
   confidence: "unknown",
   notes: [],
+  events: null,
 };
+
+/**
+ * The enforced rotation plus the events it was worked out from.
+ *
+ * The events ride along because two callers need them and parsing a long set's
+ * event stream twice per poll is measurable — kept OUT of `EnforcedLineups`
+ * itself so serve-succession's contract stays about rotation.
+ */
+type EnforcedLineupsWithEvents = EnforcedLineups & { events: SetEvents | null };
 
 /**
  * The enforced rotation for the set in play, or nothing at all.
@@ -668,7 +739,7 @@ function enforceRotation(
   xml: string,
   latestSet: { attrs: Attrs; inner: string } | null,
   remembered: ReturnType<typeof firstServerFor>,
-): EnforcedLineups {
+): EnforcedLineupsWithEvents {
   try {
     if (!latestSet) return NO_ENFORCEMENT;
     const match = tagBlocks(xml, "Match")[0]?.attrs ?? null;
@@ -684,13 +755,17 @@ function enforceRotation(
       );
       return row ? sixOf(row) : null;
     };
-    return enforceLineups({
-      events: parseSetEvents(latestSet.inner, { noTeamA, noTeamB, sides }),
-      startingLineups: { A: startingFor(noTeamA), B: startingFor(noTeamB) },
-      liberos: designatedLiberos(latestSet.inner),
-      sides,
-      remembered,
-    });
+    const events = parseSetEvents(latestSet.inner, { noTeamA, noTeamB, sides });
+    return {
+      ...enforceLineups({
+        events,
+        startingLineups: { A: startingFor(noTeamA), B: startingFor(noTeamB) },
+        liberos: designatedLiberos(latestSet.inner),
+        sides,
+        remembered,
+      }),
+      events,
+    };
   } catch {
     return NO_ENFORCEMENT;
   }

@@ -75,6 +75,35 @@ const ancorli = localFont({
 });
 
 /**
+ * Encode Sans Expanded — the second half of the AVC broadcast package's
+ * typography (spec/47). Ancorli sets the country codes and the score; every
+ * other string on a TV graphic is this face, at a weight the guidelines name
+ * per element (SemiBold for the set score, Bold for labels, Medium for a
+ * substituted player's position).
+ *
+ * Four weights, not the six the package ships: these are the ones the graphics
+ * in spec/47's scope actually call for, and an unused face is a download some
+ * venue connection pays for. Add Light or ExtraBold here when the graphic that
+ * needs it is built, not before.
+ *
+ * It is DELIBERATELY absent from BOARD_FONTS in board-theme.ts. That list is
+ * the per-competition branding picker for the venue boards, and this face is
+ * not a choice — it is what the broadcast package specifies. Offering it in the
+ * dropdown would invite someone to set a hall's scoreboard in it.
+ */
+const encodeSansExpanded = localFont({
+  src: [
+    { path: "../fonts/EncodeSansExpanded-Regular.ttf", weight: "400", style: "normal" },
+    { path: "../fonts/EncodeSansExpanded-Medium.ttf", weight: "500", style: "normal" },
+    { path: "../fonts/EncodeSansExpanded-SemiBold.ttf", weight: "600", style: "normal" },
+    { path: "../fonts/EncodeSansExpanded-Bold.ttf", weight: "700", style: "normal" },
+  ],
+  variable: "--font-encode-sans-expanded",
+  display: "swap",
+  preload: false,
+});
+
+/**
  * Class names that define the four board font variables. Applied to <html> in
  * the root layout, NOT to a wrapper on the scoreboard route: next/font emits
  * these as a CSS module, and when the only importer was the scoreboard page the
@@ -90,6 +119,7 @@ export const boardFontClassName = [
   archivo.variable,
   anton.variable,
   ancorli.variable,
+  encodeSansExpanded.variable,
 ].join(" ");
 
 // The name→variable mapping and `boardFontStack()` live in board-theme.ts: they
