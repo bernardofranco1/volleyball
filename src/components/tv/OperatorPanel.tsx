@@ -35,6 +35,7 @@ export function OperatorPanel({
   buffered,
   playerState,
   boardId,
+  schema,
 }: {
   open: boolean;
   delay: number;
@@ -50,6 +51,8 @@ export function OperatorPanel({
   buffered: number;
   playerState: PlayerState;
   boardId: string;
+  /** Non-production schema name, when this is not a production deployment. */
+  schema: string | null;
 }) {
   const onAir = [
     graphics.bug && "bug",
@@ -64,6 +67,9 @@ export function OperatorPanel({
   return (
     <div style={{ ...S.wrap, opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none" }}>
       <div style={S.row}>
+        {/* The homologation bar is hidden on this page because it would go to
+            air (spec/47); this is where that warning lives instead. */}
+        {schema ? <span style={S.envWarn}>⚠ {schema} — not production</span> : null}
         <span style={S.tag}>{boardId}</span>
         <span style={playerState === "playing" ? S.ok : S.warn}>{playerState}</span>
         {staleFor != null ? (
@@ -284,4 +290,12 @@ const S: Record<string, React.CSSProperties> = {
     color: "#9ca3af",
   },
   note: { color: "#4b5563", margin: 0, maxWidth: 900 },
+  envWarn: {
+    background: "#facc15",
+    color: "#111827",
+    borderRadius: 4,
+    padding: "3px 7px",
+    font: "700 11px/1 system-ui, sans-serif",
+    letterSpacing: "0.06em",
+  },
 };

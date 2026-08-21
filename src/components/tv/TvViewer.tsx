@@ -63,6 +63,7 @@ export function TvViewer({
   sourceParam,
   startHidden,
   demo,
+  schema,
 }: {
   boardId: string;
   initialBoard: VisBoardData;
@@ -74,6 +75,8 @@ export function TvViewer({
   startHidden: boolean;
   /** A graphic forced on for rehearsal (`?demo=sub`). */
   demo: DemoGraphic | null;
+  /** Non-production schema name, for the operator panel's warning. */
+  schema: string | null;
 }) {
   const [delay, setDelay] = useState(initialDelay);
   const [operator, setOperator] = useState<OperatorState>({
@@ -320,6 +323,7 @@ export function TvViewer({
         buffered={buffered}
         playerState={playerState}
         boardId={boardId}
+        schema={schema}
       />
     </div>
   );

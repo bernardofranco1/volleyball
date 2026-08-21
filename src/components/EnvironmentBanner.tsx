@@ -17,6 +17,12 @@ import { DB_SCHEMA, IS_PROD_SCHEMA } from "@/db/env";
  * sidebar brand and the top of the scorer console is the score, and covering
  * either would change the very layout being validated. The impersonation banner
  * uses the same convention (spec/26 §7).
+ *
+ * ONE surface hides it: the TV overlay output at /tv/{matchNo} (spec/47), which
+ * is composited into a programme feed. An amber bar across the bottom of a
+ * broadcast is a worse outcome than the ambiguity this bar exists to prevent, so
+ * that page suppresses it by id and carries the same information in its operator
+ * panel — which is pointer-gated and never on air. The id is the contract.
  */
 export function EnvironmentBanner() {
   if (IS_PROD_SCHEMA) return null;
@@ -30,6 +36,7 @@ export function EnvironmentBanner() {
 
   return (
     <div
+      id="env-banner"
       role="status"
       // pointer-events-none so it can never swallow a tap meant for the console
       // underneath; the bar carries no controls of its own.

@@ -28,6 +28,7 @@ import { MOCK_BOARD_MATCH_NO } from "@/components/scoreboard/VisBoardScreen";
 import { decodeStreamParam, resolveStreamUrl } from "@/lib/tv/stream-url";
 import { clampDelay } from "@/lib/tv/delay";
 import { parseDemo } from "@/lib/tv/director";
+import { DB_SCHEMA, IS_PROD_SCHEMA } from "@/db/env";
 import { TvViewer } from "@/components/tv/TvViewer";
 
 export const dynamic = "force-dynamic";
@@ -118,7 +119,13 @@ export default async function TvOutputPage({
       {/* The output fills the frame and the page behind it must be black, not
           the app's surface colour: any band of another colour round the picture
           is a band the vision mixer keys or crops. */}
-      <style>{"html,body{background:#000!important;margin:0;overflow:hidden}"}</style>
+      <style>
+        {"html,body{background:#000!important;margin:0;overflow:hidden}" +
+          // The homologation bar (spec/28) is on every other surface by design.
+          // Here it would be composited into a programme feed, so it is hidden
+          // and the operator panel reports the environment instead.
+          "#env-banner{display:none!important}"}
+      </style>
       <TvViewer
         boardId={synthetic ? raw : String(matchNo)}
         initialBoard={board}
@@ -128,6 +135,7 @@ export default async function TvOutputPage({
         sourceParam={forcedSource}
         startHidden={q.hidden === "1"}
         demo={parseDemo(q.demo)}
+        schema={IS_PROD_SCHEMA ? null : DB_SCHEMA}
       />
     </>
   );
