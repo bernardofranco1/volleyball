@@ -20,7 +20,7 @@
  * score bug itself stays pure (spec/48 §0.1): it never imports this file.
  */
 
-import { ART, AXIS } from "./bug-geometry";
+import { ART, AXIS, BAR } from "./bug-geometry";
 import type { Side } from "./derive";
 
 /**
@@ -176,6 +176,21 @@ export function ballFlightFrames(restX: number): Keyframe[] {
 }
 
 // ── M2: the odometer ─────────────────────────────────────────────────────────
+
+/**
+ * The window a rolling digit is visible through, per game-score cell.
+ *
+ * DERIVED from the bar, not measured: one design pixel inside the band top and
+ * bottom, so a digit on its way in is hidden by the bar's own top edge and
+ * appears to come from behind it. Wide enough for two digits with room to spare
+ * — the cell is centred on its ADVANCE box (bug-geometry.ts:148-157), so 9 → 10
+ * re-centres the pair inside this window rather than growing out of it.
+ */
+export const ROLL_CLIP = {
+  halfW: 56,
+  y: BAR.y + 1,
+  h: BAR.h - 2,
+} as const;
 
 /** Which way a roll runs: 1 = the new value arrives from ABOVE. */
 export type RollDir = 1 | -1;

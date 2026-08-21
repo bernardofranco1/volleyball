@@ -50,6 +50,8 @@ import {
 import { handOf, sideState } from "@/lib/tv/derive";
 import { MOTION } from "@/lib/tv/motion";
 import { usePresence } from "@/lib/tv/usePresence";
+import { useHydrated } from "@/lib/tv/useHydrated";
+import { RollingCell } from "@/components/tv/BugMotion";
 import { StreamPlayer, type PlayerState } from "@/components/tv/StreamPlayer";
 import { ScoreBug } from "@/components/tv/ScoreBug";
 import {
@@ -271,6 +273,13 @@ export function TvViewer({
   // Presence (spec/48 G2): the director drops a graphic the instant its window
   // closes, so without this there is never an element on screen to animate out
   // of. Each slot keeps the last value mounted for exactly its own exit.
+  // The hand-off to the motion layer. False on the server and in the hydrating
+  // render, so the FIRST PAINTED FRAME is byte-for-byte what spec/47 shipped —
+  // which is what e2e and both browser gates measure (spec/48 §0.2-0.3). It
+  // flips once, and the bug's own digits and ball go dark in the same commit as
+  // the animated ones appear, so there is never a frame with two of either.
+  const motion = useHydrated();
+
   const keyMomentP = usePresence(graphics.keyMoment, MOTION.slide.exit.duration);
   const timeoutP = usePresence(graphics.timeout, MOTION.tab.exit.duration);
   const subP = usePresence(graphics.substitution, MOTION.slide.exit.duration);
@@ -329,6 +338,7 @@ export function TvViewer({
           left={{ ...leftSide, serving: leftSide.serving }}
           right={{ ...rightSide, serving: rightSide.serving }}
           hidden={!graphics.bug}
+          scoreHidden={motion}
         />
 
         <svg viewBox="0 0 1920 1080" width="100%" height="100%" style={S.layerUnder} aria-hidden>
@@ -353,6 +363,12 @@ export function TvViewer({
         </svg>
 
         <svg viewBox="0 0 1920 1080" width="100%" height="100%" style={S.layerOver} aria-hidden>
+          {motion ? (
+            <>
+              <RollingCell side="left" value={leftSide.score} />
+              <RollingCell side="right" value={rightSide.score} />
+            </>
+          ) : null}
           {cardP.value ? (
             <ChallengeCard
               hand={cardP.value.hand}

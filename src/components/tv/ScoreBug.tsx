@@ -51,11 +51,24 @@ export function ScoreBug({
   left,
   right,
   hidden = false,
+  ballHidden = false,
+  scoreHidden = false,
 }: {
   left: BugSide;
   right: BugSide;
   /** Kept mounted but invisible, so a hide/show does not re-decode the artwork. */
   hidden?: boolean;
+  /**
+   * The serve ball is being drawn by the motion layer instead (spec/48 M1), which
+   * is the only way it can fly: an animation needs one element that persists
+   * across the flip, and this component is re-rendered from props.
+   *
+   * Defaults to false, so the SERVER still draws it and the first painted frame
+   * is unchanged. See useHydrated for the hand-off.
+   */
+  ballHidden?: boolean;
+  /** Likewise the two game-score cells, for the odometer (spec/48 M2). */
+  scoreHidden?: boolean;
 }) {
   return (
     <svg
@@ -139,7 +152,7 @@ export function ScoreBug({
       {/* The serving side's ball. Absent, not dimmed, when nobody is serving —
           between sets and before the first whistle the feed says nothing about
           serve and inventing a side would be a lie on air. */}
-      {left.serving || right.serving ? (
+      {(left.serving || right.serving) && !ballHidden ? (
         <image
           href={"/tv-gfx/bug-ball.png"}
           x={left.serving ? ART.ball.lx : ART.ball.rx}
@@ -152,8 +165,8 @@ export function ScoreBug({
 
       <Cell t={TEXT.code} side="left" value={displayCode(left.code)} />
       <Cell t={TEXT.code} side="right" value={displayCode(right.code)} />
-      <Cell t={TEXT.score} side="left" value={String(left.score)} />
-      <Cell t={TEXT.score} side="right" value={String(right.score)} />
+      <Cell t={TEXT.score} side="left" value={String(left.score)} hidden={scoreHidden} />
+      <Cell t={TEXT.score} side="right" value={String(right.score)} hidden={scoreHidden} />
       <Cell t={TEXT.setValue} side="left" value={String(left.sets)} />
       <Cell t={TEXT.setValue} side="right" value={String(right.sets)} />
       <Cell t={TEXT.setLabel} side="left" value="SETS" />
@@ -173,18 +186,33 @@ type Cellish = {
   weight?: number;
 };
 
-/** One measured text cell, centred on its advance box and sitting on its baseline. */
-function Cell({
+/**
+ * One measured text cell, centred on its advance box and sitting on its baseline.
+ *
+ * Exported because the odometer overlay (spec/48 M2) draws the rolling digits
+ * with it: the animated cell and the static one it replaces have to agree to the
+ * pixel, and the only way to guarantee that is for there to be one of them. The
+ * extra props are all dumb — a ref to animate, a visibility flag, and a style
+ * for the transform box.
+ */
+export function Cell({
   t,
   side,
   value,
+  nodeRef,
+  hidden = false,
+  style,
 }: {
   t: Cellish;
   side: "left" | "right";
   value: string;
+  nodeRef?: React.Ref<SVGTextElement>;
+  hidden?: boolean;
+  style?: React.CSSProperties;
 }) {
   return (
     <text
+      ref={nodeRef}
       x={side === "left" ? t.lcx : t.rcx}
       y={t.baseline}
       textAnchor="middle"
@@ -192,6 +220,8 @@ function Cell({
       fontSize={t.size}
       fontWeight={t.weight}
       fill={AVC.white}
+      visibility={hidden ? "hidden" : undefined}
+      style={style}
     >
       {value}
     </text>
