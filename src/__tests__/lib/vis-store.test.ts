@@ -289,6 +289,7 @@ describe("the first server outlives the instance that saw it", () => {
         },
       ],
       trailingSubs: [],
+      challenges: [],
     };
     const sides = new Map<string, "A" | "B">([["1", "A"], ["20", "B"]]);
 

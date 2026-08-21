@@ -83,6 +83,7 @@ function truncate(set: LoadedSet, upTo: number): SetEvents {
     // Trailing substitutions of the truncated stream are the ones recorded in
     // the gap before the rally now in progress.
     trailingSubs: set.events.rallies[upTo - 1]?.subsBefore ?? [],
+    challenges: [],
   };
 }
 
@@ -229,6 +230,7 @@ describe("R1 — the serving team keeps the serve", () => {
         },
       ],
       trailingSubs: [{ out: "10", in: "11", side: "A" }],
+      challenges: [],
     };
     const enforced = enforceLineups({
       events,
@@ -258,6 +260,7 @@ describe("R2 — a side-out rotates the winner", () => {
         },
       ],
       trailingSubs: [],
+      challenges: [],
     };
     const enforced = enforceLineups({
       events,
@@ -366,6 +369,7 @@ describe("R3 — the libero", () => {
       ],
       // The libero comes on for the player at position 5.
       trailingSubs: [{ out: "5", in: "99", side: "A" }],
+      challenges: [],
     };
     const enforced = enforceLineups({
       events,
@@ -446,7 +450,7 @@ describe("first server resolution", () => {
 
   it("shows the starting six, enforced, before a rally has been played", () => {
     const enforced = enforceLineups({
-      events: { rallies: [], trailingSubs: [] },
+      events: { rallies: [], trailingSubs: [], challenges: [] },
       startingLineups: set.startingLineups,
       liberos: set.liberos,
       sides: match.sides,
@@ -461,7 +465,7 @@ describe("first server resolution", () => {
 describe("degrading rather than guessing", () => {
   it("falls back when the set has no starting lineup to build on", () => {
     const enforced = enforceLineups({
-      events: { rallies: [], trailingSubs: [] },
+      events: { rallies: [], trailingSubs: [], challenges: [] },
       startingLineups: { A: null, B: null },
       liberos: new Set(),
       sides: new Map(),
@@ -488,6 +492,7 @@ describe("degrading rather than guessing", () => {
           },
         ],
         trailingSubs: [],
+        challenges: [],
       },
       startingLineups: { A: six, B: ["20", "21", "22", "23", "24", "25"] },
       liberos: new Set(),
@@ -512,7 +517,7 @@ describe("degrading rather than guessing", () => {
     });
     const run = (winner: Side) =>
       enforceLineups({
-        events: { rallies: [rally(winner)], trailingSubs: [] },
+        events: { rallies: [rally(winner)], trailingSubs: [], challenges: [] },
         startingLineups: { A: a, B: b },
         liberos: new Set(),
         sides,

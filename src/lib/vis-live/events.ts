@@ -55,6 +55,74 @@ export interface SetEvents {
   rallies: RallyEvent[];
   /** Substitutions recorded AFTER the last rally — they affect the six on court. */
   trailingSubs: SubstitutionEvent[];
+  /** Video challenges of this set, oldest first (spec/48 W6). */
+  challenges: ChallengeEvent[];
+}
+
+/**
+ * `ChallengeRequest@Type` → the XSD's own name for it.
+ *
+ * The full enum is 1–8; 3, 4 and 6 are the values our captures actually carry.
+ * These names are the RAW reason, not a card label — `categoryFor`
+ * (`lib/tv/director.ts`) turns them into one, and it deliberately has no label
+ * for the three line faults.
+ */
+export const CHALLENGE_TYPE_LABELS: Record<number, string> = {
+  1: "AntennaTouch",
+  2: "AttackLineFault",
+  3: "BallInOut",
+  4: "BlockTouch",
+  5: "CenterLineFault",
+  6: "NetTouch",
+  7: "ServiceLineFault",
+  8: "FloorTouch",
+};
+
+/**
+ * One video challenge: the request, and the result when it has been published.
+ *
+ * `<ChallengeRequest>` and `<ChallengeResult>` arrive in both placements, like
+ * `<Substitution>` — inside the rally under review, or between two rallies — so
+ * they are collected by a document-order scan of the whole `<Events>` blob and a
+ * result belongs to the last request still waiting for one.
+ *
+ * **The verdict comes from the POINTS, not from `@Outcome`.** `ChallengeResult`
+ * publishes the score AFTER the ruling, i.e. the explicit point assignment, so a
+ * result whose points differ from the request's is a call that was corrected and
+ * therefore a challenge that was upheld. The numeric↔name mapping of `@Outcome`
+ * does not reconcile with the observed scores — capture 27550 carries
+ * `Outcome="1"` on a result that moves a point from B to A, while `replay.ts`
+ * buckets `Outcome="1"` as refused — so `outcome` is recorded here and used for
+ * nothing (spec/48 §3, and the ⚠ in it).
+ *
+ * Measured against the feed's own `NbChallengeAcceptedTeam*` /
+ * `NbChallengeRefusedTeam*` set totals, the points rule agrees on nine of the ten
+ * pairs in the reference captures. The tenth is that `Outcome="1"`: the set
+ * counts the challenge REFUSED while its result plainly moves a point (13-14 →
+ * 14-13, 27550 set 3). We follow the points, because the points are what the
+ * viewer is looking at — an overlay saying "call overturned" while the score on
+ * the same screen has just changed is the reading that cannot be wrong twice.
+ */
+export interface ChallengeEvent {
+  /** The requesting team. Null when `@NoTeam` is neither side of this match. */
+  side: Side | null;
+  /** `@Type`, as sent; 0 when absent. */
+  type: number;
+  /** The XSD name for `type`, or null for a value outside the enum. */
+  typeLabel: string | null;
+  /** The score when the challenge was called. */
+  requestA: number;
+  requestB: number;
+  /** The score AFTER the ruling, or null while no result has been published. */
+  scoreA: number | null;
+  scoreB: number | null;
+  /**
+   * Upheld, by the points rule. Null means undecided — the request is published
+   * and the result is not, which live is a review in progress.
+   */
+  upheld: boolean | null;
+  /** `ChallengeResult@Outcome` verbatim. UNVERIFIED vocabulary; never read. */
+  outcome: string | null;
 }
 
 /**
@@ -119,6 +187,48 @@ function subsIn(blob: string, sides: Map<string, Side>): SubstitutionEvent[] {
   });
 }
 
+/**
+ * Every challenge in a blob, oldest first, pairing each result with the request
+ * it answers.
+ *
+ * One regex over both tag names keeps them in document order, which is the only
+ * thing that pairs them: neither element carries an id, and `ChallengeResult`
+ * carries no team of its own. A result with no request before it is dropped — it
+ * cannot be attributed to a side, and a graphic naming the wrong team is worse
+ * than no graphic (the same rule `substitutionsOf` follows).
+ */
+function challengesIn(blob: string, noTeamA: number, noTeamB: number): ChallengeEvent[] {
+  const out: ChallengeEvent[] = [];
+  const re = /<(ChallengeRequest|ChallengeResult)\b([^>]*?)\/?>/g;
+  for (const m of blob.matchAll(re)) {
+    const attrs = parseAttrs(m[2]);
+    if (m[1] === "ChallengeRequest") {
+      const noTeam = num(attrs, "NoTeam", -99);
+      const type = num(attrs, "Type", 0);
+      out.push({
+        side: noTeam === noTeamA ? "A" : noTeam === noTeamB ? "B" : null,
+        type,
+        typeLabel: CHALLENGE_TYPE_LABELS[type] ?? null,
+        requestA: num(attrs, "PointsTeamA"),
+        requestB: num(attrs, "PointsTeamB"),
+        scoreA: null,
+        scoreB: null,
+        upheld: null,
+        outcome: null,
+      });
+      continue;
+    }
+    const open = out[out.length - 1];
+    if (!open || open.upheld !== null) continue;
+    open.scoreA = num(attrs, "PointsTeamA");
+    open.scoreB = num(attrs, "PointsTeamB");
+    // The points rule, and the whole reason this is not a lookup on @Outcome.
+    open.upheld = open.scoreA !== open.requestA || open.scoreB !== open.requestB;
+    open.outcome = str(attrs, "Outcome");
+  }
+  return out;
+}
+
 /** Where each `<Rally>` of a blob starts and ends, in document order. */
 function rallySlices(inner: string): { attrs: Attrs; inner: string; from: number; to: number }[] {
   const out: { attrs: Attrs; inner: string; from: number; to: number }[] = [];
@@ -155,7 +265,7 @@ export function parseSetEvents(
   opts: { noTeamA: number; noTeamB: number; sides: Map<string, Side> },
 ): SetEvents {
   const events = tagBlocks(setInner, "Events")[0]?.inner ?? "";
-  if (!events) return { rallies: [], trailingSubs: [] };
+  if (!events) return { rallies: [], trailingSubs: [], challenges: [] };
 
   const slices = rallySlices(events);
   const rallies: RallyEvent[] = [];
@@ -191,5 +301,9 @@ export function parseSetEvents(
     prevB = scoreB;
   });
 
-  return { rallies, trailingSubs: subsIn(events.slice(cursor), opts.sides) };
+  return {
+    rallies,
+    trailingSubs: subsIn(events.slice(cursor), opts.sides),
+    challenges: challengesIn(events, opts.noTeamA, opts.noTeamB),
+  };
 }

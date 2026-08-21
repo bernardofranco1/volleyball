@@ -528,6 +528,55 @@ function substitutionsOf(
   return out.slice(-MAX_SUBSTITUTIONS);
 }
 
+/**
+ * The challenge the set's event stream says is the CURRENT state of play, or
+ * null (spec/48 W6).
+ *
+ * The stream is a record, not a snapshot: every challenge of the set stays in it
+ * to the end. What makes one of them current is that the score has not moved
+ * since — VIS rewrites the disputed rally to the corrected score, so during the
+ * review the set stands at the REQUEST's points and after the ruling at the
+ * RESULT's, and either way the next rally moves it off both. So:
+ *
+ *  - request published, no result yet, score still at the request → REQUESTED,
+ *    i.e. a review in progress right now.
+ *  - result published, score still at the result → the verdict, for as long as
+ *    nothing has been played since.
+ *  - anything else → null. History, and history does not go on air.
+ *
+ * That window is short by design, and it does not have to cover the graphic's
+ * whole time on screen: the store's machine takes it from here and holds a
+ * decided card for its own beat (`tv-signals`).
+ *
+ * The verdict is the points rule, never `@Outcome` — see `ChallengeEvent`.
+ */
+export function declaredChallengeOf(
+  events: SetEvents,
+  scoreA: number,
+  scoreB: number,
+  now: number,
+): VisChallenge | null {
+  // A challenge whose `NoTeam` matches neither side cannot be attributed, and a
+  // card naming the wrong team is worse than no card.
+  const last = [...events.challenges].reverse().find((c) => c.side !== null);
+  if (!last || !last.side) return null;
+  const at = (a: number | null, b: number | null) => a === scoreA && b === scoreB;
+  const category = last.typeLabel ? { category: last.typeLabel } : {};
+
+  if (last.upheld === null) {
+    return at(last.requestA, last.requestB)
+      ? { status: "REQUESTED", side: last.side, since: now, ...category }
+      : null;
+  }
+  if (!at(last.scoreA, last.scoreB)) return null;
+  return {
+    status: last.upheld ? "SUCCESSFUL" : "UNSUCCESSFUL",
+    side: last.side,
+    since: now,
+    ...category,
+  };
+}
+
 /** `GetVolleyLive` (Options=BOARD_OPTIONS) → the board's view model. */
 export function mapVolleyLive(
   xml: string,
@@ -755,8 +804,20 @@ export function mapVolleyLive(
       events && latest && !latestEnded
         ? substitutionsOf(events, num(latest.attrs, "No", 1), rosterA, rosterB)
         : [],
-    // Needs two payloads to see; the store fills it in (spec/47).
-    challenge: null,
+    // The event stream states its challenges outright (spec/48 W6), so this is
+    // DECLARED where spec/47 could only infer it from counters. Same guard as the
+    // substitutions: only for the set in play, because a finished set's challenge
+    // is history and the interval is no time to raise a card. The store's counter
+    // machine still runs, and is still the only road on a payload with no events.
+    challenge:
+      events && latest && !latestEnded
+        ? declaredChallengeOf(
+            events,
+            num(latest.attrs, "PointsTeamA"),
+            num(latest.attrs, "PointsTeamB"),
+            now,
+          )
+        : null,
   };
 }
 
