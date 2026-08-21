@@ -48,7 +48,8 @@ interface TvQuery {
   /** Start with the graphics hidden, for a source that opens mid-programme. */
   hidden?: string;
   /** Force one graphic on for rehearsal: sub, challenge, review, success, fail,
-   *  timeout, keymoment. */
+   *  timeout, keymoment — or drive the motion the feed normally drives:
+   *  sideout (the ball's V-flight), point (the score odometer). */
   demo?: string;
 }
 

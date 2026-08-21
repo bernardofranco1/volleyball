@@ -264,7 +264,10 @@ export type DemoGraphic =
   | "success"
   | "fail"
   | "timeout"
-  | "keymoment";
+  | "keymoment"
+  /** Motion rehearsals (spec/48 G4): the two things the FEED normally drives. */
+  | "sideout"
+  | "point";
 
 export function demoGraphics(
   demo: DemoGraphic,
@@ -300,6 +303,12 @@ export function demoGraphics(
       return { ...base, timeout: { hand: "left" } };
     case "keymoment":
       return { ...base, keyMoment: { hand: "left", text: "MATCH POINT" } };
+    // The motion rehearsals show the BUG and nothing else: what they exercise is
+    // the score and the serving side, which are not graphics at all — see
+    // demoBoard, which drives them.
+    case "sideout":
+    case "point":
+      return base;
     default: {
       const status: VisChallengeStatus =
         demo === "challenge"
@@ -329,6 +338,49 @@ export function demoGraphics(
 export function parseDemo(raw: string | undefined | null): DemoGraphic | null {
   const all: DemoGraphic[] = [
     "sub", "challenge", "review", "success", "fail", "timeout", "keymoment",
+    "sideout", "point",
   ];
   return all.find((d) => d === raw) ?? null;
+}
+
+/**
+ * The rehearsal beat. One tick every 900 ms, and every motion demo below is a
+ * multiple of it, so one interval drives all of them.
+ */
+export const DEMO_BEAT_MS = 900;
+
+/**
+ * A rehearsal board for the two demos that are about MOVEMENT rather than about
+ * a graphic (spec/48 G4).
+ *
+ * The other demos force a panel on; these two force the two things the feed
+ * normally drives and nobody can schedule — a side-out and a point — so the
+ * flight and the odometer can be watched, and re-watched, without waiting for a
+ * live rally. Pure: it takes the beat, not a clock.
+ *
+ * `point` deliberately walks the score DOWN once per cycle and across 9 → 10:
+ * the roll-back is what a challenge overturn or an undo looks like, and the
+ * two-digit crossing is where the advance-box re-centring (bug-geometry.ts:148)
+ * meets the odometer's clip. Both are exactly the cases a rehearsal is for.
+ */
+export function demoBoard(
+  demo: DemoGraphic,
+  board: VisBoardData,
+  beat: number,
+): VisBoardData {
+  if (demo === "sideout") {
+    // Every third beat, i.e. 2.7 s — the flight itself is 850 ms, so the ball
+    // rests visibly on each side between crossings.
+    return { ...board, serving: Math.floor(beat / 3) % 2 === 0 ? "A" : "B" };
+  }
+  if (demo === "point") {
+    // The two cells advance on alternate beats, never together: a real rally
+    // scores one side, and two odometers rolling at once hides which is which.
+    return {
+      ...board,
+      scoreA: 8 + (Math.floor(beat / 2) % 5),
+      scoreB: 19 + (Math.floor((beat + 1) / 2) % 4),
+    };
+  }
+  return board;
 }

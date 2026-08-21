@@ -10,7 +10,11 @@
 import { describe, expect, it } from "vitest";
 import {
   NO_OPERATOR,
+  NOTHING,
+  demoBoard,
+  demoGraphics,
   direct,
+  parseDemo,
   seedDirector,
   subKey,
   type OperatorState,
@@ -255,5 +259,68 @@ describe("key moment", () => {
     const r = direct(seedDirector(b), b, op(), 0);
     expect(r.graphics.bug).toBe(true);
     expect(r.graphics.keyMoment).toMatchObject({ hand: "left", text: "SET POINT" });
+  });
+});
+
+/**
+ * The motion rehearsals (spec/48 G4). `?demo=sideout` and `?demo=point` are the
+ * only two demos that drive the BOARD rather than force a graphic on, because
+ * what they rehearse — a side-out and a point — is movement rather than a panel.
+ * Without them the first time anyone sees the ball fly is during a live rally.
+ */
+describe("motion rehearsals", () => {
+  it("are reachable from ?demo=", () => {
+    expect(parseDemo("sideout")).toBe("sideout");
+    expect(parseDemo("point")).toBe("point");
+    expect(parseDemo("sidout")).toBeNull();
+  });
+
+  it("draw the bug and nothing else", () => {
+    const b = board();
+    for (const demo of ["sideout", "point"] as const) {
+      const g = demoGraphics(demo, b, null);
+      expect(g, demo).toEqual({ ...NOTHING, bug: true });
+    }
+  });
+
+  it("flip the serving side, and hold each side long enough to see it land", () => {
+    const b = board({ serving: "A" });
+    const serves = Array.from(
+      { length: 7 },
+      (_, beat) => demoBoard("sideout", b, beat).serving,
+    );
+    // 900 ms a beat, three beats a side: the flight is 850 ms, so the ball rests
+    // visibly before it crosses back.
+    expect(serves).toEqual(["A", "A", "A", "B", "B", "B", "A"]);
+  });
+
+  it("walk the score up, across 9 → 10, and back down again", () => {
+    const b = board();
+    const left = Array.from(
+      { length: 12 },
+      (_, beat) => demoBoard("point", b, beat).scoreA,
+    );
+    // Two beats a step. 12 → 8 at the end of the cycle is the ROLL-BACK, which
+    // is what an undo and an overturned challenge look like and is otherwise
+    // unwatchable on demand; 9 → 10 is the two-digit re-centring.
+    expect(left).toEqual([8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 8, 8]);
+  });
+
+  it("never roll both cells on the same beat", () => {
+    // A real rally scores one side. Two odometers turning at once hides which.
+    const b = board();
+    for (let beat = 1; beat < 12; beat++) {
+      const prev = demoBoard("point", b, beat - 1);
+      const now = demoBoard("point", b, beat);
+      const moved =
+        (prev.scoreA !== now.scoreA ? 1 : 0) + (prev.scoreB !== now.scoreB ? 1 : 0);
+      expect(moved, `beat ${beat}`).toBeLessThan(2);
+    }
+  });
+
+  it("leave every other demo's board alone", () => {
+    const b = board();
+    expect(demoBoard("sub", b, 3)).toBe(b);
+    expect(demoBoard("timeout", b, 7)).toBe(b);
   });
 });

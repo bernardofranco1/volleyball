@@ -69,6 +69,11 @@ export function ScoreBug({
         pointerEvents: "none",
         opacity: hidden ? 0 : 1,
         transition: "opacity 180ms linear",
+        // The middle of TvViewer's three stacked SVG layers (spec/48 G1): the
+        // extensions paint UNDER the bar so a docked panel emerges from beneath
+        // it, and the ball flight and the challenge card paint over. A constant,
+        // not a prop — there is one stack and this is its middle.
+        zIndex: 2,
       }}
       aria-hidden
     >

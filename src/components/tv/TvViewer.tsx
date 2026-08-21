@@ -20,6 +20,12 @@
  *  3. **The graphics run on the DELAYED board.** See useDelayedBoard: the
  *     director's decisions are all made against the frame the viewer is looking
  *     at, not the frame the hall is in.
+ *
+ * MOTION (spec/48) is all here rather than in the graphics: the bug and the
+ * extensions stay pure server-renderable components, and every animation is a
+ * client overlay in this stage. Three stacked SVG layers, why they are stacked
+ * the way they are, and the presence wrappers that let a dropped graphic leave
+ * are documented at the stage below.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -29,7 +35,9 @@ import { DELAY_STEP_S, clampDelay } from "@/lib/tv/delay";
 import { delayStorageKey } from "@/lib/tv/stream-url";
 import {
   CHALLENGE_CATEGORIES,
+  DEMO_BEAT_MS,
   NO_OPERATOR,
+  demoBoard,
   demoGraphics,
   direct,
   seedDirector,
@@ -40,6 +48,8 @@ import {
   type OperatorState,
 } from "@/lib/tv/director";
 import { handOf, sideState } from "@/lib/tv/derive";
+import { MOTION } from "@/lib/tv/motion";
+import { usePresence } from "@/lib/tv/usePresence";
 import { StreamPlayer, type PlayerState } from "@/components/tv/StreamPlayer";
 import { ScoreBug } from "@/components/tv/ScoreBug";
 import {
@@ -130,6 +140,13 @@ export function TvViewer({
     challenge: null,
   }));
 
+  // The rehearsal beat, and the only reason this component has a counter in it:
+  // `?demo=sideout` and `?demo=point` drive the SCORE and the SERVING SIDE
+  // rather than a graphic, so they need something to move (spec/48 G4). It only
+  // advances under a demo, and only when the beat itself turns over — React
+  // bails out of the three identical sets in between.
+  const [beat, setBeat] = useState(0);
+
   useEffect(() => {
     // Re-run on a clock as well as on every board change: substitution and
     // time-out windows expire on time, not on the next poll.
@@ -145,6 +162,7 @@ export function TvViewer({
       // back out of it; only what is DRAWN is replaced.
       const shown = demo ? demoGraphics(demo, board, operator.category) : g;
       setGraphics((prev) => (sameGraphics(prev, shown) ? prev : shown));
+      if (demo) setBeat(Math.floor(Date.now() / DEMO_BEAT_MS));
     };
     step();
     const id = setInterval(step, 250);
@@ -227,9 +245,37 @@ export function TvViewer({
   }, [board, live, nudgeDelay]);
 
   // ── the stage ──────────────────────────────────────────────────────────────
-  const hand = handOf(board);
-  const leftSide = sideState(board, hand.left);
-  const rightSide = sideState(board, hand.right);
+  // Under a motion rehearsal the BUG runs off a driven board — the score rolls,
+  // the serve flips — while the director, the operator panel and everything else
+  // still run off the real one. Identity-stable when there is no demo, so the
+  // memo is free.
+  const stage = useMemo(
+    () => (demo ? demoBoard(demo, board, beat) : board),
+    [demo, board, beat],
+  );
+  const hand = handOf(stage);
+  const leftSide = sideState(stage, hand.left);
+  const rightSide = sideState(stage, hand.right);
+
+  // The challenge arrives as one graphic and leaves as two: the small alert tab
+  // rides ON the bug, the decided card REPLACES it, and they enter and leave
+  // independently — REQUESTED → REVIEW drops the tab and raises the card at the
+  // same moment, which is the hand-off the design describes (spec/48 M5).
+  const alertIn =
+    graphics.challenge?.status === "REQUESTED" ? graphics.challenge : null;
+  const cardIn =
+    graphics.challenge && graphics.challenge.status !== "REQUESTED"
+      ? graphics.challenge
+      : null;
+
+  // Presence (spec/48 G2): the director drops a graphic the instant its window
+  // closes, so without this there is never an element on screen to animate out
+  // of. Each slot keeps the last value mounted for exactly its own exit.
+  const keyMomentP = usePresence(graphics.keyMoment, MOTION.slide.exit.duration);
+  const timeoutP = usePresence(graphics.timeout, MOTION.tab.exit.duration);
+  const subP = usePresence(graphics.substitution, MOTION.slide.exit.duration);
+  const alertP = usePresence(alertIn, MOTION.tab.exit.duration);
+  const cardP = usePresence(cardIn, MOTION.card.exit.duration);
 
   return (
     <div
@@ -260,52 +306,60 @@ export function TvViewer({
           </div>
         )}
 
+        {/* THREE STACKED SVG LAYERS, and the order is the whole of spec/48 G1.
+            Each stays its own SVG so a graphic coming and going never
+            re-rasterises the bar's artwork (spec/47), and the paint order is set
+            with z-index rather than by reordering the siblings:
+
+              1  extensions — UNDER the bar, so a docked panel slides out from
+                 beneath it instead of appearing on top of it;
+              2  the bug itself (the z-index lives in ScoreBug's own style);
+              3  motion — the serve ball's flight and the challenge card, the two
+                 things that must draw OVER the bar.
+
+            Why z-index and not the sibling swap spec/48 G1 describes: both of
+            the browser gates find the bug with `querySelector("svg")` — the
+            FIRST one — and so does e2e's first-frame assertion. Reordering the
+            siblings makes them measure an empty extensions layer and report a
+            vacuous PASS, and the gates may not be edited (spec/48 §0.2). The
+            paint order is identical, the DOM and the server output are
+            unchanged, and it is less code than the per-panel reveal clips the
+            spec offers as the fallback. */}
         <ScoreBug
           left={{ ...leftSide, serving: leftSide.serving }}
           right={{ ...rightSide, serving: rightSide.serving }}
           hidden={!graphics.bug}
         />
 
-        {/* The extensions ride in their own SVG over the bug's, so a graphic
-            coming and going never re-rasterises the bar's artwork. */}
-        <svg
-          viewBox="0 0 1920 1080"
-          width="100%"
-          height="100%"
-          style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
-          aria-hidden
-        >
-          {graphics.keyMoment ? (
+        <svg viewBox="0 0 1920 1080" width="100%" height="100%" style={S.layerUnder} aria-hidden>
+          {keyMomentP.value ? (
             <KeyMomentStrap
-              hand={graphics.keyMoment.hand}
-              text={graphics.keyMoment.text}
+              hand={keyMomentP.value.hand}
+              text={keyMomentP.value.text}
             />
           ) : null}
-          {graphics.timeout ? (
+          {timeoutP.value ? (
             <TimeoutTab
-              hand={graphics.timeout.hand}
+              hand={timeoutP.value.hand}
               taken={
-                (graphics.timeout.hand === "left" ? leftSide : rightSide).timeoutsTaken
+                (timeoutP.value.hand === "left" ? leftSide : rightSide).timeoutsTaken
               }
             />
           ) : null}
-          {graphics.substitution ? (
-            <SubstitutionBlock
-              hand={graphics.substitution.hand}
-              sub={graphics.substitution.sub}
-            />
+          {subP.value ? (
+            <SubstitutionBlock hand={subP.value.hand} sub={subP.value.sub} />
           ) : null}
-          {graphics.challenge ? (
-            graphics.challenge.status === "REQUESTED" ? (
-              <ChallengeAlert hand={graphics.challenge.hand} />
-            ) : (
-              <ChallengeCard
-                hand={graphics.challenge.hand}
-                status={graphics.challenge.status}
-                teamName={graphics.challenge.teamName}
-                category={graphics.challenge.category}
-              />
-            )
+          {alertP.value ? <ChallengeAlert hand={alertP.value.hand} /> : null}
+        </svg>
+
+        <svg viewBox="0 0 1920 1080" width="100%" height="100%" style={S.layerOver} aria-hidden>
+          {cardP.value ? (
+            <ChallengeCard
+              hand={cardP.value.hand}
+              status={cardP.value.status}
+              teamName={cardP.value.teamName}
+              category={cardP.value.category}
+            />
           ) : null}
         </svg>
       </div>
@@ -335,6 +389,10 @@ function sameGraphics(a: Graphics, b: Graphics): boolean {
 }
 
 const S: Record<string, React.CSSProperties> = {
+  /** The extensions layer: under the bar (the bug is z-index 2). */
+  layerUnder: { position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1 },
+  /** The motion layer: over the bar. Under the operator panel, which is 10. */
+  layerOver: { position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3 },
   noStream: {
     position: "absolute",
     inset: 0,
