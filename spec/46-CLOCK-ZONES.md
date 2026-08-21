@@ -136,6 +136,34 @@ the old process survived, the new one died on `EADDRINUSE`, and a stale server
 served chunk names the rebuilt `.next` no longer had — which presents as
 "hydration never ran", not as "wrong server". Kill by pid and confirm.
 
+## Bug fixed same day: unknown is not UTC
+
+Reported from Switzerland within the hour: the Local-time button read **"Local
+time GMT"**. The server render was the culprit — it cannot know the reader's
+zone, used `"UTC"` as the placeholder, and the label code then treated the
+placeholder as a fact and printed `GMT`. Every reader's first paint claimed
+Greenwich.
+
+The type now carries the distinction: `readerZone` is `string | null`, and
+`null` means *not known yet*, not UTC.
+
+- `readerOffsetLabel(null, …)` → `null`, so the button shows no offset until the
+  browser has answered.
+- `matchClock(m, "local", null)` falls back to venue time **flagged**, the same
+  way a fixture with no UTC instant does — never a guessed hour.
+- With scripts blocked the page now stays honestly on venue time end to end:
+  `Local time` (no offset) · `Event location time GMT+8` (pressed) · caption
+  "Times shown at the venue: Tianjin (GMT+8)."
+
+The report also exposed a second, real case worth naming rather than hiding: a
+device that genuinely reports UTC — its zone unset, or a browser deliberately
+concealing it (Tor, Firefox `privacy.resistFingerprinting`, Brave's shield).
+"Local time" and "GMT" then show identical numbers and the page looks broken.
+`isPlaceholderZone()` detects it **by zone name, never by a zero offset** — a
+reader in `Europe/London` in February is legitimately on GMT — and the caption
+says so outright: "Your device reports UTC as its time zone, so these are the
+same as the GMT view."
+
 ## Not done
 
 - The board itself (`/m/{matchNo}`) still shows its kick-off in venue time,

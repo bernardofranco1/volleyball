@@ -19,6 +19,7 @@ import {
   dayHeading,
   gmtLabel,
   groupByDay,
+  isPlaceholderZone,
   matchClock,
   readerOffsetLabel,
   venueOffsetLabel,
@@ -105,6 +106,47 @@ describe("matchClock", () => {
     expect(clock.time).toBeNull();
     expect(clock.dayKey).toBe(NO_DATE);
     expect(clock.sortMs).toBe(Number.POSITIVE_INFINITY);
+  });
+});
+
+describe("an unknown reader zone is not UTC", () => {
+  // The bug this pins, seen in production on 2026-08-21: the server cannot know
+  // the reader's zone, used "UTC" as its placeholder, and so labelled the
+  // Local-time button "GMT" for a reader in Zurich. Unknown must stay unknown.
+  const m = { scheduledVenue: "2026-08-21T10:00:00", scheduledUtc: "2026-08-21T02:00:00Z" };
+
+  it("states no offset at all rather than claiming Greenwich", () => {
+    expect(readerOffsetLabel(null, Date.parse("2026-08-21T02:00:00Z"))).toBeNull();
+  });
+
+  it("falls back to venue time, flagged, instead of rendering a guess", () => {
+    expect(matchClock(m, "local", null)).toMatchObject({
+      time: "10:00",
+      dayKey: "2026-08-21",
+      fellBackToVenue: true,
+    });
+    // The other two choices need no reader zone, so they are unaffected.
+    expect(matchClock(m, "venue", null).time).toBe("10:00");
+    expect(matchClock(m, "gmt", null)).toMatchObject({
+      time: "02:00",
+      fellBackToVenue: false,
+    });
+  });
+
+  it("groups on venue days while the zone is unknown", () => {
+    const rows = [{ ...m, status: "UPCOMING" as const }];
+    expect(groupByDay(rows, "local", null)[0].dayKey).toBe("2026-08-21");
+  });
+
+  it("recognises a device that reports no real zone — by name, not by offset", () => {
+    for (const z of [null, "UTC", "GMT", "Etc/UTC", "Etc/GMT", "Etc/Greenwich", "Zulu"]) {
+      expect(isPlaceholderZone(z)).toBe(true);
+    }
+    // A reader in London in February really is on GMT and must not be told
+    // their device is misreporting.
+    for (const z of ["Europe/London", "Africa/Abidjan", "Europe/Zurich"]) {
+      expect(isPlaceholderZone(z)).toBe(false);
+    }
   });
 });
 

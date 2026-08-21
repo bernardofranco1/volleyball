@@ -94,19 +94,26 @@ function partsIn(zone: string, ms: number): { dayKey: string; time: string } {
  * `readerZone` is the viewer's IANA zone, needed only for `"local"`. It is
  * passed in rather than resolved here so that the server render and the tests
  * are both deterministic — the browser's zone is not knowable on the server.
+ *
+ * **`null` means NOT KNOWN YET, and is not the same as `"UTC"`.** That
+ * distinction is the whole point of the type: a server render that treats its
+ * own placeholder as a fact tells the reader their zone is Greenwich, which for
+ * almost every reader is a lie. Unknown falls back to venue time, flagged, the
+ * same way a fixture with no UTC instant does.
  */
 export function matchClock(
   m: ScheduledPair,
   zone: ClockZone,
-  readerZone: string,
+  readerZone: string | null,
 ): MatchClock {
   const venue = m.scheduledVenue ? splitNaive(m.scheduledVenue) : null;
   const utcMs = m.scheduledUtc ? Date.parse(m.scheduledUtc) : NaN;
   const hasUtc = Number.isFinite(utcMs);
+  const canHonour = zone !== "local" || readerZone != null;
 
   // Venue time is a string, never a conversion: no zone database can disagree
   // with what VIS says the arena clock reads.
-  if (zone === "venue" || !hasUtc) {
+  if (zone === "venue" || !hasUtc || !canHonour) {
     if (!venue) {
       return hasUtc
         ? { ...partsIn("UTC", utcMs), sortMs: utcMs, fellBackToVenue: false }
@@ -120,10 +127,29 @@ export function matchClock(
   }
 
   return {
-    ...partsIn(zone === "gmt" ? "UTC" : readerZone, utcMs),
+    ...partsIn(zone === "gmt" ? "UTC" : readerZone!, utcMs),
     sortMs: utcMs,
     fellBackToVenue: false,
   };
+}
+
+/**
+ * Zone names that mean "no real zone": a device with its time zone unset, or a
+ * browser deliberately hiding it (Tor, Firefox's resistFingerprinting, Brave's
+ * fingerprint shield) reports one of these. Worth telling the reader about,
+ * because "Local time" and "GMT" then show the same numbers and the page looks
+ * broken rather than honest.
+ *
+ * Matched by NAME, not by a zero offset: a reader in `Europe/London` in
+ * February is genuinely on GMT and must not be told their device is misreporting.
+ */
+export function isPlaceholderZone(readerZone: string | null): boolean {
+  return (
+    readerZone == null ||
+    /^(UTC|GMT|Zulu|Universal|Etc\/(UTC|GMT|Zulu|Universal|Greenwich|GMT[+-]0))$/.test(
+      readerZone,
+    )
+  );
 }
 
 /**
@@ -149,8 +175,16 @@ export function gmtLabel(offsetMinutes: number): string {
   return `GMT${sign}${h}${mm ? `:${String(mm).padStart(2, "0")}` : ""}`;
 }
 
-/** The reader's own offset right now, as "GMT+2". */
-export function readerOffsetLabel(readerZone: string, atMs: number): string | null {
+/**
+ * The reader's own offset at a given instant, as "GMT+2"; null when their zone
+ * is not known yet, because the alternative is printing "GMT" at someone in
+ * Zurich.
+ */
+export function readerOffsetLabel(
+  readerZone: string | null,
+  atMs: number,
+): string | null {
+  if (readerZone == null) return null;
   try {
     const { dayKey, time } = partsIn(readerZone, atMs);
     const asIfUtc = Date.parse(`${dayKey}T${time}:00Z`);
@@ -206,7 +240,7 @@ const RANK = { LIVE: 0, UPCOMING: 1, FINISHED: 2 } as const;
 export function groupByDay<T extends ScheduledPair & { status: keyof typeof RANK }>(
   matches: readonly T[],
   zone: ClockZone,
-  readerZone: string,
+  readerZone: string | null,
 ): MatchDay<T>[] {
   const days = new Map<string, MatchDay<T>["rows"]>();
   for (const match of matches) {

@@ -23,6 +23,7 @@ import { useT } from "@/lib/i18n/client";
 import {
   type ClockZone,
   type ScheduledPair,
+  isPlaceholderZone,
   readerOffsetLabel,
   venueOffsetLabel,
 } from "@/lib/vis-live/match-times";
@@ -106,18 +107,28 @@ function readerZoneSnapshot(): string {
     try {
       readerZoneCache = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     } catch {
+      // A browser with no `resolvedOptions().timeZone`. UTC is then the honest
+      // answer: we know nothing better, and `isPlaceholderZone` will say so.
       readerZoneCache = "UTC";
     }
   }
   return readerZoneCache;
 }
 
-const serverReaderZoneSnapshot = () => "UTC";
+/**
+ * NOT "UTC" — null, meaning "the browser has not told us yet".
+ *
+ * A server that answers its own question with UTC labels the Local-time button
+ * "GMT" on every first paint, which is wrong for all but a handful of readers
+ * and looks exactly like a broken conversion. Unknown must stay unknown until
+ * the browser answers.
+ */
+const serverReaderZoneSnapshot = (): string | null => null;
 
 export interface ClockChoice {
   zone: ClockZone;
-  /** The viewer's IANA zone; "UTC" on the server and until hydration. */
-  readerZone: string;
+  /** The viewer's IANA zone; null on the server and until hydration. */
+  readerZone: string | null;
   /** The event's single offset label, or null when its venues disagree. */
   oneVenueOffset: string | null;
   /** The viewer's offset over the event, or null when there are no fixtures. */
@@ -126,7 +137,7 @@ export interface ClockChoice {
 
 export function useClockZone(matches: readonly ScheduledPair[]): ClockChoice {
   const zone = useSyncExternalStore(subscribeZone, zoneSnapshot, serverZoneSnapshot);
-  const readerZone = useSyncExternalStore(
+  const readerZone = useSyncExternalStore<string | null>(
     subscribeNothing,
     readerZoneSnapshot,
     serverReaderZoneSnapshot,
@@ -187,9 +198,17 @@ export function ClockZoneToggle({
       : (venueName ?? oneVenueOffset ?? "");
   const caption =
     zone === "local"
-      ? t("clock.captionLocal", {
-          zone: [readerZone, readerOffset && `(${readerOffset})`].filter(Boolean).join(" "),
-        })
+      ? readerZone == null
+        ? // Pre-hydration only, and pre-hydration the toggle is on venue time,
+          // so this is a belt-and-braces case rather than a visible one.
+          t("clock.captionLocalUnknown")
+        : isPlaceholderZone(readerZone)
+          ? t("clock.captionLocalIsUtc")
+          : t("clock.captionLocal", {
+              zone: [readerZone, readerOffset && `(${readerOffset})`]
+                .filter(Boolean)
+                .join(" "),
+            })
       : zone === "gmt"
         ? t("clock.captionGmt")
         : venuePlace
