@@ -22,6 +22,8 @@ import {
   isPlaceholderZone,
   matchClock,
   readerOffsetLabel,
+  resolveReaderZone,
+  validZoneOrNull,
   venueOffsetLabel,
 } from "@/lib/vis-live/match-times";
 
@@ -147,6 +149,53 @@ describe("an unknown reader zone is not UTC", () => {
     for (const z of ["Europe/London", "Africa/Abidjan", "Europe/Zurich"]) {
       expect(isPlaceholderZone(z)).toBe(false);
     }
+  });
+});
+
+describe("resolveReaderZone — the device wins, the network only fills silence", () => {
+  it("keeps the device's real zone even when a network estimate disagrees", () => {
+    // A deliberate setting is the clock the reader lives by; a VPN endpoint
+    // is not allowed to override it.
+    expect(resolveReaderZone("Europe/Zurich", "America/New_York")).toEqual({
+      zone: "Europe/Zurich",
+      estimated: false,
+    });
+  });
+
+  it("uses the network estimate when the device reports a placeholder", () => {
+    expect(resolveReaderZone("UTC", "Europe/Zurich")).toEqual({
+      zone: "Europe/Zurich",
+      estimated: true,
+    });
+    expect(resolveReaderZone(null, "Europe/Zurich")).toEqual({
+      zone: "Europe/Zurich",
+      estimated: true,
+    });
+  });
+
+  it("stays honestly on the placeholder when there is no estimate either", () => {
+    expect(resolveReaderZone("UTC", null)).toEqual({ zone: "UTC", estimated: false });
+    expect(resolveReaderZone(null, null)).toEqual({ zone: null, estimated: false });
+  });
+
+  it("rejects an estimate the runtime cannot format in — a header is input", () => {
+    expect(resolveReaderZone("UTC", "Fake/Zone")).toEqual({
+      zone: "UTC",
+      estimated: false,
+    });
+    expect(validZoneOrNull("Europe/Zurich")).toBe("Europe/Zurich");
+    expect(validZoneOrNull("Fake/Zone")).toBeNull();
+    expect(validZoneOrNull("")).toBeNull();
+    expect(validZoneOrNull(null)).toBeNull();
+  });
+
+  it("a London reader in winter is on GMT and is NOT overridden", () => {
+    // isPlaceholderZone matches by name, so a genuine Greenwich-offset zone
+    // keeps beating the network estimate.
+    expect(resolveReaderZone("Europe/London", "Europe/Zurich")).toEqual({
+      zone: "Europe/London",
+      estimated: false,
+    });
   });
 });
 

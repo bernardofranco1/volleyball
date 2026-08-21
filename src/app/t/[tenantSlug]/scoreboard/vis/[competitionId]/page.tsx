@@ -10,11 +10,13 @@
  * itself lives in a client component; this page only fetches.
  */
 
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getTenantBySlug } from "@/lib/tenant";
 import { getT } from "@/lib/i18n/server";
 import { getMatchList, getVisCompetition } from "@/lib/vis-live/store";
 import type { VisMatchSummary } from "@/lib/vis-live/board-data";
+import { validZoneOrNull } from "@/lib/vis-live/match-times";
 import { VisIndexDayList } from "@/components/scoreboard/VisIndexDayList";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +47,11 @@ export default async function VisIndexPage({
   }
 
   const base = `/t/${tenantSlug}/scoreboard/vis/${competitionId}`;
+
+  // Vercel's zone estimate for this connection — the "Local time" fallback for
+  // a device that reports no real zone (spec/46). Validated because a header is
+  // input; absent in local dev, which simply leaves the fallback off.
+  const networkZone = validZoneOrNull((await headers()).get("x-vercel-ip-timezone"));
 
   // The city as VIS states it on the fixtures, not as the competition record
   // claims: they disagree (tournament 1671 is filed under Doha and played in
@@ -80,6 +87,7 @@ export default async function VisIndexPage({
           matches={matches}
           base={base}
           venueName={cities.length === 1 ? cities[0] : null}
+          networkZone={networkZone}
         />
       </div>
     </main>

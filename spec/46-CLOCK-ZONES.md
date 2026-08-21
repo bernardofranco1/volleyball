@@ -164,6 +164,32 @@ reader in `Europe/London` in February is legitimately on GMT — and the caption
 says so outright: "Your device reports UTC as its time zone, so these are the
 same as the GMT view."
 
+## Network fallback: when the device says nothing, ask the connection
+
+Follow-up to the same report. "Local time" reads the device's zone via
+`Intl.DateTimeFormat().resolvedOptions().timeZone` — it was never server time —
+but a device with its zone unset, or a browser concealing it, reports UTC and
+gets Greenwich times under an honest caption. Honest, yet still not local.
+
+Vercel stamps every request with **`x-vercel-ip-timezone`**, the zone estimated
+from the connection. `resolveReaderZone(deviceZone, networkZone)` arbitrates:
+
+- the device's zone wins whenever it is real — it is the clock the reader
+  lives by, and a VPN endpoint must not override a deliberate setting;
+- the network estimate steps in **only** when the device reports a placeholder
+  (`isPlaceholderZone`), and the caption then says outright that the zone was
+  estimated from the network — an estimate presented as a fact is how a reader
+  on a VPN misses a match;
+- the header is validated with `validZoneOrNull` before use — it is input, and
+  an unformattable zone name would throw inside `Intl` at render time;
+- with neither source, the honest placeholder caption from the first fix stays.
+
+The pages read the header (`force-dynamic`, so per-request is already the
+deal) and pass it as a prop; being in the RSC payload it is identical on the
+server render and at hydration, so the SSR frame's Local-time button now shows
+the estimated offset instead of nothing. Absent in local dev — the fallback is
+simply off there.
+
 ## Not done
 
 - The board itself (`/m/{matchNo}`) still shows its kick-off in venue time,

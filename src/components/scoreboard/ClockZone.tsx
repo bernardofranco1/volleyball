@@ -25,6 +25,7 @@ import {
   type ScheduledPair,
   isPlaceholderZone,
   readerOffsetLabel,
+  resolveReaderZone,
   venueOffsetLabel,
 } from "@/lib/vis-live/match-times";
 
@@ -129,18 +130,32 @@ export interface ClockChoice {
   zone: ClockZone;
   /** The viewer's IANA zone; null on the server and until hydration. */
   readerZone: string | null;
+  /** True when `readerZone` is the network estimate, not the device setting. */
+  readerZoneEstimated: boolean;
   /** The event's single offset label, or null when its venues disagree. */
   oneVenueOffset: string | null;
   /** The viewer's offset over the event, or null when there are no fixtures. */
   readerOffset: string | null;
 }
 
-export function useClockZone(matches: readonly ScheduledPair[]): ClockChoice {
+export function useClockZone(
+  matches: readonly ScheduledPair[],
+  /**
+   * The zone Vercel estimated from the connection (`x-vercel-ip-timezone`),
+   * passed down from the page's server render. Used only when the device
+   * reports no real zone — see `resolveReaderZone`.
+   */
+  networkZone?: string | null,
+): ClockChoice {
   const zone = useSyncExternalStore(subscribeZone, zoneSnapshot, serverZoneSnapshot);
-  const readerZone = useSyncExternalStore<string | null>(
+  const deviceZone = useSyncExternalStore<string | null>(
     subscribeNothing,
     readerZoneSnapshot,
     serverReaderZoneSnapshot,
+  );
+  const { zone: readerZone, estimated: readerZoneEstimated } = useMemo(
+    () => resolveReaderZone(deviceZone, networkZone ?? null),
+    [deviceZone, networkZone],
   );
 
   const { oneVenueOffset, readerOffset } = useMemo(() => {
@@ -163,7 +178,7 @@ export function useClockZone(matches: readonly ScheduledPair[]): ClockChoice {
     };
   }, [matches, readerZone]);
 
-  return { zone, readerZone, oneVenueOffset, readerOffset };
+  return { zone, readerZone, readerZoneEstimated, oneVenueOffset, readerOffset };
 }
 
 /**
@@ -182,7 +197,7 @@ export function ClockZoneToggle({
   className?: string;
 }) {
   const t = useT();
-  const { zone, readerZone, oneVenueOffset, readerOffset } = choice;
+  const { zone, readerZone, readerZoneEstimated, oneVenueOffset, readerOffset } = choice;
 
   const hints: Record<ClockZone, string | null> = {
     local: readerOffset,
@@ -196,19 +211,24 @@ export function ClockZoneToggle({
     venueName && oneVenueOffset
       ? `${venueName} (${oneVenueOffset})`
       : (venueName ?? oneVenueOffset ?? "");
+  const zoneWithOffset =
+    readerZone == null
+      ? ""
+      : [readerZone, readerOffset && `(${readerOffset})`].filter(Boolean).join(" ");
   const caption =
     zone === "local"
       ? readerZone == null
         ? // Pre-hydration only, and pre-hydration the toggle is on venue time,
           // so this is a belt-and-braces case rather than a visible one.
           t("clock.captionLocalUnknown")
-        : isPlaceholderZone(readerZone)
-          ? t("clock.captionLocalIsUtc")
-          : t("clock.captionLocal", {
-              zone: [readerZone, readerOffset && `(${readerOffset})`]
-                .filter(Boolean)
-                .join(" "),
-            })
+        : readerZoneEstimated
+          ? // The device gave us nothing, so this zone came from the network —
+            // say so, because an estimate presented as a fact is how a reader
+            // on a VPN misses a match.
+            t("clock.captionLocalFromIp", { zone: zoneWithOffset })
+          : isPlaceholderZone(readerZone)
+            ? t("clock.captionLocalIsUtc")
+            : t("clock.captionLocal", { zone: zoneWithOffset })
       : zone === "gmt"
         ? t("clock.captionGmt")
         : venuePlace

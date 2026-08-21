@@ -56,14 +56,17 @@ function StatusTag({ status }: { status: VisMatchSummary["status"] }) {
 export function MatchDayList({
   matches,
   venueName,
+  networkZone,
 }: {
   matches: VisMatchSummary[];
   /** The venue's city, when the whole event is in one. For the caption. */
   venueName?: string | null;
+  /** Vercel's zone estimate for the connection; see `useClockZone`. */
+  networkZone?: string | null;
 }) {
   const t = useT();
   const bcp47 = dateLocale(useLocale());
-  const choice = useClockZone(matches);
+  const choice = useClockZone(matches, networkZone);
   const { zone, readerZone, oneVenueOffset } = choice;
 
   const days = useMemo(

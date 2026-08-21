@@ -152,6 +152,44 @@ export function isPlaceholderZone(readerZone: string | null): boolean {
   );
 }
 
+/** `zone` when the runtime can actually format in it, else null. */
+export function validZoneOrNull(zone: string | null | undefined): string | null {
+  if (!zone) return null;
+  try {
+    new Intl.DateTimeFormat("en-GB", { timeZone: zone });
+    return zone;
+  } catch {
+    return null;
+  }
+}
+
+export interface ReaderZone {
+  zone: string | null;
+  /** True when the zone came from the network estimate, not the device. */
+  estimated: boolean;
+}
+
+/**
+ * The zone "Local time" should actually use.
+ *
+ * The device's own setting wins whenever it is real — it is the clock the
+ * reader lives by, and overriding a deliberate setting would be wrong. The
+ * network estimate (Vercel's `x-vercel-ip-timezone`, derived from the
+ * connection) steps in only when the device claims UTC or nothing at all —
+ * a zone unset, or a browser concealing it — where "local" would otherwise
+ * silently mean Greenwich. The estimate is validated before use: a header is
+ * input, and an unformattable zone name would throw at render time.
+ */
+export function resolveReaderZone(
+  deviceZone: string | null,
+  networkZone: string | null,
+): ReaderZone {
+  if (!isPlaceholderZone(deviceZone)) return { zone: deviceZone, estimated: false };
+  const network = validZoneOrNull(networkZone);
+  if (network) return { zone: network, estimated: true };
+  return { zone: deviceZone, estimated: false };
+}
+
 /**
  * The venue's UTC offset for one fixture, as "GMT+8" / "GMT-3:30" / "GMT".
  * Derived from the two timestamps, so it is right across a DST boundary and

@@ -11,11 +11,13 @@
  */
 
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMatchList } from "@/lib/vis-live/store";
 import { visCompetitions } from "@/lib/vis-live/resolve";
 import type { VisMatchSummary } from "@/lib/vis-live/board-data";
+import { validZoneOrNull } from "@/lib/vis-live/match-times";
 import { MatchDayList } from "@/components/scoreboard/MatchDayList";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +37,12 @@ export default async function BoardHostCompetition({
   const { competitionId } = await params;
   const comp = (await visCompetitions()).find((c) => c.competitionId === competitionId);
   if (!comp) notFound();
+
+  // Vercel's zone estimate for this connection — the "Local time" fallback for
+  // a device that reports no real zone (spec/46). Validated because a header is
+  // input, and an unformattable zone name would throw at render time. Absent in
+  // local dev, which simply leaves the fallback off.
+  const networkZone = validZoneOrNull((await headers()).get("x-vercel-ip-timezone"));
 
   let matches: VisMatchSummary[] = [];
   let error: string | null = null;
@@ -71,6 +79,7 @@ export default async function BoardHostCompetition({
         <MatchDayList
           matches={matches}
           venueName={cities.length === 1 ? cities[0] : null}
+          networkZone={networkZone}
         />
       </div>
     </main>
