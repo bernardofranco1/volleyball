@@ -11,7 +11,11 @@
  *
  * All four share one chassis. `Band` builds the notched, slanted, gradient-filled
  * panel that every one of them is made of; each graphic is then that band plus
- * type. Pure components, no hooks — the director decides what is on screen.
+ * type. Pure components, no hooks — the director decides what is on screen, and
+ * spec/48's motion wraps these rather than living inside them (MotionGroup, in
+ * BugMotion.tsx). What motion asked of this file is only markers: a `data-tv-*`
+ * attribute on the parts that animate as a second step, and an id suffix so two
+ * challenge cards can be stacked for a crossfade without colliding.
  */
 
 import type { ReactNode } from "react";
@@ -320,43 +324,50 @@ export function SubstitutionBlock({
           pinstriped={r.pin}
           lead={r.pin}
         >
-          <Shirt
-            x={boxLeft(hand, r.spec.shirt.near, r.spec.shirt.w)}
-            top={r.spec.shirt.top}
-            w={r.spec.shirt.w}
-            h={r.spec.shirt.h}
-            number={r.jersey != null ? String(r.jersey) : "—"}
-            size={r.spec.number.size}
-            baseline={r.spec.number.baseline}
-          />
-          {/* The reference shows a role code here — "OH", "OP" — and neither
-              VIS nor VolleyStation publishes one on this pipeline. It is left
-              out rather than filled with the court position number, which is a
-              different thing wearing the same shape. See spec/47's open
-              questions. */}
-          <text
-            x={outward(hand, r.spec.name.x)}
-            y={r.spec.name.baseline}
-            textAnchor={hand === "left" ? "start" : "end"}
-            fontFamily={TV_FONT.encode}
-            fontSize={fitFontSize(
-              (r.name ?? "").toUpperCase(),
-              r.spec.name.maxW,
-              r.spec.name.size,
-            )}
-            fontWeight={r.spec.name.weight}
-            fill={AVC.white}
-          >
-            {(r.name ?? (r.jersey != null ? `#${r.jersey}` : "")).toUpperCase()}
-          </text>
-          <Arrow
-            cx={outward(hand, r.spec.arrow.cx)}
-            top={r.spec.arrow.top}
-            h={r.spec.arrow.h}
-            w={r.spec.arrow.w}
-            direction={r.dir}
-            role={r.role}
-          />
+          {/* One content group per row (spec/48 M3): the shirt, the name and the
+              arrow arrive together, 160 ms after the plate they sit on. It is
+              INSIDE the band rather than beside it so the group opacity still
+              composites the row and the panel as one thing — a shirt drawn at
+              90% over a panel already at 90% is not the same pixel. */}
+          <g data-tv-content>
+            <Shirt
+              x={boxLeft(hand, r.spec.shirt.near, r.spec.shirt.w)}
+              top={r.spec.shirt.top}
+              w={r.spec.shirt.w}
+              h={r.spec.shirt.h}
+              number={r.jersey != null ? String(r.jersey) : "—"}
+              size={r.spec.number.size}
+              baseline={r.spec.number.baseline}
+            />
+            {/* The reference shows a role code here — "OH", "OP" — and neither
+                VIS nor VolleyStation publishes one on this pipeline. It is left
+                out rather than filled with the court position number, which is a
+                different thing wearing the same shape. See spec/47's open
+                questions. */}
+            <text
+              x={outward(hand, r.spec.name.x)}
+              y={r.spec.name.baseline}
+              textAnchor={hand === "left" ? "start" : "end"}
+              fontFamily={TV_FONT.encode}
+              fontSize={fitFontSize(
+                (r.name ?? "").toUpperCase(),
+                r.spec.name.maxW,
+                r.spec.name.size,
+              )}
+              fontWeight={r.spec.name.weight}
+              fill={AVC.white}
+            >
+              {(r.name ?? (r.jersey != null ? `#${r.jersey}` : "")).toUpperCase()}
+            </text>
+            <Arrow
+              cx={outward(hand, r.spec.arrow.cx)}
+              top={r.spec.arrow.top}
+              h={r.spec.arrow.h}
+              w={r.spec.arrow.w}
+              direction={r.dir}
+              role={r.role}
+            />
+          </g>
         </Band>
       ))}
       <Rule from={dockX(hand)} to={outward(hand, SUB.width)} />
@@ -406,16 +417,27 @@ export function ChallengeAlert({ hand }: { hand: Hand }) {
  * successful, red for unsuccessful — sized to its own text, with the band's navy
  * showing either side of it.
  */
+export interface CardProps {
+  hand: Hand;
+  status: VisChallengeStatus;
+  teamName: string;
+  category: ChallengeCategory | null;
+}
+
 export function ChallengeCard({
   hand,
   status,
   teamName,
   category,
-}: {
-  hand: Hand;
-  status: VisChallengeStatus;
-  teamName: string;
-  category: ChallengeCategory | null;
+  idSuffix = "",
+}: CardProps & {
+  /**
+   * Distinguishes the gradient and clip ids when TWO cards are on screen at
+   * once — which happens for 350 ms at a verdict, stacked and crossfading
+   * (spec/48 M5). The two are sized to their own headers, so they are genuinely
+   * two different shapes and cannot share a gradient.
+   */
+  idSuffix?: string;
 }) {
   const header =
     status === "REQUESTED"
@@ -446,7 +468,7 @@ export function ChallengeCard({
   return (
     <g>
       <Band
-        id={`tv-chal-head-${hand}`}
+        id={`tv-chal-head-${hand}${idSuffix}`}
         band={BAND.upper}
         from={from}
         to={to}
@@ -478,7 +500,7 @@ export function ChallengeCard({
         </text>
       </Band>
       <Band
-        id={`tv-chal-body-${hand}`}
+        id={`tv-chal-body-${hand}${idSuffix}`}
         band={BAND.lower}
         from={from}
         to={to}
@@ -561,8 +583,11 @@ export function TimeoutTab({
                 strokeWidth={TIMEOUT_TAB.pip.strokeW}
               />
               {/* A spent time-out is struck through, not merely hollow. */}
+              {/* The strike is what CHANGES while the tab is already up, so it
+                  is the one part of a tab that ticks on its own (spec/48 M4). */}
               {used ? (
                 <line
+                  data-tv-tick
                   x1={cx - TIMEOUT_TAB.pip.r * 0.72}
                   y1={TIMEOUT_TAB.pip.cy + TIMEOUT_TAB.pip.r * 0.72}
                   x2={cx + TIMEOUT_TAB.pip.r * 0.72}

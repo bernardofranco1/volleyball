@@ -68,6 +68,29 @@ test.describe("tv overlay", () => {
     }
   });
 
+  test("the motion rehearsals actually move (spec/48)", async ({ page }) => {
+    // The motion constants are unit-tested and the geometry is gated in the
+    // browser, but neither can answer the only question that matters here: does
+    // an animation RUN on the page a production truck points at. Both of these
+    // are the client overlay working end to end — hydration handing over from
+    // the server's static bug, the WAAPI call landing on a real element.
+    await page.goto("/tv/mock?delay=0&demo=point");
+    // A digit rolling out of frame exists only while the odometer is running.
+    await expect(page.locator("[data-tv-outgoing]").first()).toBeAttached({
+      timeout: 10_000,
+    });
+
+    await page.goto("/tv/mock?delay=0&demo=sideout");
+    await page.waitForFunction(
+      () => {
+        const ball = document.querySelector('image[href$="bug-ball.png"]');
+        return !!ball && ball.getAnimations().length > 0;
+      },
+      undefined,
+      { timeout: 10_000 },
+    );
+  });
+
   test("is not indexable", async ({ page }) => {
     // The whole "invisible to the average user" mechanism is that nothing links
     // here and search engines are told to stay out — same as /m/* (spec/38).

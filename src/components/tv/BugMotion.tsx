@@ -20,23 +20,32 @@
  * identical, because none of this motion carries information.
  */
 
-import { useLayoutEffect, useRef } from "react";
-import { ART, TEXT } from "@/lib/tv/bug-geometry";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   MOTION,
   NO_ROLL,
   ROLL_CLIP,
   ballFlightFrames,
+  contentInFrames,
+  driftFor,
+  fadeOutFrames,
   prefersReducedMotion,
   rollInFrames,
   rollOutFrames,
   rollReduce,
   serveFlip,
+  slideInFrames,
+  slideOutFrames,
+  tickFrames,
+  type Hidden,
   type RollState,
   type ServeFrame,
 } from "@/lib/tv/motion";
+import { DOCK, type Hand } from "@/lib/tv/extension-geometry";
+import { ART, FRAME, TEXT } from "@/lib/tv/bug-geometry";
 import type { Side } from "@/lib/tv/derive";
 import { Cell } from "@/components/tv/ScoreBug";
+import { ChallengeCard, type CardProps } from "@/components/tv/BugExtensions";
 
 /** A rolling digit is transformed against its OWN box, not the viewBox. */
 const FILL_BOX: React.CSSProperties = { transformBox: "fill-box" };
@@ -173,5 +182,182 @@ export function ServeBallFlight({
       // default (view-box) would swing it around the middle of the frame.
       style={{ transformBox: "fill-box", transformOrigin: "center" }}
     />
+  );
+}
+
+// ── the panels ───────────────────────────────────────────────────────────────
+
+/**
+ * Any docked panel, sliding out from under the bar and back again (spec/48
+ * M3/M4/M5).
+ *
+ * Two nested groups and the nesting is load-bearing: an element's own transform
+ * establishes the user space its `clip-path` is resolved in, so a reveal clip on
+ * the group that MOVES would move with it and clip nothing. The outer group
+ * holds the clip and never moves; the inner one is what animates.
+ *
+ * The reveal clip is needed at all because "hidden under the bar" is only true
+ * for the part of a panel that is INSIDE the bar's own band. The substitution
+ * block's upper row sits at y 894-938, above the bar, where there is nothing to
+ * hide behind — so everything on the bug's side of the docking edge is clipped
+ * away, and the panel emerges from that edge exactly as it emerges from under
+ * the bar below it. This is spec/48 G1's documented fallback, used here for the
+ * one case the paint order cannot cover.
+ *
+ * The content step (`data-tv-content` on any descendant) starts 160 ms after the
+ * plate and drifts in from the bug's direction. It is nested inside the moving
+ * group, so it rides the plate and adds its own drift on top — which is why it
+ * needs `fill: "backwards"`: without it the content would be fully visible
+ * during its own delay, and there would be no two-step at all.
+ */
+export function MotionGroup({
+  hidden,
+  enter,
+  exit,
+  leaving,
+  fade = false,
+  reveal,
+  tick,
+  children,
+}: {
+  hidden: Hidden;
+  enter: { duration: number; easing: string };
+  exit: { duration: number; easing: string };
+  /** From usePresence: the director has dropped this graphic. */
+  leaving: boolean;
+  /** Fade with the movement — the centred challenge card, which docks to nothing. */
+  fade?: boolean;
+  /** Clip everything on the bug's side of this hand's docking edge. */
+  reveal?: Hand;
+  /**
+   * A value whose CHANGE ticks the opacity of any `data-tv-tick` descendant —
+   * a time-out pip being struck through while the tab is already up.
+   */
+  tick?: number;
+  children: ReactNode;
+}) {
+  const group = useRef<SVGGElement>(null);
+  const clipId = reveal ? `tv-reveal-${reveal}` : null;
+
+  useLayoutEffect(() => {
+    const el = group.current;
+    if (!el || prefersReducedMotion()) return;
+    const content = [...el.querySelectorAll("[data-tv-content]")] as SVGGraphicsElement[];
+    // Cancel first, always: a graphic replaced mid-exit has to come back from
+    // where it is rather than compose two transforms.
+    for (const target of [el, ...content]) {
+      target.getAnimations().forEach((a) => a.cancel());
+    }
+
+    if (!leaving) {
+      el.animate(slideInFrames(hidden, fade), { ...enter, fill: "backwards" });
+      const drift = driftFor(hidden);
+      for (const c of content) {
+        c.animate(contentInFrames(drift), {
+          ...MOTION.content.enter,
+          delay: MOTION.content.delay,
+          fill: "backwards",
+        });
+      }
+      return;
+    }
+    // Leaving: the content goes first and faster, while the plate is still on
+    // its way back under the bar. `fill: forwards` because the element outlives
+    // its animation by the frame or two before presence unmounts it.
+    el.animate(slideOutFrames(hidden, fade), { ...exit, fill: "forwards" });
+    for (const c of content) {
+      c.animate(fadeOutFrames(), { ...MOTION.content.exit, fill: "forwards" });
+    }
+    // The timings and the hidden offset are constants for the life of a panel;
+    // re-running on their object identity would restart the animation on every
+    // render, which is the one thing this must never do.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaving]);
+
+  // A tick is a state change WITHIN a panel that is already up, so it must not
+  // run on the way in — the strike is part of the entrance then.
+  const firstTick = useRef(true);
+  useLayoutEffect(() => {
+    const el = group.current;
+    if (firstTick.current) {
+      firstTick.current = false;
+      return;
+    }
+    if (!el || prefersReducedMotion()) return;
+    for (const t of el.querySelectorAll("[data-tv-tick]")) {
+      (t as SVGGraphicsElement).animate(tickFrames(), { duration: MOTION.tab.strike });
+    }
+  }, [tick]);
+
+  return (
+    <g clipPath={clipId ? `url(#${clipId})` : undefined}>
+      {clipId ? (
+        <defs>
+          <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
+            <rect
+              x={reveal === "left" ? 0 : DOCK.right}
+              y={0}
+              width={reveal === "left" ? DOCK.left : FRAME.w - DOCK.right}
+              height={FRAME.h}
+            />
+          </clipPath>
+        </defs>
+      ) : null}
+      {/* `data-tv-motion` is not decoration: it is what the browser QA harness
+          samples to prove a panel actually travelled rather than merely being
+          armed. */}
+      <g ref={group} data-tv-motion>
+        {children}
+      </g>
+    </g>
+  );
+}
+
+/**
+ * The challenge card, and its verdict hand-off (spec/48 M5).
+ *
+ * REVIEW → SUCCESSFUL is a 350 ms crossfade between two STACKED plates rather
+ * than a swap: the navy review card stays where it is and the verdict card —
+ * accent blue or brand red — fades in over it. Animating opacity and not the
+ * plate's fill is the point; a gradient interpolating from navy to red goes
+ * through colours that are not in the package.
+ *
+ * The two cards are sized to their own headers, so they are genuinely two
+ * different shapes and each needs its own gradient and clip ids — hence
+ * `idSuffix`, which is the only reason ChallengeCard knows this exists.
+ */
+export function ChallengeCardStack({ card }: { card: CardProps }) {
+  const [stack, setStack] = useState<{ over: CardProps; under: CardProps | null }>({
+    over: card,
+    under: null,
+  });
+  if (stack.over !== card) {
+    // Derived during render, like usePresence: the crossfade must be armed in
+    // the same commit the new verdict appears, not a frame later.
+    setStack({ over: card, under: stack.over });
+  }
+  const over = useRef<SVGGElement>(null);
+  const under = stack.over === card ? stack.under : stack.over;
+
+  useLayoutEffect(() => {
+    if (!under) return;
+    const el = over.current;
+    if (el && !prefersReducedMotion()) {
+      el.animate(tickFrames(), { duration: MOTION.card.verdict, fill: "backwards" });
+    }
+    const done = setTimeout(
+      () => setStack((s) => (s.under ? { over: s.over, under: null } : s)),
+      prefersReducedMotion() ? 0 : MOTION.card.verdict,
+    );
+    return () => clearTimeout(done);
+  }, [under]);
+
+  return (
+    <>
+      {under ? <ChallengeCard {...under} idSuffix="-under" /> : null}
+      <g ref={over}>
+        <ChallengeCard {...card} idSuffix="-over" />
+      </g>
+    </>
   );
 }

@@ -246,6 +246,75 @@ export function rollInFrames(dir: RollDir): Keyframe[] {
   ];
 }
 
+// ── M3/M4/M5: the panels ─────────────────────────────────────────────────────
+
+/** Where a docked panel hides, in design px, from where it comes to rest. */
+export interface Hidden {
+  /** Along the bar, toward the bug — under the flag and the plate (M3). */
+  x?: number;
+  /** Down into the bar's own band, where the bug covers it (M4, M5). */
+  y?: number;
+}
+
+function translate(h: Hidden): string {
+  return `translate(${h.x ?? 0}px, ${h.y ?? 0}px)`;
+}
+
+/**
+ * A panel arriving from under the bar. `fade` is for the challenge card, which
+ * is the one graphic that is not docked to anything and so has no edge to appear
+ * from — it rises and fades instead (M5).
+ */
+export function slideInFrames(hidden: Hidden, fade = false): Keyframe[] {
+  return [
+    { transform: translate(hidden), ...(fade ? { opacity: 0 } : {}) },
+    { transform: "translate(0px, 0px)", ...(fade ? { opacity: 1 } : {}) },
+  ];
+}
+
+/** And leaving again, the same way it came. */
+export function slideOutFrames(hidden: Hidden, fade = false): Keyframe[] {
+  return slideInFrames(hidden, fade).slice().reverse();
+}
+
+/**
+ * The second step: what a plate CARRIES (M3).
+ *
+ * Shirts, names and arrows drift in from the bug's direction and fade up, 160 ms
+ * after the plate starts to travel — so the plate is read as arriving first and
+ * the content as landing on it, which is what the reference package does. The
+ * jersey silhouettes ride this step and get no animation of their own: a
+ * popping or spinning shirt was rejected as off-brand.
+ */
+export function contentInFrames(drift: Hidden): Keyframe[] {
+  return [
+    { transform: translate(drift), opacity: 0 },
+    { transform: "translate(0px, 0px)", opacity: 1 },
+  ];
+}
+
+/** Content leaves by fading only, while the plate is still sliding back. */
+export function fadeOutFrames(): Keyframe[] {
+  return [{ opacity: 1 }, { opacity: 0 }];
+}
+
+/** A pip being struck through, or any other one-off state tick (M4). */
+export function tickFrames(): Keyframe[] {
+  return [{ opacity: 0 }, { opacity: 1 }];
+}
+
+/**
+ * How far the content drifts, and in which direction: from the bug, which is the
+ * direction the panel itself came from.
+ */
+export function driftFor(hidden: Hidden): Hidden {
+  const x = hidden.x ?? 0;
+  const y = hidden.y ?? 0;
+  return x !== 0
+    ? { x: Math.sign(x) * MOTION.content.drift }
+    : { y: Math.sign(y) * MOTION.content.drift };
+}
+
 // ── G2: presence ─────────────────────────────────────────────────────────────
 
 /**

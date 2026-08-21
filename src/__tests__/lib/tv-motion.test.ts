@@ -20,6 +20,8 @@ import {
   MOTION,
   NO_ROLL,
   ballFlightFrames,
+  contentInFrames,
+  driftFor,
   mirrorDepartureX,
   noPresence,
   presenceReduce,
@@ -27,6 +29,8 @@ import {
   rollOutFrames,
   rollReduce,
   serveFlip,
+  slideInFrames,
+  slideOutFrames,
   type RollState,
 } from "@/lib/tv/motion";
 import { ART, AXIS } from "@/lib/tv/bug-geometry";
@@ -163,6 +167,42 @@ describe("the score odometer", () => {
     expect(rollInFrames(1)[0].transform).toBe("translateY(-115%)");
     expect(rollOutFrames(-1)[1].transform).toBe("translateY(-115%)");
     expect(rollInFrames(-1)[0].transform).toBe("translateY(115%)");
+  });
+});
+
+// ── M3/M4/M5 · the panels ────────────────────────────────────────────────────
+
+describe("a docked panel's slide", () => {
+  it("starts fully under the bar, on the bug's side of the dock", () => {
+    // 410 px is the panel's own width, so "hidden" really is hidden rather than
+    // peeking out from behind the flag.
+    expect(slideInFrames({ x: 410 })[0].transform).toBe("translate(410px, 0px)");
+    expect(slideInFrames({ x: -410 })[0].transform).toBe("translate(-410px, 0px)");
+    expect(slideInFrames({ x: 410 })[1].transform).toBe("translate(0px, 0px)");
+  });
+
+  it("leaves exactly the way it came", () => {
+    // Not "toward the nearest edge", not a fade: back under the bar it came from.
+    const [a, b] = slideOutFrames({ y: 36 });
+    expect(a.transform).toBe("translate(0px, 0px)");
+    expect(b.transform).toBe("translate(0px, 36px)");
+  });
+
+  it("fades only where there is no edge to hide behind", () => {
+    // The challenge card is centred, not docked, so it has nothing to emerge
+    // from — it is the one graphic that fades (spec/48 M5).
+    expect(slideInFrames({ y: 40 }, true)[0].opacity).toBe(0);
+    expect(slideInFrames({ x: 410 })[0].opacity).toBeUndefined();
+  });
+
+  it("drifts its content in from the bug's direction", () => {
+    // The content follows the plate, so it comes from the same side.
+    expect(driftFor({ x: 410 })).toEqual({ x: 26 });
+    expect(driftFor({ x: -410 })).toEqual({ x: -26 });
+    expect(driftFor({ y: 36 })).toEqual({ y: 26 });
+    const [from, to] = contentInFrames({ x: 26 });
+    expect(from).toEqual({ transform: "translate(26px, 0px)", opacity: 0 });
+    expect(to).toEqual({ transform: "translate(0px, 0px)", opacity: 1 });
   });
 });
 

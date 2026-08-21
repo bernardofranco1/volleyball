@@ -47,16 +47,20 @@ import {
   type Graphics,
   type OperatorState,
 } from "@/lib/tv/director";
-import { handOf, sideState } from "@/lib/tv/derive";
+import { handOf, sideState, type Hand } from "@/lib/tv/derive";
 import { MOTION } from "@/lib/tv/motion";
 import { usePresence } from "@/lib/tv/usePresence";
 import { useHydrated } from "@/lib/tv/useHydrated";
-import { RollingCell, ServeBallFlight } from "@/components/tv/BugMotion";
+import {
+  ChallengeCardStack,
+  MotionGroup,
+  RollingCell,
+  ServeBallFlight,
+} from "@/components/tv/BugMotion";
 import { StreamPlayer, type PlayerState } from "@/components/tv/StreamPlayer";
 import { ScoreBug } from "@/components/tv/ScoreBug";
 import {
   ChallengeAlert,
-  ChallengeCard,
   KeyMomentStrap,
   SubstitutionBlock,
   TimeoutTab,
@@ -65,6 +69,14 @@ import { OperatorPanel } from "@/components/tv/OperatorPanel";
 
 /** 16:9 until the stream says otherwise. Every AVC feed is 16:9. */
 const DEFAULT_RATIO = 16 / 9;
+
+/**
+ * Where a docked panel hides: fully under the flag and the plate, on the bug's
+ * side of its own docking edge. The sign is the only thing that mirrors.
+ */
+function slideHidden(hand: Hand) {
+  return { x: hand === "left" ? MOTION.slide.hidden : -MOTION.slide.hidden };
+}
 
 export function TvViewer({
   boardId,
@@ -344,28 +356,77 @@ export function TvViewer({
 
         <svg viewBox="0 0 1920 1080" width="100%" height="100%" style={S.layerUnder} aria-hidden>
           {keyMomentP.value ? (
-            <KeyMomentStrap
-              hand={keyMomentP.value.hand}
-              text={keyMomentP.value.text}
-            />
+            <MotionGroup
+              key={`km-${keyMomentP.value.hand}`}
+              hidden={slideHidden(keyMomentP.value.hand)}
+              enter={MOTION.slide.enter}
+              exit={MOTION.slide.exit}
+              leaving={keyMomentP.leaving}
+              reveal={keyMomentP.value.hand}
+            >
+              <KeyMomentStrap
+                hand={keyMomentP.value.hand}
+                text={keyMomentP.value.text}
+              />
+            </MotionGroup>
           ) : null}
           {timeoutP.value ? (
-            <TimeoutTab
-              hand={timeoutP.value.hand}
-              taken={
-                (timeoutP.value.hand === "left" ? leftSide : rightSide).timeoutsTaken
-              }
-            />
+            <MotionGroup
+              key={`to-${timeoutP.value.hand}`}
+              hidden={{ y: MOTION.tab.hidden }}
+              enter={MOTION.tab.enter}
+              exit={MOTION.tab.exit}
+              leaving={timeoutP.leaving}
+              tick={(timeoutP.value.hand === "left" ? leftSide : rightSide).timeoutsTaken}
+            >
+              <TimeoutTab
+                hand={timeoutP.value.hand}
+                taken={
+                  (timeoutP.value.hand === "left" ? leftSide : rightSide).timeoutsTaken
+                }
+              />
+            </MotionGroup>
           ) : null}
           {subP.value ? (
-            <SubstitutionBlock hand={subP.value.hand} sub={subP.value.sub} />
+            <MotionGroup
+              key={`sub-${subP.value.hand}`}
+              hidden={slideHidden(subP.value.hand)}
+              enter={MOTION.slide.enter}
+              exit={MOTION.slide.exit}
+              leaving={subP.leaving}
+              reveal={subP.value.hand}
+            >
+              <SubstitutionBlock hand={subP.value.hand} sub={subP.value.sub} />
+            </MotionGroup>
           ) : null}
-          {alertP.value ? <ChallengeAlert hand={alertP.value.hand} /> : null}
+          {alertP.value ? (
+            <MotionGroup
+              key={`alert-${alertP.value.hand}`}
+              hidden={{ y: MOTION.tab.hidden }}
+              enter={MOTION.tab.enter}
+              exit={MOTION.tab.exit}
+              leaving={alertP.leaving}
+            >
+              <ChallengeAlert hand={alertP.value.hand} />
+            </MotionGroup>
+          ) : null}
         </svg>
 
         <svg viewBox="0 0 1920 1080" width="100%" height="100%" style={S.layerOver} aria-hidden>
+          {/* The bug's own moving parts. They follow the BUG's visibility, not
+              the layer's, and with the bug's own 180 ms fade — they are pieces of
+              it that happen to be drawn elsewhere, so a challenge card replacing
+              the bug or an operator pressing H has to take the digits and the
+              ball with it. Found in the browser: without this the score sat over
+              the challenge card, which is exactly the sort of thing that only
+              looks wrong once it is on air. */}
           {motion ? (
-            <>
+            <g
+              style={{
+                opacity: graphics.bug ? 1 : 0,
+                transition: `opacity ${MOTION.bugFade}ms linear`,
+              }}
+            >
               <RollingCell side="left" value={leftSide.score} />
               <RollingCell side="right" value={rightSide.score} />
               <ServeBallFlight
@@ -373,15 +434,18 @@ export function TvViewer({
                 set={stage.currentSet}
                 hand={hand}
               />
-            </>
+            </g>
           ) : null}
           {cardP.value ? (
-            <ChallengeCard
-              hand={cardP.value.hand}
-              status={cardP.value.status}
-              teamName={cardP.value.teamName}
-              category={cardP.value.category}
-            />
+            <MotionGroup
+              hidden={{ y: MOTION.card.hidden }}
+              enter={MOTION.card.enter}
+              exit={MOTION.card.exit}
+              leaving={cardP.leaving}
+              fade
+            >
+              <ChallengeCardStack card={cardP.value} />
+            </MotionGroup>
           ) : null}
         </svg>
       </div>
