@@ -593,7 +593,13 @@ export function getReplayBoard(
   const xml = replayXml(now, opts);
   const board = buildBoardFromXml(REPLAY_MATCH_NO, xml, { audit: false, now });
   const entry: Entry<VisBoardData> = {
-    value: board,
+    // Through the signal machine too, exactly like the live path (spec/48 W6).
+    // It cost nothing while a mapper could not report a challenge; now that the
+    // event stream declares them, skipping it left the replay board's card
+    // behaving unlike a live one — no REQUESTED → REVIEW promotion and no
+    // six-second hold, just the declaration passed through with a `since` that
+    // moved on every poll. The replay board exists to exercise the machinery.
+    value: withTvSignals(REPLAY_MATCH_NO, "vis", board, now),
     at: now,
     ttlMs: pollIntervalMs(board),
     changedAt:

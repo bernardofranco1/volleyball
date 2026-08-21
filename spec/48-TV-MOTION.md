@@ -347,18 +347,33 @@ place where it was wrong.
 19. `challenge_phase` is typed and deliberately never read (§3), and a test pins
     that: a board built with a phase value nobody has measured is byte-identical
     to one built without it.
+20. **The replay board (spec/44) now runs its boards through the signal machine**
+    as well. It always went through `buildBoardFromXml` like the live path, but
+    `withTvSignals` sits one level up in `getReplayBoard` and was not called
+    there — which cost nothing while no mapper could report a challenge, and the
+    moment the event stream started declaring them left the replay board's card
+    behaving unlike a live one: no six-second hold, and a `since` that moved on
+    every poll. Found by sweeping the running board's own API, not by a test;
+    there is a test now.
 
 ### Verification as shipped
 
-- `npx vitest run`: **1123 tests / 93 files** green (from the 1050/90 baseline
-  found). New in W5–W6: 22 across `vs-store`, `vs-live`, `tv-signals` and
-  `tv-director`, plus `vis-challenges.test.ts` (13) for the ten-pair gate.
+- `npx vitest run`: **1125 tests / 93 files** green (from the 1050/90 baseline
+  found). New in W5–W6: 24 across `vs-store`, `vs-live`, `tv-signals`,
+  `tv-director` and `vis-replay`, plus `vis-challenges.test.ts` (13) for the
+  ten-pair gate.
 - The three pixel gates of §0.2, unmodified: `check-tv-bug.mjs` PASS,
   `check-render.py` PASS (22 checks), `validate-bug.py` exit 0.
 - `npx tsc --noEmit` clean; `npx eslint src` → only the four pre-existing
   unused-var warnings in unrelated files.
 - W5–W7 touch no view except one paragraph of copy in `OperatorPanel`, so the
   first-frame assertion and the SSR output are untouched by them.
+- Live sweep of the running replay board's API (`?speed=4`, aimed at the
+  capture's own challenge windows): the four challenges of 27550 sets 1 and 3
+  come out declared with the right side, the right category and the right
+  post-ruling score — `set3 3-2 SUCCESSFUL/B/BallInOut`,
+  `set3 10-8 UNSUCCESSFUL/A/BlockTouch` — each held for six seconds and then
+  gone. That sweep is what found delta 20.
 
 ### Still open
 

@@ -28,7 +28,11 @@ import {
   phaseAt,
   replayXml,
 } from "@/lib/vis-live/replay";
-import { buildBoardFromXml, __resetVisCaches } from "@/lib/vis-live/store";
+import {
+  buildBoardFromXml,
+  getReplayBoard,
+  __resetVisCaches,
+} from "@/lib/vis-live/store";
 import { __resetLineupStability } from "@/lib/vis-live/lineup-stability";
 import {
   designatedLiberos,
@@ -408,5 +412,50 @@ describe("the replay is walled off from the evidence table", () => {
     const parsed = inspect(replayXml(during(2_000_000)))!;
     const seen = new Set<Side>([...parsed.sides.values()]);
     expect([...seen].sort()).toEqual(["A", "B"]);
+  });
+});
+
+/**
+ * The replay board and a live board must behave the SAME (spec/48 W6).
+ *
+ * The reason this is a test and not a glance: the replay path builds its board
+ * through `buildBoardFromXml` like the live path, but the TV signal machine sits
+ * one level up in `getReplayBoard`, and it was not being called there. That cost
+ * nothing while no mapper could report a challenge; the moment the event stream
+ * started declaring them, the replay board's card stopped behaving like a live
+ * one — no six-second hold, and a `since` that moved on every poll.
+ */
+describe("challenges on the replay board go through the signal machine", () => {
+  it("raises the verdict when it lands, holds it, then takes it down", () => {
+    // 27550 set three: team A's BlockTouch challenge, refused, at 10-8. Walk the
+    // wall clock in one-second steps from before it to well after.
+    const base = REPLAY_EPOCH_MS + HOLD + 905_000;
+    const frames = Array.from({ length: 24 }, (_, i) =>
+      getReplayBoard(base + i * 1_000, { speed: REPLAY_SPEED }).value.challenge,
+    );
+    const up = frames.filter((c) => c !== null);
+    expect(up.length).toBeGreaterThan(0);
+    expect(up[0]).toMatchObject({
+      status: "UNSUCCESSFUL",
+      side: "A",
+      category: "BlockTouch",
+    });
+    // One `since` across the whole time on air — the graphic's own clock, which
+    // is what the 180 ms fades and the hold are measured from.
+    expect(new Set(up.map((c) => c!.since)).size).toBe(1);
+    // Six seconds, then gone, with the same challenge still sitting in the feed.
+    expect(up).toHaveLength(6);
+    expect(frames[frames.length - 1]).toBeNull();
+  });
+
+  it("says nothing when the board's first ever frame is already mid-verdict", () => {
+    // A cold instance joining after the ruling: the challenge is in the stream
+    // but it is history, and history does not go on air. This is the counters'
+    // rule from spec/47, and a declaration does not get to break it.
+    const board = getReplayBoard(REPLAY_EPOCH_MS + HOLD + 915_000, {
+      speed: REPLAY_SPEED,
+    });
+    expect([board.value.scoreA, board.value.scoreB]).toEqual([10, 8]);
+    expect(board.value.challenge).toBeNull();
   });
 });
