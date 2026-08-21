@@ -100,19 +100,35 @@ export type VisChallengeStatus =
 /**
  * A video challenge in flight (spec/47, guidelines item 21).
  *
- * Derived from counter DELTAS across polls, which is why it is filled in by the
- * store and not by the mapper: one payload cannot tell you that a challenge has
- * just been requested, only how many have been. `null` is the ordinary state.
+ * Two roads lead here, and the difference matters (spec/48 §3):
  *
- * There is no challenge TYPE here, and there is no way to add one: VIS publishes
- * `NbChallengeRequestedTeam*` and `NbChallengeRefusedTeam*` and nothing else —
- * no reason, no category. The graphic's category line is operator input.
+ *  - **DECLARED** by the feed. A mapper fills this in from a field that states
+ *    the challenge itself — VolleyStation's `challenge_team`/`challenge_reason`,
+ *    or VIS's `<ChallengeRequest>`/`<ChallengeResult>` events. One payload is
+ *    enough, the team is certain and the `category` is the feed's own word.
+ *  - **INFERRED** from counter DELTAS across polls, which needs two payloads and
+ *    so is filled in by the store, not by a mapper. This is still the only road
+ *    on a payload carrying no challenge fields at all, so it stays as the
+ *    fallback and as the outcome signal for a declaration that has cleared.
+ *
+ * `null` is the ordinary state either way.
+ *
+ * spec/47 recorded that no feed carries a challenge TYPE. That was wrong: both
+ * do — see `challenge_reason` (`vs-live/types.ts`) and `ChallengeRequest@Type`
+ * (`vis-live/events.ts`). The operator's hotkeys still override, because a field
+ * that is populated on one event may be empty on the next.
  */
 export interface VisChallenge {
   status: VisChallengeStatus;
   side: "A" | "B";
   /** When the store first saw this state, ms epoch. The graphic's own clock. */
   since: number;
+  /**
+   * The feed's RAW reason, when it published one: `"netTouch"` (VolleyStation)
+   * or `"BlockTouch"` (VIS type name). Never a card label — `categoryFor`
+   * (director.ts) does that translation, and only for reasons it knows.
+   */
+  category?: string;
 }
 
 /** Match-total team statistics — the set-break screen's four bars. */

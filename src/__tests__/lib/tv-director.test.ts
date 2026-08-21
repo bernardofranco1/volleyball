@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import {
   NO_OPERATOR,
+  categoryFor,
   NOTHING,
   demoBoard,
   demoGraphics,
@@ -322,5 +323,70 @@ describe("motion rehearsals", () => {
     const b = board();
     expect(demoBoard("sub", b, 3)).toBe(b);
     expect(demoBoard("timeout", b, 7)).toBe(b);
+  });
+});
+
+/**
+ * The category the card prints (spec/48 §3).
+ *
+ * spec/47 shipped believing no feed carried a challenge reason, so this line was
+ * operator input and nothing else. Both feeds do carry one, in their own
+ * spelling, and this is the whole vocabulary we have measured — anything outside
+ * it must auto-fill nothing rather than guess at a label going to air.
+ */
+describe("the challenge category auto-fills from the feed's own word", () => {
+  it("knows every reason the two feeds have been observed to send", () => {
+    // VolleyStation's spelling (fixture match 2504866 carries "netTouch") …
+    expect(categoryFor("ballInOut")).toBe("BALL IN / OUT");
+    expect(categoryFor("netTouch")).toBe("NET TOUCH");
+    expect(categoryFor("blockTouch")).toBe("TOUCH ON BLOCK");
+    expect(categoryFor("antennaTouch")).toBe("ANTENNA TOUCH");
+    expect(categoryFor("defenseTouch")).toBe("FLOOR TOUCH");
+    expect(categoryFor("netReach")).toBe("NET REACH");
+    // … and VIS's, which is the same word in a different case (Type 3/4/6/8).
+    expect(categoryFor("BallInOut")).toBe("BALL IN / OUT");
+    expect(categoryFor("BlockTouch")).toBe("TOUCH ON BLOCK");
+    expect(categoryFor("NetTouch")).toBe("NET TOUCH");
+    expect(categoryFor("FloorTouch")).toBe("FLOOR TOUCH");
+  });
+
+  it("auto-fills nothing for a reason it has never seen", () => {
+    // Including the three VIS line faults: each is arguably FOOT FAULT and none
+    // of them certainly is, so the card says UNDER REVIEW until an operator
+    // decides. A blank label is honest; a wrong one is on air.
+    expect(categoryFor("AttackLineFault")).toBeNull();
+    expect(categoryFor("CenterLineFault")).toBeNull();
+    expect(categoryFor("ServiceLineFault")).toBeNull();
+    expect(categoryFor("somethingNewNextSeason")).toBeNull();
+    expect(categoryFor("")).toBeNull();
+    expect(categoryFor(null)).toBeNull();
+    expect(categoryFor(undefined)).toBeNull();
+  });
+
+  it("prints the feed's category on the card, and lets the operator overrule it", () => {
+    const b = board({
+      challenge: { status: "REVIEW", side: "A", since: 0, category: "netTouch" },
+    });
+    const auto = direct(seedDirector(b), b, NO_OPERATOR, 1000);
+    expect(auto.graphics.challenge).toMatchObject({
+      status: "REVIEW",
+      category: "NET TOUCH",
+    });
+
+    const overruled = direct(
+      seedDirector(b),
+      b,
+      { ...NO_OPERATOR, category: "BALL IN / OUT" },
+      1000,
+    );
+    expect(overruled.graphics.challenge?.category).toBe("BALL IN / OUT");
+  });
+
+  it("leaves the card blank when the feed's reason is one we cannot label", () => {
+    const b = board({
+      challenge: { status: "REVIEW", side: "B", since: 0, category: "AttackLineFault" },
+    });
+    const g = direct(seedDirector(b), b, NO_OPERATOR, 1000).graphics;
+    expect(g.challenge?.category).toBeNull();
   });
 });

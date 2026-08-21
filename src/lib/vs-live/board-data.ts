@@ -28,6 +28,7 @@
 import {
   FIVB_PER_SET,
   type VisBoardData,
+  type VisChallenge,
   type VisBoardPlayer,
   type VisBoardTeam,
   type VisBoardSet,
@@ -161,11 +162,51 @@ function interruptions(
     // shape (spec/34 saw 4 used with 4 remaining), not something to normalise.
     timeoutsTaken: Math.max(0, limitTimeouts - timeoutsRemaining),
     substitutionsUsed: Math.max(0, limitSubs - substitutionsRemaining),
+    // A challenge that is UPHELD costs its team nothing — they keep the right —
+    // so a spent allowance is a REFUSED challenge, and the count of requests is
+    // simply not in this payload. It used to be reported as equal to the
+    // refusals, which read every refusal as a request and a refusal in the same
+    // frame: the store's state machine answers the refusal first, so REQUESTED
+    // and SUCCESSFUL were unreachable on a VolleyStation board (spec/48 W5).
+    // Zero is the honest figure; `challenge_team` is what says "in flight".
     challengesRefused: Math.max(0, limitChallenges - challengesRemaining),
-    challengesRequested: Math.max(0, limitChallenges - challengesRemaining),
+    challengesRequested: 0,
     timeoutsRemaining: Math.max(0, timeoutsRemaining),
     substitutionsRemaining: Math.max(0, substitutionsRemaining),
     challengesRemaining: Math.max(0, challengesRemaining),
+  };
+}
+
+/**
+ * The challenge VolleyStation says is in flight, or null (spec/48 W5).
+ *
+ * `challenge_team` is a snapshot of the present — set while the referees are
+ * looking at the screen, null before and after — so unlike the counters it needs
+ * no previous payload to be meaningful, and unlike them it names the team
+ * outright. That is why it is the preferred signal, and why a mapper can fill it
+ * in at all.
+ *
+ * It only ever declares REQUESTED. The verdict is not in this payload: an upheld
+ * challenge leaves `challenge_count` alone and a refused one decrements it, so
+ * the outcome still comes from the store's counter machine once the declaration
+ * clears (`tv-signals`). And it is gated on LIVE, because a finished match's row
+ * keeps whatever it last carried and a decided challenge from an hour ago must
+ * not raise a card.
+ */
+function declaredChallenge(
+  match: VsMatch,
+  status: VisBoardData["status"],
+  now: number,
+): VisChallenge | null {
+  if (status !== "LIVE") return null;
+  const team = match.challenge_team;
+  if (team !== "home" && team !== "away") return null;
+  const reason = (match.challenge_reason ?? "").trim();
+  return {
+    status: "REQUESTED",
+    side: team === "home" ? "A" : "B",
+    since: now,
+    ...(reason ? { category: reason } : {}),
   };
 }
 
@@ -307,14 +348,15 @@ export function mapVsBoard(input: VsBoardInput): VisBoardData {
     // No advisory delay in this API; the cadence uses this only as a non-live
     // floor, and 5 s keeps a finished board from polling needlessly.
     pollDelaySeconds: 5,
-    // Both TV signals (spec/47) are left to the store on this source.
-    //
     // VolleyStation publishes STATE, not events: the widget carries the six on
-    // court right now and the allowances remaining, with no substitution record
-    // and no challenge record. So a substitution here can only be inferred by
-    // watching the six change between two polls, and that needs the previous
-    // board — which the store has and a mapper, by design, does not.
+    // court right now and the allowances remaining, with no substitution record.
+    // So a substitution here can only be inferred by watching the six change
+    // between two polls, and that needs the previous board — which the store has
+    // and a mapper, by design, does not.
     recentSubstitutions: [],
-    challenge: null,
+    // A challenge, though, IS in the payload (spec/48 W5) — declared, not
+    // inferred. The store still runs its machine over the counters, which is
+    // where the outcome comes from.
+    challenge: declaredChallenge(match, status, now),
   };
 }

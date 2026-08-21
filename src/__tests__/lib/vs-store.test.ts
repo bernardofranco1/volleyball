@@ -25,6 +25,12 @@ import { VS_IN_RALLY_MS, LIVE_MS } from "@/lib/vis-live/cadence";
 import { __resetVsResolve, ensureMapping } from "@/lib/vs-live/resolve";
 import { __resetVsClientCaches } from "@/lib/vs-live/client";
 import { __resetLineupStability } from "@/lib/vis-live/lineup-stability";
+import {
+  categoryFor,
+  direct,
+  seedDirector,
+  NO_OPERATOR,
+} from "@/lib/tv/director";
 
 const VIS_XML = readFileSync(
   new URL("../fixtures/vis/volley-live-events-27550.xml", import.meta.url),
@@ -55,7 +61,7 @@ const VIS_LIST_XML =
   "</VolleyballMatches></Responses>";
 
 /** VIS answers XML on fivb.org; VolleyStation answers JSON on panel.*. */
-function stubBoth(opts: { vsFails?: boolean } = {}) {
+function stubBoth(opts: { vsFails?: boolean; matchRow?: unknown } = {}) {
   const seen: string[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
     const u = String(url);
@@ -70,7 +76,10 @@ function stubBoth(opts: { vsFails?: boolean } = {}) {
     if (opts.vsFails) return new Response("upstream is unwell", { status: 502 });
     if (u.includes("/Championships/")) return new Response(VS_CHAMPS, { status: 200 });
     if (/\/Matches\/\d+\//.test(u)) {
-      return new Response(JSON.stringify(VS_MATCHES["2504876"]), { status: 200 });
+      return new Response(
+        JSON.stringify(opts.matchRow ?? VS_MATCHES["2504876"]),
+        { status: 200 },
+      );
     }
     if (u.includes("/Matches/?")) {
       // One VS match whose number AND teams match the VIS list row above.
@@ -429,5 +438,76 @@ describe("VolleyStation can never cost a board", () => {
     stubBoth();
     const board = await getBoard(27550, Date.now(), "vs");
     expect(board.source).toBe("vis");
+  });
+});
+
+/**
+ * The spec/48 W5 gate. Before it, a VolleyStation board could not report a
+ * challenge at all: the mapper synthesised `challengesRequested` as equal to
+ * `challengesRefused`, and the store's machine answers a refusal first, so every
+ * challenge came out UNSUCCESSFUL and REQUESTED was unreachable.
+ *
+ * Match 2504866 is the committed capture of one in flight — Türkiye v USA, the
+ * away side, "netTouch" — and it goes through the real store, the real mapper and
+ * the real signal machine here, because the bug being fixed lived in the seam
+ * between them rather than in any one of the three.
+ */
+describe("a challenge the feed declares (spec/48 W5)", () => {
+  it("raises a REQUESTED challenge for the away side, with its category", async () => {
+    dbRows.competitions = competitionRow("vs");
+    stubBoth({ matchRow: VS_MATCHES["2504866"] });
+    await ensureMapping();
+    const board = await getBoard(27550);
+
+    expect(board.source).toBe("vs");
+    expect(board.value.status).toBe("LIVE");
+    // Away is guest is B, and it must be B and not A: the graphic puts the
+    // team's name in the header and a flag on the wrong side of the bar is the
+    // one mistake here that a viewer cannot miss.
+    expect(board.value.challenge).toMatchObject({
+      status: "REQUESTED",
+      side: "B",
+      category: "netTouch",
+    });
+    // The raw reason reaches the card as the operator's own label would.
+    expect(categoryFor(board.value.challenge?.category)).toBe("NET TOUCH");
+  });
+
+  it("counts no refusal, because a challenge in flight has not been refused", async () => {
+    // The collapse this replaces made every remaining allowance look like a
+    // request AND a refusal. With the fixture's allowances untouched (2 of 2),
+    // both counters must read zero — the declaration alone is what fires.
+    dbRows.competitions = competitionRow("vs");
+    stubBoth({ matchRow: VS_MATCHES["2504866"] });
+    await ensureMapping();
+    const { value } = await getBoard(27550);
+    for (const team of [value.teamA, value.teamB]) {
+      expect(team.challengesRemaining).toBe(2);
+      expect(team.challengesRefused).toBe(0);
+      expect(team.challengesRequested).toBe(0);
+    }
+  });
+
+  it("puts the challenge on air through the director, with the feed's label", async () => {
+    // The last seam: the board's raw reason becomes the card's category only if
+    // the director auto-fills it, and only while the operator has pressed nothing.
+    dbRows.competitions = competitionRow("vs");
+    stubBoth({ matchRow: VS_MATCHES["2504866"] });
+    await ensureMapping();
+    const { value } = await getBoard(27550);
+
+    const auto = direct(seedDirector(value), value, NO_OPERATOR, Date.now());
+    expect(auto.graphics.challenge).toMatchObject({
+      status: "REQUESTED",
+      category: "NET TOUCH",
+    });
+    // …and the hotkey still wins over the feed.
+    const forced = direct(
+      seedDirector(value),
+      value,
+      { ...NO_OPERATOR, category: "FOOT FAULT" },
+      Date.now(),
+    );
+    expect(forced.graphics.challenge?.category).toBe("FOOT FAULT");
   });
 });

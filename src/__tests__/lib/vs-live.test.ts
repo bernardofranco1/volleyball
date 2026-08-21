@@ -259,6 +259,99 @@ describe("allowances count DOWN from what the feed reports as remaining", () => 
   });
 });
 
+/**
+ * The challenge fields (spec/48 W5). Additive: the same five columns were in
+ * every payload we have ever captured, unread.
+ */
+describe("the challenge the row declares", () => {
+  const declare = (m: VsMatch, now?: number) =>
+    mapVsBoard({
+      match: m,
+      stats: null,
+      config: champ(6005),
+      rosterHome: null,
+      rosterGuest: null,
+      matchNo: 1,
+      now,
+    }).challenge;
+
+  it("names the side and carries the raw reason", () => {
+    // Fixture 2504866: away, "netTouch", at 6-6 in set one. Away is guest is B.
+    expect(declare(MATCHES["2504866"])).toMatchObject({
+      status: "REQUESTED",
+      side: "B",
+      category: "netTouch",
+    });
+  });
+
+  it("declares nothing on a row with no challenge in flight", () => {
+    // The ordinary state, and the one every other committed fixture is in:
+    // `challenge_team` null, `challenge_reason` an empty string.
+    for (const id of ["2504640", "2504642", "2504876"]) {
+      expect(declare(MATCHES[id]), id).toBeNull();
+    }
+  });
+
+  it("never declares REFUSED or SUCCESSFUL — the row cannot say", () => {
+    // An upheld challenge leaves `challenge_count` alone and a refused one
+    // decrements it, so the verdict lives in the counters and the store's
+    // machine reads it there. The declaration only ever opens the graphic.
+    expect(declare(MATCHES["2504866"])?.status).toBe("REQUESTED");
+  });
+
+  it("stays quiet on a match that is over", () => {
+    // A finished row keeps whatever it last carried; a card raised from that
+    // would be a graphic for a challenge from an hour ago. 2491233 is finished
+    // (3-2) and carries no challenge, so force the field on to prove the gate.
+    const finished: VsMatch = {
+      ...MATCHES["2491233"],
+      challenge_team: "home",
+      challenge_reason: "netTouch",
+    };
+    const board = mapVsBoard({
+      match: finished,
+      stats: null,
+      config: champ(5899),
+      rosterHome: null,
+      rosterGuest: null,
+      matchNo: 1,
+    });
+    expect(board.status).toBe("FINISHED");
+    expect(board.challenge).toBeNull();
+  });
+
+  it("leaves the category off rather than empty when the row has no reason", () => {
+    const noReason: VsMatch = { ...MATCHES["2504866"], challenge_reason: "" };
+    const c = declare(noReason);
+    expect(c).toMatchObject({ status: "REQUESTED", side: "B" });
+    expect(c?.category).toBeUndefined();
+  });
+
+  it("treats challenge_phase as an opaque string, and reads nothing from it", () => {
+    // The vocabulary is UNOBSERVED (spec/48 §3). Every committed row carries "",
+    // and a value nobody has measured must not be able to change a graphic.
+    const phased: VsMatch = { ...MATCHES["2504866"], challenge_phase: "afterServe" };
+    expect(declare(phased)).toEqual(declare(MATCHES["2504866"]));
+  });
+
+  it("counts a challenge in flight as neither requested nor refused", () => {
+    // The collapse this replaces reported `challengesRequested` as equal to
+    // `challengesRefused`, which made REQUESTED and SUCCESSFUL unreachable on a
+    // VolleyStation board: the store answers a refusal first.
+    const board = mapVsBoard({
+      match: MATCHES["2504866"],
+      stats: null,
+      config: champ(6005),
+      rosterHome: null,
+      rosterGuest: null,
+      matchNo: 1,
+    });
+    expect(board.teamB.challengesRemaining).toBe(2);
+    expect(board.teamB.challengesRefused).toBe(0);
+    expect(board.teamB.challengesRequested).toBe(0);
+  });
+});
+
 describe("the team code — which is the flag", () => {
   it("carries the federation code so the flag and the rail label resolve", () => {
     // `flagSrc` accepts exactly /^[A-Z]{3}$/ and returns null otherwise, and the

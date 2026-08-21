@@ -10,7 +10,11 @@
 
 import { describe, expect, it } from "vitest";
 import { tvSignals, type TvSignalState } from "@/lib/vis-live/tv-signals";
-import type { VisBoardData, VisBoardPlayer } from "@/lib/vis-live/board-data";
+import type {
+  VisBoardData,
+  VisBoardPlayer,
+  VisChallenge,
+} from "@/lib/vis-live/board-data";
 
 function six(numbers: number[], liberoAt: number[] = []): VisBoardPlayer[] {
   return numbers.map((jersey, i) => ({
@@ -32,6 +36,8 @@ function board(over: {
   refB?: number;
   sixA?: VisBoardPlayer[];
   sixB?: VisBoardPlayer[];
+  /** What the FEED declares, as a mapper fills it in (spec/48 §3). */
+  declared?: VisChallenge | null;
 } = {}): VisBoardData {
   const team = (
     players: VisBoardPlayer[],
@@ -70,7 +76,7 @@ function board(over: {
     scheduledLocal: null,
     pollDelaySeconds: 20,
     recentSubstitutions: [],
-    challenge: null,
+    challenge: over.declared ?? null,
   };
 }
 
@@ -170,6 +176,129 @@ describe("challenge state machine", () => {
     ]);
     expect(r[2].challenge).toBeNull();
     expect(r[3].challenge).toBeNull();
+  });
+});
+
+/**
+ * A challenge the FEED states, rather than one deduced from counters (spec/48
+ * §3). Both feeds carry one: VolleyStation's `challenge_team`/`challenge_reason`
+ * and VIS's `<ChallengeRequest>`/`<ChallengeResult>` events. The mapper puts it
+ * on the board; everything below is what the machine is still responsible for.
+ */
+describe("a challenge the feed declares", () => {
+  const REQUESTED: VisChallenge = {
+    status: "REQUESTED",
+    side: "B",
+    since: 0,
+    category: "netTouch",
+  };
+
+  it("goes on air at once, even on the very first frame", () => {
+    // Unlike a counter, a declaration is present tense: the feed is saying a
+    // challenge is in flight NOW. An instance that starts up mid-review should
+    // show it, which is exactly what the counters cannot justify doing.
+    const [first] = run([[board({ declared: REQUESTED }), 0]]);
+    expect(first.challenge).toMatchObject({
+      status: "REQUESTED",
+      side: "B",
+      category: "netTouch",
+      since: 0,
+    });
+  });
+
+  it("is not re-announced while it stands, and promotes itself to REVIEW", () => {
+    const r = run([
+      [board({ declared: REQUESTED }), 0],
+      [board({ declared: REQUESTED }), 1000],
+      [board({ declared: REQUESTED }), 6000],
+    ]);
+    // `since` never moves: the alert's own clock is what promotes it.
+    expect(r[1].challenge).toMatchObject({ status: "REQUESTED", since: 0 });
+    expect(r[2].challenge).toMatchObject({ status: "REVIEW", since: 0 });
+    expect(r[2].challenge?.category).toBe("netTouch");
+  });
+
+  it("takes the verdict from a declaration that changes under it", () => {
+    // The VIS shape: the request is published, then the result lands beside it.
+    const upheld: VisChallenge = { ...REQUESTED, status: "SUCCESSFUL" };
+    const r = run([
+      [board({ declared: REQUESTED }), 0],
+      [board({ declared: upheld, scoreB: 11 }), 2000],
+    ]);
+    expect(r[1].challenge).toMatchObject({
+      status: "SUCCESSFUL",
+      side: "B",
+      category: "netTouch",
+      since: 2000,
+    });
+  });
+
+  it("announces a decided challenge ONCE, however long it stays in the payload", () => {
+    // VIS keeps a decided challenge in the set's event stream for the rest of
+    // the set. Without an identity for the declaration, every poll after it
+    // would put the same verdict back on air.
+    const upheld: VisChallenge = { ...REQUESTED, status: "SUCCESSFUL" };
+    const r = run([
+      [board({ declared: REQUESTED }), 0],
+      [board({ declared: upheld, scoreB: 11 }), 2000],
+      [board({ declared: upheld, scoreB: 11 }), 5000],
+      [board({ declared: upheld, scoreB: 11 }), 9000],
+      [board({ declared: upheld, scoreB: 11 }), 20_000],
+    ]);
+    expect(r[2].challenge).toMatchObject({ status: "SUCCESSFUL" });
+    // Held for its beat, then gone — and it stays gone.
+    expect(r[3].challenge).toBeNull();
+    expect(r[4].challenge).toBeNull();
+  });
+
+  it("still hears a refusal from the counters, and keeps the label", () => {
+    // The VolleyStation shape: the outcome is not in the declaration at all. A
+    // refused challenge is one fewer remaining, i.e. one more refused, and the
+    // card must not lose its category on the frame it turns red.
+    const r = run([
+      [board({ declared: REQUESTED }), 0],
+      [board({ declared: REQUESTED, refB: 1 }), 3000],
+    ]);
+    expect(r[1].challenge).toMatchObject({
+      status: "UNSUCCESSFUL",
+      side: "B",
+      category: "netTouch",
+    });
+  });
+
+  it("reads the score moving under a still-declared request as SUCCESSFUL", () => {
+    // An upheld challenge corrects the call. VolleyStation may take a poll to
+    // clear `challenge_team`, and the correction must not be swallowed by the
+    // declaration outliving it.
+    const r = run([
+      [board({ declared: REQUESTED, scoreA: 10 }), 0],
+      [board({ declared: REQUESTED, scoreA: 11 }), 3000],
+    ]);
+    expect(r[1].challenge).toMatchObject({ status: "SUCCESSFUL", side: "B" });
+  });
+
+  it("keeps the graphic when the declaration simply disappears", () => {
+    // `challenge_team` goes null the moment the referees are done, which is
+    // before the score or the counters say anything. Dropping the card there
+    // would take it off air mid-review.
+    const r = run([
+      [board({ declared: REQUESTED }), 0],
+      [board({}), 1000],
+      [board({}), 6000],
+    ]);
+    expect(r[1].challenge).toMatchObject({ status: "REQUESTED" });
+    expect(r[2].challenge).toMatchObject({ status: "REVIEW" });
+  });
+
+  it("says nothing for a decided declaration it has never seen requested", () => {
+    // A cold instance joining a set whose last challenge was decided ten
+    // rallies ago: the declaration is history, and history stays off screen.
+    const r = run([
+      [board({ declared: { status: "UNSUCCESSFUL", side: "A", since: 0 } }), 0],
+      [board({ declared: { status: "UNSUCCESSFUL", side: "A", since: 0 } }), 1000],
+    ]);
+    expect(r[0].challenge).toBeNull();
+    expect(r[1].challenge).toBeNull();
   });
 });
 

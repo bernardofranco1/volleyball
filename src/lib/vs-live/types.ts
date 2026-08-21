@@ -65,6 +65,35 @@ export interface VsMatch {
   timeout_count: number[] | null;
   substitution_count: number[] | null;
   challenge_count: number[] | null;
+  /**
+   * The challenge IN FLIGHT, when there is one (spec/48 W5). This is the field
+   * the TV overlay wants: a snapshot of the present, not a counter delta, so it
+   * says "a challenge is happening now" in a way `challenge_count` cannot.
+   * Populated example committed as fixture match 2504866.
+   *
+   * `"home"`/`"away"`, and null the rest of the time — including for a challenge
+   * that has just been decided, which is why the counters remain the outcome
+   * fallback.
+   */
+  challenge_team: "home" | "away" | null;
+  /**
+   * Why it was called, in VolleyStation's own vocabulary — `"netTouch"` is the
+   * one observed. Mapped to a card label by `categoryFor` (director.ts); an
+   * unknown reason auto-fills nothing rather than guessing.
+   */
+  challenge_reason: string | null;
+  /** ISO, panel offset — like `MatchDateTime`, an instant and nothing more. */
+  challenge_time: string | null;
+  /**
+   * OPAQUE. The vocabulary is unobserved (spec/48 §3: a capture is running to
+   * pin it), so nothing switches on this and nothing may until it is measured.
+   */
+  challenge_phase: string | null;
+  /**
+   * `{ home: [], away: [] }` on some rows and null on others; element shape
+   * unobserved. Typed so the field is not silently dropped, never read.
+   */
+  challenge_bookmarks: { home?: unknown[]; away?: unknown[] } | null;
   HomeDisqualification: boolean | null;
   GuestDisqualification: boolean | null;
   postponed: boolean | null;

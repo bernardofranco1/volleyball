@@ -28,7 +28,7 @@ const SUB_HOLD_MS = 8_000;
  */
 const TIMEOUT_HOLD_MS = 30_000;
 
-/** The categories a challenge can be, in hotkey order. Operator input. */
+/** The categories a challenge can be, in hotkey order (1–6). Operator input. */
 export const CHALLENGE_CATEGORIES = [
   "BALL IN / OUT",
   "NET TOUCH",
@@ -37,12 +37,55 @@ export const CHALLENGE_CATEGORIES = [
   "ANTENNA TOUCH",
   "FLOOR TOUCH",
 ] as const;
-export type ChallengeCategory = (typeof CHALLENGE_CATEGORIES)[number];
+/**
+ * A label the FEED can name that no hotkey does (spec/48 §3). Kept out of
+ * `CHALLENGE_CATEGORIES` so the hotkey row stays 1–6 as the operators learned
+ * it; a card can still print this when the feed asks for it.
+ */
+export const FEED_ONLY_CATEGORIES = ["NET REACH"] as const;
+export type ChallengeCategory =
+  | (typeof CHALLENGE_CATEGORIES)[number]
+  | (typeof FEED_ONLY_CATEGORIES)[number];
+
+/**
+ * Feed reason → card label (spec/48 §3).
+ *
+ * Keyed lower-case, because the two feeds spell the same event differently:
+ * VolleyStation sends `"netTouch"` and VIS's `ChallengeRequest@Type` resolves to
+ * `"NetTouch"`. Both land here.
+ *
+ * A reason that is NOT in this map auto-fills nothing — the card shows "UNDER
+ * REVIEW" until the operator presses a key. That is deliberate for the three VIS
+ * line faults (`AttackLineFault`, `CenterLineFault`, `ServiceLineFault`): they
+ * are all arguably "FOOT FAULT", none of them is certainly it, and inventing the
+ * mapping would put a wrong word on air where a blank one is honest.
+ */
+const CATEGORY_BY_REASON: Record<string, ChallengeCategory> = {
+  ballinout: "BALL IN / OUT",
+  nettouch: "NET TOUCH",
+  blocktouch: "TOUCH ON BLOCK",
+  antennatouch: "ANTENNA TOUCH",
+  // The same event under each feed's own name: VolleyStation calls the ball
+  // touching the floor a defence touch, VIS type 8 calls it a floor touch.
+  defensetouch: "FLOOR TOUCH",
+  floortouch: "FLOOR TOUCH",
+  netreach: "NET REACH",
+};
+
+/** The card label for a raw feed reason, or null when we do not know it. */
+export function categoryFor(reason: string | null | undefined): ChallengeCategory | null {
+  const key = (reason ?? "").trim().toLowerCase();
+  return key ? (CATEGORY_BY_REASON[key] ?? null) : null;
+}
 
 export interface OperatorState {
   /** Everything off. The director still runs, so nothing is missed on the way back. */
   hideAll: boolean;
-  /** The category to print on the challenge card; no feed carries this. */
+  /**
+   * The category to print on the challenge card. Both feeds do carry a reason
+   * (spec/48 §3), so this is now an OVERRIDE rather than the only source: set,
+   * it wins; null, the feed's own reason auto-fills through `categoryFor`.
+   */
   category: ChallengeCategory | null;
   /**
    * A challenge driven entirely by the operator, for when the feed's counters
@@ -204,7 +247,11 @@ export function direct(
     ? {
         hand: handFor(chosen.side),
         status: chosen.status,
-        category: operator.category,
+        // The operator's key overrides the feed, always: they can see the replay
+        // and the feed's reason may be a scorer's first guess. With no key
+        // pressed the feed's own reason auto-fills, and an unknown one leaves the
+        // card saying UNDER REVIEW exactly as it did before spec/48.
+        category: operator.category ?? categoryFor(fromFeed?.category),
         teamName:
           (chosen.side === "A" ? board.teamA.name : board.teamB.name) ||
           (chosen.side === "A" ? board.teamA.code : board.teamB.code),

@@ -209,9 +209,9 @@ export function OperatorPanel({
       </div>
 
       <p style={S.note}>
-        No feed states what a challenge was FOR — VIS publishes only how many were
-        requested and how many refused — so the category above is the one thing on
-        these graphics that has to be typed by a person.
+        Both feeds do state what a challenge was FOR (spec/48), and a reason they
+        name fills the card in on its own. The keys above OVERRIDE it — for the
+        reasons no label fits, and for the events where the field arrives empty.
       </p>
     </div>
   );
