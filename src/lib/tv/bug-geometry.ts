@@ -1,4 +1,4 @@
-import { TV_FLAG_CODES } from "@/lib/board-flag-ratios";
+import { FLAG_CODES, TV_FLAG_CODES } from "@/lib/board-flag-ratios";
 
 /**
  * The AVC TV score bug, measured (spec/47).
@@ -240,10 +240,17 @@ export function displayCode(feedCode: string): string {
 export function flagSrcFor(feedCode: string): string | null {
   const c = feedCode.toUpperCase();
   if (!/^[A-Z]{3}$/.test(c)) return null;
-  // Checked against the generated list rather than requested and retried: an
-  // SVG <image> that 404s leaves a hole in the bar, and the replay board is a
-  // Qatar v Venezuela match — a fixture from outside this competition, which is
-  // exactly the case that found this.
+  // Both libraries are checked against a GENERATED list of what is actually on
+  // disk, never requested hopefully. An SVG <image> pointing at a missing file
+  // does not fail quietly the way an <img> with an onError handler does — it
+  // draws the browser's broken-image glyph, and a grey torn-page icon in the
+  // flag slot of a live broadcast is the worst failure this graphic has.
+  //
+  // Found twice: first on the replay board, a Qatar v Venezuela fixture from
+  // outside this competition, and then on production, where the board host also
+  // serves a VNL rehearsal tournament whose Serbia has no asset in either
+  // library.
   if (TV_FLAG_CODES.has(c)) return `/tv-flags/${c}.webp`;
-  return `/flags/${c}.png`;
+  if (FLAG_CODES.has(c)) return `/flags/${c}.png`;
+  return null;
 }

@@ -16,6 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 import { DEFAULT_DELAY_S, DELAY_STEP_S, MAX_DELAY_S, clampDelay } from "@/lib/tv/delay";
+import { flagSrcFor } from "@/lib/tv/bug-geometry";
 
 describe("clampDelay", () => {
   it("passes a sane number through", () => {
@@ -45,5 +46,44 @@ describe("clampDelay", () => {
     expect(typeof DEFAULT_DELAY_S).toBe("number");
     expect(typeof DELAY_STEP_S).toBe("number");
     expect(DEFAULT_DELAY_S).toBeLessThanOrEqual(MAX_DELAY_S);
+  });
+});
+
+// ── flag assets (spec/47) ───────────────────────────────────────────────────
+//
+// Here rather than in a file of its own because it guards the same class of
+// mistake as the clamp above: something that typechecks, renders, and is wrong
+// only on a surface nobody was looking at.
+
+describe("flagSrcFor", () => {
+  it("prefers the AVC package's own asset for a competition federation", () => {
+    expect(flagSrcFor("JPN")).toBe("/tv-flags/JPN.webp");
+    expect(flagSrcFor("THA")).toBe("/tv-flags/THA.webp");
+  });
+
+  it("falls back to the platform library for a federation outside the package", () => {
+    // The replay board is a Qatar v Venezuela fixture.
+    expect(flagSrcFor("VEN")).toBe("/flags/VEN.png");
+    expect(flagSrcFor("POL")).toBe("/flags/POL.png");
+  });
+
+  it("returns NOTHING when neither library has the flag", () => {
+    // The regression: an SVG <image> pointing at a missing file draws the
+    // browser's broken-image glyph — a grey torn-page icon in the flag slot of
+    // a live broadcast. Serbia reached production that way, from the VNL
+    // rehearsal fixtures the board host also serves.
+    for (const code of ["SRB", "GER", "NED", "BEL", "CAN", "UKR"]) {
+      expect(flagSrcFor(code), code).toBeNull();
+    }
+  });
+
+  it("refuses anything that is not a three-letter code", () => {
+    for (const bad of ["", "J", "JAPAN", "jp1", "  "]) {
+      expect(flagSrcFor(bad), JSON.stringify(bad)).toBeNull();
+    }
+  });
+
+  it("is case-insensitive, since feeds are not consistent", () => {
+    expect(flagSrcFor("jpn")).toBe("/tv-flags/JPN.webp");
   });
 });

@@ -135,6 +135,18 @@ export const DEFAULT_FLAG_RATIO = 1.5;
 
 /** Federations the AVC TV package supplies a flag for (public/tv-flags). */
 export const TV_FLAG_CODES: ReadonlySet<string> = new Set(${JSON.stringify(tvFlags)});
+
+/**
+ * Federations public/flags has an asset for.
+ *
+ * Needed for the same reason as TV_FLAG_CODES and found the same way — the hard
+ * way. An SVG <image> pointing at a missing file does not fail quietly: it draws
+ * the browser's BROKEN-IMAGE GLYPH, which on the TV overlay (spec/47) is a grey
+ * torn-page icon in the flag slot of a live broadcast. The venue boards get away
+ * with an onError handler because they use <img>; SVG has no equivalent worth
+ * relying on, so the answer has to be known before anything is emitted.
+ */
+export const FLAG_CODES: ReadonlySet<string> = new Set(${JSON.stringify(Object.keys(ratios).sort())});
 `,
 );
 console.log(

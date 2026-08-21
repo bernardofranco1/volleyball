@@ -217,13 +217,24 @@ function Cell({
  */
 function Flag({ code, side }: { code: string; side: "left" | "right" }) {
   const src = flagSrcFor(code);
-  if (!src) {
-    // No asset and no usable code: the bar keeps its shape and shows nothing
-    // where the flag would be, which is honest. The code still prints in its
-    // own cell.
-    return null;
-  }
   const clip = `url(#tv-flag-clip-${side === "left" ? "l" : "r"})`;
+  if (!src) {
+    // No asset for this federation. Fill the slot with the bar's own navy
+    // rather than drawing nothing: the plate artwork only starts at x 596.5, so
+    // an empty slot is a transparent notch with the FOOTAGE showing through
+    // where the flag belongs, and the bar reads as though it were cut short.
+    // The code still prints in its own cell, so nothing is lost but the flag.
+    return (
+      <rect
+        x={side === "left" ? FLAG.outerLeft : FLAG.outerRight - FLAG_CLIP_MAX}
+        y={BAR.y}
+        width={FLAG_CLIP_MAX}
+        height={BAR.h}
+        fill={AVC.navy}
+        clipPath={clip}
+      />
+    );
+  }
   // Wider than the widest flag in the field at this height (Qatar, 28:11 —
   // 152.6 px), so `meet` is always height-limited.
   const fitBox = 200;
