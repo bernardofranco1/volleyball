@@ -209,11 +209,32 @@ team that wins its challenge **keeps** the right to another, so
 It stays silent on a cold start and across a set boundary, both of which move the
 counters for reasons that are not a challenge.
 
-**There is no challenge TYPE in any feed**, and no way to add one: VIS publishes
-`NbChallengeRequestedTeam*` and `NbChallengeRefusedTeam*` and nothing else. The
-category on the card is operator input, from a fixed list, on hotkeys 1–6. The
-whole challenge graphic can also be driven by hand, which is the expected mode
-on a VolleyStation-sourced match.
+~~**There is no challenge TYPE in any feed**, and no way to add one: VIS publishes
+`NbChallengeRequestedTeam*` and `NbChallengeRefusedTeam*` and nothing else.~~
+
+**Corrected 2026-08-21 (spec/48 W5/W6) — this was wrong, and it was wrong about
+both feeds.** What was true is narrower: the *board-level counters* carry no type.
+The payloads do:
+
+- **VolleyStation** puts it on the match row itself — `challenge_team`
+  ("home"/"away"), `challenge_reason` ("netTouch"), `challenge_time`,
+  `challenge_phase`, `challenge_bookmarks`. A populated capture is committed as
+  fixture match `2504866` (`src/__tests__/fixtures/vs/matches.json`), and
+  `challenge_team` is a better "in flight" signal than any counter delta: it is a
+  snapshot of the present and it names the team outright.
+- **VIS** publishes `<ChallengeRequest NoTeam Type RequestedFrom PointsTeamA
+  PointsTeamB>` and `<ChallengeResult Outcome PointsTeamA PointsTeamB>` inside the
+  event stream the live path was already fetching — `@Type` is an XSD enum of
+  eight (1 AntennaTouch, 2 AttackLineFault, 3 BallInOut, 4 BlockTouch,
+  5 CenterLineFault, 6 NetTouch, 7 ServiceLineFault, 8 FloorTouch), of which 3, 4
+  and 6 appear in `volley-live-events-27549.xml` / `-27550.xml`. Ten pairs are
+  committed there; `replay.ts` was reading them all along.
+
+So the category now auto-fills from the feed's own word, and hotkeys 1–6 override
+it rather than being the only source — a field populated on one event may be
+empty on the next, and the operator can see the replay. The whole challenge
+graphic remains hand-drivable, which is still the fallback on any event whose
+scorers leave the fields empty.
 
 ## Three bugs the gates caught
 

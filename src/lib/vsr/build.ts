@@ -426,6 +426,13 @@ function buildScout(report: MatchReportData, beach: boolean): Json {
               startTime: openChallenge.startTime,
               method: "video",
               endTime: ts,
+              // ⚠ "correct" is a guess, and real `.vsr` logs say it is wrong:
+              // the positive value is "right" (`Match log 26665.vsr`, one upheld
+              // challenge among eight). Left as it is on purpose — spec/22 open
+              // question 4, now answered, records the finding and asks for this
+              // to be fixed with whatever answers question 1 (the intake
+              // endpoint), since nothing dispatches until then. Changing the
+              // string alone would flip a value no consumer reads yet.
               response: p.upheld ? "correct" : "wrong",
             },
           });

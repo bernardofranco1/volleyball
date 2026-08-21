@@ -251,3 +251,121 @@ House path, spec/47 precedent (promoted with `--project board` only):
 Weekend context: a read-only capture (`~/vs-captures/`) is recording live AVC
 matches through Mon 06:00 UTC to pin `challenge_phase` vocabulary — W5
 deliberately treats the field as opaque so nothing here depends on it.
+
+---
+
+## 7. Shipped — the deltas from what is written above
+
+Written after the fact, in the order the work landed. Every constant in §1 went
+in verbatim; everything below is a decision this spec did not make for us, or a
+place where it was wrong.
+
+### Motion (W1–W4)
+
+1. **G1 paint order is set with `z-index`** (extensions 1, bug 2, motion 3),
+   **not** by swapping the siblings. Both browser gates find the bug with
+   `querySelector("svg")` — the FIRST one — and e2e uses `locator("svg").first()`,
+   so reordering the siblings has them measure the empty extensions layer and
+   report a **vacuous PASS**, which §0.2 forbids fixing by editing the gates. Same
+   paint order, same DOM, same server output, less code than per-panel clips.
+2. **Reveal clips are used as well**, for the outward panels only — the fallback
+   §2 G1 allows. Forced: "hidden under the bar" is only true inside the bar's
+   band, and the substitution's upper row sits at y 894–938 with nothing to hide
+   behind. The clip is on a STATIC outer group; on the moving group it would
+   travel with it.
+3. **`ballHidden`/`scoreHidden` flip once at hydration**, not per flight. Both
+   ride the same `useHydrated` handshake with a `false` server snapshot, so there
+   is never a frame with two balls, two digits, or none. Verified pixel-identical
+   against the static cells.
+4. **Both substitution rows' content starts at +160 ms** — §1 M3's literal
+   constant. No per-row stagger was invented.
+5. **The presence reducer is clock-free**: `react-hooks/purity` rejects
+   `Date.now()` during render, so the transition is adjusted during render and
+   the deadline is the hook's single `setTimeout`.
+6. **M3's optional 400 ms nudge on the green in-arrow was left out.** §1 gates it
+   on "only if trivial"; it needed a fifth animation target inside a marked-up
+   subtree.
+7. One regression, found only in the browser: the odometer digits and the flying
+   ball live in the motion layer, so they did not follow the bug DOWN — the score
+   sat over the challenge card and survived the operator's `H`. They now carry the
+   bug's own visibility with its own 180 ms fade.
+8. Suite baseline was **1050 tests / 90 files** when the work started, not the
+   1045/90 §2 states: five tests had landed in between.
+
+### Feed (W5–W6)
+
+9. **`VisChallenge` is now DECLARED as well as inferred**, and the interface says
+   so. §3 asked for `category?: string` and got it — the feed's RAW word
+   (`"netTouch"`, `"BlockTouch"`), never a card label; `categoryFor`
+   (`lib/tv/director.ts`) does that translation, keyed lower-case so both feeds'
+   spellings of one event land on one label.
+10. **`challengesRequested` is 0 on a VolleyStation board**, not derived. Deleting
+    the collapse (§3) leaves nothing to derive it FROM: an upheld challenge costs
+    its team nothing, so a spent allowance is a refusal and the request count is
+    simply absent from the payload. Zero is the honest figure and only
+    `tv-signals` reads the field.
+11. **`TvSignalState` gains `declaredKey`** — `side:status:category:scoreA:scoreB`.
+    A declaration persists after it is answered (VIS keeps a decided challenge in
+    the event stream for the rest of the set), so "is this news?" has to be "is
+    this a different declaration from last time?". The score is in the key because
+    a declaration carries no id; the cost is that two identical challenges by one
+    team at one score would read as one, which loses a graphic rather than
+    inventing one.
+12. **A PENDING declaration is announced on the very first frame**, unlike the
+    counters. It is present tense — the feed is saying a challenge is in flight
+    NOW — and that is as true for an instance seeing its first frame as for one
+    that watched the request land. A DECIDED declaration on a first frame stays
+    silent, exactly like the counters.
+13. **A refusal counter is read BEFORE the declaration**, and the category is
+    carried across the verdict so a card already on air does not lose its label as
+    it turns red or blue. Likewise the score moving under a still-declared request
+    is read as the correction landing, because VolleyStation may take a poll to
+    clear `challenge_team`.
+14. **`ChallengeCategory` gains `"NET REACH"` through a separate
+    `FEED_ONLY_CATEGORIES`**, so the operator's hotkey row stays 1–6 as they
+    learned it while the card can still print a label only the feed asks for.
+15. **The three VIS line faults auto-fill nothing** (`AttackLineFault`,
+    `CenterLineFault`, `ServiceLineFault`). Each is arguably FOOT FAULT and none is
+    certainly it; the card says UNDER REVIEW until an operator decides.
+16. **What is on air on the VIS path is scoped by the SCORE, not by a timer.** VIS
+    rewrites the disputed rally to the corrected score, so during a review the set
+    stands at the REQUEST's points and after the ruling at the RESULT's, and the
+    next rally moves it off both. `declaredChallengeOf` declares only inside that
+    window; the store's machine holds the decided card for its own beat from
+    there. This also means a request the feed never resolved cannot strand a
+    REQUESTED card on air.
+17. **`@Outcome` is recorded and read by nothing.** The points rule agrees with
+    the sets' own `NbChallengeAccepted*`/`NbChallengeRefused*` tallies on **nine**
+    of the ten reference pairs. The tenth is the `Outcome="1"` §3 warns about
+    (27550 set 3, team A): the set counts a refusal while the result moves a point
+    from B to A, 13-14 → 14-13. We follow the points, because the score the
+    overlay sits beside has visibly changed. `replay.ts` was left alone, as
+    instructed.
+18. **`SetEvents.challenges` is required, not optional** — a set's challenges are
+    part of its event stream. Nine literals in two existing test files gained
+    `challenges: []`; no assertion changed.
+19. `challenge_phase` is typed and deliberately never read (§3), and a test pins
+    that: a board built with a phase value nobody has measured is byte-identical
+    to one built without it.
+
+### Verification as shipped
+
+- `npx vitest run`: **1123 tests / 93 files** green (from the 1050/90 baseline
+  found). New in W5–W6: 22 across `vs-store`, `vs-live`, `tv-signals` and
+  `tv-director`, plus `vis-challenges.test.ts` (13) for the ten-pair gate.
+- The three pixel gates of §0.2, unmodified: `check-tv-bug.mjs` PASS,
+  `check-render.py` PASS (22 checks), `validate-bug.py` exit 0.
+- `npx tsc --noEmit` clean; `npx eslint src` → only the four pre-existing
+  unused-var warnings in unrelated files.
+- W5–W7 touch no view except one paragraph of copy in `OperatorPanel`, so the
+  first-frame assertion and the SSR output are untouched by them.
+
+### Still open
+
+- `challenge_phase` vocabulary — the weekend capture (§6) is what will answer it.
+- Whether a VolleyStation challenge that is upheld WITHOUT moving the score ever
+  happens. It would sit on the card as a review until the next point, which is
+  the same trade spec/47 documented for the counter path.
+- `src/lib/vsr/build.ts:429` still emits `"correct"` where real logs say
+  `"right"` — see the note added to spec/22 §Open questions 4. The fix was
+  optional here and was not taken; nothing dispatches yet.

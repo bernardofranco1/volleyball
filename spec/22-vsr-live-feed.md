@@ -87,7 +87,9 @@ files and overrides everything derivable from `TournamentConfig`.
   `SUBSTITUTION` → jerseys via roster; `LIBERO_REPLACEMENT` → `libero`
   (`direction IN/OUT` → `enters`); `VCS_CHALLENGE`+`VCS_RESULT` →
   `videoChallenge` (`upheld` → `correct`, else `wrong`; reason defaults to
-  `"other"` — we don't capture the challenge reason yet).
+  `"other"` — we don't capture the challenge reason yet). ⚠ `correct` is WRONG:
+  real logs say `right`, and both live feeds do carry the reason — see Open
+  question 4, answered.
 - Coin toss: `tossWinner` (spec/21) feeds `winner`; missing → the serving
   team (flagged in Open questions).
 - `undoLog` stays `[]`: every snapshot is rebuilt AFTER the undo, so the
@@ -136,7 +138,26 @@ files and overrides everything derivable from `TournamentConfig`.
    our matches?
 3. Schemas for `interruptions`, `objections`, `undoLog`, sanctions inside
    .vsr (none occurred in the reference matches).
-4. `videoChallenge.response` positive value (`correct` is our assumption;
+4. ~~`videoChallenge.response` positive value (`correct` is our assumption;
    only `wrong` was observed) and `reason` vocabulary (`blockTouch`,
-   `ballInOut` observed).
+   `ballInOut` observed).~~
+
+   **ANSWERED 2026-08-21 (spec/48 W7), from real `.vsr` logs.** The positive
+   value is **`"right"`**, not our `"correct"`: `Match log 26665.vsr` (indoor,
+   `version: 7`) carries eight `videoChallenge` events, seven `"wrong"` and one
+   `"right"`. The upheld one also carries a field we do not emit —
+   `"scoreChange": "assignToOther"` — and the same logs add `requested` and
+   `bookmarkedAt` timestamps beside `startTime`.
+
+   The `reason` vocabulary observed across the two logs is `ballInOut`,
+   `blockTouch`, `netTouch`, `netReach`, `antennaTouch`, `defenseTouch` — the
+   same six VolleyStation's live API sends in `challenge_reason`, which is what
+   spec/48's card-label map is keyed on.
+
+   ⚠ **`src/lib/vsr/build.ts:429` still emits `"correct"`** for an upheld
+   challenge. Nothing dispatches yet (`VSR_DISPATCH_URL` is unset and Q1 is
+   still open), so this is not live-breaking, but it is a known wrong value in a
+   file we hand to FIVB IT: fix it with, or before, whatever answers Q1. While it
+   is being fixed, `reason` is hard-coded to `"other"` on the same object and
+   both feeds now carry the real one (spec/48 §3).
 5. Format `version` semantics (7 indoor vs 6 beach observed).
