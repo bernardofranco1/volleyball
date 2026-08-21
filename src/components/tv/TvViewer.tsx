@@ -51,7 +51,7 @@ import { handOf, sideState } from "@/lib/tv/derive";
 import { MOTION } from "@/lib/tv/motion";
 import { usePresence } from "@/lib/tv/usePresence";
 import { useHydrated } from "@/lib/tv/useHydrated";
-import { RollingCell } from "@/components/tv/BugMotion";
+import { RollingCell, ServeBallFlight } from "@/components/tv/BugMotion";
 import { StreamPlayer, type PlayerState } from "@/components/tv/StreamPlayer";
 import { ScoreBug } from "@/components/tv/ScoreBug";
 import {
@@ -339,6 +339,7 @@ export function TvViewer({
           right={{ ...rightSide, serving: rightSide.serving }}
           hidden={!graphics.bug}
           scoreHidden={motion}
+          ballHidden={motion}
         />
 
         <svg viewBox="0 0 1920 1080" width="100%" height="100%" style={S.layerUnder} aria-hidden>
@@ -367,6 +368,11 @@ export function TvViewer({
             <>
               <RollingCell side="left" value={leftSide.score} />
               <RollingCell side="right" value={rightSide.score} />
+              <ServeBallFlight
+                serving={stage.serving}
+                set={stage.currentSet}
+                hand={hand}
+              />
             </>
           ) : null}
           {cardP.value ? (
