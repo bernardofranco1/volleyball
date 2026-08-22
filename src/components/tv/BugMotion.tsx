@@ -211,6 +211,7 @@ export function ServeBallFlight({
  * during its own delay, and there would be no two-step at all.
  */
 export function MotionGroup({
+  panel,
   hidden,
   enter,
   exit,
@@ -220,6 +221,16 @@ export function MotionGroup({
   tick,
   children,
 }: {
+  /**
+   * Which graphic this is — "sub", "km", "to", "alert", "card".
+   *
+   * It names the reveal clip. Two panels can dock to the SAME hand (a key
+   * moment and a substitution both arrive on the left), and an id minted from
+   * the hand alone would then exist twice in one document, where the second
+   * `<clipPath>` is dead markup and every `url(#…)` resolves to the first
+   * (spec/48.1 F4).
+   */
+  panel: string;
   hidden: Hidden;
   enter: { duration: number; easing: string };
   exit: { duration: number; easing: string };
@@ -237,7 +248,7 @@ export function MotionGroup({
   children: ReactNode;
 }) {
   const group = useRef<SVGGElement>(null);
-  const clipId = reveal ? `tv-reveal-${reveal}` : null;
+  const clipId = reveal ? `tv-reveal-${panel}-${reveal}` : null;
 
   useLayoutEffect(() => {
     const el = group.current;

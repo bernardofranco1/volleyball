@@ -358,6 +358,7 @@ export function TvViewer({
           {keyMomentP.value ? (
             <MotionGroup
               key={`km-${keyMomentP.value.hand}`}
+              panel="km"
               hidden={slideHidden(keyMomentP.value.hand)}
               enter={MOTION.slide.enter}
               exit={MOTION.slide.exit}
@@ -373,6 +374,7 @@ export function TvViewer({
           {timeoutP.value ? (
             <MotionGroup
               key={`to-${timeoutP.value.hand}`}
+              panel="to"
               hidden={{ y: MOTION.tab.hidden }}
               enter={MOTION.tab.enter}
               exit={MOTION.tab.exit}
@@ -390,6 +392,7 @@ export function TvViewer({
           {subP.value ? (
             <MotionGroup
               key={`sub-${subP.value.hand}`}
+              panel="sub"
               hidden={slideHidden(subP.value.hand)}
               enter={MOTION.slide.enter}
               exit={MOTION.slide.exit}
@@ -402,6 +405,7 @@ export function TvViewer({
           {alertP.value ? (
             <MotionGroup
               key={`alert-${alertP.value.hand}`}
+              panel="alert"
               hidden={{ y: MOTION.tab.hidden }}
               enter={MOTION.tab.enter}
               exit={MOTION.tab.exit}
@@ -438,6 +442,7 @@ export function TvViewer({
           ) : null}
           {cardP.value ? (
             <MotionGroup
+              panel="card"
               hidden={{ y: MOTION.card.hidden }}
               enter={MOTION.card.enter}
               exit={MOTION.card.exit}
