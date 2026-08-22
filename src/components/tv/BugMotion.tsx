@@ -30,6 +30,8 @@ import {
   driftFor,
   fadeOutFrames,
   prefersReducedMotion,
+  resumeFrom,
+  resumeInFrames,
   rollInFrames,
   rollOutFrames,
   rollReduce,
@@ -37,6 +39,7 @@ import {
   slideInFrames,
   slideOutFrames,
   tickFrames,
+  type ComputedNow,
   type Hidden,
   type RollState,
   type ServeFrame,
@@ -49,6 +52,20 @@ import { ChallengeCard, type CardProps } from "@/components/tv/BugExtensions";
 
 /** A rolling digit is transformed against its OWN box, not the viewBox. */
 const FILL_BOX: React.CSSProperties = { transformBox: "fill-box" };
+
+/**
+ * What the browser says an element looks like this instant, including whatever
+ * a filling animation is contributing (spec/48.1 F2).
+ *
+ * The one DOM read in this file that is not a write. Kept to the two properties
+ * this motion animates so the decision it feeds — `resumeFrom` — stays a pure
+ * function of two strings and can be tested without a browser.
+ */
+function computedNow(el: Element): ComputedNow | null {
+  if (typeof window === "undefined" || !window.getComputedStyle) return null;
+  const cs = window.getComputedStyle(el);
+  return { transform: cs.transform, opacity: cs.opacity };
+}
 
 /**
  * One game-score cell as an odometer (spec/48 M2).
@@ -254,14 +271,20 @@ export function MotionGroup({
     const el = group.current;
     if (!el || prefersReducedMotion()) return;
     const content = [...el.querySelectorAll("[data-tv-content]")] as SVGGraphicsElement[];
-    // Cancel first, always: a graphic replaced mid-exit has to come back from
-    // where it is rather than compose two transforms.
+    // Where the plate is RIGHT NOW, read BEFORE anything is cancelled: a
+    // graphic that comes back mid-exit resumes from there. Cancelling first and
+    // entering from `hidden` is a snap backwards to under the bar — the plate
+    // is somewhere in between, and the eye follows a plate (spec/48.1 F2).
+    const resume = leaving ? null : resumeFrom(computedNow(el), fade);
     for (const target of [el, ...content]) {
       target.getAnimations().forEach((a) => a.cancel());
     }
 
     if (!leaving) {
-      el.animate(slideInFrames(hidden, fade), { ...enter, fill: "backwards" });
+      el.animate(resume ? resumeInFrames(resume, fade) : slideInFrames(hidden, fade), {
+        ...enter,
+        fill: "backwards",
+      });
       const drift = driftFor(hidden);
       for (const c of content) {
         c.animate(contentInFrames(drift), {

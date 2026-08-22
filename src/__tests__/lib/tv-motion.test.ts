@@ -25,6 +25,8 @@ import {
   mirrorDepartureX,
   noPresence,
   presenceReduce,
+  resumeFrom,
+  resumeInFrames,
   rollInFrames,
   rollOutFrames,
   rollReduce,
@@ -256,6 +258,53 @@ describe("presence", () => {
     expect(presenceReduce(up, "sub", EXIT)).toBe(up);
     const empty = noPresence<string>();
     expect(presenceReduce(empty, null, EXIT)).toBe(empty);
+  });
+});
+
+// ── F2 · coming back mid-exit ────────────────────────────────────────────────
+
+describe("a panel that is brought back while it is leaving", () => {
+  it("resumes from where the plate actually is", () => {
+    // 40% of the way back under the bar: the exit is 410 px and the group is
+    // sitting at 164. Entering from `hidden` here is a snap BACKWARDS through
+    // the remaining 246 px — the eye follows a plate, so it is the one thing
+    // this must not do (spec/48.1 F2).
+    const at40 = { transform: "matrix(1, 0, 0, 1, 164, 0)", opacity: "1" };
+    const resume = resumeFrom(at40);
+    expect(resume).toEqual({ transform: "matrix(1, 0, 0, 1, 164, 0)" });
+    const [from, to] = resumeInFrames(resume!);
+    expect(from.transform).toBe("matrix(1, 0, 0, 1, 164, 0)");
+    expect(from.transform).not.toBe(slideInFrames({ x: 410 })[0].transform);
+    expect(to.transform).toBe("translate(0px, 0px)");
+  });
+
+  it("brings the card's opacity back from where it is too", () => {
+    // The challenge card is the one graphic that fades as it moves, so resuming
+    // its transform alone would still flash it back to invisible.
+    const at40 = { transform: "matrix(1, 0, 0, 1, 0, 16)", opacity: "0.6" };
+    expect(resumeFrom(at40, true)).toEqual({
+      transform: "matrix(1, 0, 0, 1, 0, 16)",
+      opacity: 0.6,
+    });
+    expect(resumeInFrames(resumeFrom(at40, true)!, true)[1]).toEqual({
+      transform: "translate(0px, 0px)",
+      opacity: 1,
+    });
+  });
+
+  it("has nothing to resume from at rest, which is a first mount", () => {
+    // A panel mounting for the first time is at rest, and that one takes the
+    // normal entrance from hidden.
+    expect(resumeFrom({ transform: "none", opacity: "1" })).toBeNull();
+    expect(resumeFrom(null)).toBeNull();
+  });
+
+  it("ignores the opacity of a panel that does not fade", () => {
+    // A docked panel emerges from an edge; its opacity is not ours to restore.
+    expect(resumeFrom({ transform: "none", opacity: "0.4" })).toBeNull();
+    expect(resumeFrom({ transform: "matrix(1, 0, 0, 1, 164, 0)", opacity: "0.4" })).toEqual(
+      { transform: "matrix(1, 0, 0, 1, 164, 0)" },
+    );
   });
 });
 

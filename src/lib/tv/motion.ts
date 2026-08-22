@@ -298,6 +298,50 @@ export function fadeOutFrames(): Keyframe[] {
   return [{ opacity: 1 }, { opacity: 0 }];
 }
 
+/**
+ * Where a panel is RIGHT NOW, as the browser reports it (spec/48.1 F2).
+ *
+ * Only ever the two properties this motion animates, and always as strings,
+ * because that is what `getComputedStyle` hands back — keeping the parse here
+ * rather than in the component is what makes "what does a group half-way
+ * through its exit resume from?" a question a test can ask.
+ */
+export interface ComputedNow {
+  /** A resolved matrix, or "none" when the element is at rest. */
+  transform: string;
+  opacity: string;
+}
+
+/**
+ * The keyframe a panel should come BACK from, or null if it is already at rest.
+ *
+ * A graphic re-entering mid-exit used to restart from `hidden` — which is a snap
+ * backwards to under the bar, visible and wrong, because the plate is somewhere
+ * in between. Reading the live matrix costs one style resolution on an event
+ * that happens at most a few times a match.
+ *
+ * Null, deliberately, when there is nothing to resume from: a panel at rest
+ * (`transform: none`, opacity 1) is a panel mounting for the first time, and
+ * that one takes the normal entrance from hidden.
+ */
+export function resumeFrom(now: ComputedNow | null, fade = false): Keyframe | null {
+  if (!now) return null;
+  const moved = !!now.transform && now.transform !== "none";
+  const opacity = Number.parseFloat(now.opacity);
+  const known = Number.isFinite(opacity);
+  const faded = fade && known && opacity < 1;
+  if (!moved && !faded) return null;
+  return {
+    ...(moved ? { transform: now.transform } : {}),
+    ...(fade && known ? { opacity } : {}),
+  };
+}
+
+/** …and the entrance that starts there instead of at the hidden position. */
+export function resumeInFrames(from: Keyframe, fade = false): Keyframe[] {
+  return [from, { transform: "translate(0px, 0px)", ...(fade ? { opacity: 1 } : {}) }];
+}
+
 /** A pip being struck through, or any other one-off state tick (M4). */
 export function tickFrames(): Keyframe[] {
   return [{ opacity: 0 }, { opacity: 1 }];
