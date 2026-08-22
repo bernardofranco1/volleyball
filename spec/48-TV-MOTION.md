@@ -384,3 +384,70 @@ place where it was wrong.
 - `src/lib/vsr/build.ts:429` still emits `"correct"` where real logs say
   `"right"` — see the note added to spec/22 §Open questions 4. The fix was
   optional here and was not taken; nothing dispatches yet.
+
+---
+
+## 8. spec/48.1 — corrections for the four verified minors (APPROVED 2026-08-22)
+
+The adversarial verify pass of the first ship recorded four cosmetic minors.
+All four get fixed; nothing else moves. Every §0 contract and every §1
+constant still holds verbatim.
+
+### F1 · Back-to-back substitutions on the same side must not cut
+
+Today `direct()` clears an expired sub and announces the next pending one in
+the SAME tick (paired subs are a supported case), so `graphics.substitution`
+goes sub1→sub2 with no null frame; `usePresence` never sees a leave, the
+MotionGroup key is only `sub-${hand}`, and the second pair's shirts/names/
+arrows CUT onto the already-extended plate.
+
+Fix — a content swap, not a full remount (the plate retracting and
+re-emerging for a paired sub would be busier than the cut):
+
+- When the substitution's identity (`subKey`, `director.ts:145`) changes while
+  the graphic is up on the SAME hand: the plate stays extended; the old
+  content group fades out **260 ms** (the standard content exit), then the new
+  content group runs the standard entry — drift 26 px + fade, **420 ms**
+  `cubic-bezier(.2,.7,.25,1)` — with no fresh 160 ms stagger (the plate is
+  already there).
+- Hand changes are already correct (presence exits one side, enters the
+  other) — do not disturb that path, nor the single-sub two-step, nor the
+  director (it stays pure; this is view-side keying/presence only).
+- Rehearsal: `?demo=subswap` plays a pair back-to-back on one side.
+- Tests: a unit test on the view-side keying/presence deciding "content swap
+  vs full reveal vs hand switch"; a browser probe asserting the second sub
+  ANIMATES (old content leaves, new enters) rather than cutting.
+
+### F2 · MotionGroup re-entry mid-exit resumes from where it is
+
+On leaving→false during an exit, the group currently cancels the exit and
+re-enters FROM HIDDEN — a visible snap. Fix: capture the current transform
+(commitStyles/getComputedStyle before cancelling) and animate from that
+position to shown; standard enter easing, duration may be the standard one.
+Make the comment at `BugMotion.tsx:265-266` true instead of aspirational.
+Test: unit or probe covering re-entry at ~40% of the exit window.
+
+### F3 · The motion-layer visibility fade gates on reduced motion
+
+The wrapper in `TvViewer` (~lines 423-429) fades the odometer digits and the
+flying ball with a raw `transition: opacity 180ms linear`. Behind
+`prefersReducedMotion()` it must be `transition: none` (states jump).
+`ScoreBug`'s own pre-existing 180 ms fade (`ScoreBug.tsx:71`) is spec/47
+baseline and stays as it is.
+
+### F4 · Reveal clip ids become collision-proof
+
+`<clipPath id="tv-reveal-${reveal}">` (`BugMotion.tsx:240`) can be minted
+twice when two panels dock to the same hand. Make the id unique per panel
+(include the graphic kind or the group's key) and keep every reference in
+step. Probe: no duplicate ids in any demo state, including simultaneous
+key-moment + substitution on one hand.
+
+### Verification and shipping
+
+Suite green (baseline now **1125/93**); the three §0.2 pixel gates
+unmodified; `npx tsc --noEmit`; e2e `tv.spec.ts` 6/6; browser probes: F1
+swap animates, F2 no snap, reduced-motion → zero running animations, zero
+duplicate DOM ids everywhere, the 12-rapid-cycles leak check still clean.
+Ship per §6 (push main → promote `--project board` → live checks), commits
+"fix(tv): … (spec/48.1)".
