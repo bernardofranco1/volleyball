@@ -48,7 +48,7 @@ import {
   type OperatorState,
 } from "@/lib/tv/director";
 import { handOf, sideState, type Hand } from "@/lib/tv/derive";
-import { MOTION } from "@/lib/tv/motion";
+import { MOTION, prefersReducedMotion } from "@/lib/tv/motion";
 import { usePresence } from "@/lib/tv/usePresence";
 import { useHydrated } from "@/lib/tv/useHydrated";
 import {
@@ -428,7 +428,14 @@ export function TvViewer({
             <g
               style={{
                 opacity: graphics.bug ? 1 : 0,
-                transition: `opacity ${MOTION.bugFade}ms linear`,
+                // Gated like every other animation in this feature (spec/48.1
+                // F3): under reduced motion the digits and the ball go with the
+                // bug in one frame instead of fading. Safe to read during render
+                // — this subtree only exists after hydration, so there is no
+                // server output to disagree with.
+                transition: prefersReducedMotion()
+                  ? "none"
+                  : `opacity ${MOTION.bugFade}ms linear`,
               }}
             >
               <RollingCell side="left" value={leftSide.score} />
