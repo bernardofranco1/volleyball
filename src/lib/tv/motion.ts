@@ -21,7 +21,7 @@
  */
 
 import { ART, AXIS, BAR } from "./bug-geometry";
-import type { Side } from "./derive";
+import type { Hand, Side } from "./derive";
 
 /**
  * The house reduced-motion gate (the pattern in BroadcastBoard.tsx:49-54).
@@ -407,4 +407,108 @@ export function presenceReduce<T>(
   // Nothing to animate out of when the exit is instant (reduced motion).
   if (exitMs <= 0) return noPresence<T>();
   return state.leaving ? state : { value: state.value, leaving: true };
+}
+
+// ── F1: a second graphic taking a plate that is already out ──────────────────
+
+/**
+ * What identifies a docked panel: the side it docks to, and what it says.
+ *
+ * The key is the CONTENT's identity — for a substitution, the director's own
+ * `subKey` — so "the same panel showing something else" and "a different panel"
+ * are distinguishable without this file knowing what a substitution is.
+ */
+export interface PanelId {
+  hand: Hand;
+  key: string;
+}
+
+/**
+ * What a graphic arriving over another one should do (spec/48.1 F1).
+ *
+ *  - `reveal` — the standard two-step: the plate slides out from under the bar
+ *    and 160 ms later the content lands on it. Also the answer when nothing
+ *    changed, because that is the reveal already on screen.
+ *  - `swap` — SAME plate, different content. Paired substitutions are a
+ *    supported case in the director: it clears the expired one and announces
+ *    the next in the SAME tick, so `graphics.substitution` goes sub1 → sub2 with
+ *    no null frame between them, presence never sees a leave, and without this
+ *    the second pair's shirts and names CUT onto the extended plate. Retracting
+ *    the plate and pushing it out again would be busier than the cut; what the
+ *    swap does instead is fade the old content off the plate and drift the new
+ *    one on.
+ *  - `switch` — the other hand. Nothing to do here: the two hands are two
+ *    MotionGroups, so one unmounts and the other does its own full reveal.
+ */
+export type Reveal = "reveal" | "swap" | "switch";
+
+export function revealFor(prev: PanelId | null, next: PanelId): Reveal {
+  if (!prev || prev.key === next.key) return "reveal";
+  if (prev.hand !== next.hand) return "switch";
+  return "swap";
+}
+
+/** The content step's phase, while a plate changes what it carries. */
+export type SwapPhase = null | "out" | "in";
+
+export interface SwapState<T> {
+  /** What the panel renders now — still the OLD content while it fades. */
+  value: T | null;
+  /** Content waiting for the plate, once the old content has gone. */
+  queued: T | null;
+  phase: SwapPhase;
+}
+
+export function noSwap<T>(): SwapState<T> {
+  return { value: null, queued: null, phase: null };
+}
+
+/**
+ * Fold one frame into the swap state.
+ *
+ * Clock-free for the same reason `presenceReduce` is: it runs during render, so
+ * the deadline belongs to the hook's one timer and every decision here is about
+ * order. It sits BETWEEN the director and presence — presence sees the value
+ * this holds, which is what keeps the old content on screen for its fade.
+ *
+ * `outMs <= 0` (reduced motion) skips the fade entirely: the content jumps, the
+ * layout is identical, exactly as everywhere else in this package.
+ */
+export function swapReduce<T>(
+  state: SwapState<T>,
+  incoming: T | null,
+  id: (value: T) => PanelId,
+  outMs: number,
+): SwapState<T> {
+  if (incoming === null) {
+    // Presence owns the exit from here — it keeps this value mounted and slides
+    // the plate back under the bar. Anything queued is dropped: a graphic that
+    // was going to take the plate does not arrive on a plate that is leaving.
+    if (state.value === null && state.queued === null) return state;
+    return noSwap<T>();
+  }
+  if (state.value === null) return { value: incoming, queued: null, phase: null };
+
+  switch (revealFor(id(state.value), id(incoming))) {
+    case "reveal":
+      // Same content. Identity-stable on purpose: this runs off a 4 Hz tick and
+      // a fresh object every tick would re-render the whole overlay for nothing.
+      return state;
+    case "switch":
+      return { value: incoming, queued: null, phase: null };
+    default:
+      if (outMs <= 0) return { value: incoming, queued: null, phase: null };
+      // Already fading for this one. A THIRD arrival replaces the queue rather
+      // than joining it: the plate shows what is current, not a backlog.
+      if (state.queued !== null && id(state.queued).key === id(incoming).key) {
+        return state;
+      }
+      return { value: state.value, queued: incoming, phase: "out" };
+  }
+}
+
+/** The old content has gone: the queued content takes the plate. */
+export function swapCommit<T>(state: SwapState<T>): SwapState<T> {
+  if (state.queued === null) return state;
+  return { value: state.queued, queued: null, phase: "in" };
 }

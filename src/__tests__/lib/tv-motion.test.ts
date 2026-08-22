@@ -24,15 +24,20 @@ import {
   driftFor,
   mirrorDepartureX,
   noPresence,
+  noSwap,
   presenceReduce,
   resumeFrom,
   resumeInFrames,
+  revealFor,
   rollInFrames,
   rollOutFrames,
   rollReduce,
   serveFlip,
   slideInFrames,
   slideOutFrames,
+  swapCommit,
+  swapReduce,
+  type PanelId,
   type RollState,
 } from "@/lib/tv/motion";
 import { ART, AXIS } from "@/lib/tv/bug-geometry";
@@ -258,6 +263,127 @@ describe("presence", () => {
     expect(presenceReduce(up, "sub", EXIT)).toBe(up);
     const empty = noPresence<string>();
     expect(presenceReduce(empty, null, EXIT)).toBe(empty);
+  });
+});
+
+// ── F1 · a second graphic on a plate that is already out ─────────────────────
+
+/**
+ * Paired substitutions (spec/48.1 F1).
+ *
+ * The director treats a pair as one supported case: it clears the expired
+ * substitution and announces the next in the SAME tick, so the graphic never
+ * goes null, presence never sees a leave, and the second pair's shirts and
+ * names used to CUT onto the plate the first was still on. The decision of what
+ * that should do instead — swap the content, run a whole reveal, or leave it to
+ * the other hand's group — is all here, because it is the only part of it a
+ * browser is not required to judge.
+ */
+describe("a plate that changes what it carries", () => {
+  const OUT = MOTION.content.exit.duration;
+  /** A substitution as the swap sees it: which side, and who it names. */
+  const sub = (key: string, hand: PanelId["hand"] = "left"): PanelId => ({ hand, key });
+  const id = (v: PanelId) => v;
+
+  describe("the decision", () => {
+    it("is a full reveal when there is nothing on air", () => {
+      expect(revealFor(null, sub("A:12:6→9"))).toBe("reveal");
+    });
+
+    it("is a full reveal when nothing has changed", () => {
+      // It runs off a 4 Hz tick: the overwhelmingly common answer is "the
+      // reveal already on screen".
+      expect(revealFor(sub("A:12:6→9"), sub("A:12:6→9"))).toBe("reveal");
+    });
+
+    it("is a content swap for a second substitution on the SAME hand", () => {
+      expect(revealFor(sub("A:12:6→9"), sub("A:12:4→11"))).toBe("swap");
+    });
+
+    it("is a hand switch when the next one docks to the other side", () => {
+      // Two MotionGroups, so one unmounts and the other does its own reveal —
+      // the path that was already right, and this names it rather than
+      // disturbing it.
+      expect(revealFor(sub("A:12:6→9", "left"), sub("B:12:2→7", "right"))).toBe(
+        "switch",
+      );
+    });
+  });
+
+  it("shows the first substitution at once, with nothing to hand over", () => {
+    expect(swapReduce(noSwap<PanelId>(), sub("one"), id, OUT)).toEqual({
+      value: sub("one"),
+      queued: null,
+      phase: null,
+    });
+  });
+
+  it("is identity-stable while the same substitution is up", () => {
+    const up = swapReduce(noSwap<PanelId>(), sub("one"), id, OUT);
+    expect(swapReduce(up, sub("one"), id, OUT)).toBe(up);
+  });
+
+  it("keeps the OLD content on the plate while it fades, then hands over", () => {
+    // The plate is untouched throughout: `value` — which is what presence and
+    // the MotionGroup render — stays the first substitution for the whole fade,
+    // and only then becomes the second.
+    const up = swapReduce(noSwap<PanelId>(), sub("one"), id, OUT);
+    const fading = swapReduce(up, sub("two"), id, OUT);
+    expect(fading).toEqual({ value: sub("one"), queued: sub("two"), phase: "out" });
+    // And it stays there for as many frames as the fade takes; the hook's one
+    // timer decides when that is.
+    expect(swapReduce(fading, sub("two"), id, OUT)).toBe(fading);
+    expect(swapCommit(fading)).toEqual({
+      value: sub("two"),
+      queued: null,
+      phase: "in",
+    });
+  });
+
+  it("takes the newest of two arrivals during one fade", () => {
+    // The plate shows what is current, not a backlog: a third substitution
+    // replaces the queue rather than joining it.
+    const up = swapReduce(noSwap<PanelId>(), sub("one"), id, OUT);
+    const fading = swapReduce(up, sub("two"), id, OUT);
+    const jumped = swapReduce(fading, sub("three"), id, OUT);
+    expect(jumped).toEqual({ value: sub("one"), queued: sub("three"), phase: "out" });
+    expect(swapCommit(jumped).value).toEqual(sub("three"));
+  });
+
+  it("does not fade anything when the next one docks to the other hand", () => {
+    const up = swapReduce(noSwap<PanelId>(), sub("one", "left"), id, OUT);
+    expect(swapReduce(up, sub("two", "right"), id, OUT)).toEqual({
+      value: sub("two", "right"),
+      queued: null,
+      phase: null,
+    });
+  });
+
+  it("jumps straight to the new content under reduced motion", () => {
+    // The house fallback everywhere in this package: the state jumps and the
+    // layout is identical, which a zero-length fade expresses exactly.
+    const up = swapReduce(noSwap<PanelId>(), sub("one"), id, 0);
+    expect(swapReduce(up, sub("two"), id, 0)).toEqual({
+      value: sub("two"),
+      queued: null,
+      phase: null,
+    });
+  });
+
+  it("drops the queue when the director drops the graphic mid-fade", () => {
+    // Presence owns the exit from there — the plate slides back under the bar
+    // carrying whatever was on it, and the substitution that was about to
+    // arrive never does.
+    const fading = swapReduce(
+      swapReduce(noSwap<PanelId>(), sub("one"), id, OUT),
+      sub("two"),
+      id,
+      OUT,
+    );
+    expect(swapReduce(fading, null, id, OUT)).toEqual(noSwap());
+    // Identity-stable once there is nothing left to hold.
+    const empty = noSwap<PanelId>();
+    expect(swapReduce(empty, null, id, OUT)).toBe(empty);
   });
 });
 

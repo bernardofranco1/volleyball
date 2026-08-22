@@ -451,3 +451,37 @@ swap animates, F2 no snap, reduced-motion → zero running animations, zero
 duplicate DOM ids everywhere, the 12-rapid-cycles leak check still clean.
 Ship per §6 (push main → promote `--project board` → live checks), commits
 "fix(tv): … (spec/48.1)".
+
+### Shipped — the deltas from the four above
+
+1. **F1 is a third reducer, not a key.** `swapReduce`/`swapCommit`
+   (`lib/tv/motion.ts`) sit BETWEEN the director and presence —
+   `graphics.substitution → useContentSwap → usePresence → MotionGroup` — and
+   hold the OLD substitution as the rendered value for the 260 ms its content
+   takes to fade. Keying could not do it: a layout effect fires after React has
+   already replaced the content in the DOM, so there is nothing left to fade
+   out. The three-way decision §8 asks for is `revealFor`, and it is what the
+   reducer switches on.
+2. **`?demo=subswap` varies the SCORE the substitution was made at**, not only
+   the two players. `subKey` is the identity the swap turns on and the demo
+   board's roster may be short of four names; the score a substitution was made
+   at is part of that key and is never drawn, so the rehearsal is honest on any
+   board. It also made the demo beat an argument to `demoGraphics` — the first
+   demo whose GRAPHIC moves rather than whose board does — and the beat is now
+   computed inside the director's own step, because the state copy of it is one
+   tick behind the closure that reads it.
+3. **F2 reads `getComputedStyle`, not `commitStyles`.** Both are offered by §8.
+   commitStyles writes the animated value into the inline style, which then has
+   to be unwound; a computed read is one call and leaves no residue. The parse
+   is a pure function (`resumeFrom`) so the 40 % case is a unit test rather than
+   a browser one — but it was ALSO probed in the browser: mid-exit at 200 ms the
+   key-moment strap sits at x −33.8 and the time-out tab at y 11.7, and both
+   resume within a pixel of there instead of snapping to −410 / 36.
+4. **The reveal clip id carries the panel's kind** (`tv-reveal-sub-left`), from
+   a required `panel` prop on `MotionGroup` — the same word as its React key.
+   `useId` would also be collision-proof but names nothing when you are looking
+   at the DOM.
+5. e2e gained one assertion inside the existing motion rehearsal test (content
+   animating while the plate it sits on is not) rather than a seventh test.
+6. Suite: **1144 tests / 93 files** green, 19 new — 11 on the swap decision and
+   its reducer, 4 on the mid-exit resume, 4 on the rehearsal in `tv-director`.

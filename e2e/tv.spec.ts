@@ -89,6 +89,27 @@ test.describe("tv overlay", () => {
       undefined,
       { timeout: 10_000 },
     );
+
+    // A second substitution on the SAME side (spec/48.1 F1). It used to CUT,
+    // and what proves it does not is the shape of the hand-over rather than any
+    // one frame: the content is animating while the plate it sits on is not.
+    await page.goto("/tv/mock?delay=0&demo=subswap");
+    await page.waitForFunction(
+      () => {
+        const plate = [...document.querySelectorAll("[data-tv-motion]")].find((g) =>
+          g.querySelector("[data-tv-content]"),
+        );
+        if (!plate) return false;
+        const content = [...plate.querySelectorAll("[data-tv-content]")];
+        return (
+          content.some((c) =>
+            c.getAnimations().some((a) => a.playState === "running"),
+          ) && plate.getAnimations().every((a) => a.playState !== "running")
+        );
+      },
+      undefined,
+      { timeout: 10_000 },
+    );
   });
 
   test("is not indexable", async ({ page }) => {

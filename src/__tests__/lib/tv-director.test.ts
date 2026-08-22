@@ -327,6 +327,51 @@ describe("motion rehearsals", () => {
 });
 
 /**
+ * `?demo=subswap` (spec/48.1 F1): the pair of substitutions that used to CUT.
+ *
+ * The one demo whose GRAPHIC changes with the beat, because what it rehearses is
+ * a hand-over rather than a panel: two substitutions on one side, back to back,
+ * with no null frame between them — which is exactly what the director produces
+ * for a real pair and what nobody can schedule to watch.
+ */
+describe("the substitution-swap rehearsal", () => {
+  const at = (beat: number) => demoGraphics("subswap", board(), null, beat);
+
+  it("is reachable from ?demo=", () => {
+    expect(parseDemo("subswap")).toBe("subswap");
+  });
+
+  it("keeps one substitution up on one hand, and never a gap", () => {
+    for (let beat = 0; beat < 12; beat++) {
+      const g = at(beat);
+      expect(g.substitution, `beat ${beat}`).not.toBeNull();
+      expect(g.substitution?.hand, `beat ${beat}`).toBe("left");
+      expect(g.bug, `beat ${beat}`).toBe(true);
+    }
+  });
+
+  it("alternates between two substitutions the director can tell apart", () => {
+    // Distinct `subKey`s are the whole rehearsal: identical keys would be one
+    // substitution held for six seconds, which is the `sub` demo.
+    const keys = Array.from({ length: 7 }, (_, beat) => subKey(at(beat).substitution!.sub));
+    expect(new Set(keys).size).toBe(2);
+    expect(keys[0]).toBe(keys[2]);
+    expect(keys[2]).not.toBe(keys[3]);
+    expect(keys[3]).toBe(keys[5]);
+    expect(keys[6]).toBe(keys[0]);
+  });
+
+  it("leaves the single-substitution rehearsal alone", () => {
+    // `?demo=sub` is what the render gate screenshots: one substitution, the
+    // same one on every beat.
+    const b = board();
+    const one = demoGraphics("sub", b, null, 0);
+    expect(demoGraphics("sub", b, null, 5)).toEqual(one);
+    expect(one.substitution?.sub.scoreA).toBe(b.scoreA);
+  });
+});
+
+/**
  * The category the card prints (spec/48 §3).
  *
  * spec/47 shipped believing no feed carried a challenge reason, so this line was

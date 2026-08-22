@@ -306,6 +306,8 @@ export function direct(
  */
 export type DemoGraphic =
   | "sub"
+  /** A second substitution taking the plate the first is still on (spec/48.1 F1). */
+  | "subswap"
   | "challenge"
   | "review"
   | "success"
@@ -320,6 +322,8 @@ export function demoGraphics(
   demo: DemoGraphic,
   board: VisBoardData,
   category: ChallengeCategory | null,
+  /** The rehearsal beat, for the one demo that changes over time (`subswap`). */
+  beat = 0,
 ): Graphics {
   const hand = handOf(board);
   const left = hand.left;
@@ -328,24 +332,40 @@ export function demoGraphics(
   const jersey = (i: number) => six[i]?.jersey ?? null;
 
   const base: Graphics = { ...NOTHING, bug: true };
+  /** One substitution on the left, naming the board's own players. */
+  const subOf = (out: number, inn: number, at: number): Graphics["substitution"] => ({
+    hand: "left",
+    sub: {
+      side: left,
+      outJersey: jersey(out),
+      outName: name(out),
+      inJersey: jersey(inn),
+      inName: name(inn),
+      setNumber: board.currentSet ?? 1,
+      // The score the substitution was made at. It is not drawn — it is part of
+      // the director's `subKey`, which is what tells one substitution from the
+      // next, so the rehearsal below varies it and the swap is exercised even on
+      // a board whose roster is short of four names.
+      scoreA: board.scoreA + at,
+      scoreB: board.scoreB,
+    },
+  });
+
   switch (demo) {
     case "sub":
+      return { ...base, substitution: subOf(0, 1, 0) };
+    case "subswap": {
+      // Two pairs made together on ONE side, three beats each — the case the
+      // director handles by announcing the second in the tick it drops the
+      // first, so the plate never leaves and the content has to hand over on it
+      // (spec/48.1 F1). 2.7 s a pair: the fade is 260 ms and the drift 420 ms,
+      // so each stands still long enough to be read before the next takes over.
+      const second = Math.floor(beat / 3) % 2 === 1;
       return {
         ...base,
-        substitution: {
-          hand: "left",
-          sub: {
-            side: left,
-            outJersey: jersey(0),
-            outName: name(0),
-            inJersey: jersey(1),
-            inName: name(1),
-            setNumber: board.currentSet ?? 1,
-            scoreA: board.scoreA,
-            scoreB: board.scoreB,
-          },
-        },
+        substitution: second ? subOf(2, 3, 1) : subOf(0, 1, 0),
       };
+    }
     case "timeout":
       return { ...base, timeout: { hand: "left" } };
     case "keymoment":
@@ -384,8 +404,8 @@ export function demoGraphics(
 /** Parse `?demo=` into a graphic, or null. */
 export function parseDemo(raw: string | undefined | null): DemoGraphic | null {
   const all: DemoGraphic[] = [
-    "sub", "challenge", "review", "success", "fail", "timeout", "keymoment",
-    "sideout", "point",
+    "sub", "subswap", "challenge", "review", "success", "fail", "timeout",
+    "keymoment", "sideout", "point",
   ];
   return all.find((d) => d === raw) ?? null;
 }

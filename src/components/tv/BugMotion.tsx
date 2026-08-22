@@ -43,6 +43,7 @@ import {
   type Hidden,
   type RollState,
   type ServeFrame,
+  type SwapPhase,
 } from "@/lib/tv/motion";
 import { DOCK, type Hand } from "@/lib/tv/extension-geometry";
 import { ART, FRAME, TEXT } from "@/lib/tv/bug-geometry";
@@ -226,6 +227,9 @@ export function ServeBallFlight({
  * group, so it rides the plate and adds its own drift on top — which is why it
  * needs `fill: "backwards"`: without it the content would be fully visible
  * during its own delay, and there would be no two-step at all.
+ *
+ * `swap` is the same content step run on its own, for a plate that stays out
+ * while what it carries changes hands (spec/48.1 F1).
  */
 export function MotionGroup({
   panel,
@@ -236,6 +240,7 @@ export function MotionGroup({
   fade = false,
   reveal,
   tick,
+  swap = null,
   children,
 }: {
   /**
@@ -262,6 +267,8 @@ export function MotionGroup({
    * a time-out pip being struck through while the tab is already up.
    */
   tick?: number;
+  /** From useContentSwap: the plate stays, its content changes (F1). */
+  swap?: SwapPhase;
   children: ReactNode;
 }) {
   const group = useRef<SVGGElement>(null);
@@ -307,6 +314,35 @@ export function MotionGroup({
     // render, which is the one thing this must never do.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leaving]);
+
+  // The content step on its own, for a plate that is already out (F1). Only the
+  // `data-tv-content` groups move: the plate is where it belongs and re-running
+  // its slide would be the busy retract-and-re-emerge the spec rejected. The
+  // entry gets NO 160 ms stagger — the stagger exists to let the plate arrive
+  // first, and it has already arrived.
+  const armed = useRef(false);
+  useLayoutEffect(() => {
+    const el = group.current;
+    if (!armed.current) {
+      // The mount is the reveal above, not a swap.
+      armed.current = true;
+      return;
+    }
+    if (!el || !swap || leaving || prefersReducedMotion()) return;
+    const content = [...el.querySelectorAll("[data-tv-content]")] as SVGGraphicsElement[];
+    for (const c of content) {
+      c.getAnimations().forEach((a) => a.cancel());
+      c.animate(
+        swap === "out" ? fadeOutFrames() : contentInFrames(driftFor(hidden)),
+        swap === "out"
+          ? { ...MOTION.content.exit, fill: "forwards" }
+          : { ...MOTION.content.enter, fill: "backwards" },
+      );
+    }
+    // Same reason as above: `hidden` is a constant for the life of the panel and
+    // only the PHASE is news.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swap]);
 
   // A tick is a state change WITHIN a panel that is already up, so it must not
   // run on the way in — the strike is part of the entrance then.

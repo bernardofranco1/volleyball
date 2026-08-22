@@ -41,6 +41,7 @@ import {
   demoGraphics,
   direct,
   seedDirector,
+  subKey,
   type ChallengeCategory,
   type DemoGraphic,
   type DirectorMemory,
@@ -48,8 +49,9 @@ import {
   type OperatorState,
 } from "@/lib/tv/director";
 import { handOf, sideState, type Hand } from "@/lib/tv/derive";
-import { MOTION, prefersReducedMotion } from "@/lib/tv/motion";
+import { MOTION, prefersReducedMotion, type PanelId } from "@/lib/tv/motion";
 import { usePresence } from "@/lib/tv/usePresence";
+import { useContentSwap } from "@/lib/tv/useContentSwap";
 import { useHydrated } from "@/lib/tv/useHydrated";
 import {
   ChallengeCardStack,
@@ -76,6 +78,16 @@ const DEFAULT_RATIO = 16 / 9;
  */
 function slideHidden(hand: Hand) {
   return { x: hand === "left" ? MOTION.slide.hidden : -MOTION.slide.hidden };
+}
+
+/**
+ * A substitution's identity, for the content swap (spec/48.1 F1): the side it
+ * docks to, and the director's own key for who it names. Module scope because
+ * the swap reducer runs during render and this must not be a new function every
+ * frame.
+ */
+function subPanelId(g: NonNullable<Graphics["substitution"]>): PanelId {
+  return { hand: g.hand, key: subKey(g.sub) };
 }
 
 export function TvViewer({
@@ -173,10 +185,14 @@ export function TvViewer({
       );
       memoryRef.current = memory;
       // The director still runs under a demo, so nothing is missed on the way
-      // back out of it; only what is DRAWN is replaced.
-      const shown = demo ? demoGraphics(demo, board, operator.category) : g;
+      // back out of it; only what is DRAWN is replaced. The beat is computed
+      // here rather than read from state: `step` is a closure over the render
+      // that armed the interval, so the state copy of it is a tick behind and
+      // `?demo=subswap` would hand over on the wrong frame.
+      const b = Math.floor(Date.now() / DEMO_BEAT_MS);
+      const shown = demo ? demoGraphics(demo, board, operator.category, b) : g;
       setGraphics((prev) => (sameGraphics(prev, shown) ? prev : shown));
-      if (demo) setBeat(Math.floor(Date.now() / DEMO_BEAT_MS));
+      if (demo) setBeat(b);
     };
     step();
     const id = setInterval(step, 250);
@@ -294,7 +310,11 @@ export function TvViewer({
 
   const keyMomentP = usePresence(graphics.keyMoment, MOTION.slide.exit.duration);
   const timeoutP = usePresence(graphics.timeout, MOTION.tab.exit.duration);
-  const subP = usePresence(graphics.substitution, MOTION.slide.exit.duration);
+  // A pair of substitutions on ONE side never leaves the screen — the director
+  // announces the second in the tick it drops the first — so presence sees no
+  // gap and the swap is what animates the hand-over (spec/48.1 F1).
+  const subSwap = useContentSwap(graphics.substitution, subPanelId);
+  const subP = usePresence(subSwap.value, MOTION.slide.exit.duration);
   const alertP = usePresence(alertIn, MOTION.tab.exit.duration);
   const cardP = usePresence(cardIn, MOTION.card.exit.duration);
 
@@ -398,6 +418,7 @@ export function TvViewer({
               exit={MOTION.slide.exit}
               leaving={subP.leaving}
               reveal={subP.value.hand}
+              swap={subSwap.phase}
             >
               <SubstitutionBlock hand={subP.value.hand} sub={subP.value.sub} />
             </MotionGroup>
